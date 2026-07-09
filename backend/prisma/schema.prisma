@@ -1,0 +1,540 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  userId        String   @id @default(uuid())
+  username      String   @unique
+  passwordHash  String
+  fullName      String
+  email         String
+  role          String   // Administrator, Maintenance Planner, Maintenance Supervisor, Technician, Requester, View-Only
+  workCenterId  String?
+  isActive      Boolean  @default(true)
+  lastLogin     DateTime?
+  createdBy     String   @default("system")
+  createdDate   DateTime @default(now())
+  modifiedBy    String   @default("system")
+  modifiedDate  DateTime @updatedAt
+  isDeleted     Boolean  @default(false)
+
+  workCenter        WorkCenter?       @relation(fields: [workCenterId], references: [workCenterId])
+  assignedWOs       WorkOrder[]       @relation("Supervisor")
+  reportedNotifs    Notification[]    @relation("ReportedBy")
+  laborEntries      LaborEntry[]
+  auditLogs         AuditLogEntry[]
+  comments          Comment[]
+  workOrderChecklists WorkOrderChecklist[]
+  refreshTokens     RefreshToken[]
+  systemAlerts      SystemAlert[]
+}
+
+model RefreshToken {
+  tokenId    String   @id @default(uuid())
+  token      String   @unique
+  userId     String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  revoked    Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [userId])
+}
+
+model FunctionalLocation {
+  functionalLocationId String   @id @default(uuid())
+  locationCode         String   @unique
+  description          String
+  parentLocationId     String?
+  locationType         String   // Plant, Area, Unit, Sub-unit, System
+  operationalStatus    String   @default("Active") // Active, Inactive
+  installationDate     DateTime?
+  gpsCoordinates       String?
+  safetyCritical       Boolean  @default(false)
+  createdBy            String   @default("system")
+  createdDate          DateTime @default(now())
+  modifiedBy           String   @default("system")
+  modifiedDate         DateTime @updatedAt
+  isDeleted            Boolean  @default(false)
+
+  parent       FunctionalLocation?  @relation("LocationHierarchy", fields: [parentLocationId], references: [functionalLocationId])
+  children     FunctionalLocation[] @relation("LocationHierarchy")
+  equipment    Equipment[]
+  notifications Notification[]
+  workOrders   WorkOrder[]
+}
+
+model Equipment {
+  equipmentId          String   @id @default(uuid())
+  equipmentCode        String   @unique
+  name                 String
+  description          String
+  functionalLocationId String
+  manufacturer         String
+  model                String
+  serialNumber         String
+  assetTag             String
+  equipmentClass       String
+  criticality          String   // A, B, C
+  installationDate     DateTime?
+  warrantyExpiryDate   DateTime?
+  operationalStatus    String   @default("Active") // Active, Inactive, Decommissioned
+  technicalParameters  Json     @default("{}")
+  createdBy            String   @default("system")
+  createdDate          DateTime @default(now())
+  modifiedBy           String   @default("system")
+  modifiedDate         DateTime @updatedAt
+  isDeleted            Boolean  @default(false)
+
+  functionalLocation FunctionalLocation       @relation(fields: [functionalLocationId], references: [functionalLocationId])
+  meters             EquipmentMeter[]
+  bomItems           EquipmentBOMMaterial[]
+  notifications      Notification[]
+  workOrders         WorkOrder[]
+  maintenancePlans   MaintenancePlan[]
+  taskLists          TaskList[]
+}
+
+model EquipmentMeter {
+  meterId        String   @id @default(uuid())
+  equipmentId    String
+  meterName      String
+  unitOfMeasure  String
+  lastReading    Float    @default(0)
+  lastReadingDate DateTime?
+  createdBy      String   @default("system")
+  createdDate    DateTime @default(now())
+  modifiedBy     String   @default("system")
+  modifiedDate   DateTime @updatedAt
+  isDeleted      Boolean  @default(false)
+
+  equipment      Equipment        @relation(fields: [equipmentId], references: [equipmentId])
+  readings       MeterReading[]
+  planMeters     MaintenancePlanMeter[]
+}
+
+model MeterReading {
+  readingId    String   @id @default(uuid())
+  meterId      String
+  readingValue Float
+  readingDate  DateTime
+  notes        String?
+  createdBy    String   @default("system")
+  createdDate  DateTime @default(now())
+  modifiedBy   String   @default("system")
+  modifiedDate DateTime @updatedAt
+  isDeleted    Boolean  @default(false)
+
+  meter EquipmentMeter @relation(fields: [meterId], references: [meterId])
+}
+
+model WorkCenter {
+  workCenterId       String   @id @default(uuid())
+  code               String   @unique
+  name               String
+  dailyCapacityHours Float
+  costRatePerHour    Float
+  isActive           Boolean  @default(true)
+  createdBy          String   @default("system")
+  createdDate        DateTime @default(now())
+  modifiedBy         String   @default("system")
+  modifiedDate       DateTime @updatedAt
+  isDeleted          Boolean  @default(false)
+
+  crafts       Craft[]
+  workOrders   WorkOrder[]
+  users        User[]
+  taskLists    TaskList[]
+  maintenancePlans MaintenancePlan[]
+}
+
+model Craft {
+  craftId      String   @id @default(uuid())
+  workCenterId String
+  craftCode    String
+  description  String
+  hourlyRate   Float
+  createdBy    String   @default("system")
+  createdDate  DateTime @default(now())
+  modifiedBy   String   @default("system")
+  modifiedDate DateTime @updatedAt
+  isDeleted    Boolean  @default(false)
+
+  workCenter          WorkCenter           @relation(fields: [workCenterId], references: [workCenterId])
+  workOrderOperations WorkOrderOperation[]
+  taskListOperations  TaskListOperation[]
+}
+
+model Material {
+  materialId   String   @id @default(uuid())
+  materialCode String   @unique
+  description  String
+  unitOfMeasure String
+  standardCost Float
+  currentStock Float   @default(0)
+  createdBy    String   @default("system")
+  createdDate  DateTime @default(now())
+  modifiedBy   String   @default("system")
+  modifiedDate DateTime @updatedAt
+  isDeleted    Boolean  @default(false)
+
+  bomItems     EquipmentBOMMaterial[]
+  woMaterials  WorkOrderMaterial[]
+}
+
+model EquipmentBOMMaterial {
+  bomId       String @id @default(uuid())
+  equipmentId String
+  materialId  String
+  quantity    Float
+
+  equipment Equipment @relation(fields: [equipmentId], references: [equipmentId])
+  material  Material  @relation(fields: [materialId], references: [materialId])
+}
+
+model FailureCode {
+  failureCodeId  String   @id @default(uuid())
+  parentCodeId   String?
+  code           String
+  description    String
+  createdBy      String   @default("system")
+  createdDate    DateTime @default(now())
+  modifiedBy     String   @default("system")
+  modifiedDate   DateTime @updatedAt
+  isDeleted      Boolean  @default(false)
+
+  parent FailureCode?  @relation("FailureCodeHierarchy", fields: [parentCodeId], references: [failureCodeId])
+  children FailureCode[] @relation("FailureCodeHierarchy")
+}
+
+model CauseCode {
+  causeCodeId  String   @id @default(uuid())
+  code         String
+  description  String
+  createdBy    String   @default("system")
+  createdDate  DateTime @default(now())
+  modifiedBy   String   @default("system")
+  modifiedDate DateTime @updatedAt
+  isDeleted    Boolean  @default(false)
+}
+
+model TaskList {
+  taskListId     String   @id @default(uuid())
+  code           String   @unique
+  description    String
+  equipmentClass String?
+  equipmentId    String?
+  workCenterId   String
+  createdBy      String   @default("system")
+  createdDate    DateTime @default(now())
+  modifiedBy     String   @default("system")
+  modifiedDate   DateTime @updatedAt
+  isDeleted      Boolean  @default(false)
+
+  equipment      Equipment?           @relation(fields: [equipmentId], references: [equipmentId])
+  workCenter     WorkCenter           @relation(fields: [workCenterId], references: [workCenterId])
+  operations     TaskListOperation[]
+  maintenancePlans MaintenancePlan[]
+}
+
+model TaskListOperation {
+  taskOperationId  String   @id @default(uuid())
+  taskListId       String
+  sequenceNumber   Int
+  description      String
+  craftId          String
+  plannedHours     Float
+  numberOfTechnicians Int
+  createdBy        String   @default("system")
+  createdDate      DateTime @default(now())
+  modifiedBy       String   @default("system")
+  modifiedDate     DateTime @updatedAt
+  isDeleted        Boolean  @default(false)
+
+  taskList TaskList @relation(fields: [taskListId], references: [taskListId])
+  craft    Craft    @relation(fields: [craftId], references: [craftId])
+}
+
+model Notification {
+  notificationId      String   @id @default(uuid())
+  notificationNumber  String   @unique
+  type                String   // M1, M2, M3
+  priority            String   // High, Medium, Low
+  functionalLocationId String
+  equipmentId         String?
+  reportedByUserId    String
+  description         String
+  breakdownFlag       Boolean  @default(false)
+  status              String   @default("Open") // Open, In Process, Completed, Converted
+  createdBy           String   @default("system")
+  createdDate         DateTime @default(now())
+  modifiedBy          String   @default("system")
+  modifiedDate        DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
+
+  functionalLocation FunctionalLocation @relation(fields: [functionalLocationId], references: [functionalLocationId])
+  equipment          Equipment?         @relation(fields: [equipmentId], references: [equipmentId])
+  reportedBy         User               @relation("ReportedBy", fields: [reportedByUserId], references: [userId])
+  workOrders         WorkOrderNotifLink[]
+}
+
+model WorkOrder {
+  workOrderId         String   @id @default(uuid())
+  woNumber            String   @unique
+  type                String   // CM, PM, PdM, EM, CAL
+  priority            String   // High, Medium, Low
+  status              String   @default("Draft") // Draft, Planned, Scheduled, In Progress, Suspended, Completed, Closed, Cancelled
+  functionalLocationId String
+  equipmentId         String?
+  description         String
+  workCenterId        String
+  supervisorUserId    String
+  plannedStart        DateTime?
+  plannedFinish       DateTime?
+  actualStart         DateTime?
+  actualFinish        DateTime?
+  costCenterCode      String   @default("")
+  internalOrder       String   @default("")
+  breakdownFlag       Boolean  @default(false)
+  safetyCriticalFlag  Boolean  @default(false)
+  plannedCost         Float    @default(0)
+  actualCost          Float    @default(0)
+  createdBy           String   @default("system")
+  createdDate         DateTime @default(now())
+  modifiedBy          String   @default("system")
+  modifiedDate        DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
+
+  functionalLocation FunctionalLocation @relation(fields: [functionalLocationId], references: [functionalLocationId])
+  equipment          Equipment?         @relation(fields: [equipmentId], references: [equipmentId])
+  workCenter         WorkCenter         @relation(fields: [workCenterId], references: [workCenterId])
+  supervisor         User               @relation("Supervisor", fields: [supervisorUserId], references: [userId])
+  operations         WorkOrderOperation[]
+  woMaterials        WorkOrderMaterial[]
+  externalServices   ExternalServiceCost[]
+  checklists         WorkOrderChecklist[]
+  costSplits         CostSplit[]
+  notifications      WorkOrderNotifLink[]
+}
+
+model WorkOrderNotifLink {
+  workOrderId    String
+  notificationId String
+
+  workOrder     WorkOrder    @relation(fields: [workOrderId], references: [workOrderId])
+  notification  Notification @relation(fields: [notificationId], references: [notificationId])
+
+  @@id([workOrderId, notificationId])
+}
+
+model WorkOrderOperation {
+  operationId        String   @id @default(uuid())
+  workOrderId        String
+  sequenceNumber     Int
+  description        String
+  craftId            String
+  plannedHours       Float
+  numberOfTechnicians Int    @default(1)
+  actualHours        Float   @default(0)
+  status             String   @default("Pending") // Pending, In Progress, Completed
+  createdBy          String   @default("system")
+  createdDate        DateTime @default(now())
+  modifiedBy         String   @default("system")
+  modifiedDate       DateTime @updatedAt
+
+  workOrder  WorkOrder    @relation(fields: [workOrderId], references: [workOrderId])
+  craft      Craft        @relation(fields: [craftId], references: [craftId])
+  laborEntries LaborEntry[]
+}
+
+model WorkOrderMaterial {
+  woMaterialId       String @id @default(uuid())
+  workOrderId        String
+  materialId         String
+  plannedQuantity    Float
+  actualQuantity     Float  @default(0)
+  unitCost           Float  @default(0)
+  reservationQuantity Float @default(0)
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId])
+  material  Material  @relation(fields: [materialId], references: [materialId])
+}
+
+model LaborEntry {
+  laborEntryId String   @id @default(uuid())
+  operationId  String
+  userId       String
+  hoursWorked  Float
+  entryDateTime DateTime @default(now())
+  notes        String?
+  createdBy    String   @default("system")
+  createdDate  DateTime @default(now())
+  modifiedBy   String   @default("system")
+  modifiedDate DateTime @updatedAt
+  isDeleted    Boolean  @default(false)
+
+  operation WorkOrderOperation @relation(fields: [operationId], references: [operationId])
+  user      User               @relation(fields: [userId], references: [userId])
+}
+
+model ExternalServiceCost {
+  serviceCostId String @id @default(uuid())
+  workOrderId   String
+  vendor        String
+  description   String
+  cost          Float
+  invoiceRef    String
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId])
+}
+
+model SafetyChecklistTemplate {
+  checklistTemplateId String   @id @default(uuid())
+  name                String
+  description         String
+  isMandatory         Boolean  @default(false)
+  createdBy           String   @default("system")
+  createdDate         DateTime @default(now())
+  modifiedBy          String   @default("system")
+  modifiedDate        DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
+
+  items      ChecklistItem[]
+  woChecklists WorkOrderChecklist[]
+}
+
+model ChecklistItem {
+  itemId              String @id @default(uuid())
+  checklistTemplateId String
+  sequenceNumber      Int
+  description         String
+
+  template SafetyChecklistTemplate @relation(fields: [checklistTemplateId], references: [checklistTemplateId])
+  responses WorkOrderChecklistItem[]
+}
+
+model WorkOrderChecklist {
+  woChecklistId       String   @id @default(uuid())
+  workOrderId         String
+  checklistTemplateId String
+  status              String   @default("Pending") // Pending, In Progress, Completed
+  signedBy            String?
+  signedDate          DateTime?
+  createdBy           String   @default("system")
+  createdDate         DateTime @default(now())
+  modifiedBy          String   @default("system")
+  modifiedDate        DateTime @updatedAt
+
+  workOrder  WorkOrder              @relation(fields: [workOrderId], references: [workOrderId])
+  template   SafetyChecklistTemplate @relation(fields: [checklistTemplateId], references: [checklistTemplateId])
+  items      WorkOrderChecklistItem[]
+  signer     User?                   @relation(fields: [signedBy], references: [userId])
+}
+
+model WorkOrderChecklistItem {
+  woChecklistItemId String @id @default(uuid())
+  woChecklistId     String
+  itemId            String
+  response          String // Yes, No, NA
+  comment           String?
+
+  woChecklist WorkOrderChecklist @relation(fields: [woChecklistId], references: [woChecklistId])
+  item        ChecklistItem      @relation(fields: [itemId], references: [itemId])
+}
+
+model MaintenancePlan {
+  planId              String   @id @default(uuid())
+  planCode            String   @unique
+  description         String
+  equipmentId         String?
+  functionalLocationId String?
+  workCenterId        String
+  taskListId          String
+  strategyType        String   // Time, Meter, Combined
+  intervalValue       Int
+  intervalUnit        String   // Days, Weeks, Months
+  callHorizonValue    Int      @default(7)
+  callHorizonUnit     String   @default("Days") // Days, Units
+  startDate           DateTime
+  endDate             DateTime?
+  activeFlag          Boolean  @default(true)
+  createdBy           String   @default("system")
+  createdDate         DateTime @default(now())
+  modifiedBy          String   @default("system")
+  modifiedDate        DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
+
+  equipment  Equipment?           @relation(fields: [equipmentId], references: [equipmentId])
+  workCenter WorkCenter           @relation(fields: [workCenterId], references: [workCenterId])
+  taskList   TaskList             @relation(fields: [taskListId], references: [taskListId])
+  planMeters MaintenancePlanMeter[]
+}
+
+model MaintenancePlanMeter {
+  planMeterId  String @id @default(uuid())
+  planId       String
+  meterId      String
+  meterInterval Float
+
+  plan  MaintenancePlan @relation(fields: [planId], references: [planId])
+  meter EquipmentMeter  @relation(fields: [meterId], references: [meterId])
+}
+
+model CostSplit {
+  splitId         String @id @default(uuid())
+  workOrderId     String
+  costCenterCode  String
+  percentage      Float
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId])
+}
+
+model AuditLogEntry {
+  auditId    String   @id @default(uuid())
+  tableName  String
+  recordId   String
+  action     String   // Create, Update, Delete
+  fieldName  String?
+  oldValue   String?
+  newValue   String?
+  userId     String
+  ipAddress  String?
+  timestamp  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [userId])
+}
+
+model SystemAlert {
+  alertId           String   @id @default(uuid())
+  alertType         String   // WO_Assigned, WO_Overdue, PM_Generation, High_Priority_Notification
+  userId            String
+  title             String
+  message           String
+  isRead            Boolean  @default(false)
+  createdDate       DateTime @default(now())
+  relatedEntityId   String?
+  relatedEntityType String?
+
+  user User @relation(fields: [userId], references: [userId])
+}
+
+model Comment {
+  commentId   String   @id @default(uuid())
+  entityType  String   // WorkOrder, Notification, Equipment
+  entityId    String
+  userId      String
+  content     String
+  createdDate DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [userId])
+}
+
+model SystemConfig {
+  configId String @id @default(uuid())
+  key      String @unique
+  value    String
+}

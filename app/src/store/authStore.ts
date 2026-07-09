@@ -1,19 +1,18 @@
-// ============================================================
-// Auth Store — Zustand
-// ============================================================
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, UserRole } from '@/types';
-import { mockUsers } from '@/data/mockData';
+import { authService } from '@/services/authService';
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => boolean;
+  loading: boolean;
+  error: string | null;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   switchRole: (role: UserRole) => void;
   hasPermission: (requiredRoles: UserRole[]) => boolean;
+  clearError: () => void;
 }
 
 const roleHierarchy: Record<UserRole, number> = {
@@ -30,25 +29,24 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       isAuthenticated: false,
+      loading: false,
+      error: null,
 
-      login: (username: string, _password: string) => {
-        const found = mockUsers.find(
-          (u) => u.username === username && u.isActive
-        );
-        if (found) {
-          set({ user: found, isAuthenticated: true });
+      login: async (username: string, password: string) => {
+        set({ loading: true, error: null });
+        try {
+          const user = await authService.login(username, password);
+          set({ user, isAuthenticated: true, loading: false });
           return true;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Login failed';
+        set({ loading: false, error: msg });
+          return false;
         }
-        // Allow any password for demo - match by username only
-        const fallback = mockUsers.find((u) => u.username === username);
-        if (fallback) {
-          set({ user: fallback, isAuthenticated: true });
-          return true;
-        }
-        return false;
       },
 
       logout: () => {
+        authService.logout();
         set({ user: null, isAuthenticated: false });
       },
 
@@ -67,6 +65,8 @@ export const useAuthStore = create<AuthState>()(
           (role) => roleHierarchy[role] <= userLevel
         );
       },
+
+      clearError: () => set({ error: null }),
     }),
     { name: 'cmms-auth' }
   )

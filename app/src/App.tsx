@@ -1,9 +1,7 @@
-// ============================================================
-// CommandPulse CMMS — Main App Component
-// ============================================================
-
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useAppStore } from '@/store/appStore';
 import AppLayout from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
@@ -25,6 +23,23 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+function AppInitializer({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const loadFromApi = useAppStore((s) => s.loadFromApi);
+  const loadDashboardKPIs = useAppStore((s) => s.loadDashboardKPIs);
+  const loadAlerts = useAppStore((s) => s.loadAlerts);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadFromApi();
+      loadDashboardKPIs();
+      loadAlerts();
+    }
+  }, [isAuthenticated]);
+
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -34,24 +49,26 @@ function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <AppLayout>
-                <Routes>
-                  <Route path="/" element={<DashboardPage />} />
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/work-orders" element={<WorkOrdersPage />} />
-                  <Route path="/work-orders/:id" element={<WorkOrderDetailPage />} />
-                  <Route path="/notifications" element={<NotificationsPage />} />
-                  <Route path="/notifications/:id" element={<NotificationDetailPage />} />
-                  <Route path="/equipment" element={<EquipmentPage />} />
-                  <Route path="/equipment/:id" element={<EquipmentDetailPage />} />
-                  <Route path="/locations" element={<LocationsPage />} />
-                  <Route path="/materials" element={<MaterialsPage />} />
-                  <Route path="/work-centers" element={<WorkCentersPage />} />
-                  <Route path="/preventive-maintenance" element={<PreventiveMaintenancePage />} />
-                  <Route path="/reports" element={<ReportsPage />} />
-                  <Route path="/administration" element={<AdministrationPage />} />
-                </Routes>
-              </AppLayout>
+              <AppInitializer>
+                <AppLayout>
+                  <Routes>
+                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/work-orders" element={<WorkOrdersPage />} />
+                    <Route path="/work-orders/:id" element={<WorkOrderDetailPage />} />
+                    <Route path="/notifications" element={<NotificationsPage />} />
+                    <Route path="/notifications/:id" element={<NotificationDetailPage />} />
+                    <Route path="/equipment" element={<EquipmentPage />} />
+                    <Route path="/equipment/:id" element={<EquipmentDetailPage />} />
+                    <Route path="/locations" element={<LocationsPage />} />
+                    <Route path="/materials" element={<MaterialsPage />} />
+                    <Route path="/work-centers" element={<WorkCentersPage />} />
+                    <Route path="/preventive-maintenance" element={<PreventiveMaintenancePage />} />
+                    <Route path="/reports" element={<ReportsPage />} />
+                    <Route path="/administration" element={<AdministrationPage />} />
+                  </Routes>
+                </AppLayout>
+              </AppInitializer>
             </ProtectedRoute>
           }
         />

@@ -1,61 +1,32 @@
-// ============================================================
-// App Store — Zustand (Main CMMS State Management)
-// ============================================================
-
 import { create } from 'zustand';
 import type {
-  WorkOrder,
-  Notification,
-  Equipment,
-  FunctionalLocation,
-  WorkCenter,
-  Craft,
-  Material,
-  TaskList,
-  MaintenancePlan,
-  SystemAlert,
-  AuditLogEntry,
-  User,
-  WorkOrderOperation,
-  WorkOrderMaterial,
-  LaborEntry,
-  ExternalServiceCost,
-  WorkOrderChecklist,
-  MeterReading,
-  DashboardKPIs,
-  WorkOrderStatus,
-  NotificationStatus,
+  WorkOrder, Notification, Equipment, FunctionalLocation, WorkCenter,
+  Craft, Material, TaskList, MaintenancePlan, SystemAlert, AuditLogEntry,
+  User, WorkOrderOperation, WorkOrderMaterial, LaborEntry, ExternalServiceCost,
+  WorkOrderChecklist, MeterReading, DashboardKPIs, WorkOrderStatus,
   SafetyChecklistTemplate,
 } from '@/types';
 import {
-  mockWorkOrders,
-  mockNotifications,
-  mockEquipment,
-  mockLocations,
-  mockWorkCenters,
-  mockCrafts,
-  mockMaterials,
-  mockTaskLists,
-  mockTaskListOperations,
-  mockMaintenancePlans,
-  mockAlerts,
-  mockAuditLog,
-  mockUsers,
-  mockWorkOrderOperations,
-  mockWorkOrderMaterials,
-  mockLaborEntries,
-  mockExternalServices,
-  mockWorkOrderChecklists,
-  mockChecklistTemplates,
-  mockChecklistItems,
-  mockMeters,
-  mockMeterReadings,
-  mockDashboardKPIs,
+  mockWorkOrders, mockNotifications, mockEquipment, mockLocations,
+  mockWorkCenters, mockCrafts, mockMaterials, mockTaskLists,
+  mockTaskListOperations, mockMaintenancePlans, mockAlerts, mockAuditLog,
+  mockUsers, mockWorkOrderOperations, mockWorkOrderMaterials, mockLaborEntries,
+  mockExternalServices, mockWorkOrderChecklists, mockChecklistTemplates,
+  mockChecklistItems, mockMeters, mockMeterReadings, mockDashboardKPIs,
   mockComments,
 } from '@/data/mockData';
+import { functionalLocationService } from '@/services/functionalLocationService';
+import { equipmentService } from '@/services/equipmentService';
+import { workOrderService } from '@/services/workOrderService';
+import { notificationService } from '@/services/notificationService';
+import { materialService } from '@/services/materialService';
+import { workCenterService } from '@/services/workCenterService';
+import { maintenancePlanService } from '@/services/maintenancePlanService';
+import { dashboardService } from '@/services/dashboardService';
+import { alertService } from '@/services/alertService';
+import { commentService } from '@/services/commentService';
 
 interface AppState {
-  // Data
   workOrders: WorkOrder[];
   notifications: Notification[];
   equipment: Equipment[];
@@ -80,52 +51,45 @@ interface AppState {
   meterReadings: MeterReading[];
   dashboardKPIs: DashboardKPIs;
   comments: typeof mockComments;
+  loading: boolean;
+  error: string | null;
 
-  // Actions: Work Orders
+  loadFromApi: () => Promise<void>;
+  loadDashboardKPIs: () => Promise<void>;
+  loadAlerts: () => Promise<void>;
+
   addWorkOrder: (wo: WorkOrder) => void;
   updateWorkOrder: (id: string, updates: Partial<WorkOrder>) => void;
   deleteWorkOrder: (id: string) => void;
   transitionWorkOrderStatus: (id: string, newStatus: WorkOrderStatus) => void;
 
-  // Actions: Notifications
   addNotification: (notif: Notification) => void;
   updateNotification: (id: string, updates: Partial<Notification>) => void;
   convertNotificationToWO: (notifId: string) => WorkOrder | null;
 
-  // Actions: Equipment
   addEquipment: (eq: Equipment) => void;
   updateEquipment: (id: string, updates: Partial<Equipment>) => void;
 
-  // Actions: Locations
   addLocation: (loc: FunctionalLocation) => void;
   updateLocation: (id: string, updates: Partial<FunctionalLocation>) => void;
 
-  // Actions: Maintenance Plans
   addMaintenancePlan: (plan: MaintenancePlan) => void;
   updateMaintenancePlan: (id: string, updates: Partial<MaintenancePlan>) => void;
 
-  // Actions: Alerts
   markAlertRead: (id: string) => void;
   markAllAlertsRead: () => void;
 
-  // Actions: Materials
   addMaterial: (mat: Material) => void;
   updateMaterial: (id: string, updates: Partial<Material>) => void;
 
-  // Actions: Work Centers
   addWorkCenter: (wc: WorkCenter) => void;
 
-  // Actions: Users
   addUser: (user: User) => void;
   updateUser: (id: string, updates: Partial<User>) => void;
 
-  // Actions: Labor
   addLaborEntry: (entry: LaborEntry) => void;
-
-  // Actions: Meter Readings
   addMeterReading: (reading: MeterReading) => void;
 
-  // Getters
   getEquipmentByLocation: (locationId: string) => Equipment[];
   getWorkOrdersByEquipment: (equipmentId: string) => WorkOrder[];
   getOpenWorkOrders: () => WorkOrder[];
@@ -140,8 +104,16 @@ interface AppState {
   getEquipmentMeterReadings: (meterId: string) => MeterReading[];
 }
 
+function getAllDescendantIds(locations: FunctionalLocation[], parentId: string): string[] {
+  const ids: string[] = [parentId];
+  const children = locations.filter((l) => l.parentLocationId === parentId);
+  for (const child of children) {
+    ids.push(...getAllDescendantIds(locations, child.functionalLocationId));
+  }
+  return ids;
+}
+
 export const useAppStore = create<AppState>()((set, get) => ({
-  // Initial data
   workOrders: mockWorkOrders,
   notifications: mockNotifications,
   equipment: mockEquipment,
@@ -166,255 +138,231 @@ export const useAppStore = create<AppState>()((set, get) => ({
   meterReadings: mockMeterReadings,
   dashboardKPIs: mockDashboardKPIs,
   comments: mockComments,
+  loading: false,
+  error: null,
 
-  // ─── Work Order Actions ───
-  addWorkOrder: (wo) =>
-    set((s) => {
-      const entry: AuditLogEntry = {
-        auditId: `AUD-${Date.now()}`,
-        tableName: 'WorkOrder',
-        recordId: wo.workOrderId,
-        action: 'Create',
-        fieldName: null,
-        oldValue: null,
-        newValue: `WO ${wo.woNumber} created`,
-        userId: wo.createdBy,
-        ipAddress: '192.168.1.100',
-        timestamp: new Date().toISOString(),
-      };
-      return { workOrders: [...s.workOrders, wo], auditLog: [...s.auditLog, entry] };
-    }),
+  loadFromApi: async () => {
+    set({ loading: true, error: null });
+    try {
+      const [locations, equipment, workOrders, notifications, materials, workCenters, maintenancePlans] =
+        await Promise.all([
+          functionalLocationService.getAll().catch(() => get().locations),
+          equipmentService.getAll().catch(() => get().equipment),
+          workOrderService.getAll({ take: 200 }).then(r => r.data).catch(() => get().workOrders),
+          notificationService.getAll().catch(() => get().notifications),
+          materialService.getAll().catch(() => get().materials),
+          workCenterService.getAll().catch(() => get().workCenters),
+          maintenancePlanService.getAll().catch(() => get().maintenancePlans),
+        ]);
+      set({
+        locations, equipment, workOrders, notifications,
+        materials, workCenters, maintenancePlans, loading: false,
+      });
+    } catch {
+      set({ loading: false });
+    }
+  },
 
-  updateWorkOrder: (id, updates) =>
-    set((s) => {
-      const old = s.workOrders.find((w) => w.workOrderId === id);
-      if (!old) return s;
-      const entries: AuditLogEntry[] = [];
-      for (const [key, val] of Object.entries(updates)) {
-        const oldVal = (old as unknown as Record<string, unknown>)[key];
-        if (oldVal !== val) {
-          entries.push({
-            auditId: `AUD-${Date.now()}-${key}`,
-            tableName: 'WorkOrder',
-            recordId: id,
-            action: 'Update',
-            fieldName: key,
-            oldValue: String(oldVal ?? ''),
-            newValue: String(val ?? ''),
-            userId: 'USR-002',
-            ipAddress: '192.168.1.100',
-            timestamp: new Date().toISOString(),
-          });
-        }
-      }
-      return {
-        workOrders: s.workOrders.map((w) =>
-          w.workOrderId === id ? { ...w, ...updates } : w
-        ),
-        auditLog: [...s.auditLog, ...entries],
-      };
-    }),
+  loadDashboardKPIs: async () => {
+    try {
+      const kpis = await dashboardService.getKPIs();
+      set({ dashboardKPIs: kpis });
+    } catch { /* keep mock */ }
+  },
 
-  deleteWorkOrder: (id) =>
+  loadAlerts: async () => {
+    try {
+      const alerts = await alertService.getAll();
+      set({ alerts });
+    } catch { /* keep mock */ }
+  },
+
+  addWorkOrder: (wo) => {
+    set((s) => ({ workOrders: [wo, ...s.workOrders] }));
+  },
+
+  updateWorkOrder: (id, updates) => {
     set((s) => ({
-      workOrders: s.workOrders.filter((w) => w.workOrderId !== id),
-    })),
+      workOrders: s.workOrders.map((wo) =>
+        wo.workOrderId === id ? { ...wo, ...updates } : wo
+      ),
+    }));
+  },
 
-  transitionWorkOrderStatus: (id, newStatus) =>
-    set((s) => {
-      const wo = s.workOrders.find((w) => w.workOrderId === id);
-      if (!wo) return s;
-      const entry: AuditLogEntry = {
-        auditId: `AUD-${Date.now()}`,
-        tableName: 'WorkOrder',
-        recordId: id,
-        action: 'Update',
-        fieldName: 'status',
-        oldValue: wo.status,
-        newValue: newStatus,
-        userId: 'USR-003',
-        ipAddress: '192.168.1.100',
-        timestamp: new Date().toISOString(),
-      };
-      return {
-        workOrders: s.workOrders.map((w) =>
-          w.workOrderId === id ? { ...w, status: newStatus } : w
-        ),
-        auditLog: [...s.auditLog, entry],
-      };
-    }),
-
-  // ─── Notification Actions ───
-  addNotification: (notif) =>
+  deleteWorkOrder: (id) => {
     set((s) => ({
-      notifications: [...s.notifications, notif],
-    })),
+      workOrders: s.workOrders.filter((wo) => wo.workOrderId !== id),
+    }));
+  },
 
-  updateNotification: (id, updates) =>
+  transitionWorkOrderStatus: (id, newStatus) => {
+    set((s) => ({
+      workOrders: s.workOrders.map((wo) =>
+        wo.workOrderId === id ? { ...wo, status: newStatus } : wo
+      ),
+    }));
+  },
+
+  addNotification: (notif) => {
+    set((s) => ({ notifications: [notif, ...s.notifications] }));
+  },
+
+  updateNotification: (id, updates) => {
     set((s) => ({
       notifications: s.notifications.map((n) =>
         n.notificationId === id ? { ...n, ...updates } : n
       ),
-    })),
+    }));
+  },
 
   convertNotificationToWO: (notifId) => {
-    const s = get();
-    const notif = s.notifications.find((n) => n.notificationId === notifId);
+    const notif = get().notifications.find((n) => n.notificationId === notifId);
     if (!notif) return null;
-
-    const newWO: WorkOrder = {
-      workOrderId: `WO-${Date.now()}`,
-      woNumber: `WO-2026-${String(s.workOrders.length + 1).padStart(4, '0')}`,
+    const wo: WorkOrder = {
+      workOrderId: `wo-${Date.now()}`,
+      woNumber: `WO-${Date.now()}`,
       type: notif.breakdownFlag ? 'EM' : 'CM',
       priority: notif.priority,
       status: 'Draft',
       functionalLocationId: notif.functionalLocationId,
       equipmentId: notif.equipmentId,
-      description: `Converted from ${notif.notificationNumber}: ${notif.description}`,
-      workCenterId: 'WC-001',
-      supervisorUserId: 'USR-003',
+      description: `Converted from notification: ${notif.description}`,
+      workCenterId: '',
+      supervisorUserId: '',
       plannedStart: null,
       plannedFinish: null,
       actualStart: null,
       actualFinish: null,
-      costCenterCode: 'CC-PROD-01',
+      costCenterCode: '',
       internalOrder: '',
       breakdownFlag: notif.breakdownFlag,
       safetyCriticalFlag: false,
       plannedCost: 0,
       actualCost: 0,
-      createdBy: 'USR-002',
+      createdBy: '',
       createdDate: new Date().toISOString(),
-      modifiedBy: 'USR-002',
+      modifiedBy: '',
       modifiedDate: new Date().toISOString(),
       isDeleted: false,
     };
-
-    set({
-      workOrders: [...s.workOrders, newWO],
+    set((s) => ({
+      workOrders: [wo, ...s.workOrders],
       notifications: s.notifications.map((n) =>
-        n.notificationId === notifId
-          ? { ...n, status: 'Converted' as NotificationStatus, workOrderIds: [...n.workOrderIds, newWO.workOrderId] }
-          : n
+        n.notificationId === notifId ? { ...n, status: 'Converted' as any, workOrderIds: [...n.workOrderIds, wo.workOrderId] } : n
       ),
-    });
-
-    return newWO;
+    }));
+    return wo;
   },
 
-  // ─── Equipment Actions ───
-  addEquipment: (eq) =>
-    set((s) => ({
-      equipment: [...s.equipment, eq],
-    })),
-  updateEquipment: (id, updates) =>
+  addEquipment: (eq) => {
+    set((s) => ({ equipment: [eq, ...s.equipment] }));
+  },
+
+  updateEquipment: (id, updates) => {
     set((s) => ({
       equipment: s.equipment.map((e) =>
         e.equipmentId === id ? { ...e, ...updates } : e
       ),
-    })),
+    }));
+  },
 
-  // ─── Location Actions ───
-  addLocation: (loc) =>
-    set((s) => ({
-      locations: [...s.locations, loc],
-    })),
-  updateLocation: (id, updates) =>
+  addLocation: (loc) => {
+    set((s) => ({ locations: [...s.locations, loc] }));
+  },
+
+  updateLocation: (id, updates) => {
     set((s) => ({
       locations: s.locations.map((l) =>
         l.functionalLocationId === id ? { ...l, ...updates } : l
       ),
-    })),
+    }));
+  },
 
-  // ─── Maintenance Plan Actions ───
-  addMaintenancePlan: (plan) =>
-    set((s) => ({
-      maintenancePlans: [...s.maintenancePlans, plan],
-    })),
-  updateMaintenancePlan: (id, updates) =>
+  addMaintenancePlan: (plan) => {
+    set((s) => ({ maintenancePlans: [plan, ...s.maintenancePlans] }));
+  },
+
+  updateMaintenancePlan: (id, updates) => {
     set((s) => ({
       maintenancePlans: s.maintenancePlans.map((p) =>
         p.planId === id ? { ...p, ...updates } : p
       ),
-    })),
+    }));
+  },
 
-  // ─── Alert Actions ───
-  markAlertRead: (id) =>
+  markAlertRead: (id) => {
     set((s) => ({
       alerts: s.alerts.map((a) =>
         a.alertId === id ? { ...a, isRead: true } : a
       ),
-    })),
-  markAllAlertsRead: () =>
+    }));
+    alertService.markRead(id).catch(() => {});
+  },
+
+  markAllAlertsRead: () => {
     set((s) => ({
       alerts: s.alerts.map((a) => ({ ...a, isRead: true })),
-    })),
+    }));
+    alertService.markAllRead().catch(() => {});
+  },
 
-  // ─── Material Actions ───
-  addMaterial: (mat) =>
-    set((s) => ({ materials: [...s.materials, mat] })),
-  updateMaterial: (id, updates) =>
+  addMaterial: (mat) => {
+    set((s) => ({ materials: [mat, ...s.materials] }));
+  },
+
+  updateMaterial: (id, updates) => {
     set((s) => ({
       materials: s.materials.map((m) =>
         m.materialId === id ? { ...m, ...updates } : m
       ),
-    })),
+    }));
+  },
 
-  // ─── Work Center Actions ───
-  addWorkCenter: (wc) =>
-    set((s) => ({ workCenters: [...s.workCenters, wc] })),
+  addWorkCenter: (wc) => {
+    set((s) => ({ workCenters: [...s.workCenters, wc] }));
+  },
 
-  // ─── User Actions ───
-  addUser: (user) =>
-    set((s) => ({ users: [...s.users, user] })),
-  updateUser: (id, updates) =>
+  addUser: (user) => {
+    set((s) => ({ users: [...s.users, user] }));
+  },
+
+  updateUser: (id, updates) => {
     set((s) => ({
-      users: s.users.map((u) => (u.userId === id ? { ...u, ...updates } : u)),
-    })),
+      users: s.users.map((u) =>
+        u.userId === id ? { ...u, ...updates } : u
+      ),
+    }));
+  },
 
-  // ─── Labor Actions ───
-  addLaborEntry: (entry) =>
-    set((s) => ({ laborEntries: [...s.laborEntries, entry] })),
+  addLaborEntry: (entry) => {
+    set((s) => ({ laborEntries: [...s.laborEntries, entry] }));
+  },
 
-  // ─── Meter Reading Actions ───
-  addMeterReading: (reading) =>
-    set((s) => ({
-      meterReadings: [...s.meterReadings, reading],
-    })),
+  addMeterReading: (reading) => {
+    set((s) => ({ meterReadings: [...s.meterReadings, reading] }));
+  },
 
-  // ─── Getters ───
   getEquipmentByLocation: (locationId) => {
-    const s = get();
-    // Include equipment at this location and all sub-locations
-    const allLocationIds = new Set<string>();
-    const collectChildren = (parentId: string) => {
-      allLocationIds.add(parentId);
-      s.locations
-        .filter((l) => l.parentLocationId === parentId)
-        .forEach((l) => collectChildren(l.functionalLocationId));
-    };
-    collectChildren(locationId);
-    return s.equipment.filter((e) => allLocationIds.has(e.functionalLocationId));
+    const locIds = getAllDescendantIds(get().locations, locationId);
+    return get().equipment.filter((e) => locIds.includes(e.functionalLocationId));
   },
 
   getWorkOrdersByEquipment: (equipmentId) => {
-    return get().workOrders.filter((w) => w.equipmentId === equipmentId);
+    return get().workOrders.filter((wo) => wo.equipmentId === equipmentId);
   },
 
   getOpenWorkOrders: () => {
-    return get().workOrders.filter(
-      (w) => !['Closed', 'Cancelled'].includes(w.status)
+    return get().workOrders.filter((wo) =>
+      !['Completed', 'Closed', 'Cancelled'].includes(wo.status)
     );
   },
 
   getOverdueWorkOrders: () => {
-    const now = new Date().toISOString();
-    return get().workOrders.filter(
-      (w) =>
-        w.plannedFinish &&
-        w.plannedFinish < now &&
-        !['Closed', 'Completed', 'Cancelled'].includes(w.status)
-    );
+    return get().workOrders.filter((wo) => {
+      if (['Completed', 'Closed', 'Cancelled'].includes(wo.status)) return false;
+      if (!wo.plannedFinish) return false;
+      return new Date(wo.plannedFinish) < new Date();
+    });
   },
 
   getUnreadAlertCount: () => {
@@ -422,32 +370,28 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   getWorkOrderOperations: (woId) => {
-    return get().operations.filter((o) => o.workOrderId === woId);
+    return get().operations.filter((op) => op.workOrderId === woId);
   },
 
   getWorkOrderMaterials: (woId) => {
-    return get().woMaterials.filter((m) => m.workOrderId === woId);
+    return get().woMaterials.filter((wm) => wm.workOrderId === woId);
   },
 
   getWorkOrderLabor: (woId) => {
-    const opIds = get()
-      .operations.filter((o) => o.workOrderId === woId)
-      .map((o) => o.operationId);
-    return get().laborEntries.filter((l) => opIds.includes(l.operationId));
+    const opIds = get().operations.filter((op) => op.workOrderId === woId).map((op) => op.operationId);
+    return get().laborEntries.filter((le) => opIds.includes(le.operationId));
   },
 
   getWorkOrderServices: (woId) => {
-    return get().externalServices.filter((s) => s.workOrderId === woId);
+    return get().externalServices.filter((es) => es.workOrderId === woId);
   },
 
   getWorkOrderComments: (woId) => {
-    return get().comments.filter((c) => c.entityId === woId);
+    return get().comments.filter((c) => c.entityType === 'WorkOrder' && c.entityId === woId);
   },
 
   getNotificationsAwaitingConversion: () => {
-    return get().notifications.filter(
-      (n) => n.status === 'Open' || n.status === 'In Process'
-    );
+    return get().notifications.filter((n) => n.status === 'Open' || n.status === 'In Process');
   },
 
   getEquipmentMeterReadings: (meterId) => {
