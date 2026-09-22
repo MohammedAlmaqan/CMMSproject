@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
+import { validate, laborCreateSchema } from '../utils/validation.js';
 
 const router = Router();
 
@@ -36,7 +38,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), async (req: Request, res: Response) => {
   try {
     const { operationId, userId, hoursWorked, entryDateTime, notes } = req.body;
 
@@ -52,6 +54,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'LaborEntry', recordId: entry.laborEntryId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(entry);
   } catch (error) {
     console.error('Error creating labor entry:', error);
@@ -59,7 +67,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.laborEntry.findFirst({
@@ -73,6 +81,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
       where: { laborEntryId: id },
       data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
+
+    await logAudit(
+      { tableName: 'LaborEntry', recordId: id, action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Labor entry deleted successfully' });
   } catch (error) {

@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
+import { validate, commentCreateSchema } from '../utils/validation.js';
 
 const router = Router();
 
@@ -26,7 +28,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Requester'), validate(commentCreateSchema), async (req: Request, res: Response) => {
   try {
     const { entityType, entityId, content } = req.body;
 
@@ -40,6 +42,12 @@ router.post('/', async (req: Request, res: Response) => {
       include: { user: { select: { userId: true, fullName: true, username: true } } },
     });
 
+    await logAudit(
+      { tableName: 'Comment', recordId: comment.commentId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(comment);
   } catch (error) {
     console.error('Error creating comment:', error);
@@ -47,7 +55,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Requester'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.comment.findUnique({
@@ -56,10 +64,19 @@ router.delete('/:id', async (req: Request, res: Response) => {
     if (!existing) {
       return res.status(404).json({ error: 'Comment not found' });
     }
+    if (existing.userId !== req.user!.userId && req.user!.role !== 'Administrator') {
+      return res.status(403).json({ error: 'Only the comment author or an administrator can delete this comment' });
+    }
 
     await prisma.comment.delete({
       where: { commentId: id },
     });
+
+    await logAudit(
+      { tableName: 'Comment', recordId: id, action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Comment deleted successfully' });
   } catch (error) {

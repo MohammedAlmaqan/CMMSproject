@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
+import { validate, woMaterialCreateSchema, woMaterialUpdateSchema } from '../utils/validation.js';
 
 const router = Router();
 
@@ -25,7 +27,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema), async (req: Request, res: Response) => {
   try {
     const { workOrderId, materialId, plannedQuantity, actualQuantity, unitCost, reservationQuantity } = req.body;
 
@@ -40,6 +42,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'WorkOrderMaterial', recordId: material.woMaterialId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(material);
   } catch (error) {
     console.error('Error creating work order material:', error);
@@ -47,7 +55,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.workOrderMaterial.findUnique({
@@ -69,6 +77,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'WorkOrderMaterial', recordId: id, action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(material);
   } catch (error) {
     console.error('Error updating work order material:', error);
@@ -76,7 +90,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.workOrderMaterial.findUnique({
@@ -89,6 +103,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await prisma.workOrderMaterial.delete({
       where: { woMaterialId: id },
     });
+
+    await logAudit(
+      { tableName: 'WorkOrderMaterial', recordId: id, action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Work order material deleted successfully' });
   } catch (error) {

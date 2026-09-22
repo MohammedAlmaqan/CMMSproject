@@ -1,7 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
 import { generateWoNumber } from '../utils/sequence.js';
+import {
+  validate,
+  workOrderCreateSchema,
+  workOrderUpdateSchema,
+  workOrderStatusBodySchema,
+} from '../utils/validation.js';
 
 const router = Router();
 
@@ -35,8 +42,8 @@ router.get('/', async (req: Request, res: Response) => {
     if (equipmentId) where.equipmentId = equipmentId as string;
     if (workCenterId) where.workCenterId = workCenterId as string;
 
-    const skipNum = skip ? parseInt(skip as string, 10) : 0;
-    const takeNum = take ? parseInt(take as string, 10) : 50;
+    const skipNum = skip ? parseInt(skip as string, 10) || 0 : 0;
+    const takeNum = take ? parseInt(take as string, 10) || 50 : 50;
 
     const [workOrders, total] = await Promise.all([
       prisma.workOrder.findMany({
@@ -105,7 +112,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema), async (req: Request, res: Response) => {
   try {
     const {
       type, priority, functionalLocationId, equipmentId, description,
@@ -137,6 +144,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(workOrder);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -147,7 +160,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.workOrder.findFirst({
@@ -215,6 +228,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       data: { plannedCost },
     });
 
+    await logAudit(
+      { tableName: 'WorkOrder', recordId: id, action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(result);
   } catch (error) {
     console.error('Error updating work order:', error);
@@ -222,7 +241,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.workOrder.findFirst({
@@ -237,6 +256,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
       data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
+    await logAudit(
+      { tableName: 'WorkOrder', recordId: id, action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json({ message: 'Work order deleted successfully' });
   } catch (error) {
     console.error('Error deleting work order:', error);
@@ -244,13 +269,10 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id/status', async (req: Request, res: Response) => {
+router.put('/:id/status', authorizeMinRole('Technician'), validate(workOrderStatusBodySchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const { status: newStatus } = req.body;
-    if (!newStatus) {
-      return res.status(400).json({ error: 'Status is required' });
-    }
 
     const workOrder = await prisma.workOrder.findFirst({
       where: { workOrderId: id, isDeleted: false },
@@ -282,6 +304,12 @@ router.put('/:id/status', async (req: Request, res: Response) => {
       where: { workOrderId: id },
       data: updateData,
     });
+
+    await logAudit(
+      { tableName: 'WorkOrder', recordId: id, action: 'Update', fieldName: 'status', oldValue: workOrder.status, newValue: newStatus },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json(updated);
   } catch (error) {
