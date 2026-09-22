@@ -92,11 +92,14 @@ router.put('/:id/password', async (req: Request, res: Response) => {
     if (!newPassword) {
       return res.status(400).json({ error: 'New password is required' });
     }
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
 
     const isAdmin = req.user!.role === 'Administrator';
     const isSelf = req.user!.userId === id;
 
-    if (!isAdmin && !isSelf) {
+    if (!isSelf && !isAdmin) {
       return res.status(403).json({ error: 'Can only change own password' });
     }
 
@@ -107,7 +110,10 @@ router.put('/:id/password', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (!isAdmin && currentPassword) {
+    if (isSelf) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required' });
+      }
       const valid = await bcrypt.compare(currentPassword, existing.passwordHash);
       if (!valid) {
         return res.status(400).json({ error: 'Current password is incorrect' });

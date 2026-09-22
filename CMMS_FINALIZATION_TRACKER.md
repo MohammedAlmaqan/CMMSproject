@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 of 7 - Complete
+**Status:** Phase 0 of 7 - Complete | Phase 1 - In Progress
 
 ## Status Legend
 
@@ -53,7 +53,7 @@
 |---|---|---|---|---|
 | 1.1 | Reorder alerts routes so `read-all` precedes `/:id/read` | ⬜ | `PUT /api/alerts/read-all` returns 200 |  |
 | 1.2 | Add `/work-orders/new` route + WO creation form (or fix button to open dialog) | ⬜ | Create flow persists WO to DB |  |
-| 1.3 | Fix password change: require current password; restrict resets to Administrator | ⬜ | Non-admin cannot reset others; wrong current password -> 400 |  |
+| 1.3 | Fix password change: require current password; restrict resets to Administrator | ✅ | Non-admin cannot reset others; wrong current password -> 400 |  |
 | 1.4 | Fix PM `generate-wo` empty-FK; replace `Date.now()` WO number with sequence/prefix+counter | ⬜ | Equipment-only plan generates WO; concurrent creates don't collide |  |
 | 1.5 | Replace hardcoded `* 50` labor rate with work-center/craft rate from DB | ⬜ | Planned labor cost matches master data |  |
 | 1.6 | Security baseline: env-only `JWT_SECRET` (fail fast if missing), CORS origin allow-list, `helmet`, `express-rate-limit` on `/api/auth/login` | ⬜ | Missing secret refuses boot; login rate-limited |  |
