@@ -4,10 +4,9 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
+import { JWT_SECRET, JWT_EXPIRES_IN } from '../utils/config.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'cmms-jwt-secret';
-const JWT_EXPIRES_IN = 8 * 60 * 60; // 8 hours in seconds
 
 router.post('/login', async (req: Request, res: Response) => {
   try {

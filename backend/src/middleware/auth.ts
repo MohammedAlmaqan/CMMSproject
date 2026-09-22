@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../utils/prisma.js';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'cmms-jwt-secret';
+import { JWT_SECRET } from '../utils/config.js';
 
 export interface AuthPayload {
   userId: string;
