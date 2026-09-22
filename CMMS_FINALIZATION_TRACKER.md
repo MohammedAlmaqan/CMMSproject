@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 of 7 - In Progress
+**Status:** Phase 0 of 7 - Complete
 
 ## Status Legend
 
@@ -32,11 +32,11 @@
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 0.1 | `npm install` in `backend/` and `app/` | ⬜ | Both succeed |  |
-| 0.2 | Provision PostgreSQL, create `cmms`, write `.env` from examples | ⬜ | `prisma db push` succeeds |  |
-| 0.3 | Seed + boot backend; hit `/api/health` and `/api-docs.json` | ⬜ | 200 OK; spec loads |  |
-| 0.4 | Boot frontend, verify login + Vite proxy | ⬜ | Login as `admin` renders dashboard |  |
-| 0.5 | Run `tsc` + `eslint` both packages; capture baseline error list | ⬜ | Baseline recorded (backend-tsc, backend-eslint, frontend-tsc, frontend-eslint) |  |
+| 0.1 | `npm install` in `backend/` and `app/` | ✅ | Both succeed |  |
+| 0.2 | Provision PostgreSQL, create `cmms`, write `.env` from examples | ✅ | `prisma db push` succeeds |  |
+| 0.3 | Seed + boot backend; hit `/api/health` and `/api-docs.json` | ✅ | 200 OK; spec loads |  |
+| 0.4 | Boot frontend, verify login + Vite proxy | ✅ | Login as `admin` renders dashboard |  |
+| 0.5 | Run `tsc` + `eslint` both packages; capture baseline error list | ✅ | Baseline recorded (backend-tsc, backend-eslint, frontend-tsc, frontend-eslint) |  |
 
 ## Phase 1 - Critical Defects & Security Baseline (2-3 days) - *gate: no P0 open*
 
