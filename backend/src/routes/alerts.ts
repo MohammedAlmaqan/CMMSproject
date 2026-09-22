@@ -33,6 +33,20 @@ router.get('/unread-count', async (req: Request, res: Response) => {
   }
 });
 
+router.put('/read-all', async (req: Request, res: Response) => {
+  try {
+    await prisma.systemAlert.updateMany({
+      where: { userId: req.user!.userId, isRead: false },
+      data: { isRead: true },
+    });
+
+    res.json({ message: 'All alerts marked as read' });
+  } catch (error) {
+    console.error('Error marking all alerts as read:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.put('/:id/read', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -51,20 +65,6 @@ router.put('/:id/read', async (req: Request, res: Response) => {
     res.json(alert);
   } catch (error) {
     console.error('Error marking alert as read:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-router.put('/read-all', async (req: Request, res: Response) => {
-  try {
-    await prisma.systemAlert.updateMany({
-      where: { userId: req.user!.userId, isRead: false },
-      data: { isRead: true },
-    });
-
-    res.json({ message: 'All alerts marked as read' });
-  } catch (error) {
-    console.error('Error marking all alerts as read:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
