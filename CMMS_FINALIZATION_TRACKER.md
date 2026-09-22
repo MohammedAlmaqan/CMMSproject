@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 of 7 - Complete | Phase 1 - In Progress
+**Status:** Phase 0 of 7 - Complete | Phase 1 - Complete (0 P0 open)
 
 ## Status Legend
 
@@ -34,6 +34,22 @@
 | 0d74455 | docs: record tracker baseline commit (backfill S1-S3 row status + hash) |
 | 8f4739c | build: complete phase 0 baseline (0.1-0.5); repair app/package-lock.json |
 | e6df64e | docs: record phase 0 commit hashes |
+| 5ad8e4e | fix(auth): require current password on self-service password change (1.3) |
+| 849cab1 | fix(security): env-only JWT_SECRET fail-fast, CORS allow-list, helmet, rate-limit login (1.6) |
+| d0c51a1 | fix(routes): move alerts/read-all before /:id/read (1.1) |
+| 41181ca | fix(wo): replace hardcoded * 50 labor rate with craft hourly rate (1.5; also narrows JWT_SECRET type in utils/config.ts) |
+| 498c221 | fix(wo): atomic sequence WO numbers + resolve generate-wo functional location (1.4) |
+| 593cf63 | docs: record phase 1.4 commit hash |
+| 40e90af | feat(wo): add work order creation form at /work-orders/new (1.2) |
+| 90a5f6b | docs: record phase 1.2 commit hash |
+| caa4ba1 | chore(app): remove unused scaffolding (1.7) |
+| 38cf7c1 | docs: record phase 1.7 commit hash |
+| cab39a5 | fix(dashboard): remove stray literal newline; drop stale scaffold docs (1.8) |
+| f81d4a1 | docs: record phase 1.8 commit hash |
+| 4115150 | fix(dashboard): React 19 render-safe refs and one-time particle init (1.9) |
+| adab974 | docs: record phase 1.9 commit hash |
+| 08646c1 | fix(ui): correct hook dependencies in App.tsx and EquipmentPage.tsx (1.10) |
+| 1e6ada1 | docs: record phase 1.10 commit hash |
 
 ---
 
