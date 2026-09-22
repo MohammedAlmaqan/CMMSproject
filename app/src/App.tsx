@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
 import AppLayout from '@/components/layout/AppLayout';
@@ -43,39 +43,37 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <AppInitializer>
-                <AppLayout>
-                  <Routes>
-                    <Route path="/" element={<DashboardPage />} />
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/work-orders" element={<WorkOrdersPage />} />
-                    <Route path="/work-orders/new" element={<WorkOrderCreatePage />} />
-                    <Route path="/work-orders/:id" element={<WorkOrderDetailPage />} />
-                    <Route path="/notifications" element={<NotificationsPage />} />
-                    <Route path="/notifications/:id" element={<NotificationDetailPage />} />
-                    <Route path="/equipment" element={<EquipmentPage />} />
-                    <Route path="/equipment/:id" element={<EquipmentDetailPage />} />
-                    <Route path="/locations" element={<LocationsPage />} />
-                    <Route path="/materials" element={<MaterialsPage />} />
-                    <Route path="/work-centers" element={<WorkCentersPage />} />
-                    <Route path="/preventive-maintenance" element={<PreventiveMaintenancePage />} />
-                    <Route path="/reports" element={<ReportsPage />} />
-                    <Route path="/administration" element={<AdministrationPage />} />
-                  </Routes>
-                </AppLayout>
-              </AppInitializer>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <AppInitializer>
+              <AppLayout>
+                <Routes>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/work-orders" element={<WorkOrdersPage />} />
+                  <Route path="/work-orders/new" element={<WorkOrderCreatePage />} />
+                  <Route path="/work-orders/:id" element={<WorkOrderDetailPage />} />
+                  <Route path="/notifications" element={<NotificationsPage />} />
+                  <Route path="/notifications/:id" element={<NotificationDetailPage />} />
+                  <Route path="/equipment" element={<EquipmentPage />} />
+                  <Route path="/equipment/:id" element={<EquipmentDetailPage />} />
+                  <Route path="/locations" element={<LocationsPage />} />
+                  <Route path="/materials" element={<MaterialsPage />} />
+                  <Route path="/work-centers" element={<WorkCentersPage />} />
+                  <Route path="/preventive-maintenance" element={<PreventiveMaintenancePage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/administration" element={<AdministrationPage />} />
+                </Routes>
+              </AppLayout>
+            </AppInitializer>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   );
 }
 
