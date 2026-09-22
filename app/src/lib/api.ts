@@ -25,14 +25,13 @@ export class ApiError extends Error {
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>) {
-  const base = `${API_BASE}${path}`;
-  if (!params) return base;
+  if (!params) return path;
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== '') searchParams.set(k, String(v));
   });
   const qs = searchParams.toString();
-  return qs ? `${base}?${qs}` : base;
+  return qs ? `${path}?${qs}` : path;
 }
 
 async function request<T>(
