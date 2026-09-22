@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
+import { generateWoNumber } from '../utils/sequence.js';
 
 const router = Router();
 
@@ -112,8 +113,7 @@ router.post('/', async (req: Request, res: Response) => {
       costCenterCode, internalOrder, breakdownFlag, safetyCriticalFlag,
     } = req.body;
 
-    const prefixConfig = await prisma.systemConfig.findUnique({ where: { key: 'WO_PREFIX' } });
-    const woNumber = `${prefixConfig?.value || 'WO'}-${Date.now()}`;
+    const woNumber = await generateWoNumber();
 
     const workOrder = await prisma.workOrder.create({
       data: {

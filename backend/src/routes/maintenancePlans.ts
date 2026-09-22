@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
+import { generateWoNumber } from '../utils/sequence.js';
 
 const router = Router();
 
@@ -171,10 +172,21 @@ router.post('/:id/generate-wo', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Maintenance plan not found' });
     }
 
-    const prefixConfig = await prisma.systemConfig.findUnique({ where: { key: 'wo_number_prefix' } });
-    const woNumber = `${prefixConfig?.value || 'WO'}-${Date.now()}`;
+    const woNumber = await generateWoNumber();
 
     const taskListOps = (plan as any).taskList?.operations || [];
+
+    let functionalLocationId = plan.functionalLocationId;
+    if (!functionalLocationId && plan.equipmentId) {
+      const equipment = await prisma.equipment.findUnique({
+        where: { equipmentId: plan.equipmentId },
+        select: { functionalLocationId: true },
+      });
+      functionalLocationId = equipment?.functionalLocationId || null;
+    }
+    if (!functionalLocationId) {
+      return res.status(400).json({ error: 'Maintenance plan requires a functional location (set on the plan or its equipment)' });
+    }
 
     const workOrder = await prisma.$transaction(async (tx) => {
       const wo = await tx.workOrder.create({
@@ -183,7 +195,7 @@ router.post('/:id/generate-wo', async (req: Request, res: Response) => {
           type: 'PM',
           priority: 'Medium',
           status: 'Draft',
-          functionalLocationId: plan.functionalLocationId || '',
+          functionalLocationId,
           equipmentId: plan.equipmentId,
           description: plan.description,
           workCenterId: plan.workCenterId,

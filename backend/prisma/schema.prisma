@@ -538,3 +538,8 @@ model SystemConfig {
   key      String @unique
   value    String
 }
+
+model SequenceCounter {
+  code  String @id
+  value Int    @default(0)
+}
