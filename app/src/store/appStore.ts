@@ -19,6 +19,7 @@ import { functionalLocationService } from '@/services/functionalLocationService'
 import { equipmentService } from '@/services/equipmentService';
 import { workOrderService } from '@/services/workOrderService';
 import { notificationService } from '@/services/notificationService';
+import { userService } from '@/services/userService';
 import { materialService } from '@/services/materialService';
 import { workCenterService } from '@/services/workCenterService';
 import { maintenancePlanService } from '@/services/maintenancePlanService';
@@ -144,7 +145,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   loadFromApi: async () => {
     set({ loading: true, error: null });
     try {
-      const [locations, equipment, workOrders, notifications, materials, workCenters, maintenancePlans] =
+      const [locations, equipment, workOrders, notifications, materials, workCenters, maintenancePlans, users] =
         await Promise.all([
           functionalLocationService.getAll().catch(() => get().locations),
           equipmentService.getAll().catch(() => get().equipment),
@@ -153,10 +154,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
           materialService.getAll().catch(() => get().materials),
           workCenterService.getAll().catch(() => get().workCenters),
           maintenancePlanService.getAll().catch(() => get().maintenancePlans),
+          userService.getAll().catch(() => get().users),
         ]);
       set({
         locations, equipment, workOrders, notifications,
-        materials, workCenters, maintenancePlans, loading: false,
+        materials, workCenters, maintenancePlans, users, loading: false,
       });
     } catch {
       set({ loading: false });

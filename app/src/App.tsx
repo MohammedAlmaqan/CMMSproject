@@ -6,6 +6,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import WorkOrdersPage from '@/pages/WorkOrdersPage';
+import WorkOrderCreatePage from '@/pages/WorkOrderCreatePage';
 import WorkOrderDetailPage from '@/pages/WorkOrderDetailPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import NotificationDetailPage from '@/pages/NotificationDetailPage';
@@ -55,6 +56,7 @@ function App() {
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/work-orders" element={<WorkOrdersPage />} />
+                    <Route path="/work-orders/new" element={<WorkOrderCreatePage />} />
                     <Route path="/work-orders/:id" element={<WorkOrderDetailPage />} />
                     <Route path="/notifications" element={<NotificationsPage />} />
                     <Route path="/notifications/:id" element={<NotificationDetailPage />} />
