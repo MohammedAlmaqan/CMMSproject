@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
+import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { validate, operationCreateSchema, operationUpdateSchema } from '../utils/validation.js';
 
 const router = Router();
@@ -32,6 +33,13 @@ router.post('/', authorizeMinRole('Technician'), validate(operationCreateSchema)
   try {
     const { workOrderId, sequenceNumber, description, craftId, plannedHours, numberOfTechnicians } = req.body;
 
+    const craftExists = await prisma.craft.findFirst({
+      where: { craftId, isDeleted: false },
+    });
+    if (!craftExists) {
+      return res.status(404).json({ error: 'Craft not found' });
+    }
+
     const operation = await prisma.workOrderOperation.create({
       data: {
         workOrderId,
@@ -44,6 +52,8 @@ router.post('/', authorizeMinRole('Technician'), validate(operationCreateSchema)
         modifiedBy: req.user!.userId,
       },
     });
+
+    await recomputeWorkOrderCosts(workOrderId);
 
     await logAudit(
       { tableName: 'WorkOrderOperation', recordId: operation.operationId, action: 'Create' },
@@ -84,6 +94,8 @@ router.put('/:id', authorizeMinRole('Technician'), validate(operationUpdateSchem
       },
     });
 
+    await recomputeWorkOrderCosts(existing.workOrderId);
+
     await logAudit(
       { tableName: 'WorkOrderOperation', recordId: id, action: 'Update' },
       req.user!.userId,
@@ -107,9 +119,15 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
       return res.status(404).json({ error: 'Operation not found' });
     }
 
+    await prisma.laborEntry.deleteMany({
+      where: { operationId: id },
+    });
+
     await prisma.workOrderOperation.delete({
       where: { operationId: id },
     });
+
+    await recomputeWorkOrderCosts(existing.workOrderId);
 
     await logAudit(
       { tableName: 'WorkOrderOperation', recordId: id, action: 'Delete' },

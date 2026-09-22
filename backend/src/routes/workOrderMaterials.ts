@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
+import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { validate, woMaterialCreateSchema, woMaterialUpdateSchema } from '../utils/validation.js';
 
 const router = Router();
@@ -31,6 +32,11 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
   try {
     const { workOrderId, materialId, plannedQuantity, actualQuantity, unitCost, reservationQuantity } = req.body;
 
+    const materialExists = await prisma.material.findUnique({ where: { materialId } });
+    if (!materialExists) {
+      return res.status(404).json({ error: 'Material not found' });
+    }
+
     const material = await prisma.workOrderMaterial.create({
       data: {
         workOrderId,
@@ -41,6 +47,8 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
         reservationQuantity: reservationQuantity || 0,
       },
     });
+
+    await recomputeWorkOrderCosts(workOrderId);
 
     await logAudit(
       { tableName: 'WorkOrderMaterial', recordId: material.woMaterialId, action: 'Create' },
@@ -77,6 +85,8 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
       },
     });
 
+    await recomputeWorkOrderCosts(existing.workOrderId);
+
     await logAudit(
       { tableName: 'WorkOrderMaterial', recordId: id, action: 'Update' },
       req.user!.userId,
@@ -103,6 +113,8 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
     await prisma.workOrderMaterial.delete({
       where: { woMaterialId: id },
     });
+
+    await recomputeWorkOrderCosts(existing.workOrderId);
 
     await logAudit(
       { tableName: 'WorkOrderMaterial', recordId: id, action: 'Delete' },

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
+import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber } from '../utils/sequence.js';
 import {
   validate,
@@ -200,33 +201,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
       },
     });
 
-    const [ops, matTotal, svcTotal] = await Promise.all([
-      prisma.workOrderOperation.findMany({
-        where: { workOrderId: id },
-        include: { craft: true },
-      }),
-      prisma.workOrderMaterial.aggregate({
-        where: { workOrderId: id },
-        _sum: { plannedQuantity: true, unitCost: true },
-      }),
-      prisma.externalServiceCost.aggregate({
-        where: { workOrderId: id },
-        _sum: { cost: true },
-      }),
-    ]);
-
-    const laborCost = ops.reduce(
-      (sum, op) => sum + (op.plannedHours || 0) * (op.numberOfTechnicians || 1) * (op.craft.hourlyRate || 0),
-      0
-    );
-    const materialCost = (matTotal._sum.plannedQuantity || 0) * (matTotal._sum.unitCost || 0);
-    const serviceCost = svcTotal._sum.cost || 0;
-    const plannedCost = laborCost + materialCost + serviceCost;
-
-    const result = await prisma.workOrder.update({
-      where: { workOrderId: id },
-      data: { plannedCost },
-    });
+    await recomputeWorkOrderCosts(id);
 
     await logAudit(
       { tableName: 'WorkOrder', recordId: id, action: 'Update' },
@@ -234,7 +209,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
       req.ip
     );
 
-    res.json(result);
+    res.json(await prisma.workOrder.findUnique({ where: { workOrderId: id } }));
   } catch (error) {
     console.error('Error updating work order:', error);
     res.status(500).json({ error: 'Internal server error' });
