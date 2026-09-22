@@ -24,7 +24,7 @@
 
 | # | Task | Status | Commit |
 |---|---|---|---|
-| S1-S3 | Tracker written, stale evaluation plan archived, initial commit | ⬜ |  |
+| S1-S3 | Tracker written, stale evaluation plan archived, initial commit | ✅ | 1bab61d |
 
 ---
 
