@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.1–1.10) - Complete | Task 1.0 pending before Phase 2
+**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - Not Started
 
 ## Status Legend
 
@@ -50,6 +50,9 @@
 | adab974 | docs: record phase 1.9 commit hash |
 | 08646c1 | fix(ui): correct hook dependencies in App.tsx and EquipmentPage.tsx (1.10) |
 | 1e6ada1 | docs: record phase 1.10 commit hash |
+| e4f7ce2 | fix(app): remove nested Router causing blank screen (1.0) |
+| 2fda2c7 | feat(app): add top-level Error Boundary (1.0) |
+| 0f48927 | fix(api): stop double /api prefix in GET requests (1.0 verification blocker) |
 
 ---
 
@@ -67,7 +70,7 @@
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 1.0 | Fix blank screen: remove nested `<Router>`; add top-level Error Boundary | ⬜ | `http://localhost:3000` loads the login page; no console errors; Error Boundary renders on crash |  |
+| 1.0 | Fix blank screen: remove nested `<Router>`; add top-level Error Boundary | ✅ | `http://localhost:3000` loads the login page; no console errors; Error Boundary renders on crash | e4f7ce2, 2fda2c7 |
 | 1.1 | Reorder alerts routes so `read-all` precedes `/:id/read` | ✅ | `PUT /api/alerts/read-all` returns 200 | d0c51a1 |
 | 1.2 | Add `/work-orders/new` route + WO creation form (or fix button to open dialog) | ✅ | Create flow persists WO to DB | 40e90af |
 | 1.3 | Fix password change: require current password; restrict resets to Administrator | ✅ | Non-admin cannot reset others; wrong current password -> 400 | 5ad8e4e |
@@ -79,7 +82,7 @@
 | 1.9 | Fix `TacticalDashboardGrid.tsx` React 19 render violations (refs accessed during render, impure function calls; 9 lint errors - flickering / non-deterministic render risk) | ✅ | File passes eslint cleanly; 3D dashboard still renders correctly | 4115150 |
 | 1.10 | Fix `App.tsx` useEffect deps + `EquipmentPage.tsx` useMemo deps (stale-closure / stale-calculation risk) | ✅ | Files pass eslint cleanly; affected pages behave correctly | 08646c1 |
 
-Note: Phase 1 tasks 1.2, 1.7, 1.8, 1.9, 1.10 were verified by build/lint only. Visual verification in browser is pending task 1.0.
+Note: Phase 1 tasks 1.2, 1.7, 1.8, 1.9, 1.10 were verified by build/lint only. Visual verification in browser of login + dashboard (including the Error Boundary fallback) was completed under task 1.0; page-level visual checks for the 1.2/1.7/1.8/1.9/1.10 features remain pending (deferred to Phase 2).
 
 ## Phase 2 - End-to-End Integration (5-8 days) - *core phase*
 
@@ -125,6 +128,8 @@ Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userServic
 | 4.2 | Fix `ecosystem.config.cjs` (drop phantom `register.js`, fix `env_file`, confirm fork mode) | ⬜ | `pm2 start` serves API |  |
 | 4.3 | Backend eslint dependency or remove script; lint green both packages | ⬜ | Exit 0 |  |
 | 4.4 | Verify `build.bat`/`start.bat` cold on target Windows box | ⬜ | Cold build -> running app |  |
+
+Note: Follow-up (non-blocking) - add a one-line comment to `Craft.hourlyRate` in `schema.prisma` documenting the per-person interpretation confirmed in task 1.5 (see `WorkOrderOperation.numberOfTechnicians` costing). Add during the next schema-touching task (e.g. 4.1 migrate baseline).
 
 ## Phase 5 - Testing, moderate floor (5-8 days) - *backend route tests protected first*
 
