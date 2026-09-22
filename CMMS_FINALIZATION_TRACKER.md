@@ -32,11 +32,11 @@
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 0.1 | `npm install` in `backend/` and `app/` | ✅ | Both succeed |  |
-| 0.2 | Provision PostgreSQL, create `cmms`, write `.env` from examples | ✅ | `prisma db push` succeeds |  |
-| 0.3 | Seed + boot backend; hit `/api/health` and `/api-docs.json` | ✅ | 200 OK; spec loads |  |
-| 0.4 | Boot frontend, verify login + Vite proxy | ✅ | Login as `admin` renders dashboard |  |
-| 0.5 | Run `tsc` + `eslint` both packages; capture baseline error list | ✅ | Baseline recorded (backend-tsc, backend-eslint, frontend-tsc, frontend-eslint) |  |
+| 0.1 | `npm install` in `backend/` and `app/` | ✅ | Both succeed | 8f4739c |
+| 0.2 | Provision PostgreSQL, create `cmms`, write `.env` from examples | ✅ | `prisma db push` succeeds | 8f4739c |
+| 0.3 | Seed + boot backend; hit `/api/health` and `/api-docs.json` | ✅ | 200 OK; spec loads | 8f4739c |
+| 0.4 | Boot frontend, verify login + Vite proxy | ✅ | Login as `admin` renders dashboard | 8f4739c |
+| 0.5 | Run `tsc` + `eslint` both packages; capture baseline error list | ✅ | Baseline recorded (backend-tsc, backend-eslint, frontend-tsc, frontend-eslint) | 8f4739c |
 
 ## Phase 1 - Critical Defects & Security Baseline (2-3 days) - *gate: no P0 open*
 
