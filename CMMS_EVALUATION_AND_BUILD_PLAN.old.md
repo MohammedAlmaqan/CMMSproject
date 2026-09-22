@@ -1,3 +1,7 @@
+> **ARCHIVED** - superseded by [CMMS_FINALIZATION_TRACKER.md](./CMMS_FINALIZATION_TRACKER.md) on 2026-09-22.
+
+---
+
 # CMMS Project — Comprehensive Evaluation & Build Plan
 
 ## 1. Project Overview
