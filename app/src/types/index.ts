@@ -149,7 +149,12 @@ export interface Notification extends Auditable {
   description: string;
   breakdownFlag: boolean;
   status: NotificationStatus;
-  workOrderIds: string[];
+  functionalLocation?: { functionalLocationId: string; locationCode: string; description: string };
+  equipment?: { equipmentId: string; equipmentCode: string; name: string };
+  reportedBy?: { userId: string; fullName: string; username: string };
+  workOrders?: { workOrder: { workOrderId: string; woNumber: string; status: string; type: string } }[];
+  comments?: Comment[];
+  workOrderIds?: string[];
 }
 
 // ─── Work Order (§3.3) ───

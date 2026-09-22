@@ -1,6 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
+import { generateNotifNumber, generateWoNumber } from '../utils/sequence.js';
+import {
+  validate,
+  notificationCreateSchema,
+  notificationUpdateSchema,
+  convertNotificationSchema,
+} from '../utils/validation.js';
 
 const router = Router();
 
@@ -8,7 +16,7 @@ router.use(authenticate);
 
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { search, type, priority, status } = req.query;
+    const { search, type, priority, status, skip, take } = req.query;
     const where: any = { isDeleted: false };
 
     if (search) {
@@ -21,16 +29,25 @@ router.get('/', async (req: Request, res: Response) => {
     if (priority) where.priority = priority as string;
     if (status) where.status = status as string;
 
-    const notifications = await prisma.notification.findMany({
-      where,
-      include: {
-        functionalLocation: { select: { functionalLocationId: true, locationCode: true, description: true } },
-        equipment: { select: { equipmentId: true, equipmentCode: true, name: true } },
-      },
-      orderBy: { createdDate: 'desc' },
-    });
+    const skipNum = skip ? parseInt(skip as string, 10) || 0 : 0;
+    const takeNum = take ? parseInt(take as string, 10) || 50 : 50;
 
-    res.json(notifications);
+    const [notifications, total] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        include: {
+          functionalLocation: { select: { functionalLocationId: true, locationCode: true, description: true } },
+          equipment: { select: { equipmentId: true, equipmentCode: true, name: true } },
+          reportedBy: { select: { userId: true, fullName: true, username: true } },
+        },
+        orderBy: { createdDate: 'desc' },
+        skip: skipNum,
+        take: takeNum,
+      }),
+      prisma.notification.count({ where }),
+    ]);
+
+    res.json({ data: notifications, total, skip: skipNum, take: takeNum });
   } catch (error) {
     console.error('Error fetching notifications:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -58,21 +75,27 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Notification not found' });
     }
 
-    res.json(notification);
+    const comments = await prisma.comment.findMany({
+      where: { entityType: 'Notification', entityId: notification.notificationId },
+      include: { user: { select: { userId: true, fullName: true } } },
+      orderBy: { createdDate: 'desc' },
+    });
+
+    res.json({ ...notification, comments });
   } catch (error) {
     console.error('Error fetching notification:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchema), async (req: Request, res: Response) => {
   try {
     const {
       type, priority, functionalLocationId, equipmentId,
       reportedByUserId, description, breakdownFlag,
     } = req.body;
 
-    const notificationNumber = `N${Date.now()}`;
+    const notificationNumber = await generateNotifNumber();
 
     const notification = await prisma.notification.create({
       data: {
@@ -90,6 +113,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'Notification', recordId: notification.notificationId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(notification);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -100,7 +129,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Requester'), validate(notificationUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.notification.findFirst({
@@ -130,6 +159,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'Notification', recordId: notification.notificationId, action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(notification);
   } catch (error) {
     console.error('Error updating notification:', error);
@@ -137,7 +172,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.notification.findFirst({
@@ -152,6 +187,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
       data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
+    await logAudit(
+      { tableName: 'Notification', recordId: id, action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json({ message: 'Notification deleted successfully' });
   } catch (error) {
     console.error('Error deleting notification:', error);
@@ -159,7 +200,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/:id/convert-to-wo', async (req: Request, res: Response) => {
+router.post('/:id/convert-to-wo', authorizeMinRole('Maintenance Planner'), validate(convertNotificationSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const notification = await prisma.notification.findFirst({
@@ -173,10 +214,13 @@ router.post('/:id/convert-to-wo', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Notification already converted' });
     }
 
-    const prefixConfig = await prisma.systemConfig.findUnique({ where: { key: 'wo_number_prefix' } });
-    const woNumber = `${prefixConfig?.value || 'WO'}-${Date.now()}`;
+    const woNumber = await generateWoNumber();
+
     const workCenters = await prisma.workCenter.findMany({ where: { isDeleted: false }, take: 1 });
     const defaultWorkCenter = workCenters[0];
+    if (!defaultWorkCenter) {
+      return res.status(400).json({ error: 'No active work center available' });
+    }
 
     const workOrder = await prisma.$transaction(async (tx) => {
       const wo = await tx.workOrder.create({
@@ -188,7 +232,7 @@ router.post('/:id/convert-to-wo', async (req: Request, res: Response) => {
           functionalLocation: { connect: { functionalLocationId: notification.functionalLocationId } },
           equipment: notification.equipmentId ? { connect: { equipmentId: notification.equipmentId } } : undefined,
           description: notification.description,
-          workCenter: { connect: { workCenterId: req.body.workCenterId || defaultWorkCenter!.workCenterId } },
+          workCenter: { connect: { workCenterId: req.body.workCenterId || defaultWorkCenter.workCenterId } },
           supervisor: { connect: { userId: req.body.supervisorUserId || notification.reportedByUserId || req.user!.userId } },
           breakdownFlag: notification.breakdownFlag,
           createdBy: req.user!.userId,
@@ -210,6 +254,17 @@ router.post('/:id/convert-to-wo', async (req: Request, res: Response) => {
 
       return wo;
     });
+
+    await logAudit(
+      { tableName: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+    await logAudit(
+      { tableName: 'Notification', recordId: notification.notificationId, action: 'Update', fieldName: 'status', oldValue: notification.status, newValue: 'Converted' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.status(201).json(workOrder);
   } catch (error) {

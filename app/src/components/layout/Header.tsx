@@ -2,7 +2,7 @@
 // Master Command Header
 // ============================================================
 
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Filter, Download, Plus, ChevronRight } from 'lucide-react';
 import { useAppStore } from '@/store/appStore';
 
@@ -15,7 +15,9 @@ interface HeaderProps {
 
 export default function Header({ title, onCreate, tabs, showActions = true }: HeaderProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const unreadCount = useAppStore((s) => s.getUnreadAlertCount());
+  const markAllAlertsRead = useAppStore((s) => s.markAllAlertsRead);
 
   const getBreadcrumb = () => {
     const parts = location.pathname.split('/').filter(Boolean);
@@ -79,7 +81,13 @@ export default function Header({ title, onCreate, tabs, showActions = true }: He
       {showActions && (
         <div className="flex items-center gap-2">
           {/* Alerts Bell */}
-          <button className="relative p-2 text-secondary hover:text-primary transition-colors">
+          <button
+            onClick={() => {
+              markAllAlertsRead();
+              navigate('/notifications');
+            }}
+            className="relative p-2 text-secondary hover:text-primary transition-colors"
+          >
             <Bell className="w-[18px] h-[18px]" strokeWidth={1.5} />
             {unreadCount > 0 && (
               <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-amber text-xs font-medium flex items-center justify-center" style={{ color: '#111113', fontSize: '9px' }}>

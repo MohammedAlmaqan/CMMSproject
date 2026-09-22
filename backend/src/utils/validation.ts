@@ -127,6 +127,36 @@ export const checklistItemUpdateSchema = z.object({
   comment: z.string().nullable().optional(),
 });
 
+export const notificationTypeSchema = z.enum(['M1', 'M2', 'M3']);
+
+export const notificationStatusSchema = z.enum(['Open', 'In Process', 'Completed', 'Converted']);
+
+export const notificationCreateSchema = z.object({
+  type: notificationTypeSchema,
+  priority: prioritySchema,
+  description: z.string().min(3),
+  functionalLocationId: z.string().min(1),
+  equipmentId: z.string().min(1).nullable().optional(),
+  reportedByUserId: z.string().min(1),
+  breakdownFlag: z.boolean().optional(),
+});
+
+export const notificationUpdateSchema = z.object({
+  type: notificationTypeSchema.optional(),
+  priority: prioritySchema.optional(),
+  description: z.string().min(3).optional(),
+  functionalLocationId: z.string().min(1).optional(),
+  equipmentId: z.string().min(1).nullable().optional(),
+  reportedByUserId: z.string().min(1).optional(),
+  breakdownFlag: z.boolean().optional(),
+  status: notificationStatusSchema.optional(),
+});
+
+export const convertNotificationSchema = z.object({
+  workCenterId: z.string().min(1).optional(),
+  supervisorUserId: z.string().min(1).optional(),
+});
+
 export function validate(schema: z.ZodTypeAny) {
   return (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);

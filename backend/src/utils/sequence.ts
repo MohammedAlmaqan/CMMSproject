@@ -23,3 +23,10 @@ export async function generateWoNumber(): Promise<string> {
   const sequence = await nextSequence(prisma, 'WORK_ORDER');
   return `${prefix}-${String(sequence).padStart(6, '0')}`;
 }
+
+export async function generateNotifNumber(): Promise<string> {
+  const prefixConfig = await prisma.systemConfig.findUnique({ where: { key: 'notif_number_prefix' } });
+  const prefix = prefixConfig?.value || 'N';
+  const sequence = await nextSequence(prisma, 'NOTIFICATION');
+  return `${prefix}-${String(sequence).padStart(6, '0')}`;
+}

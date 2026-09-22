@@ -20,6 +20,7 @@ import { equipmentService } from '@/services/equipmentService';
 import { workOrderService } from '@/services/workOrderService';
 import { notificationService } from '@/services/notificationService';
 import { userService } from '@/services/userService';
+import { useAuthStore } from '@/store/authStore';
 import { materialService } from '@/services/materialService';
 import { workCenterService } from '@/services/workCenterService';
 import { maintenancePlanService } from '@/services/maintenancePlanService';
@@ -145,16 +146,18 @@ export const useAppStore = create<AppState>()((set, get) => ({
   loadFromApi: async () => {
     set({ loading: true, error: null });
     try {
+      const role = useAuthStore.getState().user?.role;
+      const canListUsers = role === 'Administrator';
       const [locations, equipment, workOrders, notifications, materials, workCenters, maintenancePlans, users] =
         await Promise.all([
           functionalLocationService.getAll().catch(() => get().locations),
           equipmentService.getAll().catch(() => get().equipment),
           workOrderService.getAll({ take: 200 }).then(r => r.data).catch(() => get().workOrders),
-          notificationService.getAll().catch(() => get().notifications),
+          notificationService.getAll({ take: 250 }).then(r => r.data).catch(() => get().notifications),
           materialService.getAll().catch(() => get().materials),
           workCenterService.getAll().catch(() => get().workCenters),
           maintenancePlanService.getAll().catch(() => get().maintenancePlans),
-          userService.getAll().catch(() => get().users),
+          canListUsers ? userService.getAll().catch(() => get().users) : Promise.resolve(get().users),
         ]);
       set({
         locations, equipment, workOrders, notifications,
