@@ -1,8 +1,9 @@
 // ============================================================
 // Work Orders Page — List View + Board View + Full Management
+// Live data from API (Milestone A)
 // ============================================================
 
-import { useState, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -10,17 +11,25 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Edit3,
+  Loader2,
   Play,
   Pause,
   CheckCircle,
   XCircle,
   Lock,
+  AlertTriangle,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
-import { useAppStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
+import { workOrderService } from '@/services/workOrderService';
+import { ApiError } from '@/lib/api';
 import type { WorkOrder, ViewMode, WorkOrderStatus, Priority } from '@/types';
+
+interface WorkOrderRow extends WorkOrder {
+  functionalLocation?: { functionalLocationId: string; locationCode: string; description?: string };
+  equipment?: { equipmentId: string; equipmentCode: string; name?: string } | null;
+  workCenter?: { workCenterId: string; code: string; name?: string };
+}
 
 const statusBadges: Record<WorkOrderStatus, string> = {
   Draft: 'badge-open',
@@ -52,22 +61,79 @@ const priorityClasses: Record<Priority, string> = {
 
 const PAGE_SIZE = 10;
 
+const TRANSITIONS: Record<string, string[]> = {
+  Draft: ['Planned', 'Cancelled'],
+  Planned: ['Scheduled', 'Draft'],
+  Scheduled: ['In Progress', 'Planned', 'Cancelled'],
+  'In Progress': ['Completed', 'Suspended'],
+  Suspended: ['In Progress', 'Cancelled'],
+  Completed: ['Closed'],
+  Closed: [],
+  Cancelled: ['Draft'],
+};
+
 export default function WorkOrdersPage() {
   const navigate = useNavigate();
-  const workOrders = useAppStore((s) => s.workOrders);
-  const locations = useAppStore((s) => s.locations);
-  const equipment = useAppStore((s) => s.equipment);
-  const workCenters = useAppStore((s) => s.workCenters);
-  const transitionStatus = useAppStore((s) => s.transitionWorkOrderStatus);
   const hasPermission = useAuthStore((s) => s.hasPermission);
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [workOrders, setWorkOrders] = useState<WorkOrderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [priorityFilter, setPriorityFilter] = useState<string>('All');
   const [sortField, setSortField] = useState<string>('woNumber');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(0);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await workOrderService.getAll({ take: 250 });
+      setWorkOrders((res.data || []) as WorkOrderRow[]);
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : 'Failed to load work orders');
+      setWorkOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await workOrderService.getAll({ take: 250 });
+      setWorkOrders((res.data || []) as WorkOrderRow[]);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Failed to refresh work orders');
+    }
+  }, []);
+
+  const handleTransition = useCallback(
+    async (wo: WorkOrderRow, newStatus: WorkOrderStatus) => {
+      setActionError(null);
+      setBusyIds((b) => ({ ...b, [wo.workOrderId]: true }));
+      try {
+        await workOrderService.transitionStatus(wo.workOrderId, newStatus);
+        await refresh();
+      } catch (err) {
+        setActionError(
+          err instanceof ApiError ? err.message : `Failed to update status to ${newStatus}`
+        );
+      } finally {
+        setBusyIds((b) => ({ ...b, [wo.workOrderId]: false }));
+      }
+    },
+    [refresh]
+  );
 
   const filtered = useMemo(() => {
     let data = [...workOrders];
@@ -94,16 +160,11 @@ export default function WorkOrdersPage() {
   }, [workOrders, searchQuery, statusFilter, priorityFilter, sortField, sortDir]);
 
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
-  const getLocationName = (id: string) =>
-    locations.find((l) => l.functionalLocationId === id)?.locationCode || id;
-
-  const getEquipmentCode = (id: string | null) =>
-    id ? equipment.find((e) => e.equipmentId === id)?.equipmentCode || id : '-';
-
-  const getWorkCenterName = (id: string) =>
-    workCenters.find((w) => w.workCenterId === id)?.code || id;
+  const getEquipmentCode = (wo: WorkOrderRow) => wo.equipment?.equipmentCode || wo.equipmentId || '-';
+  const getWorkCenterName = (wo: WorkOrderRow) => wo.workCenter?.code || wo.workCenterId;
+  const getLocationCode = (wo: WorkOrderRow) => wo.functionalLocation?.locationCode || wo.functionalLocationId;
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -114,19 +175,8 @@ export default function WorkOrdersPage() {
     }
   };
 
-  const canTransition = (wo: WorkOrder, newStatus: WorkOrderStatus) => {
-    const transitions: Record<string, string[]> = {
-      Draft: ['Planned', 'Cancelled'],
-      Planned: ['Scheduled', 'Draft'],
-      Scheduled: ['In Progress', 'Planned', 'Cancelled'],
-      'In Progress': ['Completed', 'Suspended'],
-      Suspended: ['In Progress', 'Cancelled'],
-      Completed: ['Closed'],
-      Closed: [],
-      Cancelled: ['Draft'],
-    };
-    return transitions[wo.status]?.includes(newStatus);
-  };
+  const canTransition = (wo: WorkOrderRow, newStatus: WorkOrderStatus) =>
+    TRANSITIONS[wo.status]?.includes(newStatus);
 
   return (
     <>
@@ -140,6 +190,32 @@ export default function WorkOrdersPage() {
       />
 
       <div className="flex-1 overflow-y-auto p-6">
+        {actionError && (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded text-xs text-red-status border border-red-status/30"
+            style={{ backgroundColor: 'rgba(220,38,38,0.08)' }}>
+            <AlertTriangle className="w-4 h-4" />
+            {actionError}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <Loader2 className="w-6 h-6 animate-spin text-tertiary" />
+            <span className="ml-3 text-sm text-tertiary">Loading work orders...</span>
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <AlertTriangle className="w-8 h-8 text-red-status" />
+            <p className="text-sm text-red-status">{loadError}</p>
+            <button
+              onClick={load}
+              className="px-4 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <>
         {/* Filters */}
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1 max-w-xs">
@@ -159,13 +235,9 @@ export default function WorkOrdersPage() {
             style={{ backgroundColor: '#27272A' }}
           >
             <option value="All">All Statuses</option>
-            <option value="Draft">Draft</option>
-            <option value="Planned">Planned</option>
-            <option value="Scheduled">Scheduled</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Suspended">Suspended</option>
-            <option value="Completed">Completed</option>
-            <option value="Closed">Closed</option>
+            {Object.keys(statusBadges).map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
           </select>
           <select
             value={priorityFilter}
@@ -183,8 +255,17 @@ export default function WorkOrdersPage() {
           </span>
         </div>
 
-        {/* List View */}
-        {viewMode === 'list' && (
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-2">
+            <p className="text-sm text-secondary">No work orders found</p>
+            <button
+              onClick={() => navigate('/work-orders/new')}
+              className="px-4 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight transition-colors"
+            >
+              Create Work Order
+            </button>
+          </div>
+        ) : viewMode === 'list' ? (
           <div className="industrial-card rounded overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -198,7 +279,7 @@ export default function WorkOrdersPage() {
                       { key: 'equipmentId', label: 'Equipment' },
                       { key: 'type', label: 'Type' },
                       { key: 'plannedStart', label: 'Start Date' },
-                      { key: 'status', label: 'Assigned To' },
+                      { key: 'status', label: 'Location' },
                       { key: '', label: 'Actions' },
                     ].map((col) => (
                       <th
@@ -251,7 +332,7 @@ export default function WorkOrdersPage() {
                       </td>
                       <td className="px-4 py-2.5">
                         <span className="font-mono text-xs text-secondary">
-                          {getEquipmentCode(wo.equipmentId)}
+                          {getEquipmentCode(wo)}
                         </span>
                       </td>
                       <td className="px-4 py-2.5">
@@ -272,7 +353,7 @@ export default function WorkOrdersPage() {
                       </td>
                       <td className="px-4 py-2.5">
                         <span className="text-xs text-secondary">
-                          {getWorkCenterName(wo.workCenterId)}
+                          {getWorkCenterName(wo)} · {getLocationCode(wo)}
                         </span>
                       </td>
                       <td className="px-4 py-2.5">
@@ -284,50 +365,56 @@ export default function WorkOrdersPage() {
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
-                          {canTransition(wo, 'In Progress') && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); transitionStatus(wo.workOrderId, 'In Progress'); }}
-                              className="p-1 text-tertiary hover:text-green-status transition-colors"
-                              title="Start"
-                            >
-                              <Play className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {canTransition(wo, 'Completed') && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); transitionStatus(wo.workOrderId, 'Completed'); }}
-                              className="p-1 text-tertiary hover:text-green-status transition-colors"
-                              title="Complete"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {canTransition(wo, 'Suspended') && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); transitionStatus(wo.workOrderId, 'Suspended'); }}
-                              className="p-1 text-tertiary hover:text-amber transition-colors"
-                              title="Suspend"
-                            >
-                              <Pause className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {canTransition(wo, 'Closed') && hasPermission(['Maintenance Supervisor', 'Administrator']) && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); transitionStatus(wo.workOrderId, 'Closed'); }}
-                              className="p-1 text-tertiary hover:text-primary transition-colors"
-                              title="Close"
-                            >
-                              <Lock className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {canTransition(wo, 'Cancelled') && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); transitionStatus(wo.workOrderId, 'Cancelled'); }}
-                              className="p-1 text-tertiary hover:text-red-status transition-colors"
-                              title="Cancel"
-                            >
-                              <XCircle className="w-3.5 h-3.5" />
-                            </button>
+                          {busyIds[wo.workOrderId] ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-tertiary" />
+                          ) : (
+                            <>
+                              {canTransition(wo, 'In Progress') && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'In Progress'); }}
+                                  className="p-1 text-tertiary hover:text-green-status transition-colors"
+                                  title="Start"
+                                >
+                                  <Play className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {canTransition(wo, 'Completed') && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Completed'); }}
+                                  className="p-1 text-tertiary hover:text-green-status transition-colors"
+                                  title="Complete"
+                                >
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {canTransition(wo, 'Suspended') && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Suspended'); }}
+                                  className="p-1 text-tertiary hover:text-amber transition-colors"
+                                  title="Suspend"
+                                >
+                                  <Pause className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {canTransition(wo, 'Closed') && hasPermission(['Maintenance Supervisor', 'Administrator']) && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Closed'); }}
+                                  className="p-1 text-tertiary hover:text-primary transition-colors"
+                                  title="Close"
+                                >
+                                  <Lock className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {canTransition(wo, 'Cancelled') && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Cancelled'); }}
+                                  className="p-1 text-tertiary hover:text-red-status transition-colors"
+                                  title="Cancel"
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>
@@ -363,10 +450,7 @@ export default function WorkOrdersPage() {
               </div>
             </div>
           </div>
-        )}
-
-        {/* Board View */}
-        {viewMode === 'board' && (
+        ) : (
           <div className="flex gap-4 overflow-x-auto pb-2">
             {(['Draft', 'Planned', 'Scheduled', 'In Progress', 'Suspended', 'Completed'] as WorkOrderStatus[]).map(
               (status) => {
@@ -404,7 +488,7 @@ export default function WorkOrdersPage() {
                           </div>
                           <p className="text-primary text-xs mb-2 line-clamp-2">{wo.description}</p>
                           <div className="flex items-center justify-between text-tertiary" style={{ fontSize: '10px' }}>
-                            <span>{getEquipmentCode(wo.equipmentId)}</span>
+                            <span>{getEquipmentCode(wo)}</span>
                             <span>{wo.type}</span>
                           </div>
                         </div>
@@ -418,6 +502,8 @@ export default function WorkOrdersPage() {
               }
             )}
           </div>
+        )}
+          </>
         )}
       </div>
     </>

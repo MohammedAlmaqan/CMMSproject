@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 import Header from '@/components/layout/Header';
-import { useAppStore } from '@/store/appStore';
 import { workOrderService } from '@/services/workOrderService';
+import { functionalLocationService } from '@/services/functionalLocationService';
+import { equipmentService } from '@/services/equipmentService';
+import { workCenterService } from '@/services/workCenterService';
+import { userService } from '@/services/userService';
 import { ApiError } from '@/lib/api';
-import type { Priority, WorkOrderType } from '@/types';
+import type { FunctionalLocation, Equipment, WorkCenter, User, Priority, WorkOrderType } from '@/types';
 
 const inputClass =
   'w-full px-3 py-2 rounded text-primary text-sm outline-none border border-subtle focus:border-highlight transition-colors';
@@ -13,11 +16,12 @@ const labelClass = 'block text-secondary text-xs font-medium mb-1.5';
 
 export default function WorkOrderCreatePage() {
   const navigate = useNavigate();
-  const locations = useAppStore((s) => s.locations);
-  const equipment = useAppStore((s) => s.equipment);
-  const workCenters = useAppStore((s) => s.workCenters);
-  const users = useAppStore((s) => s.users);
-  const addWorkOrder = useAppStore((s) => s.addWorkOrder);
+  const [locations, setLocations] = useState<FunctionalLocation[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [type, setType] = useState<WorkOrderType>('CM');
   const [priority, setPriority] = useState<Priority>('Medium');
@@ -44,6 +48,32 @@ export default function WorkOrderCreatePage() {
     setEquipmentId(value);
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [locData, eqData, wcData, userData] = await Promise.all([
+          functionalLocationService.getAll(),
+          equipmentService.getAll(),
+          workCenterService.getAll(),
+          userService.getAll(),
+        ]);
+        if (cancelled) return;
+        setLocations(locData);
+        setEquipment(eqData);
+        setWorkCenters(wcData);
+        setUsers(userData);
+      } catch (err) {
+        if (!cancelled) setLoadError(err instanceof ApiError ? err.message : 'Failed to load form options');
+      } finally {
+        if (!cancelled) setLoadingOptions(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -64,7 +94,6 @@ export default function WorkOrderCreatePage() {
         breakdownFlag,
         safetyCriticalFlag,
       });
-      addWorkOrder(created);
       navigate(`/work-orders/${created.workOrderId}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create work order');
@@ -85,6 +114,30 @@ export default function WorkOrderCreatePage() {
           <span className="text-xs">Back to Work Orders</span>
         </button>
 
+        {loadError && (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded text-xs text-red-status border border-red-status/30"
+            style={{ backgroundColor: 'rgba(220,38,38,0.08)' }}>
+            <AlertTriangle className="w-4 h-4" />
+            {loadError}
+          </div>
+        )}
+
+        {loadingOptions ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-6 h-6 animate-spin text-tertiary" />
+            <span className="ml-3 text-sm text-tertiary">Loading form options...</span>
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <p className="text-sm text-red-status">Could not load form options</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="industrial-card rounded-lg p-6 max-w-3xl">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -244,6 +297,7 @@ export default function WorkOrderCreatePage() {
             </button>
           </div>
         </form>
+        )}
       </div>
     </>
   );
