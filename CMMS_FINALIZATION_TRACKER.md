@@ -26,6 +26,15 @@
 |---|---|---|---|
 | S1-S3 | Tracker written, stale evaluation plan archived, initial commit | ✅ | 1bab61d |
 
+### Commit Log
+
+| Commit | Description |
+|---|---|
+| 1bab61d | docs: add finalization tracker; archive stale evaluation plan |
+| 0d74455 | docs: record tracker baseline commit (backfill S1-S3 row status + hash) |
+| 8f4739c | build: complete phase 0 baseline (0.1-0.5); repair app/package-lock.json |
+| e6df64e | docs: record phase 0 commit hashes |
+
 ---
 
 ## Phase 0 - Baseline & Environment (0.5 day)
@@ -50,6 +59,8 @@
 | 1.6 | Security baseline: env-only `JWT_SECRET` (fail fast if missing), CORS origin allow-list, `helmet`, `express-rate-limit` on `/api/auth/login` | ⬜ | Missing secret refuses boot; login rate-limited |  |
 | 1.7 | Remove scaffolding: `Home.tsx`, `App.css`, stock `app/README.md`, kimi plugin, unused UI components | ⬜ | `npm run build` passes; no dead imports |  |
 | 1.8 | Fix dashboard literal `\n`; update/archive stale `CMMS_EVALUATION_AND_BUILD_PLAN.md` | ⬜ | No stray text; docs match reality |  |
+| 1.9 | Fix `TacticalDashboardGrid.tsx` React 19 render violations (refs accessed during render, impure function calls; 9 lint errors - flickering / non-deterministic render risk) | ⬜ | File passes eslint cleanly; 3D dashboard still renders correctly |  |
+| 1.10 | Fix `App.tsx` useEffect deps + `EquipmentPage.tsx` useMemo deps (stale-closure / stale-calculation risk) | ⬜ | Files pass eslint cleanly; affected pages behave correctly |  |
 
 ## Phase 2 - End-to-End Integration (5-8 days) - *core phase*
 
