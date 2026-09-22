@@ -36,7 +36,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
       loadDashboardKPIs();
       loadAlerts();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loadFromApi, loadDashboardKPIs, loadAlerts]);
 
   return <>{children}</>;
 }

@@ -2,7 +2,7 @@
 // Equipment Page — Master Data with Location Tree
 // ============================================================
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -12,11 +12,10 @@ import {
   Tag,
   ChevronLeft as CPLeft,
   ChevronRight as CPRight,
-  Filter,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { useAppStore } from '@/store/appStore';
-import type { Equipment as EquipmentType, FunctionalLocation } from '@/types';
+import type { FunctionalLocation } from '@/types';
 
 const PAGE_SIZE = 12;
 
@@ -45,17 +44,23 @@ export default function EquipmentPage() {
     });
   };
 
-  const getChildren = (parentId: string) => locations.filter((l) => l.parentLocationId === parentId);
+  const getChildren = useCallback(
+    (parentId: string) => locations.filter((l) => l.parentLocationId === parentId),
+    [locations]
+  );
 
-  const getEquipmentForNode = (locId: string) => {
-    const allIds = new Set<string>();
-    const collect = (id: string) => {
-      allIds.add(id);
-      getChildren(id).forEach((c) => collect(c.functionalLocationId));
-    };
-    collect(locId);
-    return equipment.filter((e) => allIds.has(e.functionalLocationId));
-  };
+  const getEquipmentForNode = useCallback(
+    (locId: string) => {
+      const allIds = new Set<string>();
+      const collect = (id: string) => {
+        allIds.add(id);
+        getChildren(id).forEach((c) => collect(c.functionalLocationId));
+      };
+      collect(locId);
+      return equipment.filter((e) => allIds.has(e.functionalLocationId));
+    },
+    [getChildren, equipment]
+  );
 
   const filteredEquipment = useMemo(() => {
     let data = selectedLocationId
@@ -73,7 +78,7 @@ export default function EquipmentPage() {
     if (classFilter !== 'All') data = data.filter((e) => e.equipmentClass === classFilter);
     if (criticalityFilter !== 'All') data = data.filter((e) => e.criticality === criticalityFilter);
     return data;
-  }, [equipment, selectedLocationId, searchQuery, classFilter, criticalityFilter]);
+  }, [equipment, selectedLocationId, searchQuery, classFilter, criticalityFilter, getEquipmentForNode]);
 
   const paged = filteredEquipment.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const totalPages = Math.ceil(filteredEquipment.length / PAGE_SIZE);
