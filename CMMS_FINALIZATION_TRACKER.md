@@ -70,7 +70,7 @@
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 1.0 | Fix blank screen: remove nested `<Router>`; add top-level Error Boundary | ✅ | `http://localhost:3000` loads the login page; no console errors; Error Boundary renders on crash | e4f7ce2, 2fda2c7 |
+| 1.0 | Fix blank screen: remove nested `<Router>`; add top-level Error Boundary | ✅ | `http://localhost:3000` loads the login page; no console errors; Error Boundary renders on crash. Evidence: `screenshots/login.png`, `screenshots/dashboard.png`, `screenshots/errorboundary.png` | e4f7ce2, 2fda2c7 |
 | 1.1 | Reorder alerts routes so `read-all` precedes `/:id/read` | ✅ | `PUT /api/alerts/read-all` returns 200 | d0c51a1 |
 | 1.2 | Add `/work-orders/new` route + WO creation form (or fix button to open dialog) | ✅ | Create flow persists WO to DB | 40e90af |
 | 1.3 | Fix password change: require current password; restrict resets to Administrator | ✅ | Non-admin cannot reset others; wrong current password -> 400 | 5ad8e4e |
@@ -82,7 +82,7 @@
 | 1.9 | Fix `TacticalDashboardGrid.tsx` React 19 render violations (refs accessed during render, impure function calls; 9 lint errors - flickering / non-deterministic render risk) | ✅ | File passes eslint cleanly; 3D dashboard still renders correctly | 4115150 |
 | 1.10 | Fix `App.tsx` useEffect deps + `EquipmentPage.tsx` useMemo deps (stale-closure / stale-calculation risk) | ✅ | Files pass eslint cleanly; affected pages behave correctly | 08646c1 |
 
-Note: Phase 1 tasks 1.2, 1.7, 1.8, 1.9, 1.10 were verified by build/lint only. Visual verification in browser of login + dashboard (including the Error Boundary fallback) was completed under task 1.0; page-level visual checks for the 1.2/1.7/1.8/1.9/1.10 features remain pending (deferred to Phase 2).
+Note: Phase 1 tasks 1.2, 1.7, 1.8, 1.9, 1.10 were verified by build/lint only. Task 1.0 completed visual verification of login + dashboard (screenshots referenced in the 1.0 row). Page-level visual checks for the 1.2/1.7/1.8/1.9/1.10 features remain pending (deferred to Phase 2).
 
 ## Phase 2 - End-to-End Integration (5-8 days) - *core phase*
 
@@ -139,6 +139,8 @@ Note: Follow-up (non-blocking) - add a one-line comment to `Craft.hourlyRate` in
 | 5.2 | Vitest + Testing Library for 5 key pages (login, WO list/detail, guard) - *deferrable* | ⬜ | Green, or explicitly deferred |  |
 | 5.3 | One Playwright E2E: login -> create WO -> transition -> convert notification -> report | ⬜ | Passes against seeded DB |  |
 | 5.4 | Regression pass re-verifying every Phase 1 defect | ⬜ | Checklist signed off |  |
+
+Note (Playwright tooling): during task 1.0 verification a corrupted byte was found in `C:\Users\Injaz\AppData\Roaming\Python\Python314\site-packages\playwright\driver\package\lib\utilsBundle.js`. On line 6310 the string `if (this.lastDraw <0x01>== str)` contained an injected `0x01` byte between `lastDraw ` and `==`, which broke the Node driver (`SyntaxError: Invalid or unexpected token`). Fix: binary-patched that single byte `0x01` -> `0x20` (space), restoring valid JS `if (this.lastDraw  == str)`. This patch does NOT survive `pip install playwright --upgrade` (pip replaces the installed package; a reinstall also restores the clean official file since the corruption was local, not in the wheel). Recommend a clean `pip uninstall playwright` + `pip install playwright` before 5.3 E2E setup. Not urgent.
 
 ## Phase 6 - CI/CD, Ops & Security Hardening (3-4 days)
 
