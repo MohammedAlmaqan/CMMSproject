@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - Not Started
+**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete, awaiting approval)
 
 ## Status Legend
 
@@ -88,20 +88,35 @@ Note: Phase 1 tasks 1.2, 1.7, 1.8, 1.9, 1.10 were verified by build/lint only. T
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 2.1 | Wire **all mutations** to services: create/update WO, status transitions, convert-to-WO, comments, alert read, materials/labor/checklists CRUD | ⬜ | Refresh after each action -> data persists |  |
-| 2.2 | Load remaining collections live: users, crafts, taskLists, operations, labor, checklists, meter readings, comments, **audit log** | 🔶 | Administration audit tab shows real entries | 40e90af |
+| 2.1 | Wire **all mutations** to services: create/update WO, status transitions, convert-to-WO, comments, alert read, materials/labor/checklists CRUD | 🔶 | Refresh after each action -> data persists | 367b59d, d842bb9, 1f2ff8e |
+| 2.2 | Load remaining collections live: users, crafts, taskLists, operations, labor, checklists, meter readings, comments, **audit log** | 🔶 | Administration audit tab shows real entries | 40e90af, d842bb9 |
 | 2.3 | **Delete `mockData.ts` and all `.catch(() => mock)` fallbacks**; add toast + loading/error states on every view | ⬜ | API down -> visible error, zero fabricated data |  |
 | 2.4 | ReportsPage -> call `reportService` (7 endpoints); delete `Math.random()`/simulated logic | ⬜ | Report figures match SQL results |  |
 | 2.5 | Implement Export (CSV minimum; align README claim) | ⬜ | Button downloads file |  |
 | 2.6 | Dashboard: feed trend chart from `/dashboard/cost-summary`; alerts from API | ⬜ | No hardcoded series |  |
 | 2.7 | Add missing sidebar entries: Work Centers, Preventive Maintenance | ⬜ | Both reachable via nav |  |
-| 2.8 | Wire `auditMiddleware`/`logAudit` onto all mutating routes | ⬜ | Every create/update/delete writes `AuditLogEntry` |  |
-| 2.9 | Apply `authorizeMinRole` per SOW role matrix | ⬜ | View-Only gets 403 on writes |  |
-| 2.10 | Zod validation on all request bodies/params | ⬜ | Malformed payload -> 400 with message, never raw Prisma error |  |
+| 2.8 | Wire `auditMiddleware`/`logAudit` onto all mutating routes | 🔶 | Every create/update/delete writes `AuditLogEntry` | 367b59d |
+| 2.9 | Apply `authorizeMinRole` per SOW role matrix | 🔶 | View-Only gets 403 on writes | 367b59d |
+| 2.10 | Zod validation on all request bodies/params | 🔶 | Malformed payload -> 400 with message, never raw Prisma error | 367b59d |
 | 2.11 | Annotate all routes with Swagger JSDoc (or regenerate spec) | ⬜ | `/api-docs` renders full API reference |  |
 | 2.12 | Decide refresh-token scope: implement refresh endpoints **or** document fixed 8h session | ⬜ | Decision recorded; no dead schema |  |
 
 Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userService.getAll()` into `appStore.loadFromApi` (with fallback to current user on failure). Remaining collections (crafts, taskLists, operations, labor, checklists, meter readings, comments, audit log) are still on mock/static data and land with 2.2.
+
+### Milestone A - WO domain end-to-end pilot (COMPLETE, awaiting approval)
+
+**Scope done in this milestone (folded 2.8/2.9/2.10 into every route edit):**
+- Backend: `backend/src/utils/validation.ts` (zod v4: workOrder create/update/status, operation, woMaterial, labor, comment schemas + `validate` middleware). Rewrote `workOrders.ts` (RBAC create/update=Requester, transition=Technician, delete=Supervisor; documented state machine; auto actualStart/actualFinish; plannedCost recompute; `logAudit` on create/update/delete/status incl. old→new) + `workOrderOperations.ts`, `workOrderMaterials.ts`, `labor.ts`, `comments.ts` (writes=Technician; comment delete author-or-admin; labor soft-delete; audit on all).
+- Frontend: `WorkOrdersPage` (live `workOrderService` list via embedded functionalLocation/equipment/workCenter, loading/error/empty states, async quick actions + Plan/Schedule added, busy indicators), `WorkOrderDetailPage` (live detail + labor + audit history, async transitions, Delete (Supervisor/Admin), comment compose/delete, per-tab empty states), `WorkOrderCreatePage` (form options from live API, loading/error/Retry).
+
+**Verification (all raw, automated via Playwright headless Chromium):**
+- API: create 201 / WO-000004; malformed body -> 400 with zod path list; View-Only create+delete -> 403; invalid status transition -> 400; transition chain Draft→Planned→Scheduled→In Progress (actualStart auto-set) -> audit rows `{Create, Update status old/new ×3}`.
+- Browser E2E (WO-000011, full lifecycle): create via UI -> list empty state -> Draft badge -> Plan/Schedule/Start/Complete/Close buttons appear/disappear per state -> reload persists -> History tab shows 6 entries -> comment add (in-memory ≤1s) + persists after reload + delete -> list shows Closed -> Board view renders -> Delete WO -> absent after refresh. `PAGE_ERRORS=[] CONSOLE_ERRORS=[]`.
+- API-failure state: aborted `/api/work-orders` -> error panel + Retry shown; Retry recovers to live data.
+- Screenshots (evidence, git-ignored): `screenshots/ma_01_list_start.png`, `ma_02_detail_draft.png`, `ma_03_detail_closed.png`, `ma_04_history.png`, `ma_05_comments.png`, `ma_06_list_closed.png`, `ma_07_board.png`, `ma_08_after_delete.png`.
+- DB left clean after verification (0 active work orders; test comments/WOs deleted). Backend restarted on :4000 (logs `backend-out12/err12.log`).
+
+**Remaining for 2.1/2.2/2.8/2.9/2.10 (non-WO domains, Milestone B):** work-order operations/materials/labor CRUD UI, checklists CRUD, external services CRUD, alert read, convert-notification-to-WO, notifications/materials/equipment/locations/work-centers pages, Preventative Maintenance page, Reports, Dashboard live feeds, admin audit tab, plus mockData deletion.
 
 ## Phase 3 - Missing SOW Features (6-9 days)
 
