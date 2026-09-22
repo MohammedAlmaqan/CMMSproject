@@ -12,6 +12,8 @@ import {
   ChevronRight,
   Eye,
   Loader2,
+  CalendarClock,
+  CalendarCheck,
   Play,
   Pause,
   CheckCircle,
@@ -369,6 +371,24 @@ export default function WorkOrdersPage() {
                             <Loader2 className="w-3.5 h-3.5 animate-spin text-tertiary" />
                           ) : (
                             <>
+                              {canTransition(wo, 'Planned') && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Planned'); }}
+                                  className="p-1 text-tertiary hover:text-amber transition-colors"
+                                  title="Plan"
+                                >
+                                  <CalendarClock className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {canTransition(wo, 'Scheduled') && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Scheduled'); }}
+                                  className="p-1 text-tertiary hover:text-blue-status transition-colors"
+                                  title="Schedule"
+                                >
+                                  <CalendarCheck className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                               {canTransition(wo, 'In Progress') && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'In Progress'); }}

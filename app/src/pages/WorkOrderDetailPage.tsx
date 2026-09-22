@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
+  CalendarClock,
+  CalendarCheck,
   Play,
   Pause,
   CheckCircle,
@@ -352,6 +354,22 @@ export default function WorkOrderDetailPage() {
               <Loader2 className="w-4 h-4 animate-spin text-tertiary" />
             ) : (
               <>
+                {canTransition('Planned') && (
+                  <button
+                    onClick={() => performTransition('Planned')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
+                  >
+                    <CalendarClock className="w-3.5 h-3.5" /> Plan
+                  </button>
+                )}
+                {canTransition('Scheduled') && (
+                  <button
+                    onClick={() => performTransition('Scheduled')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-blue-status border border-blue-status/50 hover:bg-blue-status/10 transition-all"
+                  >
+                    <CalendarCheck className="w-3.5 h-3.5" /> Schedule
+                  </button>
+                )}
                 {canTransition('In Progress') && (
                   <button
                     onClick={() => performTransition('In Progress')}
