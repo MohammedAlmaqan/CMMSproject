@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 of 7 - Complete | Phase 1 - Complete (0 P0 open)
+**Status:** Phase 0 - Complete | Phase 1 (1.1–1.10) - Complete | Task 1.0 pending before Phase 2
 
 ## Status Legend
 
@@ -67,6 +67,7 @@
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
+| 1.0 | Fix blank screen: remove nested `<Router>`; add top-level Error Boundary | ⬜ | `http://localhost:3000` loads the login page; no console errors; Error Boundary renders on crash |  |
 | 1.1 | Reorder alerts routes so `read-all` precedes `/:id/read` | ✅ | `PUT /api/alerts/read-all` returns 200 | d0c51a1 |
 | 1.2 | Add `/work-orders/new` route + WO creation form (or fix button to open dialog) | ✅ | Create flow persists WO to DB | 40e90af |
 | 1.3 | Fix password change: require current password; restrict resets to Administrator | ✅ | Non-admin cannot reset others; wrong current password -> 400 | 5ad8e4e |
@@ -78,12 +79,14 @@
 | 1.9 | Fix `TacticalDashboardGrid.tsx` React 19 render violations (refs accessed during render, impure function calls; 9 lint errors - flickering / non-deterministic render risk) | ✅ | File passes eslint cleanly; 3D dashboard still renders correctly | 4115150 |
 | 1.10 | Fix `App.tsx` useEffect deps + `EquipmentPage.tsx` useMemo deps (stale-closure / stale-calculation risk) | ✅ | Files pass eslint cleanly; affected pages behave correctly | 08646c1 |
 
+Note: Phase 1 tasks 1.2, 1.7, 1.8, 1.9, 1.10 were verified by build/lint only. Visual verification in browser is pending task 1.0.
+
 ## Phase 2 - End-to-End Integration (5-8 days) - *core phase*
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
 | 2.1 | Wire **all mutations** to services: create/update WO, status transitions, convert-to-WO, comments, alert read, materials/labor/checklists CRUD | ⬜ | Refresh after each action -> data persists |  |
-| 2.2 | Load remaining collections live: users, crafts, taskLists, operations, labor, checklists, meter readings, comments, **audit log** | ⬜ | Administration audit tab shows real entries |  |
+| 2.2 | Load remaining collections live: users, crafts, taskLists, operations, labor, checklists, meter readings, comments, **audit log** | 🔶 | Administration audit tab shows real entries | 40e90af |
 | 2.3 | **Delete `mockData.ts` and all `.catch(() => mock)` fallbacks**; add toast + loading/error states on every view | ⬜ | API down -> visible error, zero fabricated data |  |
 | 2.4 | ReportsPage -> call `reportService` (7 endpoints); delete `Math.random()`/simulated logic | ⬜ | Report figures match SQL results |  |
 | 2.5 | Implement Export (CSV minimum; align README claim) | ⬜ | Button downloads file |  |
@@ -94,6 +97,8 @@
 | 2.10 | Zod validation on all request bodies/params | ⬜ | Malformed payload -> 400 with message, never raw Prisma error |  |
 | 2.11 | Annotate all routes with Swagger JSDoc (or regenerate spec) | ⬜ | `/api-docs` renders full API reference |  |
 | 2.12 | Decide refresh-token scope: implement refresh endpoints **or** document fixed 8h session | ⬜ | Decision recorded; no dead schema |  |
+
+Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userService.getAll()` into `appStore.loadFromApi` (with fallback to current user on failure). Remaining collections (crafts, taskLists, operations, labor, checklists, meter readings, comments, audit log) are still on mock/static data and land with 2.2.
 
 ## Phase 3 - Missing SOW Features (6-9 days)
 
