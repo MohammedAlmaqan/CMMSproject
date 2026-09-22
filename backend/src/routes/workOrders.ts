@@ -187,10 +187,10 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
-    const [opsTotal, matTotal, svcTotal] = await Promise.all([
-      prisma.workOrderOperation.aggregate({
+    const [ops, matTotal, svcTotal] = await Promise.all([
+      prisma.workOrderOperation.findMany({
         where: { workOrderId: id },
-        _sum: { plannedHours: true },
+        include: { craft: true },
       }),
       prisma.workOrderMaterial.aggregate({
         where: { workOrderId: id },
@@ -202,7 +202,10 @@ router.put('/:id', async (req: Request, res: Response) => {
       }),
     ]);
 
-    const laborCost = (opsTotal._sum.plannedHours || 0) * 50;
+    const laborCost = ops.reduce(
+      (sum, op) => sum + (op.plannedHours || 0) * (op.numberOfTechnicians || 1) * (op.craft.hourlyRate || 0),
+      0
+    );
     const materialCost = (matTotal._sum.plannedQuantity || 0) * (matTotal._sum.unitCost || 0);
     const serviceCost = svcTotal._sum.cost || 0;
     const plannedCost = laborCost + materialCost + serviceCost;

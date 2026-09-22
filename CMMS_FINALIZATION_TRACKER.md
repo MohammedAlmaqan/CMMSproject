@@ -51,12 +51,12 @@
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 1.1 | Reorder alerts routes so `read-all` precedes `/:id/read` | ⬜ | `PUT /api/alerts/read-all` returns 200 |  |
+| 1.1 | Reorder alerts routes so `read-all` precedes `/:id/read` | ✅ | `PUT /api/alerts/read-all` returns 200 | d0c51a1 |
 | 1.2 | Add `/work-orders/new` route + WO creation form (or fix button to open dialog) | ⬜ | Create flow persists WO to DB |  |
 | 1.3 | Fix password change: require current password; restrict resets to Administrator | ✅ | Non-admin cannot reset others; wrong current password -> 400 | 5ad8e4e |
 | 1.4 | Fix PM `generate-wo` empty-FK; replace `Date.now()` WO number with sequence/prefix+counter | ⬜ | Equipment-only plan generates WO; concurrent creates don't collide |  |
-| 1.5 | Replace hardcoded `* 50` labor rate with work-center/craft rate from DB | ⬜ | Planned labor cost matches master data |  |
-| 1.6 | Security baseline: env-only `JWT_SECRET` (fail fast if missing), CORS origin allow-list, `helmet`, `express-rate-limit` on `/api/auth/login` | ✅ | Missing secret refuses boot; login rate-limited |  |
+| 1.5 | Replace hardcoded `* 50` labor rate with work-center/craft rate from DB | ✅ | Planned labor cost matches master data |  |
+| 1.6 | Security baseline: env-only `JWT_SECRET` (fail fast if missing), CORS origin allow-list, `helmet`, `express-rate-limit` on `/api/auth/login` | ✅ | Missing secret refuses boot; login rate-limited | 849cab1 |
 | 1.7 | Remove scaffolding: `Home.tsx`, `App.css`, stock `app/README.md`, kimi plugin, unused UI components | ⬜ | `npm run build` passes; no dead imports |  |
 | 1.8 | Fix dashboard literal `\n`; update/archive stale `CMMS_EVALUATION_AND_BUILD_PLAN.md` | ⬜ | No stray text; docs match reality |  |
 | 1.9 | Fix `TacticalDashboardGrid.tsx` React 19 render violations (refs accessed during render, impure function calls; 9 lint errors - flickering / non-deterministic render risk) | ⬜ | File passes eslint cleanly; 3D dashboard still renders correctly |  |
