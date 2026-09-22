@@ -6,5 +6,7 @@ export const laborService = {
     api.get<LaborEntry[]>('/labor', { workOrderId }),
   create: (data: Partial<LaborEntry>) =>
     api.post<LaborEntry>('/labor', data),
+  update: (id: string, data: Partial<LaborEntry>) =>
+    api.put<LaborEntry>(`/labor/${id}`, data),
   delete: (id: string) => api.delete(`/labor/${id}`),
 };

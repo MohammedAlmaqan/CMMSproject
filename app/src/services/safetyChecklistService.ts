@@ -9,9 +9,11 @@ export const safetyChecklistService = {
   getByWorkOrder: (woId: string) =>
     api.get<WorkOrderChecklist[]>(`/safety-checklists/work-order/${woId}`),
   attachToWorkOrder: (woId: string, templateId: string) =>
-    api.post(`/safety-checklists/work-order/${woId}/attach`, { templateId }),
+    api.post(`/safety-checklists/work-order/${woId}/attach`, { checklistTemplateId: templateId }),
   updateChecklistStatus: (id: string, data: Partial<WorkOrderChecklist>) =>
     api.put(`/safety-checklists/work-order-checklist/${id}`, data),
   updateChecklistItem: (id: string, data: { response: string; comment?: string }) =>
     api.put(`/safety-checklists/work-order-checklist-item/${id}`, data),
+  deleteChecklist: (id: string) =>
+    api.delete(`/safety-checklists/work-order-checklist/${id}`),
 };

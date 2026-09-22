@@ -472,7 +472,7 @@ export default function WorkOrdersPage() {
           </div>
         ) : (
           <div className="flex gap-4 overflow-x-auto pb-2">
-            {(['Draft', 'Planned', 'Scheduled', 'In Progress', 'Suspended', 'Completed'] as WorkOrderStatus[]).map(
+            {(['Draft', 'Planned', 'Scheduled', 'In Progress', 'Suspended', 'Completed', 'Closed', 'Cancelled'] as WorkOrderStatus[]).map(
               (status) => {
                 const statusWos = filtered.filter((w) => w.status === status);
                 return (
