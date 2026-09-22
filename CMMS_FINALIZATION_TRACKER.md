@@ -52,7 +52,7 @@
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
 | 1.1 | Reorder alerts routes so `read-all` precedes `/:id/read` | ✅ | `PUT /api/alerts/read-all` returns 200 | d0c51a1 |
-| 1.2 | Add `/work-orders/new` route + WO creation form (or fix button to open dialog) | ⬜ | Create flow persists WO to DB |  |
+| 1.2 | Add `/work-orders/new` route + WO creation form (or fix button to open dialog) | ✅ | Create flow persists WO to DB | 40e90af |
 | 1.3 | Fix password change: require current password; restrict resets to Administrator | ✅ | Non-admin cannot reset others; wrong current password -> 400 | 5ad8e4e |
 | 1.4 | Fix PM `generate-wo` empty-FK; replace `Date.now()` WO number with sequence/prefix+counter | ✅ | Equipment-only plan generates WO; concurrent creates don't collide | 498c221 |
 | 1.5 | Replace hardcoded `* 50` labor rate with work-center/craft rate from DB | ✅ | Planned labor cost matches master data | 41181ca |
