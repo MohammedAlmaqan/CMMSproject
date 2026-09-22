@@ -2,7 +2,7 @@
 // Tactical Dashboard Grid — 3D Background Effect
 // ============================================================
 
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -53,16 +53,11 @@ function TacticalGrid({ rowCount, columnCount, spacing, color }: TacticalGridPro
     return result;
   }, [rowCount, columnCount, spacing, offsetX, offsetY]);
 
-  const lineRefs = useRef<(THREE.Line | null)[]>([]);
-  const totalLines = rows.length + columns.length;
-
-  if (lineRefs.current.length !== totalLines) {
-    lineRefs.current = new Array(totalLines).fill(null);
-  }
+  const lineRefs = useRef<Map<string, THREE.Line>>(new Map<string, THREE.Line>());
 
   useFrame(({ clock }) => {
     for (let i = 0; i < rowCount; i++) {
-      const ref = lineRefs.current[i];
+      const ref = lineRefs.current.get(`h-${i}`);
       if (!ref) continue;
       const y = rows[i].y;
       const waveY = y + Math.sin(clock.elapsedTime * 0.15 + y * 0.05) * 0.3;
@@ -71,7 +66,7 @@ function TacticalGrid({ rowCount, columnCount, spacing, color }: TacticalGridPro
       ref.geometry.attributes.position.needsUpdate = true;
     }
     for (let j = 0; j < columnCount; j++) {
-      const ref = lineRefs.current[rowCount + j];
+      const ref = lineRefs.current.get(`v-${j}`);
       if (!ref) continue;
       const x = columns[j].x;
       const waveX = x + Math.cos(clock.elapsedTime * 0.15 + x * 0.05) * 0.3;
@@ -83,19 +78,31 @@ function TacticalGrid({ rowCount, columnCount, spacing, color }: TacticalGridPro
 
   return (
     <group>
-      {rows.map((row, index) => (
+      {rows.map((row) => (
         <line
           key={row.id}
-          ref={(el) => { lineRefs.current[index] = el as unknown as THREE.Line; }}
+          ref={(el) => {
+            if (el) {
+              lineRefs.current.set(row.id, el as unknown as THREE.Line);
+            } else {
+              lineRefs.current.delete(row.id);
+            }
+          }}
         >
           <primitive object={row.geometry} attach="geometry" />
           <lineBasicMaterial attach="material-0" color={color} toneMapped={false} transparent />
         </line>
       ))}
-      {columns.map((col, index) => (
+      {columns.map((col) => (
         <line
           key={col.id}
-          ref={(el) => { lineRefs.current[rowCount + index] = el as unknown as THREE.Line; }}
+          ref={(el) => {
+            if (el) {
+              lineRefs.current.set(col.id, el as unknown as THREE.Line);
+            } else {
+              lineRefs.current.delete(col.id);
+            }
+          }}
         >
           <primitive object={col.geometry} attach="geometry" />
           <lineBasicMaterial attach="material-0" color={color} toneMapped={false} transparent />
@@ -113,7 +120,10 @@ function TelemetryDots({ dotColor }: TelemetryDotsProps) {
   const pointsRef = useRef<THREE.Points>(null);
   const positionsArray = useMemo(() => new Float32Array(15 * 3), []);
 
-  const pointData = useMemo(() => {
+  const [pointData] = useState<{
+    startX: number; startY: number; speed: number;
+    freqX: number; freqY: number; ampX: number; ampY: number;
+  }[]>(() => {
     const boundsX = 14 * 0.25;
     const boundsY = 11 * 0.25;
     const data: {
@@ -132,7 +142,7 @@ function TelemetryDots({ dotColor }: TelemetryDotsProps) {
       });
     }
     return data;
-  }, []);
+  });
 
   useFrame((state) => {
     if (!pointsRef.current) return;
