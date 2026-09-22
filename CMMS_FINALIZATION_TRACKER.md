@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete, awaiting approval)
+**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Groups 2-7 pending)
 
 ## Status Legend
 
@@ -116,7 +116,24 @@ Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userServic
 - Screenshots (evidence, git-ignored): `screenshots/ma_01_list_start.png`, `ma_02_detail_draft.png`, `ma_03_detail_closed.png`, `ma_04_history.png`, `ma_05_comments.png`, `ma_06_list_closed.png`, `ma_07_board.png`, `ma_08_after_delete.png`.
 - DB left clean after verification (0 active work orders; test comments/WOs deleted). Backend restarted on :4000 (logs `backend-out12/err12.log`).
 
-**Remaining for 2.1/2.2/2.8/2.9/2.10 (non-WO domains, Milestone B):** work-order operations/materials/labor CRUD UI, checklists CRUD, external services CRUD, alert read, convert-notification-to-WO, notifications/materials/equipment/locations/work-centers pages, Preventative Maintenance page, Reports, Dashboard live feeds, admin audit tab, plus mockData deletion.
+**Remaining for 2.1/2.2/2.8/2.9/2.10 (non-WO domains, Milestone B):** alert read, convert-notification-to-WO, notifications/materials/equipment/locations/work-centers pages, Preventative Maintenance page, Reports, Dashboard live feeds, admin audit tab, plus mockData deletion.
+
+### Milestone B - Remaining SOW domains in 8 ordered groups (IN PROGRESS)
+
+**Group order:** G1 WO sub-domain CRUD (ops/materials/labor/services/checklists) + cost recompute verify (Corrective 1&3) + board Closed handling (Corrective 2) -> G2 Notifications -> G3 Asset master -> G4 Preventive Maintenance -> G5 Dashboard+Reports -> G6 Administration -> G7 Sidebar + delete `mockData.ts` and all `.catch(() => mock)` -> G8 coverage re-check.
+
+### Milestone B - Group 1 (COMPLETE): WO sub-domain CRUD + costs + board
+
+**Scope (folded 2.8/2.9/2.10 into each touched route):**
+- Backend (commits `8df301d`): new `utils/costs.ts` `recomputeWorkOrderCosts` (planned=Σ ops(plannedHours×techs×craft.hourlyRate) + Σ materials(plannedQuantity×unitCost) + Σ services(cost); actual=Σ labor(hours×op.craft.hourlyRate) + Σ materials(actualQuantity×unitCost) + Σ services(cost)); wired into labor/operations/materials/external-services CRUD + WO PUT (also fixes old sum×sum material math). New routes `externalServiceCosts.ts` (GET by workOrderId required / POST / PUT / DELETE, Technician, zod, audit, recompute) + `crafts.ts` (GET /crafts, `craftCode`/`description` order). `labor.ts` +PUT /:id + recompute + FK 404 guards (operation/user/craft/material). `workOrderOperations.ts` recompute + cascade delete laborEntries + craft 404 guard. `workOrderMaterials.ts` recompute + material 404 guard. `safetyChecklists.ts` full rewrite: RBAC, zod, audit on all routes + DELETE. `validation.ts` added laborUpdate/externalServiceCreate+Update/checklistTemplateCreate+Attach+Update+Item schemas. Backend `tsc --noEmit` exit 0.
+- Frontend (commit `c40030a`): new `craftService.ts`, `externalServiceService.ts`; `laborService.update`; `safetyChecklistService.deleteChecklist` + attach payload fix (`checklistTemplateId` not `templateId`). `WorkOrderDetailPage.tsx` full rewrite — CRUD for Operations (craft dropdown, plannedHours, techs), Materials (dropdown auto-fill standardCost→unitCost when empty, planned/actual/unitCost), Labor (operation+user dropdowns, hours, notes), Services (vendor/desc/cost/invoiceRef), Checklists (attach, Yes/No/NA chips, Complete & Sign, delete); cost cards recompute via reload after each mutation; `performTransition` now clears `busy` so transition buttons render after each step (bug found by E2E); loading/empty/error states preserved; zero mock, zero `any`. `WorkOrdersPage.tsx` board = all 8 lanes incl. Closed + Cancelled (Corrective 2, add-column option). Group-1 files `tsc` exit 0 and `eslint` exit 0.
+
+**Verification (Playwright headless, `g1_e2e.py`, run at commit c40030a — all SI flags True, `PAGE_ERRORS=[] CONSOLE_ERRORS=[]`):**
+- Operations: add (planned 70), reload persists, edit craft→WELDER (80, Δ-10), delete (0), re-add FITTER (90 planned chain); Materials: add 3×10 (planned+30), reload persists, edit unitCost 20 (+30 more), delete (back to 90); Services: add 50 (+50 planned/actual), edit cost 60 (+10), delete (back to 90); Labor: add 2h FITTER → actual 90, reload persists, edit 1h → actual 45, delete → actual 0.
+- Checklists: attach Lockout/Tagout (persists; template id payload verified via API), respond Yes, Complete & Sign ("Signed by Admin User on …"), delete.
+- Transitions on detail page: Draft→…→Close chain completed on a second WO (regression re-proof of full lifecycle after Group 1 refactor); Closed card verified present in the **Closed** board lane (header-span-scoped selector); all 8 lanes render.
+- Two product bugs found by E2E and fixed: attach sent wrong field (`templateId`) and `performTransition` never cleared busy (transition buttons stuck as spinner).
+- Screenshots (evidence, git-ignored): `screenshots/g1_01_operation_added.png`, `g1_01b_operation_deleted.png`, `g1_02b_material_deleted.png`, `g1_05_checklist_responded.png`, `g1_05b_checklist_deleted.png`, `g1_07_board_all_lanes.png`, `g1_08_closed_lane_card.png`.
 
 ## Phase 3 - Missing SOW Features (6-9 days)
 
