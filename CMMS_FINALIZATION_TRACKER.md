@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Groups 2-7 pending)
+**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; Groups 3-7 pending)
 
 ## Status Legend
 
@@ -134,6 +134,19 @@ Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userServic
 - Transitions on detail page: Draft→…→Close chain completed on a second WO (regression re-proof of full lifecycle after Group 1 refactor); Closed card verified present in the **Closed** board lane (header-span-scoped selector); all 8 lanes render.
 - Two product bugs found by E2E and fixed: attach sent wrong field (`templateId`) and `performTransition` never cleared busy (transition buttons stuck as spinner).
 - Screenshots (evidence, git-ignored): `screenshots/g1_01_operation_added.png`, `g1_01b_operation_deleted.png`, `g1_02b_material_deleted.png`, `g1_05_checklist_responded.png`, `g1_05b_checklist_deleted.png`, `g1_07_board_all_lanes.png`, `g1_08_closed_lane_card.png`.
+
+### Milestone B - Group 2 (COMPLETE): Notifications
+
+**Scope (folded 2.8/2.9/2.10 into each touched route):**
+- Backend (commit `42d8a82`): rewrote `notifications.ts` — GET `/` envelope `{data,total,skip,take}` with search/type/priority/status filters; GET `/:id` detail with nested `functionalLocation`/`equipment`/`reportedBy`/`workOrders`/`comments`; POST `/` `authorizeMinRole('Requester')` + `notificationCreateSchema` + `generateNotifNumber()` (prefix + NOTIFICATION sequence padded 6) + audit; PUT `/:id` Requester + `notificationUpdateSchema` + audit; DELETE `/:id` Maintenance Supervisor + soft delete + audit; POST `/:id/convert-to-wo` Maintenance Planner + `convertNotificationSchema` (optional workCenterId/supervisorUserId) + `generateWoNumber()` **before** transaction + tx { create WO (EM if breakdown else CM), `WorkOrderNotifLink`, notification→Converted } + dual audit (WorkOrder Create + Notification status Open→Converted) + 201 + duplicate-convert 400. `validation.ts` added notificationType (M1/M2/M3), notificationStatus (Open/In Process/Completed/Converted), create/update/convert schemas; `sequence.ts` added `generateNotifNumber`.
+- Frontend (commit `42d8a82`): `Notification` type now matches backend wire (nested `functionalLocation`/`equipment`/`reportedBy`/`workOrders`/`comments`); `notificationService.getAll` envelope-aware; `NotificationsPage.tsx` live API (loading/error/Retry/empty states, type/priority/status filters, client pagination, reporter/location/equipment from nested payload); `NotificationDetailPage.tsx` live detail + real Convert-to-WO (busy/error handling, post-convert reload, status badge, linked-WO cards, hidden Convert button once Converted); header alerts bell now clickable → marks all read + navigates to Notifications. Fixed a real app bug found by E2E: `appStore.loadFromApi()` unconditionally fetched `/api/users` for every role → 403 console noise for non-admins (backend gates GET /users to Administrator); now only fetched for Administrator.
+
+**Verification (Playwright headless, `g2_e2e.py` — all 22 SI flags True, `PAGE_ERRORS=[]`, only benign 404 from the deliberate unknown-id probe):**
+- Created fresh notification via operator API → list shows it (nested reporter "Plant Operator", location AR-001); Open filter isolates it; Open details (no breakdown banner, no linked WOs, Convert button visible).
+- Convert to WO as admin → navigates to `work-orders/:id`, WO number `WO-xxxxxx` shown; list now shows Converted; detail shows Linked Work Orders (1) with WO card, status badge Converted, Convert button hidden; Converted filter includes it; unknown-id path → clean not-found/error UI.
+- API probes: envelope list shape; nested detail (reportedBy/fullName, workOrders[]); `/api/users` 403 root-caused and fixed (no more console 403s for operator login).
+- Screenshots (evidence, git-ignored): `screenshots/g2_01_notification_detail_open.png`, `g2_02_after_convert_wo_detail.png`, `g2_03_notification_detail_converted.png`.
+- Quality gates: frontend `tsc --noEmit` exit 0; G2-scoped eslint exit 0 (appStore 2 pre-existing errors remain — unused `commentService` import + `as any` in mock converter — both removed with `mockData.ts` deletion in G7).
 
 ## Phase 3 - Missing SOW Features (6-9 days)
 
