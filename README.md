@@ -10,7 +10,7 @@ A comprehensive Computerized Maintenance Management System (CMMS) for managing m
 │  React 19       │     │  Express/TS     │     │  Database    │
 │  Vite 7         │     │  Prisma ORM     │     │              │
 │  Tailwind CSS   │     │  JWT Auth       │     │              │
-│  shadcn/ui      │     │  Swagger Docs   │     │              │
+│  React Three    │     │  Swagger Docs   │     │              │
 └─────────────────┘     └─────────────────┘     └──────────────┘
 ```
 
@@ -174,7 +174,7 @@ See `scripts/build.bat` and `scripts/start.bat` for Windows batch deployment scr
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 19, TypeScript, Vite 7, Tailwind CSS 3, shadcn/ui |
+| Frontend | React 19, TypeScript, Vite 7, Tailwind CSS 3 |
 | State | Zustand |
 | Charts | Recharts |
 | 3D | React Three Fiber |

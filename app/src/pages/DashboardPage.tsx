@@ -109,7 +109,8 @@ export default function DashboardPage() {
       <div className="flex-1 overflow-y-auto">
         {/* KPI Ribbon with 3D Grid */}
         <div className="kpi-canvas-container">
-          <Suspense fallback={<div style={{ backgroundColor: '#1E1E22' }} />}>\n            <TacticalDashboardGrid />
+          <Suspense fallback={<div style={{ backgroundColor: '#1E1E22' }} />}>
+            <TacticalDashboardGrid />
           </Suspense>
           <div className="kpi-metrics-overlay">
             <KPICard
