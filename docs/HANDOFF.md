@@ -2,17 +2,17 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, Milestone B G1-G3, G4a, G4b, G5 complete; G6-G7 pending
+**State:** Phase 0/1, Milestone A, B G1-G5 complete; G6a pending
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
 **Standing rules:** never touch .env/.env.example; never print secrets; raw outputs not summaries; one commit per logical unit; no .catch(() => mock) anywhere; stop at each group boundary for review
 
-**Verify harness:** committed scripts/verify/verify_gN.py (Python + Playwright); assert live endpoint 200 + expected shape, not just render (e.g. /api/locations 404 → grouped G2-G3 latent bug; was masked by mock fallback; after G7 the mockData.ts delete surfaces all of them)
+**Verify harness:** committed scripts/verify/verify_gN.py (Python + Playwright); assert live endpoint 200 + expected shape, not just render (e.g. /api/locations 404 → grouped G2-G3 latent bug; was masked by mock fallback; after G6a the mockData.ts delete surfaces all of them)
 
-**Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G7 will surface latent bugs
+**Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G6a will surface latent bugs
 
-**Next action for a fresh session:** read tracker + git log + this file; then complete G6 (remaining Phase 2 items + hardening)
+**Next action for a fresh session:** read tracker + git log + this file; then complete G6a (delete mockData.ts + remove all .catch(() => mock); fix every page that breaks)
 
 ---
 
@@ -33,7 +33,7 @@
   - Dashboard trend reads `/api/dashboard/cost-summary` (AreaChart), alerts from `/api/dashboard/alerts`.
   - Proof: `verify_g5.py` PASS exit 0 (10 endpoints live, material row BEARING-6205, export downloaded, trend area + live alerts, no hardcoded/simulated markers).
 - **Findings recorded, not yet fixed:** F1 (no zod on plan create); F3 (soft-delete/unique conflict → Phase 4.5).
-- **Next action on resume:** Group 6 — hardening / remaining Phase 2 items (2.3 mockData delete, 2.7 sidebar, 2.11 Swagger, 2.12 refresh-token decision). STOP before G7.
+- **Next action on resume:** Group 6a — delete mockData.ts + remove all .catch(() => mock); fix every page that breaks. Then G6b (sidebar + swagger + refresh). STOP before G7.
 
 
 ---

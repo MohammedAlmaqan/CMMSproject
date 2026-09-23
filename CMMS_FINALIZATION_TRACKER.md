@@ -120,7 +120,7 @@ Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userServic
 
 ### Milestone B - Remaining SOW domains in 8 ordered groups (IN PROGRESS)
 
-**Group order:** G1 WO sub-domain CRUD (ops/materials/labor/services/checklists) + cost recompute verify (Corrective 1&3) + board Closed handling (Corrective 2) -> G2 Notifications -> G3 Asset master -> G4 Preventive Maintenance -> G5 Dashboard+Reports -> G6 Administration -> G7 Sidebar + delete `mockData.ts` and all `.catch(() => mock)` -> G8 coverage re-check.
+**Group order:** G1 WO sub-domain CRUD -> G2 Notifications -> G3 Asset master -> G4 PM (frontend + scheduler) -> G5 Dashboard+Reports -> G6a mockData deletion + fallback removal (trust property) -> G6b Sidebar + Swagger + refresh-token -> G7 Administration -> G8 coverage re-check.
 
 ### Milestone B - Group 1 (COMPLETE): WO sub-domain CRUD + costs + board
 
