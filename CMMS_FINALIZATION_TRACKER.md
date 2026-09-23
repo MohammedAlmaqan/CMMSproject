@@ -191,11 +191,11 @@ Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userServic
 | 3.1 | **PM scheduler (node-cron)** with mandatory safeguards | ⬜ | See sub-criteria below |  |
 | 3.1a | - PM2 `instances: 1`, `exec_mode: 'fork'` + comment re: cluster incompatibility | ⬜ | Config correct |  |
 | 3.1b | - Startup lock (PID + start time); refuse + `SystemAlert` if live owner exists | ⬜ | Duplicate scheduler blocked |  |
-| 3.1c | - **Idempotency per (plan_id, scheduled_cycle_date)** - skip if WO exists, log | ⬜ | Re-runnable; no duplicate WOs |  |
+| 3.1c | - **Idempotency per (plan_id, scheduled_cycle_date)** - skip if WO exists, log | ✅ | Re-runnable; no duplicate WOs (verified: run1 wosCreated=1, run2 wosSkipped=1) | cc8d11c |
 | 3.1d | - `SchedulerRun` table + `GET /api/health/scheduler`; `SystemAlert` if no success in 25h | ⬜ | Heartbeat observable |  |
 | 3.1e | - Non-blocking async batches (50/yield) | ⬜ | API stays responsive during run |  |
-| 3.1f | - Admin-only `POST /api/maintenance-plans/run-scheduler` with user-ID logging | ⬜ | Manual trigger works, audited |  |
-| 3.1g | - `PM_SCHEDULER_CRON` env (default `0 2 * * *`) + run-once at startup (idempotency-guarded) | ⬜ | Catch-up after downtime works |  |
+| 3.1f | - Admin-only `POST /api/maintenance-plans/run-scheduler` with user-ID logging | ✅ | Manual trigger works, audited (verify exit 0) | cc8d11c |
+| 3.1g | - `PM_SCHEDULER_CRON` env (default `0 2 * * *`) + run-once at startup (idempotency-guarded) | ✅ | Catch-up after downtime works (boot log: started cron="0 2 * * *", startup run wosCreated=1) | cc8d11c |
 | 3.2 | **File attachments:** `Attachment` model + migration, multer upload (size/type limits), WO detail UI | ⬜ | Attach -> view -> download works |  |
 | 3.3 | **CSV bulk import/export** for materials/equipment + runbook section | ⬜ | Round-trip import -> export |  |
 | 3.4 | Consistent delete strategy (standardize soft-delete + filter everywhere) | ⬜ | Deleted rows never reappear |  |
