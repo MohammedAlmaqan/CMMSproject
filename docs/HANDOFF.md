@@ -16,18 +16,19 @@
 
 ---
 
-## Current position (G4a COMPLETE — 2026-09-23)
+## Current position (2026-09-23)
 
-- **G4a** = Preventive Maintenance frontend + API verification. Status: **COMPLETE**. Gate commit `4beb2fb`, tracker docs commit `68f3990`, verify script exit 0 (`G4A_EXIT PASS`).
-- **Frontend:** `PreventiveMaintenancePage.tsx` — loading/error/empty states (spinner reads `appStore.loading`; error panel reads `appStore.error` with Dismiss + Retry via `loadFromApi`; "No maintenance plans found" empty state); new **Next Due** column (Time: `startDate + intervalValue` unit-aware; Meter: runtime value); per-row **Generate WO** wired to `maintenancePlanService.generateWorkOrder(planId)` with `generatingId` busy spinner + `woNumber` toast. `tsc --noEmit` exit 0.
-- **Verify:** committed `scripts/verify/verify_g4a.py` — UI+API login (operator), POST `G4A-TEST` plan (201), GET list/detail shape, `generate-wo` x2 → **WO-000043 / WO-000044** (distinct, direct proof of F2), headless `/preventive-maintenance` (plan row + Generate WO button visible; `PAGE_ERRORS=[] CONSOLE_ERRORS=[]`), API cleanup (plan + both WOs soft-deleted) + post-cleanup absence checks. Screenshots `g4a_01_plan_list.png`, `g4a_02_plan_row_details.png`.
-- **Backend findings (recorded in tracker G4a row + Phase 4, NOT fixed in G4a):**
-  - **F1:** `POST /api/maintenance-plans` has NO zod validation — `req.body` passed directly to Prisma; malformed payload -> 500, never 400. Fix belongs in G4b or Phase 2 addendum.
-  - **F2:** `POST /api/maintenance-plans/:id/generate-wo` has NO idempotency guard — calling twice creates duplicate WOs. Fix is G4b safeguard 3.1c.
-  - **F3:** Soft-delete + unique-constraint conflict — soft-deleted rows still reserve their `@unique` code (planCode confirmed); re-running `verify_g4a.py` -> 409; real users hit the same. Fix: partial unique index (`where isDeleted=false`), Phase 4 (DB hygiene) row 4.5.
-- **G4a re-run caveat:** until F3 is fixed, `verify_g4a.py` relies on a one-off `prisma db execute` purge of `MaintenancePlan WHERE planCode='G4A-TEST'` between runs to stay re-runnable.
-- **Seed IDs for G4 verify (live):** equipment `27fbcebc-b922-4b71-b8df-349d98d8955a`, functionalLocation `3c26edce-b5d3-4448-a547-e9e04a674581`, workCenter `0a4cf365-5fce-4262-a1f2-b1d0ddc2a53c`, taskList `4343f060-5b81-41c8-9b9f-01c462c0dbf1`.
-- **Next action on resume:** complete **G4b** (PM scheduler with the 5 mandatory safeguards + expansions: 3.1a-3.1g). STOP before G4b scope creep.
+- **G4a** — COMPLETE. Gate `4beb2fb`.
+- **G4b-1** — COMPLETE. Scheduler core + idempotency (`cc8d11c`).
+- **G4b-2** — COMPLETE. All 5 safeguards landed (`5048a17`, docs `7f183d3`).
+  - `SchedulerRun` table; startup lock (`acquireStartupLock`, 5-min heartbeat window);
+    `GET /api/health/scheduler` (200 ok / 503 stale + SystemAlert dedup);
+    non-blocking batches (BATCH_SIZE=50 + setImmediate);
+    PM2 fork config (`instances: 1`, `exec_mode: 'fork'`, register.js + env_file removed).
+  - Proof: `verify_g4b2.py` PASS — 2nd backend locked out; stale→503→alert→restore; batch markers present.
+- **Phase 3.1 (PM scheduler) — COMPLETE.**
+- **Findings recorded, not yet fixed:** F1 (no zod on plan create); F3 (soft-delete/unique conflict → Phase 4.5).
+- **Next action on resume:** Group 5 — Dashboard + Reports (task 2.4 reportService live, 2.6 dashboard real trend + alerts, 2.5 Export CSV minimum). STOP before G6.
 
 
 ---
