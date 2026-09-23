@@ -43,3 +43,4 @@
 - **Screenshots:** written to `screenshots/` (gitignored). Naming: `g*_*.png`.
 - **Playwright note:** local `utilsBundle.js` was patched once during G1 to fix a corrupted byte. Survives normal use, lost on `pip install --upgrade playwright`. Not urgent.
 - **Dev servers:** may or may not be running. Check ports 3000/4000 before assuming.
+- **tsc invocation on Windows:** `npx tsc` may resolve to a stale `tsc@2.0.4` via PATH. Always use `app\node_modules\.bin\tsc.cmd` (frontend) or `backend\node_modules\.bin\tsc.cmd` (backend) for authoritative results.
