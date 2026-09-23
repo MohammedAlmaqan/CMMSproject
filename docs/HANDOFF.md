@@ -28,3 +28,18 @@
 - **Session reset reason:** context exhaustion + thrash loop on JSX bracket balance.
 - **Next action on resume:** fresh session completes G4a frontend wiring + `verify_g4a.py` + tracker + commit. STOP before G4b.
 - **Seed IDs for G4a verify (live):** equipment `27fbcebc-b922-4b71-b8df-349d98d8955a`, functionalLocation `3c26edce-b5d3-4448-a547-e9e04a674581`, workCenter `0a4cf365-5fce-4262-a1f2-b1d0ddc2a53c`, taskList `4343f060-5b81-41c8-9b9f-01c462c0dbf1`.
+
+
+---
+
+## Environment (Windows, on-prem)
+
+- **Repo root:** `C:\Users\Injaz\Documents\Default Project\CMMSproject`
+- **Backend:** Express on `http://localhost:4000` (dev via `tsx watch`)
+- **Frontend:** Vite on `http://localhost:3000`
+- **PostgreSQL:** Windows service `postgresql-x64-18` — must be **Running**. DB `cmms` on `localhost:5432`, user `postgres`.
+- **Test credentials:** `operator / password` (Requester), `admin / password` (Administrator). Seeded, verified.
+- **Verify harness:** Python 3.14 + Playwright (`from playwright.sync_api import sync_playwright`). Committed scripts at `scripts/verify/verify_gN.py`. **`verify_g3.py` is the canonical template** — read it before writing a new one.
+- **Screenshots:** written to `screenshots/` (gitignored). Naming: `g*_*.png`.
+- **Playwright note:** local `utilsBundle.js` was patched once during G1 to fix a corrupted byte. Survives normal use, lost on `pip install --upgrade playwright`. Not urgent.
+- **Dev servers:** may or may not be running. Check ports 3000/4000 before assuming.
