@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, B G1-G5 complete; G6a pending
+**State:** Phase 0/1, Milestone A, B G1-G6a complete; G6b pending
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -12,7 +12,7 @@
 
 **Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G6a will surface latent bugs
 
-**Next action for a fresh session:** read tracker + git log + this file; then complete G6a (delete mockData.ts + remove all .catch(() => mock); fix every page that breaks)
+**Next action for a fresh session:** read tracker + git log + this file; then complete G6b (sidebar + swagger + refresh-token)
 
 ---
 
@@ -32,8 +32,16 @@
     CSV export via Blob download; PM compliance renders backend single-period stats; README claim aligned to CSV.
   - Dashboard trend reads `/api/dashboard/cost-summary` (AreaChart), alerts from `/api/dashboard/alerts`.
   - Proof: `verify_g5.py` PASS exit 0 (10 endpoints live, material row BEARING-6205, export downloaded, trend area + live alerts, no hardcoded/simulated markers).
+- **G6a** — COMPLETE. mockData deleted; trust property (`9876e67`).
+  - `mockData.ts` removed; zero `mock*` refs and zero `.catch(() =>)` in app/src; appStore seeds empty arrays and
+    `loadFromApi`/`loadAlerts`/`loadDashboardKPIs` propagate real errors to `store.error` (no silent mock keep).
+    Loaded live now: crafts + auditLog added to `loadFromApi`.
+  - Three-state (loading/error/empty) added to Materials, Work Centers, Administration, Dashboard (KPI error banner);
+    all other pages already had it (G1-G5).
+  - Proof: `verify_g6a.py` PASS exit 0 — grep gates clean, tsc gates clean (only 4 pre-existing baseline errors in
+    untouched files), 14-route sweep: API up = real data, /api aborted = visible error + no fabricated records.
 - **Findings recorded, not yet fixed:** F1 (no zod on plan create); F3 (soft-delete/unique conflict → Phase 4.5).
-- **Next action on resume:** Group 6a — delete mockData.ts + remove all .catch(() => mock); fix every page that breaks. Then G6b (sidebar + swagger + refresh). STOP before G7.
+- **Next action on resume:** Group 6b — sidebar (Work Centers/PM entries), Swagger 2.11, refresh-token decision 2.12. STOP before G7.
 
 
 ---
