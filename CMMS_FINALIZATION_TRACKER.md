@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Groups 4-7 pending**)
+**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (findings F1/F2 recorded, not fixed); Group 4b pending; Groups 5-7 pending**)
 
 ## Status Legend
 
@@ -162,6 +162,27 @@ Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userServic
 - `api_equipment_count=5`, target `P-1001` → meters=2, loc ✓, params ✓; list+detail render, tabs switch (Meters/BOM) with no console/page errors (`PAGE_ERRORS=[] CONSOLE_ERRORS=[]`).
 - Screenshots (evidence, git-ignored): `screenshots/g3_01_equipment_list.png`, `g3_02_equipment_detail.png` (incl. Meters+BOM tabs), `g3_03_locations.png`, `g3_04_materials.png`, `g3_05_work_centers.png`.
 - Quality gates: committed verify script `G3_EXIT PASS` (exit 0); frontend page files tsc-clean.
+
+### Milestone B - Group 4a (COMPLETE): Preventive Maintenance — frontend wiring + API verification
+
+**Scope (frontend only, surgical edits on `PreventiveMaintenancePage.tsx`):**
+- Loading / error / empty states: spinner reads `appStore.loading`; error panel reads `appStore.error` with Dismiss + Retry ($ `loadFromApi`); "No maintenance plans found" empty state.
+- New **Next Due** column: Time strategy computes `startDate + intervalValue` (unit-aware Days/Weeks/Months); Meter strategy displays the runtime value (`intervalValue` + unit).
+- Per-row **Generate WO** button wired to `maintenancePlanService.generateWorkOrder(plan.planId)` with `generatingId` busy spinner and success toast showing the returned `woNumber`.
+- Quality gate: `npx tsc --noEmit -p app` exit 0.
+
+**Findings established live (observations — NOT fixed in G4a; both belong to G4b / Phase 2 addendum):**
+- **F1:** `POST /api/maintenance-plans` has NO zod validation — `req.body` is passed straight to Prisma (malformed payload -> 500, not 400). Confirmed by route source while writing verify wiring.
+- **F2:** `POST /api/maintenance-plans/:id/generate-wo` has NO idempotency guard — two sequential calls on the same plan produced **WO-000043** and **WO-000044** (two distinct WOs). Fix = G4b safeguard 3.1c (per plan-cycle idempotency).
+
+**Verification (committed `scripts/verify/verify_g4a.py`, exit code `0` = PASS):**
+- Login UI + API (`operator / password`, backend :4000); admin API token for WO cleanup (DELETE /work-orders/:id is Maintenance-Supervisor-gated).
+- POST test plan `G4A-TEST` (seed IDs per HANDOFF) -> 201; GET list -> 200 + plan present; GET `/:id` -> 200 + expected shape (strategy Time, interval 30 Days, all FK ids resolved).
+- `POST generate-wo` twice on the same plan -> both 201, bodies captured verbatim, **two distinct WO numbers** (direct proof of F2).
+- Headless `/preventive-maintenance` -> `G4A-TEST` row visible + Generate WO button present; `PAGE_ERRORS=[] CONSOLE_ERRORS=[]`.
+- Cleanup: test plan + both generated WOs deleted via API; post-cleanup list clean (no `G4A-TEST`, both WOs absent). Residual soft-deleted rows hard-purged so `G4A-TEST` planCode remains reusable.
+- Screenshots (evidence, git-ignored): `screenshots/g4a_01_plan_list.png`, `screenshots/g4a_02_plan_row_details.png`.
+- Gate commit (hash recorded): `4beb2fb` — `feat(g4a): wire preventive maintenance page live (...) + verify_g4a.py live API + headless E2E gate`. Frontend page tsc-clean, verify script exit 0.
 
 ## Phase 3 - Missing SOW Features (6-9 days)
 
