@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { validate, equipmentMeterCreateSchema, equipmentMeterUpdateSchema, meterReadingCreateSchema } from '../utils/validation.js';
+import { logAudit } from '../middleware/audit.js';
 
 const router = Router();
 
@@ -58,7 +60,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Technician'), validate(equipmentMeterCreateSchema), async (req: Request, res: Response) => {
   try {
     const { equipmentId, meterName, unitOfMeasure, lastReading, lastReadingDate } = req.body;
 
@@ -74,6 +76,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'EquipmentMeter', recordId: meter.meterId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(meter);
   } catch (error: any) {
     if (error.code === 'P2003') {
@@ -84,7 +92,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Technician'), validate(equipmentMeterUpdateSchema), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.equipmentMeter.findFirst({
       where: { meterId: String(req.params.id), isDeleted: false },
@@ -107,6 +115,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'EquipmentMeter', recordId: existing.meterId, action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(meter);
   } catch (error: any) {
     if (error.code === 'P2003') {
@@ -117,7 +131,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/:id/readings', async (req: Request, res: Response) => {
+router.post('/:id/readings', authorizeMinRole('Technician'), validate(meterReadingCreateSchema), async (req: Request, res: Response) => {
   try {
     const meter = await prisma.equipmentMeter.findFirst({
       where: { meterId: String(req.params.id), isDeleted: false },
@@ -148,6 +162,12 @@ router.post('/:id/readings', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'MeterReading', recordId: reading.readingId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(reading);
   } catch (error) {
     console.error('Error adding meter reading:', error);
@@ -155,7 +175,7 @@ router.post('/:id/readings', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.equipmentMeter.findFirst({
       where: { meterId: String(req.params.id), isDeleted: false },
@@ -171,6 +191,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
         modifiedBy: req.user!.userId,
       },
     });
+
+    await logAudit(
+      { tableName: 'EquipmentMeter', recordId: existing.meterId, action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Meter deleted successfully' });
   } catch (error) {

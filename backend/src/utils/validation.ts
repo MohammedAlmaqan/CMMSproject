@@ -157,6 +157,54 @@ export const convertNotificationSchema = z.object({
   supervisorUserId: z.string().min(1).optional(),
 });
 
+export const equipmentCreateSchema = z.object({
+  equipmentCode: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().default(''),
+  functionalLocationId: z.string().min(1),
+  manufacturer: z.string().optional(),
+  model: z.string().optional(),
+  serialNumber: z.string().optional(),
+  assetTag: z.string().optional(),
+  equipmentClass: z.string().optional(),
+  criticality: z.enum(['A', 'B', 'C']),
+  installationDate: z.string().min(1).nullable().optional(),
+  warrantyExpiryDate: z.string().min(1).nullable().optional(),
+  operationalStatus: z.enum(['Active', 'Inactive', 'Decommissioned']).optional(),
+  technicalParameters: z.record(z.string(), z.string()).optional(),
+});
+
+export const equipmentUpdateSchema = equipmentCreateSchema.partial();
+
+export const functionalLocationCreateSchema = z.object({
+  locationCode: z.string().min(1),
+  description: z.string().min(1),
+  parentLocationId: z.string().min(1).nullable().optional(),
+  locationType: z.enum(['Plant', 'Area', 'Unit', 'Sub-unit', 'System']),
+  operationalStatus: z.enum(['Active', 'Inactive']).optional(),
+  installationDate: z.string().min(1).nullable().optional(),
+  gpsCoordinates: z.string().min(1).nullable().optional(),
+  safetyCritical: z.boolean().optional(),
+});
+
+export const functionalLocationUpdateSchema = functionalLocationCreateSchema.partial();
+
+export const equipmentMeterCreateSchema = z.object({
+  equipmentId: z.string().min(1),
+  meterName: z.string().min(1),
+  unitOfMeasure: z.string().min(1),
+  lastReading: z.number().nonnegative().optional(),
+  lastReadingDate: z.string().min(1).nullable().optional(),
+});
+
+export const equipmentMeterUpdateSchema = equipmentMeterCreateSchema.partial();
+
+export const meterReadingCreateSchema = z.object({
+  readingValue: z.number().nonnegative(),
+  readingDate: z.string().min(1).optional(),
+  notes: z.string().min(1).nullable().optional(),
+});
+
 export function validate(schema: z.ZodTypeAny) {
   return (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);

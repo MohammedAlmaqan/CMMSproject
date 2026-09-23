@@ -23,6 +23,9 @@ export interface FunctionalLocation extends Auditable {
   installationDate: string | null;
   gpsCoordinates: string | null;
   safetyCritical: boolean;
+  parent?: FunctionalLocation | null;
+  children?: FunctionalLocation[];
+  equipment?: Equipment[];
 }
 
 // ─── Equipment (§3.1.2) ───
@@ -42,6 +45,9 @@ export interface Equipment extends Auditable {
   warrantyExpiryDate: string | null;
   operationalStatus: 'Active' | 'Inactive' | 'Decommissioned';
   technicalParameters: Record<string, string>;
+  functionalLocation?: FunctionalLocation | null;
+  meters?: EquipmentMeter[];
+  bomItems?: EquipmentBOM[];
 }
 
 // ─── Equipment Meter (§3.1.2) ───
@@ -52,6 +58,8 @@ export interface EquipmentMeter extends Auditable {
   unitOfMeasure: string;
   lastReading: number;
   lastReadingDate: string | null;
+  equipment?: { equipmentId: string; equipmentCode: string; name: string } | null;
+  readings?: MeterReading[];
 }
 
 export interface MeterReading extends Auditable {

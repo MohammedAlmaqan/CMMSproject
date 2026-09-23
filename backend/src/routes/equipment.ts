@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { validate, equipmentCreateSchema, equipmentUpdateSchema } from '../utils/validation.js';
+import { logAudit } from '../middleware/audit.js';
 
 const router = Router();
 
@@ -56,6 +58,13 @@ router.get('/:id', async (req: Request, res: Response) => {
         meters: {
           where: { isDeleted: false },
           orderBy: { meterName: 'asc' },
+          include: {
+            readings: {
+              where: { isDeleted: false },
+              orderBy: { readingDate: 'desc' },
+              take: 20,
+            },
+          },
         },
         bomItems: {
           include: {
@@ -76,7 +85,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Technician'), validate(equipmentCreateSchema), async (req: Request, res: Response) => {
   try {
     const {
       equipmentCode, name, description, functionalLocationId,
@@ -106,6 +115,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'Equipment', recordId: equipment.equipmentId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(equipment);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -119,7 +134,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Technician'), validate(equipmentUpdateSchema), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.equipment.findFirst({
       where: { equipmentId: String(req.params.id), isDeleted: false },
@@ -156,6 +171,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'Equipment', recordId: existing.equipmentId, action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(equipment);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -169,7 +190,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.equipment.findFirst({
       where: { equipmentId: String(req.params.id), isDeleted: false },
@@ -185,6 +206,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
         modifiedBy: req.user!.userId,
       },
     });
+
+    await logAudit(
+      { tableName: 'Equipment', recordId: existing.equipmentId, action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Equipment deleted successfully' });
   } catch (error) {

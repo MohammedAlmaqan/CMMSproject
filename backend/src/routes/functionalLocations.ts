@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { validate, functionalLocationCreateSchema, functionalLocationUpdateSchema } from '../utils/validation.js';
+import { logAudit } from '../middleware/audit.js';
 
 const router = Router();
 
@@ -87,7 +89,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Technician'), validate(functionalLocationCreateSchema), async (req: Request, res: Response) => {
   try {
     const { locationCode, description, parentLocationId, locationType, operationalStatus, installationDate, gpsCoordinates, safetyCritical } = req.body;
     const userId = req.user!.userId;
@@ -118,6 +120,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'FunctionalLocation', recordId: location.functionalLocationId, action: 'Create' },
+      userId,
+      req.ip
+    );
+
     res.status(201).json(location);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -128,7 +136,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Technician'), validate(functionalLocationUpdateSchema), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.functionalLocation.findFirst({
       where: { functionalLocationId: String(req.params.id), isDeleted: false },
@@ -154,6 +162,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'FunctionalLocation', recordId: existing.functionalLocationId, action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(location);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -164,7 +178,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.functionalLocation.findFirst({
       where: { functionalLocationId: String(req.params.id), isDeleted: false },
@@ -180,6 +194,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
         modifiedBy: req.user!.userId,
       },
     });
+
+    await logAudit(
+      { tableName: 'FunctionalLocation', recordId: existing.functionalLocationId, action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Functional location deleted successfully' });
   } catch (error) {
