@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (findings F1/F2 recorded, not fixed); Group 4b pending; Groups 5-7 pending**)
+**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (F1/F2 recorded); Group 4b-1: scheduler core complete (3.1c/3.1f/3.1g ✅); Group 4b-2 pending (3.1a/3.1b/3.1d/3.1e); Groups 5-7 pending**)
 
 ## Status Legend
 
