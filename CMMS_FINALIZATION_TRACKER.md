@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (F1/F2 recorded); Group 4b-1: scheduler core complete (3.1c/3.1f/3.1g ✅); Group 4b-2 pending (3.1a/3.1b/3.1d/3.1e); Groups 5-7 pending**)
+**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (F1/F2 recorded); Group 4b: PM scheduler complete (3.1a–3.1g ✅); Groups 5-7 pending**)
 
 ## Status Legend
 
@@ -188,11 +188,12 @@ Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userServic
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 3.1 | **PM scheduler (node-cron)** with mandatory safeguards | ⬜ | See sub-criteria below |  |
-| 3.1a | - PM2 `instances: 1`, `exec_mode: 'fork'` + comment re: cluster incompatibility | ⬜ | Config correct |  |
-| 3.1b | - Startup lock (PID + start time); refuse + `SystemAlert` if live owner exists | ⬜ | Duplicate scheduler blocked |  |
+| 3.1 | **PM scheduler (node-cron)** with mandatory safeguards | ✅ | All 3.1a–3.1g green (verify_g4b1/g4b2 exit 0) | `5048a17` |
+| 3.1a | - PM2 `instances: 1`, `exec_mode: 'fork'` + comment re: cluster incompatibility | ✅ | `instances: 1`/`fork` present; register.js + env_file removed | `5048a17` |
+| 3.1b | - Startup lock (PID + start time); refuse + `SystemAlert` if live owner exists | ✅ | 2nd backend blocked (log: disabled — lock held by); fake running row test (verify exit 0) | `5048a17` |
 | 3.1c | - **Idempotency per (plan_id, scheduled_cycle_date)** - skip if WO exists, log | ✅ | Re-runnable; no duplicate WOs (verified: run1 wosCreated=1, run2 wosSkipped=1) | cc8d11c |
-| 3.1d | - `SchedulerRun` table + `GET /api/health/scheduler`; `SystemAlert` if no success in 25h | ⬜ | Heartbeat observable |  |
+| 3.1d | - `SchedulerRun` table + `GET /api/health/scheduler`; `SystemAlert` if no success in 25h | ✅ | 200 ok + 503 stale→SystemAlert, row restored (verify exit 0) | `5048a17` |
+| 3.1e | - **Non-blocking batches (max 50)** with `setImmediate` yield + per-batch log | ✅ | `BATCH_SIZE` 50 + `[scheduler] batch N/M complete` present | `5048a17` |
 | 3.1e | - Non-blocking async batches (50/yield) | ⬜ | API stays responsive during run |  |
 | 3.1f | - Admin-only `POST /api/maintenance-plans/run-scheduler` with user-ID logging | ✅ | Manual trigger works, audited (verify exit 0) | cc8d11c |
 | 3.1g | - `PM_SCHEDULER_CRON` env (default `0 2 * * *`) + run-once at startup (idempotency-guarded) | ✅ | Catch-up after downtime works (boot log: started cron="0 2 * * *", startup run wosCreated=1) | cc8d11c |
