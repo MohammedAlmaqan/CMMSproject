@@ -542,6 +542,23 @@ model SystemConfig {
   value    String
 }
 
+model SchedulerRun {
+  schedulerRunId String   @id @default(uuid())
+  hostname       String
+  pid            Int
+  status         String   // 'running' | 'success' | 'error'
+  startedAt      DateTime
+  heartbeatAt    DateTime
+  completedAt    DateTime?
+  plansEvaluated Int      @default(0)
+  wosCreated     Int      @default(0)
+  wosSkipped     Int      @default(0)
+  errorMessage   String?
+
+  @@index([status, heartbeatAt])
+  @@index([completedAt])
+}
+
 model SequenceCounter {
   code  String @id
   value Int    @default(0)

@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import os from 'os';
 import { prisma } from '../utils/prisma.js';
 import { generateWoNumber } from '../utils/sequence.js';
 
@@ -9,6 +10,66 @@ export interface SchedulerRunResult {
   wosSkipped: number;
   errors: string[];
 }
+
+const LOCK_FRESH_MS = 5 * 60 * 1000;
+let currentRunRecordId: string | undefined;
+
+export async function acquireStartupLock(): Promise<boolean> {
+  const hostname = os.hostname();
+  const pid = process.pid;
+  const freshAt = new Date(Date.now() - LOCK_FRESH_MS);
+
+  const foreign = await prisma.schedulerRun.findFirst({
+    where: {
+      status: 'running',
+      heartbeatAt: { gt: freshAt },
+      OR: [{ hostname: { not: hostname } }, { pid: { not: pid } }],
+    },
+  });
+
+  if (foreign) {
+    console.log(`[scheduler] disabled — lock held by ${foreign.pid}@${foreign.hostname}`);
+    return false;
+  }
+
+  const record = await prisma.schedulerRun.create({
+    data: {
+      hostname,
+      pid,
+      status: 'running',
+      startedAt: new Date(),
+      heartbeatAt: new Date(),
+    },
+  });
+  currentRunRecordId = record.schedulerRunId;
+  console.log(`[scheduler] startup lock acquired (${pid}@${hostname}, run ${record.schedulerRunId})`);
+  return true;
+}
+
+async function heartbeatLock(): Promise<void> {
+  if (!currentRunRecordId) return;
+  await prisma.schedulerRun.update({
+    where: { schedulerRunId: currentRunRecordId },
+    data: { heartbeatAt: new Date() },
+  });
+}
+
+async function completeRunRecord(result: SchedulerRunResult, status: 'success' | 'error'): Promise<void> {
+  if (!currentRunRecordId) return;
+  await prisma.schedulerRun.update({
+    where: { schedulerRunId: currentRunRecordId },
+    data: {
+      status,
+      completedAt: new Date(),
+      plansEvaluated: result.plansEvaluated,
+      wosCreated: result.wosCreated,
+      wosSkipped: result.wosSkipped,
+      errorMessage: result.errors.length > 0 ? result.errors.join('; ') : null,
+    },
+  });
+}
+
+const BATCH_SIZE = 50;
 
 function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -45,7 +106,7 @@ export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
     },
   });
   if (deferred > 0) {
-    console.log(`[scheduler] ${deferred} meter-strategy plans deferred to G4b-2`);
+    console.log(`[scheduler] ${deferred} meter-strategy plans deferred (meter strategy not yet implemented)`);
   }
 
   const plans = await prisma.maintenancePlan.findMany({
@@ -56,7 +117,16 @@ export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
     },
   });
 
-  for (const plan of plans) {
+  await heartbeatLock();
+
+  const batches: typeof plans[] = [];
+  for (let i = 0; i < plans.length; i += BATCH_SIZE) {
+    batches.push(plans.slice(i, i + BATCH_SIZE));
+  }
+
+  for (let b = 0; b < batches.length; b++) {
+    const batch = batches[b];
+    for (const plan of batch) {
     try {
       result.plansEvaluated += 1;
       const start = new Date(plan.startDate);
@@ -128,11 +198,16 @@ export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
       result.errors.push(`${plan.planCode}: ${err?.message ?? String(err)}`);
       console.error(`[scheduler] plan ${plan.planCode} threw:`, err);
     }
+    }
+    await new Promise((r) => setImmediate(r));
+    console.log(`[scheduler] batch ${b + 1}/${batches.length} complete`);
   }
 
   console.log(
     `[scheduler] run complete: plansEvaluated=${result.plansEvaluated} wosCreated=${result.wosCreated} wosSkipped=${result.wosSkipped} errors=${result.errors.length}`
   );
+
+  await completeRunRecord(result, result.errors.length > 0 ? 'error' : 'success');
 
   return result;
 }

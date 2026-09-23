@@ -28,7 +28,8 @@ import commentRoutes from './routes/comments.js';
 import auditLogRoutes from './routes/auditLog.js';
 import userRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
-import { runSchedulerOnce, startScheduler } from './services/scheduler.js';
+import { acquireStartupLock, runSchedulerOnce, startScheduler } from './services/scheduler.js';
+import { prisma } from './utils/prisma.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -87,6 +88,56 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+const STALE_WINDOW_MS = 25 * 60 * 60 * 1000;
+
+async function createSchedulerStaleAlert(): Promise<void> {
+  const existing = await prisma.systemAlert.findFirst({
+    where: { alertType: 'Scheduler_Stale', createdDate: { gt: new Date(Date.now() - STALE_WINDOW_MS) } },
+  });
+  if (existing) return;
+  const admin = await prisma.user.findFirst({ where: { role: 'Administrator', isActive: true } });
+  if (!admin) return;
+  await prisma.systemAlert.create({
+    data: {
+      alertType: 'Scheduler_Stale',
+      userId: admin.userId,
+      title: 'PM Scheduler Stale',
+      message: 'PM scheduler has not reported a successful run within 25 hours.',
+    },
+  });
+  console.log('[scheduler] stale health detected — SystemAlert created');
+}
+
+app.get('/api/health/scheduler', async (_req, res) => {
+  try {
+    const last = await prisma.schedulerRun.findFirst({
+      where: { status: 'success' },
+      orderBy: { completedAt: 'desc' },
+    });
+    const nowMs = Date.now();
+    const lastMs = last?.completedAt ? last.completedAt.getTime() : null;
+    const minutesSinceSuccess = lastMs !== null ? Math.floor((nowMs - lastMs) / 60000) : null;
+    if (lastMs !== null && nowMs - lastMs <= STALE_WINDOW_MS) {
+      res.json({
+        status: 'ok',
+        lastSuccessAt: last!.completedAt!.toISOString(),
+        lastRunStatus: 'success',
+        minutesSinceSuccess,
+      });
+      return;
+    }
+    await createSchedulerStaleAlert();
+    res.status(503).json({
+      status: 'stale',
+      lastSuccessAt: lastMs !== null ? last!.completedAt!.toISOString() : null,
+      minutesSinceSuccess,
+    });
+  } catch (err) {
+    console.error('Error checking scheduler health:', err);
+    res.status(503).json({ status: 'stale', lastSuccessAt: null, minutesSinceSuccess: null });
+  }
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/functional-locations', functionalLocationRoutes);
@@ -121,9 +172,18 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 app.listen(PORT, () => {
   console.log(`CMMS API server running on port ${PORT}`);
   console.log(`API docs: http://localhost:${PORT}/api-docs`);
-  setImmediate(() => {
-    runSchedulerOnce().catch((err) => console.error('[scheduler] startup run failed', err));
-    startScheduler();
+  setImmediate(async () => {
+    try {
+      const acquired = await acquireStartupLock();
+      if (!acquired) {
+        console.log('[scheduler] startup skipped — lock refused; API serving without scheduler');
+        return;
+      }
+      await runSchedulerOnce().catch((err) => console.error('[scheduler] startup run failed', err));
+      startScheduler();
+    } catch (err) {
+      console.error('[scheduler] startup wiring failed', err);
+    }
   });
 });
 
