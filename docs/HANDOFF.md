@@ -13,3 +13,18 @@
 **Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G7 will surface latent bugs
 
 **Next action for a fresh session:** read tracker + git log + this file; then begin G4
+
+---
+
+## Current position (G4a mid-flight — paused for session reset, 2026-09-23)
+
+- **G4a** = Preventive Maintenance frontend + API verification. Status: **IN PROGRESS**, blocked on session reset.
+- **Backend findings (established live, NOT yet in tracker):**
+  - **F1:** `POST /api/maintenance-plans` has NO zod validation — `req.body` passed directly to Prisma. Fix belongs in G4b or Phase 2 addendum, not G4a.
+  - **F2:** `POST /api/maintenance-plans/:id/generate-wo` has NO idempotency guard — calling twice creates duplicate WOs. Fix is G4b safeguard 3.1c.
+- **Frontend:** `PreventiveMaintenancePage.tsx` wiring was attempted and **REVERTED** (broken JSX, 8 tsc errors). Must be re-done cleanly with surgical edits only.
+- **`scripts/verify/verify_g4a.py`:** NOT written.
+- **Tracker G4a row:** NOT updated.
+- **Session reset reason:** context exhaustion + thrash loop on JSX bracket balance.
+- **Next action on resume:** fresh session completes G4a frontend wiring + `verify_g4a.py` + tracker + commit. STOP before G4b.
+- **Seed IDs for G4a verify (live):** equipment `27fbcebc-b922-4b71-b8df-349d98d8955a`, functionalLocation `3c26edce-b5d3-4448-a547-e9e04a674581`, workCenter `0a4cf365-5fce-4262-a1f2-b1d0ddc2a53c`, taskList `4343f060-5b81-41c8-9b9f-01c462c0dbf1`.
