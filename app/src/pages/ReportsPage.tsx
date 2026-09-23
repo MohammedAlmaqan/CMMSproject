@@ -69,7 +69,7 @@ export default function ReportsPage() {
           setReportLoading(false);
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
           setReportError((prev) => ({ ...prev, [activeReport]: 'Failed to load report data. Please try again.' }));
           setReportLoading(false);

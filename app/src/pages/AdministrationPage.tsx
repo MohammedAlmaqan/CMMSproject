@@ -30,6 +30,8 @@ export default function AdministrationPage() {
   const users = useAppStore((s) => s.users);
   const auditLog = useAppStore((s) => s.auditLog);
   const workCenters = useAppStore((s) => s.workCenters);
+  const loading = useAppStore((s) => s.loading);
+  const storeError = useAppStore((s) => s.error);
 
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
   const [userPage, setUserPage] = useState(0);
@@ -105,6 +107,18 @@ export default function AdministrationPage() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {loading && (
+            <div className="mb-4 flex items-center gap-3 text-tertiary text-xs">
+              <span className="inline-block w-3 h-3 rounded-full border-2 border-tertiary border-t-transparent animate-spin" />
+              Loading administration data...
+            </div>
+          )}
+          {storeError && (
+            <div className="mb-4 flex items-center justify-between rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+              <span>{storeError}</span>
+              <button onClick={() => useAppStore.getState().loadFromApi()} className="ml-2 underline hover:text-red-100">Retry</button>
+            </div>
+          )}
           {activeTab === 'users' && (
             <div>
               <div className="flex items-center gap-3 mb-4">
@@ -120,6 +134,9 @@ export default function AdministrationPage() {
                 </div>
                 <span className="text-tertiary text-xs ml-auto">{filteredUsers.length} users</span>
               </div>
+              {!loading && !storeError && users.length === 0 && (
+                <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No users found in the system.</div>
+              )}
 
               <div className="industrial-card rounded overflow-hidden">
                 <table className="w-full">
@@ -189,6 +206,9 @@ export default function AdministrationPage() {
                 </div>
                 <span className="text-tertiary text-xs ml-auto">{filteredAudit.length} entries</span>
               </div>
+              {!loading && !storeError && filteredAudit.length === 0 && (
+                <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No audit log entries found.</div>
+              )}
 
               <div className="industrial-card rounded overflow-hidden">
                 <table className="w-full">

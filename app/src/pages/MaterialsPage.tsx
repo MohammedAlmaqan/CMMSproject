@@ -17,6 +17,8 @@ const PAGE_SIZE = 10;
 
 export default function MaterialsPage() {
   const materials = useAppStore((s) => s.materials);
+  const loading = useAppStore((s) => s.loading);
+  const storeError = useAppStore((s) => s.error);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [sortField, setSortField] = useState<string>('materialCode');
@@ -54,6 +56,21 @@ export default function MaterialsPage() {
     <>
       <Header title="MATERIALS" showActions={false} />
       <div className="flex-1 overflow-y-auto p-6">
+        {loading && (
+          <div className="mb-4 flex items-center gap-3 text-tertiary text-xs">
+            <span className="inline-block w-3 h-3 rounded-full border-2 border-tertiary border-t-transparent animate-spin" />
+            Loading materials...
+          </div>
+        )}
+        {storeError && (
+          <div className="mb-4 flex items-center justify-between rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+            <span>{storeError}</span>
+            <button onClick={() => useAppStore.getState().loadFromApi()} className="ml-2 underline hover:text-red-100">Retry</button>
+          </div>
+        )}
+        {!loading && !storeError && materials.length === 0 && (
+          <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No materials found in the system.</div>
+        )}
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-tertiary" />

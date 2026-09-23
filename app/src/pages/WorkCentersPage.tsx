@@ -10,6 +10,8 @@ import { useAppStore } from '@/store/appStore';
 export default function WorkCentersPage() {
   const workCenters = useAppStore((s) => s.workCenters);
   const crafts = useAppStore((s) => s.crafts);
+  const loading = useAppStore((s) => s.loading);
+  const storeError = useAppStore((s) => s.error);
   const [expandedWC, setExpandedWC] = useState<Set<string>>(new Set());
 
   const toggleWC = (id: string) => {
@@ -25,6 +27,21 @@ export default function WorkCentersPage() {
     <>
       <Header title="WORK CENTERS & CRAFTS" showActions={false} />
       <div className="flex-1 overflow-y-auto p-6">
+        {loading && (
+          <div className="mb-4 flex items-center gap-3 text-tertiary text-xs">
+            <span className="inline-block w-3 h-3 rounded-full border-2 border-tertiary border-t-transparent animate-spin" />
+            Loading work centers...
+          </div>
+        )}
+        {storeError && (
+          <div className="mb-4 flex items-center justify-between rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+            <span>{storeError}</span>
+            <button onClick={() => useAppStore.getState().loadFromApi()} className="ml-2 underline hover:text-red-100">Retry</button>
+          </div>
+        )}
+        {!loading && !storeError && workCenters.length === 0 && (
+          <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No work centers found in the system.</div>
+        )}
         <div className="grid grid-cols-2 gap-4">
           {workCenters.map((wc) => {
             const wcCrafts = crafts.filter((c) => c.workCenterId === wc.workCenterId);

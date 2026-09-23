@@ -1,20 +1,12 @@
 import { create } from 'zustand';
 import type {
   WorkOrder, Notification, Equipment, FunctionalLocation, WorkCenter,
-  Craft, Material, TaskList, MaintenancePlan, SystemAlert, AuditLogEntry,
-  User, WorkOrderOperation, WorkOrderMaterial, LaborEntry, ExternalServiceCost,
-  WorkOrderChecklist, MeterReading, DashboardKPIs, WorkOrderStatus,
-  SafetyChecklistTemplate,
+  Craft, Material, TaskList, TaskListOperation, MaintenancePlan, SystemAlert,
+  AuditLogEntry, User, WorkOrderOperation, WorkOrderMaterial, LaborEntry,
+  ExternalServiceCost, WorkOrderChecklist, SafetyChecklistTemplate,
+  EquipmentMeter, MeterReading, DashboardKPIs, WorkOrderStatus, ChecklistItem,
+  Comment,
 } from '@/types';
-import {
-  mockWorkOrders, mockNotifications, mockEquipment, mockLocations,
-  mockWorkCenters, mockCrafts, mockMaterials, mockTaskLists,
-  mockTaskListOperations, mockMaintenancePlans, mockAlerts, mockAuditLog,
-  mockUsers, mockWorkOrderOperations, mockWorkOrderMaterials, mockLaborEntries,
-  mockExternalServices, mockWorkOrderChecklists, mockChecklistTemplates,
-  mockChecklistItems, mockMeters, mockMeterReadings, mockDashboardKPIs,
-  mockComments,
-} from '@/data/mockData';
 import { functionalLocationService } from '@/services/functionalLocationService';
 import { equipmentService } from '@/services/equipmentService';
 import { workOrderService } from '@/services/workOrderService';
@@ -27,6 +19,8 @@ import { maintenancePlanService } from '@/services/maintenancePlanService';
 import { dashboardService } from '@/services/dashboardService';
 import { alertService } from '@/services/alertService';
 import { commentService } from '@/services/commentService';
+import { craftService } from '@/services/craftService';
+import { auditLogService } from '@/services/auditLogService';
 
 interface AppState {
   workOrders: WorkOrder[];
@@ -37,7 +31,7 @@ interface AppState {
   crafts: Craft[];
   materials: Material[];
   taskLists: TaskList[];
-  taskListOperations: typeof mockTaskListOperations;
+  taskListOperations: TaskListOperation[];
   maintenancePlans: MaintenancePlan[];
   alerts: SystemAlert[];
   auditLog: AuditLogEntry[];
@@ -48,11 +42,11 @@ interface AppState {
   externalServices: ExternalServiceCost[];
   woChecklists: WorkOrderChecklist[];
   checklistTemplates: SafetyChecklistTemplate[];
-  checklistItems: typeof mockChecklistItems;
-  meters: typeof mockMeters;
+  checklistItems: ChecklistItem[];
+  meters: EquipmentMeter[];
   meterReadings: MeterReading[];
   dashboardKPIs: DashboardKPIs;
-  comments: typeof mockComments;
+  comments: Comment[];
   loading: boolean;
   error: string | null;
 
@@ -101,7 +95,7 @@ interface AppState {
   getWorkOrderMaterials: (woId: string) => WorkOrderMaterial[];
   getWorkOrderLabor: (woId: string) => LaborEntry[];
   getWorkOrderServices: (woId: string) => ExternalServiceCost[];
-  getWorkOrderComments: (woId: string) => typeof mockComments;
+  getWorkOrderComments: (woId: string) => Comment[];
   getNotificationsAwaitingConversion: () => Notification[];
   getEquipmentMeterReadings: (meterId: string) => MeterReading[];
 }
@@ -116,30 +110,37 @@ function getAllDescendantIds(locations: FunctionalLocation[], parentId: string):
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
-  workOrders: mockWorkOrders,
-  notifications: mockNotifications,
-  equipment: mockEquipment,
-  locations: mockLocations,
-  workCenters: mockWorkCenters,
-  crafts: mockCrafts,
-  materials: mockMaterials,
-  taskLists: mockTaskLists,
-  taskListOperations: mockTaskListOperations,
-  maintenancePlans: mockMaintenancePlans,
-  alerts: mockAlerts,
-  auditLog: mockAuditLog,
-  users: mockUsers,
-  operations: mockWorkOrderOperations,
-  woMaterials: mockWorkOrderMaterials,
-  laborEntries: mockLaborEntries,
-  externalServices: mockExternalServices,
-  woChecklists: mockWorkOrderChecklists,
-  checklistTemplates: mockChecklistTemplates,
-  checklistItems: mockChecklistItems,
-  meters: mockMeters,
-  meterReadings: mockMeterReadings,
-  dashboardKPIs: mockDashboardKPIs,
-  comments: mockComments,
+  workOrders: [],
+  notifications: [],
+  equipment: [],
+  locations: [],
+  workCenters: [],
+  crafts: [],
+  materials: [],
+  taskLists: [],
+  taskListOperations: [],
+  maintenancePlans: [],
+  alerts: [],
+  auditLog: [],
+  users: [],
+  operations: [],
+  woMaterials: [],
+  laborEntries: [],
+  externalServices: [],
+  woChecklists: [],
+  checklistTemplates: [],
+  checklistItems: [],
+  meters: [],
+  meterReadings: [],
+  dashboardKPIs: {
+    activeWorkOrders: 0,
+    overdueWorkOrders: 0,
+    scheduledToday: 0,
+    completionRate: 0,
+    openNotifications: 0,
+    pmCompliance: 0,
+  },
+  comments: [],
   loading: false,
   error: null,
 
@@ -148,38 +149,42 @@ export const useAppStore = create<AppState>()((set, get) => ({
     try {
       const role = useAuthStore.getState().user?.role;
       const canListUsers = role === 'Administrator';
-      const [locations, equipment, workOrders, notifications, materials, workCenters, maintenancePlans, users] =
+      const [locations, equipment, workOrders, notifications, materials, workCenters, maintenancePlans, crafts, users, auditLog] =
         await Promise.all([
-          functionalLocationService.getAll().catch(() => get().locations),
-          equipmentService.getAll().catch(() => get().equipment),
-          workOrderService.getAll({ take: 200 }).then(r => r.data).catch(() => get().workOrders),
-          notificationService.getAll({ take: 250 }).then(r => r.data).catch(() => get().notifications),
-          materialService.getAll().catch(() => get().materials),
-          workCenterService.getAll().catch(() => get().workCenters),
-          maintenancePlanService.getAll().catch(() => get().maintenancePlans),
-          canListUsers ? userService.getAll().catch(() => get().users) : Promise.resolve(get().users),
+          functionalLocationService.getAll(),
+          equipmentService.getAll(),
+          workOrderService.getAll({ take: 200 }).then(r => r.data),
+          notificationService.getAll({ take: 250 }).then(r => r.data),
+          materialService.getAll(),
+          workCenterService.getAll(),
+          maintenancePlanService.getAll(),
+          craftService.getAll(),
+          canListUsers ? userService.getAll() : Promise.resolve([]),
+          canListUsers ? auditLogService.getAll().then(r => r.data) : Promise.resolve([]),
         ]);
       set({
         locations, equipment, workOrders, notifications,
-        materials, workCenters, maintenancePlans, users, loading: false,
+        materials, workCenters, maintenancePlans, crafts, users, auditLog, loading: false,
       });
     } catch {
-      set({ loading: false });
+      set({ loading: false, error: 'Failed to load data from the server. Showing no data.' });
     }
   },
 
   loadDashboardKPIs: async () => {
     try {
-      const kpis = await dashboardService.getKPIs();
-      set({ dashboardKPIs: kpis });
-    } catch { /* keep mock */ }
+      set({ dashboardKPIs: await dashboardService.getKPIs() });
+    } catch {
+      set({ error: 'Failed to load dashboard KPIs.' });
+    }
   },
 
   loadAlerts: async () => {
     try {
-      const alerts = await alertService.getAll();
-      set({ alerts });
-    } catch { /* keep mock */ }
+      set({ alerts: await alertService.getAll() });
+    } catch {
+      set({ error: 'Failed to load alerts.' });
+    }
   },
 
   addWorkOrder: (wo) => {
@@ -253,7 +258,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((s) => ({
       workOrders: [wo, ...s.workOrders],
       notifications: s.notifications.map((n) =>
-        n.notificationId === notifId ? { ...n, status: 'Converted' as any, workOrderIds: [...n.workOrderIds, wo.workOrderId] } : n
+        n.notificationId === notifId ? { ...n, status: 'Converted', workOrderIds: [...(n.workOrderIds ?? []), wo.workOrderId] } : n
       ),
     }));
     return wo;
@@ -301,14 +306,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
         a.alertId === id ? { ...a, isRead: true } : a
       ),
     }));
-    alertService.markRead(id).catch(() => {});
+    alertService.markRead(id).catch((err) => {});
   },
 
   markAllAlertsRead: () => {
     set((s) => ({
       alerts: s.alerts.map((a) => ({ ...a, isRead: true })),
     }));
-    alertService.markAllRead().catch(() => {});
+    alertService.markAllRead().catch((err) => {});
   },
 
   addMaterial: (mat) => {
