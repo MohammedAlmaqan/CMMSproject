@@ -28,6 +28,7 @@ import commentRoutes from './routes/comments.js';
 import auditLogRoutes from './routes/auditLog.js';
 import userRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
+import { runSchedulerOnce, startScheduler } from './services/scheduler.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -120,6 +121,10 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 app.listen(PORT, () => {
   console.log(`CMMS API server running on port ${PORT}`);
   console.log(`API docs: http://localhost:${PORT}/api-docs`);
+  setImmediate(() => {
+    runSchedulerOnce().catch((err) => console.error('[scheduler] startup run failed', err));
+    startScheduler();
+  });
 });
 
 export default app;

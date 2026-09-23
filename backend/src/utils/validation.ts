@@ -205,6 +205,8 @@ export const meterReadingCreateSchema = z.object({
   notes: z.string().min(1).nullable().optional(),
 });
 
+export const schedulerRunSchema = z.object({}).strict();
+
 export function validate(schema: z.ZodTypeAny) {
   return (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);

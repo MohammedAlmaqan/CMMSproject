@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
+import { validate, schedulerRunSchema } from '../utils/validation.js';
+import { runSchedulerOnce } from '../services/scheduler.js';
 import { generateWoNumber } from '../utils/sequence.js';
 
 const router = Router();
@@ -28,6 +31,21 @@ router.get('/', async (req: Request, res: Response) => {
     res.json(plans);
   } catch (error) {
     console.error('Error fetching maintenance plans:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/run-scheduler', authorizeMinRole('Administrator'), validate(schedulerRunSchema), async (req: Request, res: Response) => {
+  try {
+    const result = await runSchedulerOnce();
+    await logAudit(
+      { tableName: 'MaintenancePlan', recordId: req.user!.userId, action: 'Run' },
+      req.user!.userId,
+      req.ip
+    );
+    res.json(result);
+  } catch (error) {
+    console.error('Error running scheduler:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

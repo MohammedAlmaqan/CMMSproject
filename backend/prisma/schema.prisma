@@ -86,11 +86,10 @@ model Equipment {
   technicalParameters  Json     @default("{}")
   createdBy            String   @default("system")
   createdDate          DateTime @default(now())
-  modifiedBy           String   @default("system")
-  modifiedDate         DateTime @updatedAt
-  isDeleted            Boolean  @default(false)
-
-  functionalLocation FunctionalLocation       @relation(fields: [functionalLocationId], references: [functionalLocationId])
+  modifiedBy          String   @default("system")
+  modifiedDate        DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
+  functionalLocation FunctionalLocation @relation(fields: [functionalLocationId], references: [functionalLocationId])
   meters             EquipmentMeter[]
   bomItems           EquipmentBOMMaterial[]
   notifications      Notification[]
@@ -308,6 +307,10 @@ model WorkOrder {
   modifiedBy          String   @default("system")
   modifiedDate        DateTime @updatedAt
   isDeleted           Boolean  @default(false)
+  sourcePlanId        String?
+  sourcePlanCycle     String?
+
+  @@unique([sourcePlanId, sourcePlanCycle])
 
   functionalLocation FunctionalLocation @relation(fields: [functionalLocationId], references: [functionalLocationId])
   equipment          Equipment?         @relation(fields: [equipmentId], references: [equipmentId])

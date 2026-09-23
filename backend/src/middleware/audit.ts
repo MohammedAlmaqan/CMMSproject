@@ -4,7 +4,7 @@ import { prisma } from '../utils/prisma.js';
 export interface AuditEntry {
   tableName: string;
   recordId: string;
-  action: 'Create' | 'Update' | 'Delete';
+  action: 'Create' | 'Update' | 'Delete' | 'Run';
   fieldName?: string | null;
   oldValue?: string | null;
   newValue?: string | null;
