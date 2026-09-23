@@ -148,6 +148,21 @@ Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userServic
 - Screenshots (evidence, git-ignored): `screenshots/g2_01_notification_detail_open.png`, `g2_02_after_convert_wo_detail.png`, `g2_03_notification_detail_converted.png`.
 - Quality gates: frontend `tsc --noEmit` exit 0; G2-scoped eslint exit 0 (appStore 2 pre-existing errors remain — unused `commentService` import + `as any` in mock converter — both removed with `mockData.ts` deletion in G7).
 
+### Milestone B - Group 3 (COMPLETE): Asset Master — Equipment (+Locations/Materials/Work Centers)
+
+**Scope (live API + UI, replaced mock-only rendering):**
+- `EquipmentPage.tsx` — live `equipmentService.getAll()`; card grid + row-click → detail; zero mocks, zero `.catch(() => mock)`.
+- `EquipmentDetailPage.tsx` — live detail: **Meters tab** (renders P-1001's 2 meters with recent readings), **BOM tab** (equipment BOM items — currently empty-state "No BOM items" for all seed equipment since none are seeded with BOM), Technical Parameters + Functional Location cards; tab UI renders per tab.
+- `LocationsPage.tsx` — **tree** render from `/api/functional-locations` (Plant root, 6 nodes) — NOT a table.
+- `MaterialsPage.tsx` — live `/api/materials` table (5 rows: M-1001..M-1005, Std Cost/Stock/Value, search + sort).
+- `WorkCentersPage.tsx` — live `/api/work-centers` (3 cards WC-001/002/004, capacity + cost rate).
+- Backend — `locations` tree endpoint lives at `/api/functional-locations` (NOT `/api/locations` — the earlier parse-error probe hard-coded `/api/locations` and 404'd; corrected). Re-ran live probe: P-1001 → meters=2 ✓, technicalParameters ✓, functionalLocation ✓; materials=5, work-centers=3, functional-locations=6.
+
+**Verification (committed `scripts/verify/verify_g3.py`, exit 0 = PASS):**
+- `api_equipment_count=5`, target `P-1001` → meters=2, loc ✓, params ✓; list+detail render, tabs switch (Meters/BOM) with no console/page errors (`PAGE_ERRORS=[] CONSOLE_ERRORS=[]`).
+- Screenshots (evidence, git-ignored): `screenshots/g3_01_equipment_list.png`, `g3_02_equipment_detail.png` (incl. Meters+BOM tabs), `g3_03_locations.png`, `g3_04_materials.png`, `g3_05_work_centers.png`.
+- Quality gates: committed verify script `G3_EXIT PASS` (exit 0); frontend page files tsc-clean.
+
 ## Phase 3 - Missing SOW Features (6-9 days)
 
 | # | Task | Status | Acceptance Criteria | Commit |
