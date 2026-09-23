@@ -2,7 +2,7 @@
 // Reports Page — 6 Standard Reports + Dashboards
 // ============================================================
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ClipboardList,
   ClipboardCheck,
@@ -16,7 +16,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
-import { useAppStore } from '@/store/appStore';
+import { reportService } from '@/services/reportService';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
@@ -34,121 +34,179 @@ type ReportType =
 const COLORS = ['#D97706', '#2563EB', '#059669', '#DC2626', '#7C3AED', '#52525B', '#A1A1AA'];
 
 export default function ReportsPage() {
-  const workOrders = useAppStore((s) => s.workOrders);
-  const equipment = useAppStore((s) => s.equipment);
-  const locations = useAppStore((s) => s.locations);
-  const materials = useAppStore((s) => s.materials);
-  const woMaterials = useAppStore((s) => s.woMaterials);
   const [activeReport, setActiveReport] = useState<ReportType>('backlog');
+  interface ReportData {
+    backlog: unknown;
+    'pm-compliance': unknown;
+    mtbf: unknown;
+    mttr: unknown;
+    'cost-summary': unknown;
+    downtime: unknown;
+    'material-consumption': unknown;
+  }
+
+  const [reportData, setReportData] = useState<Partial<ReportData>>({});
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<Partial<Record<ReportType, string>>>({});
+
+  useEffect(() => {
+    if (reportData[activeReport] !== undefined) return;
+    let cancelled = false;
+    setReportLoading(true);
+    const fetchers: Record<ReportType, () => Promise<unknown>> = {
+      backlog: () => reportService.getBacklog(),
+      'pm-compliance': () => reportService.getPMCompliance(),
+      mtbf: () => reportService.getMTBF(),
+      mttr: () => reportService.getMTTR(),
+      'cost-summary': () => reportService.getCostSummary(),
+      downtime: () => reportService.getDowntime(),
+      'material-consumption': () => reportService.getMaterialConsumption(),
+    };
+    fetchers[activeReport]()
+      .then((data) => {
+        if (!cancelled) {
+          setReportData((prev) => ({ ...prev, [activeReport]: data }));
+          setReportLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setReportError((prev) => ({ ...prev, [activeReport]: 'Failed to load report data. Please try again.' }));
+          setReportLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeReport, reportData]);
 
   // Report 1: Work Order Backlog
   const backlogData = useMemo(() => {
-    const statusCounts: Record<string, { count: number; hours: number }> = {};
-    workOrders
-      .filter((w) => !['Closed', 'Cancelled'].includes(w.status))
-      .forEach((w) => {
-        if (!statusCounts[w.status]) statusCounts[w.status] = { count: 0, hours: 0 };
-        statusCounts[w.status].count++;
-        statusCounts[w.status].hours += w.plannedCost;
-      });
-    return Object.entries(statusCounts).map(([status, data]) => ({
-      status,
-      count: data.count,
-      hours: Math.round(data.hours),
-    }));
-  }, [workOrders]);
+    return Array.isArray(reportData.backlog)
+      ? (reportData.backlog as Array<{ status: string; count: number; totalPlannedHours: number }>).map((r) => ({
+          status: r.status,
+          count: r.count,
+          hours: r.totalPlannedHours,
+        }))
+      : [];
+  }, [reportData]);
 
-  // Report 2: PM Compliance
-  const pmComplianceData = useMemo(() => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'];
-    return months.map((m, i) => ({
-      month: m,
-      scheduled: 8 + i,
-      completed: Math.round((8 + i) * (0.8 + Math.random() * 0.15)),
-    }));
-  }, []);
+  const pmCompliance = (reportData['pm-compliance'] ?? {}) as {
+    period?: string;
+    totalPM?: number;
+    completedPM?: number;
+    complianceRate?: number;
+  };
 
-  // Report 3: MTBF (simplified)
+  // Report 3: MTBF
   const mtbfData = useMemo(() => {
-    return equipment
-      .filter((e) => e.criticality === 'A')
-      .slice(0, 8)
-      .map((e) => {
-        const breakdownWOs = workOrders.filter(
-          (w) => w.equipmentId === e.equipmentId && w.breakdownFlag
-        );
-        return {
-          equipment: e.equipmentCode,
-          mtbf: breakdownWOs.length > 0
-            ? Math.round(8760 / (breakdownWOs.length + 1))
-            : 8760,
-          breakdowns: breakdownWOs.length,
-        };
-      });
-  }, [equipment, workOrders]);
+    return Array.isArray(reportData.mtbf)
+      ? (reportData.mtbf as Array<{ equipmentId: string; mtbfHours: number }>).map((r) => ({
+          equipment: r.equipmentId,
+          mtbf: r.mtbfHours,
+        }))
+      : [];
+  }, [reportData]);
 
   // Report 4: MTTR
   const mttrData = useMemo(() => {
-    return equipment
-      .filter((e) => e.criticality === 'A')
-      .slice(0, 8)
-      .map((e) => {
-        const repairWOs = workOrders.filter(
-          (w) => w.equipmentId === e.equipmentId && (w.type === 'CM' || w.type === 'EM')
-        );
-        return {
-          equipment: e.equipmentCode,
-          mttr: repairWOs.length > 0
-            ? Math.round(repairWOs.reduce((sum, w) => sum + w.plannedCost, 0) / repairWOs.length / 100)
-            : 0,
-        };
-      });
-  }, [equipment, workOrders]);
+    return Array.isArray(reportData.mttr)
+      ? (reportData.mttr as Array<{ equipmentId: string; mttrHours: number }>).map((r) => ({
+          equipment: r.equipmentId,
+          mttr: r.mttrHours,
+        }))
+      : [];
+  }, [reportData]);
 
   // Report 5: Cost Summary
   const costData = useMemo(() => {
-    const costMap: Record<string, { planned: number; actual: number }> = {};
-    workOrders.forEach((w) => {
-      if (!costMap[w.costCenterCode]) costMap[w.costCenterCode] = { planned: 0, actual: 0 };
-      costMap[w.costCenterCode].planned += w.plannedCost;
-      costMap[w.costCenterCode].actual += w.actualCost;
-    });
-    return Object.entries(costMap).map(([code, costs]) => ({
-      costCenter: code,
-      planned: costs.planned,
-      actual: costs.actual,
-      variance: costs.actual - costs.planned,
-    }));
-  }, [workOrders]);
+    return Array.isArray(reportData['cost-summary'])
+      ? (reportData['cost-summary'] as Array<{ costCenterCode: string; plannedCost: number; actualCost: number; variance: number }>).map(
+          (r) => ({
+            costCenter: r.costCenterCode,
+            planned: r.plannedCost,
+            actual: r.actualCost,
+            variance: r.variance,
+          })
+        )
+      : [];
+  }, [reportData]);
 
   // Report 6: Downtime
   const downtimeData = useMemo(() => {
-    const dtMap: Record<string, number> = {};
-    workOrders
-      .filter((w) => w.breakdownFlag && w.actualStart)
-      .forEach((w) => {
-        const eq = equipment.find((e) => e.equipmentId === w.equipmentId);
-        if (eq) {
-          if (!dtMap[eq.equipmentCode]) dtMap[eq.equipmentCode] = 0;
-          dtMap[eq.equipmentCode] += 12; // simulated hours
-        }
-      });
-    return Object.entries(dtMap).map(([eq, hours]) => ({ equipment: eq, hours }));
-  }, [workOrders, equipment]);
+    return Array.isArray(reportData.downtime)
+      ? (reportData.downtime as Array<{ equipmentId: string; totalDowntimeHours: number }>).map((r) => ({
+          equipment: r.equipmentId,
+          hours: r.totalDowntimeHours,
+        }))
+      : [];
+  }, [reportData]);
 
   // Report 7: Material Consumption
   const materialConsumption = useMemo(() => {
-    const matMap: Record<string, { code: string; description: string; totalQty: number; totalCost: number }> = {};
-    woMaterials.forEach((wm) => {
-      const mat = materials.find((m) => m.materialId === wm.materialId);
-      if (mat) {
-        if (!matMap[wm.materialId]) matMap[wm.materialId] = { code: mat.materialCode, description: mat.description, totalQty: 0, totalCost: 0 };
-        matMap[wm.materialId].totalQty += wm.actualQuantity;
-        matMap[wm.materialId].totalCost += wm.actualQuantity * wm.unitCost;
-      }
-    });
-    return Object.values(matMap);
-  }, [woMaterials, materials]);
+    return Array.isArray(reportData['material-consumption'])
+      ? (reportData['material-consumption'] as Array<{ materialCode: string; description: string; totalQuantityUsed: number; totalCost: number }>).map(
+          (r) => ({
+            code: r.materialCode,
+            description: r.description,
+            totalQty: r.totalQuantityUsed,
+            totalCost: r.totalCost,
+          })
+        )
+      : [];
+  }, [reportData]);
+
+  const currentRows = useMemo(() => {
+    switch (activeReport) {
+      case 'backlog':
+        return backlogData;
+      case 'pm-compliance':
+        return [
+          {
+            period: pmCompliance.period ?? '',
+            totalPM: pmCompliance.totalPM ?? 0,
+            completedPM: pmCompliance.completedPM ?? 0,
+            complianceRate: pmCompliance.complianceRate ?? 0,
+          },
+        ];
+      case 'mtbf':
+        return mtbfData;
+      case 'mttr':
+        return mttrData;
+      case 'cost-summary':
+        return costData;
+      case 'downtime':
+        return downtimeData;
+      case 'material-consumption':
+        return materialConsumption;
+    }
+  }, [activeReport, backlogData, pmCompliance, mtbfData, mttrData, costData, downtimeData, materialConsumption]);
+
+  const exportCSV = (rows: Array<Record<string, unknown>>, filename: string) => {
+    if (!rows || rows.length === 0) return;
+    const headers = Object.keys(rows[0]);
+    const lines = [
+      headers.join(','),
+      ...rows.map((row) => headers.map((h) => `"${String(row[h] ?? '').replaceAll('"', '""')}"`).join(',')),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const isLoading = reportLoading;
+  const hasError = reportError[activeReport] != null;
+  const current = reportData[activeReport];
+  const isEmpty =
+    !reportLoading &&
+    reportError[activeReport] == null &&
+    (Array.isArray(current) ? current.length === 0 : current === undefined);
 
   const reportConfig = [
     { id: 'backlog' as ReportType, label: 'WO Backlog', icon: ClipboardList },
@@ -188,7 +246,8 @@ export default function ReportsPage() {
         {/* Report Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {activeReport === 'backlog' && (
-            <ReportContainer title="Work Order Backlog" icon={<ClipboardList className="w-5 h-5" />}>
+            <ReportContainer title="Work Order Backlog" icon={<ClipboardList className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'backlog-report')}>
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <h4 className="text-secondary text-xs font-medium mb-2">Count by Status</h4>
@@ -205,7 +264,7 @@ export default function ReportsPage() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-secondary text-xs font-medium mb-2">Planned Cost by Status</h4>
+                  <h4 className="text-secondary text-xs font-medium mb-2">Planned Hours by Status</h4>
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={backlogData}>
@@ -219,47 +278,42 @@ export default function ReportsPage() {
                   </div>
                 </div>
               </div>
+              )}
             </ReportContainer>
           )}
 
           {activeReport === 'pm-compliance' && (
-            <ReportContainer title="PM Compliance" icon={<ClipboardCheck className="w-5 h-5" />}>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={pmComplianceData}>
-                    <defs>
-                      <linearGradient id="schedGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#D97706" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#D97706" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="compGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#059669" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#059669" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                    <XAxis dataKey="month" stroke="#52525B" fontSize={11} />
-                    <YAxis stroke="#52525B" fontSize={11} />
-                    <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
-                    <Area type="monotone" dataKey="scheduled" stroke="#D97706" fill="url(#schedGrad)" strokeWidth={1.5} name="Scheduled" />
-                    <Area type="monotone" dataKey="completed" stroke="#059669" fill="url(#compGrad)" strokeWidth={1.5} name="Completed" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-3 gap-3 mt-4">
-                {pmComplianceData.map((m) => (
-                  <div key={m.month} className="p-3 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
-                    <div className="text-tertiary" style={{ fontSize: '10px' }}>{m.month}</div>
-                    <div className="text-sm text-primary font-semibold">{Math.round((m.completed / m.scheduled) * 100)}%</div>
-                    <div className="text-tertiary" style={{ fontSize: '10px' }}>{m.completed}/{m.scheduled}</div>
+            <ReportContainer title="PM Compliance" icon={<ClipboardCheck className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'pm-compliance-report')}>
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
+              <>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
+                    <div className="text-tertiary" style={{ fontSize: '10px' }}>Period</div>
+                    <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.period}</div>
                   </div>
-                ))}
-              </div>
+                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
+                    <div className="text-tertiary" style={{ fontSize: '10px' }}>PMs Created</div>
+                    <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.totalPM ?? 0}</div>
+                  </div>
+                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
+                    <div className="text-tertiary" style={{ fontSize: '10px' }}>PMs Completed</div>
+                    <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.completedPM ?? 0}</div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-center h-48">
+                  <div className="text-center">
+                    <div className="text-5xl font-bold text-amber">{pmCompliance.complianceRate ?? 0}%</div>
+                    <div className="text-tertiary mt-2" style={{ fontSize: '11px' }}>Compliance rate ({pmCompliance.period})</div>
+                  </div>
+                </div>
+              </>
+              )}
             </ReportContainer>
           )}
 
           {activeReport === 'mtbf' && (
-            <ReportContainer title="Mean Time Between Failures (MTBF)" icon={<Clock className="w-5 h-5" />}>
+            <ReportContainer title="Mean Time Between Failures (MTBF)" icon={<Clock className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'mtbf-report')}>
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={mtbfData}>
@@ -271,11 +325,13 @@ export default function ReportsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              )}
             </ReportContainer>
           )}
 
           {activeReport === 'mttr' && (
-            <ReportContainer title="Mean Time To Repair (MTTR)" icon={<Timer className="w-5 h-5" />}>
+            <ReportContainer title="Mean Time To Repair (MTTR)" icon={<Timer className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'mttr-report')}>
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={mttrData}>
@@ -287,11 +343,14 @@ export default function ReportsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              )}
             </ReportContainer>
           )}
 
           {activeReport === 'cost-summary' && (
-            <ReportContainer title="Maintenance Cost Summary" icon={<DollarSign className="w-5 h-5" />}>
+            <ReportContainer title="Maintenance Cost Summary" icon={<DollarSign className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'cost-summary-report')}>
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
+              <>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={costData}>
@@ -327,11 +386,14 @@ export default function ReportsPage() {
                   </tbody>
                 </table>
               </div>
+              </>
+              )}
             </ReportContainer>
           )}
 
           {activeReport === 'downtime' && (
-            <ReportContainer title="Equipment Downtime Report" icon={<AlertTriangle className="w-5 h-5" />}>
+            <ReportContainer title="Equipment Downtime Report" icon={<AlertTriangle className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'downtime-report')}>
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={downtimeData}>
@@ -343,11 +405,13 @@ export default function ReportsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              )}
             </ReportContainer>
           )}
 
           {activeReport === 'material-consumption' && (
-            <ReportContainer title="Material Consumption Report" icon={<Package className="w-5 h-5" />}>
+            <ReportContainer title="Material Consumption Report" icon={<Package className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'material-consumption-report')}>
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <div className="industrial-card rounded overflow-hidden">
                 <table className="w-full">
                   <thead>
@@ -369,6 +433,7 @@ export default function ReportsPage() {
                   </tbody>
                 </table>
               </div>
+              )}
             </ReportContainer>
           )}
         </div>
@@ -377,17 +442,41 @@ export default function ReportsPage() {
   );
 }
 
-function ReportContainer({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function ReportContainer({ title, icon, onExport, children }: { title: string; icon: React.ReactNode; onExport: () => void; children: React.ReactNode }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
         <div className="text-amber">{icon}</div>
         <h2 className="text-primary text-lg font-semibold">{title}</h2>
-        <button className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded text-xs text-secondary border border-subtle hover:border-highlight transition-all">
+        <button onClick={onExport} className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded text-xs text-secondary border border-subtle hover:border-highlight transition-all">
           <Download className="w-3 h-3" /> Export
         </button>
       </div>
       <div className="industrial-card rounded p-4">{children}</div>
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="flex items-center justify-center h-32 text-secondary text-sm">
+      Loading report data...
+    </div>
+  );
+}
+
+function ErrorState() {
+  return (
+    <div className="flex items-center justify-center h-32 text-red-status text-sm">
+      Failed to load report data. Please try again.
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex items-center justify-center h-32 text-secondary text-sm">
+      No data yet for this report.
     </div>
   );
 }

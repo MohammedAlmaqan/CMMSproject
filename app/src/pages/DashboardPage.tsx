@@ -3,7 +3,7 @@
 // ============================================================
 
 import { useNavigate } from 'react-router-dom';
-import { lazy, Suspense, useMemo } from 'react';
+import { lazy, Suspense, useMemo, useEffect, useState } from 'react';
 import {
   ClipboardList,
   AlertTriangle,
@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { useAppStore } from '@/store/appStore';
+import { dashboardService } from '@/services/dashboardService';
+import type { SystemAlert } from '@/types';
 import type { WorkOrderStatus, WorkOrderType } from '@/types';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -48,7 +50,28 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const kpis = useAppStore((s) => s.dashboardKPIs);
   const workOrders = useAppStore((s) => s.workOrders);
-  const alerts = useAppStore((s) => s.alerts);
+  const [trendData, setTrendData] = useState<Array<{ month: string; planned: number; actual: number }>>([]);
+  const [dashAlerts, setDashAlerts] = useState<SystemAlert[]>([]);
+
+  useEffect(() => {
+    dashboardService
+      .getCostSummary()
+      .then((rows) => {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        setTrendData(
+          rows.map((r) => {
+            const m = Number(r.month.split('-')[1]);
+            return {
+              month: m >= 1 && m <= 12 ? monthNames[m - 1] : r.month,
+              planned: r.plannedCost,
+              actual: r.actualCost,
+            };
+          })
+        );
+      })
+      .catch(() => setTrendData([]));
+    dashboardService.getAlerts().then(setDashAlerts).catch(() => setDashAlerts([]));
+  }, []);
 
   const statusData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -74,18 +97,6 @@ export default function DashboardPage() {
     }));
   }, [workOrders]);
 
-  const monthlyTrend = useMemo(() => {
-    return [
-      { month: 'Jan', planned: 12, actual: 10 },
-      { month: 'Feb', planned: 14, actual: 13 },
-      { month: 'Mar', planned: 10, actual: 9 },
-      { month: 'Apr', planned: 16, actual: 14 },
-      { month: 'May', planned: 18, actual: 17 },
-      { month: 'Jun', planned: 15, actual: 13 },
-      { month: 'Jul', planned: 8, actual: 6 },
-    ];
-  }, []);
-
   const backlogByCenter = useMemo(() => {
     const centerMap: Record<string, number> = {};
     workOrders
@@ -100,7 +111,7 @@ export default function DashboardPage() {
     });
   }, [workOrders]);
 
-  const unreadAlerts = alerts.filter((a) => !a.isRead);
+  const unreadAlerts = dashAlerts.filter((a) => !a.isRead);
 
   return (
     <>
@@ -192,7 +203,7 @@ export default function DashboardPage() {
             <h3 className="text-primary text-sm font-semibold mb-4">Maintenance Trend</h3>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyTrend}>
+                <AreaChart data={trendData}>
                   <defs>
                     <linearGradient id="plannedGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#D97706" stopOpacity={0.3} />
@@ -283,7 +294,7 @@ export default function DashboardPage() {
               </span>
             </div>
             <div className="space-y-2 max-h-44 overflow-y-auto">
-              {alerts.slice(0, 6).map((alert) => (
+              {dashAlerts.slice(0, 6).map((alert) => (
                 <div
                   key={alert.alertId}
                   className={`flex items-start gap-2 p-2 rounded ${

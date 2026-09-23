@@ -160,7 +160,7 @@ See `scripts/build.bat` and `scripts/start.bat` for Windows batch deployment scr
 - Breakdown flag for emergency handling
 
 ### Reporting & Dashboards
-- 7 standard reports with PDF/Excel export
+- 7 standard reports with CSV export
 - Real-time KPI dashboard with charts
 - Drill-down capability
 
