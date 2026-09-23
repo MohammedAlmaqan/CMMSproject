@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, Milestone B G1-G3 + G4a complete; G4b-G7 pending
+**State:** Phase 0/1, Milestone A, Milestone B G1-G3, G4a, G4b, G5 complete; G6-G7 pending
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -12,7 +12,7 @@
 
 **Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G7 will surface latent bugs
 
-**Next action for a fresh session:** read tracker + git log + this file; then complete G4b (PM scheduler + 5 safeguards)
+**Next action for a fresh session:** read tracker + git log + this file; then complete G6 (remaining Phase 2 items + hardening)
 
 ---
 
@@ -27,8 +27,13 @@
     PM2 fork config (`instances: 1`, `exec_mode: 'fork'`, register.js + env_file removed).
   - Proof: `verify_g4b2.py` PASS — 2nd backend locked out; stale→503→alert→restore; batch markers present.
 - **Phase 3.1 (PM scheduler) — COMPLETE.**
+- **G5** — COMPLETE. Dashboard + Reports (`e047a40`).
+  - ReportsPage now calls all 7 reportService endpoints (per-report keyed cache, no stale-data cross-tab crash);
+    CSV export via Blob download; PM compliance renders backend single-period stats; README claim aligned to CSV.
+  - Dashboard trend reads `/api/dashboard/cost-summary` (AreaChart), alerts from `/api/dashboard/alerts`.
+  - Proof: `verify_g5.py` PASS exit 0 (10 endpoints live, material row BEARING-6205, export downloaded, trend area + live alerts, no hardcoded/simulated markers).
 - **Findings recorded, not yet fixed:** F1 (no zod on plan create); F3 (soft-delete/unique conflict → Phase 4.5).
-- **Next action on resume:** Group 5 — Dashboard + Reports (task 2.4 reportService live, 2.6 dashboard real trend + alerts, 2.5 Export CSV minimum). STOP before G6.
+- **Next action on resume:** Group 6 — hardening / remaining Phase 2 items (2.3 mockData delete, 2.7 sidebar, 2.11 Swagger, 2.12 refresh-token decision). STOP before G7.
 
 
 ---

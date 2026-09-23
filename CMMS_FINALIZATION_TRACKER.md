@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (F1/F2 recorded); Group 4b: PM scheduler complete (3.1a–3.1g ✅); Groups 5-7 pending**)
+**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (F1/F2 recorded); Group 4b: PM scheduler complete (3.1a–3.1g ✅); Group 5: Dashboard + Reports complete (2.4/2.5/2.6 ✅); Groups 6-7 pending**)
 
 ## Status Legend
 
@@ -91,9 +91,9 @@ Note: Phase 1 tasks 1.2, 1.7, 1.8, 1.9, 1.10 were verified by build/lint only. T
 | 2.1 | Wire **all mutations** to services: create/update WO, status transitions, convert-to-WO, comments, alert read, materials/labor/checklists CRUD | 🔶 | Refresh after each action -> data persists | 367b59d, d842bb9, 1f2ff8e |
 | 2.2 | Load remaining collections live: users, crafts, taskLists, operations, labor, checklists, meter readings, comments, **audit log** | 🔶 | Administration audit tab shows real entries | 40e90af, d842bb9 |
 | 2.3 | **Delete `mockData.ts` and all `.catch(() => mock)` fallbacks**; add toast + loading/error states on every view | ⬜ | API down -> visible error, zero fabricated data |  |
-| 2.4 | ReportsPage -> call `reportService` (7 endpoints); delete `Math.random()`/simulated logic | ⬜ | Report figures match SQL results |  |
-| 2.5 | Implement Export (CSV minimum; align README claim) | ⬜ | Button downloads file |  |
-| 2.6 | Dashboard: feed trend chart from `/dashboard/cost-summary`; alerts from API | ⬜ | No hardcoded series |  |
+| 2.4 | ReportsPage -> call `reportService` (7 endpoints); delete `Math.random()`/simulated logic | ✅ | verify_g5 PASS exit 0; figures match SQL (backlog 2 rows, material 1 row, pm period 2026-09); no simulated/random markers | e047a40 |
+| 2.5 | Implement Export (CSV minimum; align README claim) | ✅ | CSV downloads via expect_download (pm-compliance-report.csv); README claim aligned to CSV; PDF/Excel deferred to 3.3 | e047a40 |
+| 2.6 | Dashboard: feed trend chart from `/dashboard/cost-summary`; alerts from API | ✅ | Trend = 2 live Area series + Sep tick, alerts = live PM rows (verify_g5 PASS) | e047a40 |
 | 2.7 | Add missing sidebar entries: Work Centers, Preventive Maintenance | ⬜ | Both reachable via nav |  |
 | 2.8 | Wire `auditMiddleware`/`logAudit` onto all mutating routes | 🔶 | Every create/update/delete writes `AuditLogEntry` | 367b59d |
 | 2.9 | Apply `authorizeMinRole` per SOW role matrix | 🔶 | View-Only gets 403 on writes | 367b59d |
