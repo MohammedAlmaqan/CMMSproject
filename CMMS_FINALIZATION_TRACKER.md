@@ -209,8 +209,11 @@ Note: 2.2 is partially started — commit `40e90af` (task 1.2) wired `userServic
 | 4.2 | Fix `ecosystem.config.cjs` (drop phantom `register.js`, fix `env_file`, confirm fork mode) | ⬜ | `pm2 start` serves API |  |
 | 4.3 | Backend eslint dependency or remove script; lint green both packages | ⬜ | Exit 0 |  |
 | 4.4 | Verify `build.bat`/`start.bat` cold on target Windows box | ⬜ | Cold build -> running app |  |
+| 4.5 | F3: Partial unique index for soft-deletable `@unique` fields (`planCode` etc., `where isDeleted=false`) — regenerate migration, verify `verify_g4a.py` passes twice | ⬜ | Soft-deleted row frees its unique code |  |
 
 Note: Follow-up (non-blocking) - add a one-line comment to `Craft.hourlyRate` in `schema.prisma` documenting the per-person interpretation confirmed in task 1.5 (see `WorkOrderOperation.numberOfTechnicians` costing). Add during the next schema-touching task (e.g. 4.1 migrate baseline).
+
+Note (F3, task 4.5): until the partial unique index lands, `verify_g4a.py` relies on a one-off `prisma db execute` purge of `MaintenancePlan WHERE planCode='G4A-TEST'` between runs to remain re-runnable (the API soft-delete leaves the physical row reserving the unique `planCode`).
 
 ## Phase 5 - Testing, moderate floor (5-8 days) - *backend route tests protected first*
 
