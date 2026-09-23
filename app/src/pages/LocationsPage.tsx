@@ -2,8 +2,7 @@
 // Locations Page — Functional Location Hierarchy Management
 // ============================================================
 
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Search,
   ChevronRight,
@@ -13,12 +12,17 @@ import {
   MapPin,
   Box,
   CircuitBoard,
-  ClipboardList,
+  Loader2,
+  RefreshCw,
   AlertTriangle,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
-import { useAppStore } from '@/store/appStore';
-import type { FunctionalLocation } from '@/types';
+import { functionalLocationService } from '@/services/functionalLocationService';
+import { equipmentService } from '@/services/equipmentService';
+import { workOrderService } from '@/services/workOrderService';
+import { notificationService } from '@/services/notificationService';
+import { ApiError } from '@/lib/api';
+import type { FunctionalLocation, Equipment, WorkOrder, Notification } from '@/types';
 
 const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   Plant: Factory,
@@ -29,14 +33,40 @@ const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 export default function LocationsPage() {
-  const navigate = useNavigate();
-  const locations = useAppStore((s) => s.locations);
-  const equipment = useAppStore((s) => s.equipment);
-  const workOrders = useAppStore((s) => s.workOrders);
-  const notifications = useAppStore((s) => s.notifications);
+  const [locations, setLocations] = useState<FunctionalLocation[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['FL-001']));
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [locRes, eqRes, woRes, notifRes] = await Promise.all([
+        functionalLocationService.getAll(),
+        equipmentService.getAll(),
+        workOrderService.getAll({ take: 200 }),
+        notificationService.getAll({ take: 250 }),
+      ]);
+      setLocations(locRes);
+      setEquipment(eqRes);
+      setWorkOrders(woRes.data);
+      setNotifications(notifRes.data);
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : 'Failed to load locations');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   const rootLocations = locations.filter((l) => l.parentLocationId === null);
 
@@ -142,20 +172,52 @@ export default function LocationsPage() {
               style={{ backgroundColor: '#27272A' }}
             />
           </div>
-          <span className="text-tertiary text-xs ml-auto">{locations.length} locations</span>
+          <span className="text-tertiary text-xs ml-auto">
+            {loading ? 'Loading…' : `${locations.length} locations`}
+          </span>
+          {loadError && (
+            <button
+              onClick={reload}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber/50 hover:bg-amber/10"
+            >
+              <RefreshCw className="w-3 h-3" /> Retry
+            </button>
+          )}
         </div>
 
-        <div className="industrial-card rounded overflow-hidden">
-          <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-3 py-2 border-b border-subtle" style={{ backgroundColor: '#27272A' }}>
-            <span className="text-tertiary font-medium" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Location</span>
-            <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Status</span>
-            <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Equipment</span>
-            <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Work Orders</span>
-            <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Open WOs</span>
-            <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Alerts</span>
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center py-24">
+            <Loader2 className="w-6 h-6 animate-spin text-tertiary" />
+            <span className="ml-3 text-sm text-tertiary">Loading locations...</span>
           </div>
-          {renderTree(rootLocations)}
-        </div>
+        ) : loadError ? (
+          <div className="flex-1 flex items-center justify-center py-24">
+            <div className="text-center">
+              <MapPin className="w-12 h-12 text-tertiary mx-auto mb-3" />
+              <p className="text-secondary text-sm">{loadError}</p>
+              <button onClick={reload} className="text-amber text-xs mt-2 hover:underline">Retry</button>
+            </div>
+          </div>
+        ) : filteredLocations.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center py-24">
+            <div className="text-center">
+              <MapPin className="w-12 h-12 text-tertiary mx-auto mb-3" />
+              <p className="text-secondary text-sm">No locations found</p>
+            </div>
+          </div>
+        ) : (
+          <div className="industrial-card rounded overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-3 py-2 border-b border-subtle" style={{ backgroundColor: '#27272A' }}>
+              <span className="text-tertiary font-medium" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Location</span>
+              <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Status</span>
+              <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Equipment</span>
+              <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Work Orders</span>
+              <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Open WOs</span>
+              <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Alerts</span>
+            </div>
+            {renderTree(rootLocations)}
+          </div>
+        )}
       </div>
     </>
   );
