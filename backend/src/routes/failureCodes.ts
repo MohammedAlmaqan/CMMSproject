@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
+import { failureCodeCreateSchema, failureCodeUpdateSchema, validate } from '../utils/validation.js';
 
 const router = Router();
 
@@ -86,7 +88,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Requester'), validate(failureCodeCreateSchema), async (req: Request, res: Response) => {
   try {
     const { parentCodeId, code, description } = req.body;
 
@@ -100,6 +102,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'FailureCode', recordId: failureCode.failureCodeId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(failureCode);
   } catch (error: any) {
     if (error.code === 'P2003') {
@@ -110,7 +118,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Requester'), validate(failureCodeUpdateSchema), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.failureCode.findFirst({
       where: { failureCodeId: String(req.params.id), isDeleted: false },
@@ -131,6 +139,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'FailureCode', recordId: failureCode.failureCodeId, action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(failureCode);
   } catch (error: any) {
     if (error.code === 'P2003') {
@@ -141,7 +155,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.failureCode.findFirst({
       where: { failureCodeId: String(req.params.id), isDeleted: false },
@@ -157,6 +171,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
         modifiedBy: req.user!.userId,
       },
     });
+
+    await logAudit(
+      { tableName: 'FailureCode', recordId: String(req.params.id), action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Failure code deleted successfully' });
   } catch (error) {

@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
+import { workCenterCreateSchema, workCenterUpdateSchema, validate } from '../utils/validation.js';
 
 const router = Router();
 
@@ -50,7 +52,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Requester'), validate(workCenterCreateSchema), async (req: Request, res: Response) => {
   try {
     const { code, name, dailyCapacityHours, costRatePerHour, isActive } = req.body;
 
@@ -66,6 +68,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'WorkCenter', recordId: workCenter.workCenterId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(workCenter);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -76,7 +84,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Requester'), validate(workCenterUpdateSchema), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.workCenter.findFirst({
       where: { workCenterId: String(req.params.id), isDeleted: false },
@@ -99,6 +107,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'WorkCenter', recordId: workCenter.workCenterId, action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(workCenter);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -109,7 +123,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.workCenter.findFirst({
       where: { workCenterId: String(req.params.id), isDeleted: false },
@@ -125,6 +139,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
         modifiedBy: req.user!.userId,
       },
     });
+
+    await logAudit(
+      { tableName: 'WorkCenter', recordId: String(req.params.id), action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Work center deleted successfully' });
   } catch (error) {

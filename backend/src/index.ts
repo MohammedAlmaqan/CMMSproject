@@ -171,22 +171,26 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`CMMS API server running on port ${PORT}`);
-  console.log(`API docs: http://localhost:${PORT}/api-docs`);
-  setImmediate(async () => {
-    try {
-      const acquired = await acquireStartupLock();
-      if (!acquired) {
-        console.log('[scheduler] startup skipped — lock refused; API serving without scheduler');
-        return;
+// The scheduler startup wiring and the HTTP listener are skipped under tests so
+// supertest can import `app` without binding :4000 or taking the scheduler lock.
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`CMMS API server running on port ${PORT}`);
+    console.log(`API docs: http://localhost:${PORT}/api-docs`);
+    setImmediate(async () => {
+      try {
+        const acquired = await acquireStartupLock();
+        if (!acquired) {
+          console.log('[scheduler] startup skipped — lock refused; API serving without scheduler');
+          return;
+        }
+        await runSchedulerOnce().catch((err) => console.error('[scheduler] startup run failed', err));
+        startScheduler();
+      } catch (err) {
+        console.error('[scheduler] startup wiring failed', err);
       }
-      await runSchedulerOnce().catch((err) => console.error('[scheduler] startup run failed', err));
-      startScheduler();
-    } catch (err) {
-      console.error('[scheduler] startup wiring failed', err);
-    }
+    });
   });
-});
+}
 
 export default app;

@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
+import { userUpdateSchema, validate } from '../utils/validation.js';
 
 const router = Router();
 
@@ -49,7 +51,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', authorize('Administrator'), async (req: Request, res: Response) => {
+router.put('/:id', authorize('Administrator'), validate(userUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.user.findFirst({
@@ -77,6 +79,12 @@ router.put('/:id', authorize('Administrator'), async (req: Request, res: Respons
         createdBy: true, createdDate: true, modifiedBy: true, modifiedDate: true,
       },
     });
+
+    await logAudit(
+      { tableName: 'User', recordId: id, action: 'Update', fieldName: 'profile' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json(user);
   } catch (error) {
@@ -129,6 +137,12 @@ router.put('/:id/password', async (req: Request, res: Response) => {
         modifiedBy: req.user!.userId,
       },
     });
+
+    await logAudit(
+      { tableName: 'User', recordId: id, action: 'Update', fieldName: 'password' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Password updated successfully' });
   } catch (error) {

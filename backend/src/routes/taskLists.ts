@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
+import { taskListCreateSchema, taskListUpdateSchema, validate } from '../utils/validation.js';
 
 const router = Router();
 
@@ -89,7 +91,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), async (req: Request, res: Response) => {
   try {
     const { code, description, equipmentClass, equipmentId, workCenterId, operations } = req.body;
 
@@ -124,6 +126,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'TaskList', recordId: taskList.taskListId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(taskList);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -137,7 +145,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.taskList.findFirst({
       where: { taskListId: String(req.params.id), isDeleted: false },
@@ -206,6 +214,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'TaskList', recordId: String(req.params.id), action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(updated);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -219,7 +233,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.taskList.findFirst({
       where: { taskListId: String(req.params.id), isDeleted: false },
@@ -235,6 +249,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
         modifiedBy: req.user!.userId,
       },
     });
+
+    await logAudit(
+      { tableName: 'TaskList', recordId: String(req.params.id), action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Task list deleted successfully' });
   } catch (error) {

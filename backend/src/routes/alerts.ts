@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logAudit } from '../middleware/audit.js';
 
 const router = Router();
 
@@ -33,12 +34,18 @@ router.get('/unread-count', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/read-all', async (req: Request, res: Response) => {
+router.put('/read-all', authorizeMinRole('Requester'), async (req: Request, res: Response) => {
   try {
     await prisma.systemAlert.updateMany({
       where: { userId: req.user!.userId, isRead: false },
       data: { isRead: true },
     });
+
+    await logAudit(
+      { tableName: 'SystemAlert', recordId: req.user!.userId, action: 'Update', fieldName: 'read-all' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'All alerts marked as read' });
   } catch (error) {
@@ -47,7 +54,7 @@ router.put('/read-all', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id/read', async (req: Request, res: Response) => {
+router.put('/:id/read', authorizeMinRole('Requester'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.systemAlert.findFirst({
@@ -61,6 +68,12 @@ router.put('/:id/read', async (req: Request, res: Response) => {
       where: { alertId: id },
       data: { isRead: true },
     });
+
+    await logAudit(
+      { tableName: 'SystemAlert', recordId: id, action: 'Update', fieldName: 'read' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json(alert);
   } catch (error) {

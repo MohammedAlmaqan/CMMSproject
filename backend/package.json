@@ -12,7 +12,8 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "test": "vitest run"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
@@ -37,6 +38,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^24.10.1",
     "@types/node-cron": "^3.0.11",
+    "@types/supertest": "^7.2.1",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.7",
     "@types/uuid": "^10.0.0",
@@ -44,7 +46,9 @@
     "@typescript-eslint/parser": "^8.70.1",
     "eslint": "^10.11.0",
     "prisma": "^6.6.0",
+    "supertest": "^7.3.0",
     "tsx": "^4.19.4",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.1"
   }
 }

@@ -3,7 +3,7 @@ import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
-import { materialImportRowSchema } from '../utils/validation.js';
+import { materialImportRowSchema, materialCreateSchema, materialUpdateSchema, validate } from '../utils/validation.js';
 import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
 
 const router = Router();
@@ -201,7 +201,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Requester'), validate(materialCreateSchema), async (req: Request, res: Response) => {
   try {
     const { materialCode, description, unitOfMeasure, standardCost, currentStock } = req.body;
 
@@ -210,12 +210,18 @@ router.post('/', async (req: Request, res: Response) => {
         materialCode,
         description,
         unitOfMeasure,
-        standardCost,
-        currentStock: currentStock || 0,
+        standardCost: standardCost ?? 0,
+        currentStock: currentStock ?? 0,
         createdBy: req.user!.userId,
         modifiedBy: req.user!.userId,
       },
     });
+
+    await logAudit(
+      { tableName: 'Material', recordId: material.materialId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.status(201).json(material);
   } catch (error: any) {
@@ -227,7 +233,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Requester'), validate(materialUpdateSchema), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.material.findFirst({
       where: { materialId: String(req.params.id), isDeleted: false },
@@ -250,6 +256,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'Material', recordId: material.materialId, action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(material);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -260,7 +272,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.material.findFirst({
       where: { materialId: String(req.params.id), isDeleted: false },
@@ -276,6 +288,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
         modifiedBy: req.user!.userId,
       },
     });
+
+    await logAudit(
+      { tableName: 'Material', recordId: String(req.params.id), action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.json({ message: 'Material deleted successfully' });
   } catch (error) {

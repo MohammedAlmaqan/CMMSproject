@@ -229,6 +229,84 @@ export const meterReadingCreateSchema = z.object({
 
 export const schedulerRunSchema = z.object({}).strict();
 
+export const materialCreateSchema = z.object({
+  materialCode: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  unitOfMeasure: z.string().trim().min(1),
+  standardCost: z.number().nonnegative().optional(),
+  currentStock: z.number().nonnegative().optional(),
+});
+
+export const materialUpdateSchema = materialCreateSchema.partial();
+
+export const workCenterCreateSchema = z.object({
+  code: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  dailyCapacityHours: z.number().nonnegative(),
+  costRatePerHour: z.number().nonnegative(),
+  isActive: z.boolean().optional(),
+});
+
+export const workCenterUpdateSchema = workCenterCreateSchema.partial();
+
+export const taskListOperationItemSchema = z.object({
+  sequenceNumber: z.number().int().positive(),
+  description: z.string().min(1),
+  craftId: z.string().min(1),
+  plannedHours: z.number().nonnegative().optional(),
+  numberOfTechnicians: z.number().int().positive().optional(),
+});
+
+export const taskListCreateSchema = z.object({
+  code: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  equipmentClass: z.string().nullable().optional(),
+  equipmentId: z.string().min(1).nullable().optional(),
+  workCenterId: z.string().min(1),
+  operations: z.array(taskListOperationItemSchema).optional(),
+});
+
+export const taskListUpdateSchema = taskListCreateSchema.partial();
+
+export const failureCodeCreateSchema = z.object({
+  parentCodeId: z.string().min(1).nullable().optional(),
+  code: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+});
+
+export const failureCodeUpdateSchema = failureCodeCreateSchema.partial();
+
+export const maintenancePlanCreateSchema = z.object({
+  planCode: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  equipmentId: z.string().min(1).nullable().optional(),
+  functionalLocationId: z.string().min(1).nullable().optional(),
+  workCenterId: z.string().min(1),
+  taskListId: z.string().min(1),
+  strategyType: z.enum(['Time', 'Meter', 'Combined']),
+  intervalValue: z.number().int().nonnegative(),
+  intervalUnit: z.enum(['Days', 'Weeks', 'Months']),
+  callHorizonValue: z.number().int().nonnegative().optional(),
+  callHorizonUnit: z.enum(['Days', 'Units']).optional(),
+  startDate: z.string().min(1),
+  endDate: z.string().min(1).nullable().optional(),
+  activeFlag: z.boolean().optional(),
+});
+
+export const maintenancePlanUpdateSchema = maintenancePlanCreateSchema.partial();
+
+export const userUpdateSchema = z
+  .object({
+    fullName: z.string().trim().min(1).optional(),
+    email: z.string().email().optional(),
+    role: z
+      .enum(['View-Only', 'Requester', 'Technician', 'Maintenance Supervisor', 'Maintenance Planner', 'Administrator'])
+      .optional(),
+    workCenterId: z.string().min(1).nullable().optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required' });
+
 export const attachmentEntityTypeSchema = z.enum(['WorkOrder', 'Notification', 'Equipment']);
 
 export const attachmentCreateSchema = z.object({

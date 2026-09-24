@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
-import { validate, schedulerRunSchema } from '../utils/validation.js';
+import { validate, schedulerRunSchema, maintenancePlanCreateSchema, maintenancePlanUpdateSchema } from '../utils/validation.js';
 import { runSchedulerOnce } from '../services/scheduler.js';
 import { generateWoNumber } from '../utils/sequence.js';
 
@@ -74,7 +74,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorizeMinRole('Requester'), validate(maintenancePlanCreateSchema), async (req: Request, res: Response) => {
   try {
     const {
       planCode, description, equipmentId, functionalLocationId,
@@ -102,6 +102,12 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'MaintenancePlan', recordId: plan.planId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.status(201).json(plan);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -112,7 +118,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.maintenancePlan.findFirst({
@@ -148,6 +154,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       },
     });
 
+    await logAudit(
+      { tableName: 'MaintenancePlan', recordId: plan.planId, action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json(plan);
   } catch (error) {
     console.error('Error updating maintenance plan:', error);
@@ -155,7 +167,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.maintenancePlan.findFirst({
@@ -170,6 +182,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
       data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
+    await logAudit(
+      { tableName: 'MaintenancePlan', recordId: id, action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
+
     res.json({ message: 'Maintenance plan deleted successfully' });
   } catch (error) {
     console.error('Error deleting maintenance plan:', error);
@@ -177,7 +195,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/:id/generate-wo', async (req: Request, res: Response) => {
+router.post('/:id/generate-wo', authorizeMinRole('Maintenance Planner'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const plan = await prisma.maintenancePlan.findFirst({
@@ -252,6 +270,12 @@ router.post('/:id/generate-wo', async (req: Request, res: Response) => {
         relatedEntityType: 'WorkOrder',
       },
     });
+
+    await logAudit(
+      { tableName: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
 
     res.status(201).json(workOrder);
   } catch (error) {
