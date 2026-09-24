@@ -53,14 +53,14 @@ if %errorlevel% neq 0 (
 echo Frontend build complete.
 echo.
 
-REM Seed Database
-echo [3/3] Seeding Database...
-cd /d "%~dp0..\backend"
-call npx tsx prisma/seed.ts
-if %errorlevel% neq 0 (
-    echo WARNING: Database seed completed with warnings
-)
-echo.
+REM [3/3] removed — demo seeding is no longer part of a build.
+REM Choice (documented): the old `npx tsx prisma/seed.ts` step wiped ALL tables
+REM (WorkOrder + Notification included) without recreating them — a production
+REM trust-property violation. seed.ts is now guarded (SEED_DEMO=1 + a
+REM non-production NODE_ENV) and demo reseed moved to scripts\seed-demo.bat.
+REM Run that ONLY on a fresh demo install; builds never touch live data.
+echo Seed skipped - a build must not destroy live WO/Notification data.
+echo To reseed demo data on a fresh install only: scripts\seed-demo.bat
 
 echo ============================================
 echo Build Complete!
