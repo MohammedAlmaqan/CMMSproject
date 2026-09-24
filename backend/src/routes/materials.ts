@@ -151,7 +151,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
     });
 
     res.json(result);
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof CsvRowError) {
       return res.status(400).json({ error: `Row ${error.row}: ${error.reason}` });
     }
