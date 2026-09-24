@@ -221,13 +221,13 @@ def main():
         try:
             g1 = page.request.post(
                 api + f"/api/maintenance-plans/{plan_id}/generate-wo",
-                headers=hdrs,
+                headers=admin_hdrs,
                 data=json.dumps({}),
             )
             GEN1 = g1.text()
             g2 = page.request.post(
                 api + f"/api/maintenance-plans/{plan_id}/generate-wo",
-                headers=hdrs,
+                headers=admin_hdrs,
                 data=json.dumps({}),
             )
             GEN2 = g2.text()
@@ -270,7 +270,7 @@ def main():
 
         # ---------- Cleanup: delete plan + both generated WOs ----------
         try:
-            dl = page.request.delete(api + f"/api/maintenance-plans/{plan_id}", headers=hdrs)
+            dl = page.request.delete(api + f"/api/maintenance-plans/{plan_id}", headers=admin_hdrs)
             SI["plan_delete_status"] = dl.status
         except Exception as e:
             print("PLAN_DELETE_ERR", e)

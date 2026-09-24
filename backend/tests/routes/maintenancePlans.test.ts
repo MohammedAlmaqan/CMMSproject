@@ -72,6 +72,15 @@ describe('maintenance plans routes', () => {
     expect(res.body.error).toContain('workCenterId');
   });
 
+  it('maps P2003 to a 400 when a referenced entity does not exist (5.4 finding)', async () => {
+    const res = await api()
+      .post('/api/maintenance-plans')
+      .set(authHeaders(ctx.operatorToken))
+      .send({ ...planBody(), planCode: `${planCode}-FK`, taskListId: '00000000-0000-4000-8000-000000000000' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('Referenced entity not found');
+  });
+
   it('creates a maintenance plan (Requester+) and writes an audit row', async () => {
     const res = await api()
       .post('/api/maintenance-plans')

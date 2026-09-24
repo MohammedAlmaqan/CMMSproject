@@ -113,6 +113,9 @@ router.post('/', authorizeMinRole('Requester'), validate(maintenancePlanCreateSc
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Plan code already exists' });
     }
+    if (error.code === 'P2003') {
+      return res.status(400).json({ error: 'Referenced entity not found (equipment, location, work center, or task list)' });
+    }
     console.error('Error creating maintenance plan:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -162,6 +165,9 @@ router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdate
 
     res.json(plan);
   } catch (error) {
+    if ((error as { code?: string })?.code === 'P2003') {
+      return res.status(400).json({ error: 'Referenced entity not found (equipment, location, work center, or task list)' });
+    }
     console.error('Error updating maintenance plan:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
