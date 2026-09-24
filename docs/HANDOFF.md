@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped (Administration remaining needs folded into Phase 4/G8); Phase 4 next
+**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped; Phase 4 partially done — 4.1/4.3/4.5 ✅, 4.4 ⬜ blocked (cold-build follow-up); Phase 3 remaining pending
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -12,7 +12,7 @@
 
 **Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G6a will surface latent bugs
 
-**Next action for a fresh session:** read tracker + git log + this file; then Phase 4 — DB & build hygiene (4.1 prisma migrate baseline, 4.3 backend eslint, 4.4 cold-build verification, 4.5 F3 partial unique index). Then Phase 3 remaining (attachments, bulk import, delete strategy, WCAG). STOP before Phase 5.
+**Next action for a fresh session:** read tracker + git log + this file. Next: **4.4 follow-up** — cold-build blockers (frontend 4 pre-existing tsc errors at app/src/pages/EquipmentDetailPage.tsx:184, WorkOrderDetailPage.tsx:505/533/857; prisma generate EPERM → stop :4000 backend before install/generate; change build.bat line 18 `prisma db push` → `prisma migrate deploy`). Then Phase 3 remaining (attachments, bulk import, delete strategy, WCAG). STOP before Phase 5.
 
 ---
 
@@ -49,8 +49,20 @@
     Proved live: token `exp-iat=28800`; `JWT_EXPIRES_IN=28800` in `.env.example`. No refresh endpoints built.
   - Proof: `verify_g6b.py` PASS exit 0 — login UI+API, sidebar asserts, click-through both routes, direct renders,
     swagger gates, `PAGE_ERRORS=[]`. Screenshots `screenshots/g6b_01..06`.
-- **Findings recorded, not yet fixed:** F1 (no zod on plan create); F3 (soft-delete/unique conflict → Phase 4.5).
-- **Next action on resume:** Phase 4 — DB & build hygiene (4.1 prisma migrate baseline, 4.3 backend eslint, 4.4 cold-build verification, 4.5 F3 partial unique index). Then Phase 3 remaining (attachments, bulk import, delete strategy, WCAG). STOP before Phase 5.
+- **Phase 4 (partial)** — DB & Build Hygiene.
+  - 4.1 baseline migration `20260924142537_init_baseline` (`72e8834`): DB was db-push-created so `migrate dev` demanded a
+    destructive reset → adopted non-destructively (generate SQL via `migrate diff --from-empty`, then `migrate resolve --applied`);
+    `migrate status` = up to date; `migrate deploy` is now the fresh-DB path; **db push retired**.
+  - 4.3 backend eslint (`5d63f1a`): flat config (TS recommended). Baseline = 50 errors (mostly no-explicit-any) — >30 so fixes
+    deferred to Phase 5; p4 gate = no new errors vs baseline (currently exactly 50).
+  - 4.4 **BLOCKED** (`build.bat` exit 2): see tracker row + next-action above. Follow-up required before cold-build is real.
+  - 4.5 F3 partial unique index for `MaintenancePlan.planCode` (`a888665`, migration `20260924113634_partial_unique_index`):
+    `DROP INDEX MaintenancePlan_planCode_key` + raw `CREATE UNIQUE INDEX ... WHERE isDeleted=false`. verify_g4a passed twice with
+    NO purge (G4A-TEST recreate 201 both runs). Client regenerated after stopping the dev backend (DLL EPERM fix).
+  - `verify_p4.py` PASS exit 0 (`ae9c2a5`): migrations>=2, status up to date, eslint<=50, g4a x2.
+- **Findings recorded, not yet fixed:** F1 (no zod on plan create); tsc tech-debt x4 (Phase 5); eslint baseline 50 (Phase 5);
+  build.bat db push → migrate deploy (4.4 follow-up); F3 partial-index pattern still pending for 8 more models (recorded in tracker 4.5).
+- **Next action on resume:** 4.4 cold-build follow-up first (see above) → then Phase 3 remaining. STOP before Phase 5.
 
 
 ---

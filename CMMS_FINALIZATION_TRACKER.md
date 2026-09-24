@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (F1/F2 recorded); Group 4b: PM scheduler complete (3.1a–3.1g ✅); Group 5: Dashboard + Reports complete (2.4/2.5/2.6 ✅); **Group 6a: mockData deletion + fallback removal complete (2.3 ✅, trust property); Group 6b: sidebar + Swagger + refresh decision complete (2.7/2.11/2.12 ✅); Group 7 pending**)
+**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (F1/F2 recorded); Group 4b: PM scheduler complete (3.1a–3.1g ✅); Group 5: Dashboard + Reports complete (2.4/2.5/2.6 ✅); **Group 6a: mockData deletion + fallback removal complete (2.3 ✅, trust property); Group 6b: sidebar + Swagger + refresh decision complete (2.7/2.11/2.12 ✅); Group 7 dropped — Administration remaining needs folded into Phase 4/G8 | Phase 4 - DB & Build Hygiene: 4.1 ✅ (baseline migration), 4.3 ✅ (eslint baseline 50, fixes -> Phase 5), 4.5 ✅ (F3 partial unique index); 4.4 ⬜ BLOCKED (cold-build: frontend tsc-b 4 pre-existing errors + prisma generate EPERM — follow-up); Phase 3 remaining pending**)
 
 ## Status Legend
 
@@ -207,15 +207,15 @@ Note (Swagger deferral, 2026-09-24): 2.11 executed as option (a) — WO domain o
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 4.1 | Baseline `prisma migrate dev`; commit `prisma/migrations/` | ⬜ | Fresh DB via `migrate deploy` only |  |
+| 4.1 | Baseline `prisma migrate dev`; commit `prisma/migrations/` | ✅ | Baseline `20260924142537_init_baseline` (34 tables, all models incl. SchedulerRun); adopted via `migrate resolve --applied` (DB was db-push-created, non-destructive adopt) + `migrate status` "up to date"; `prisma migrate deploy` = fresh-DB path; db push retired | 72e8834 |
 | 4.2 | Fix `ecosystem.config.cjs` (drop phantom `register.js`, fix `env_file`, confirm fork mode) | ✅ | Landed in G4b-2 safeguard 3.1a: phantom `register.js` removed, `env_file` removed, `instances: 1`/`exec_mode: 'fork'` confirmed — `pm2 start` serves API | `5048a17` |
-| 4.3 | Backend eslint dependency or remove script; lint green both packages | ⬜ | Exit 0 |  |
-| 4.4 | Verify `build.bat`/`start.bat` cold on target Windows box | ⬜ | Cold build -> running app |  |
-| 4.5 | F3: Partial unique index for soft-deletable `@unique` fields (`planCode` etc., `where isDeleted=false`) — regenerate migration, verify `verify_g4a.py` passes twice | ⬜ | Soft-deleted row frees its unique code |  |
+| 4.3 | Backend eslint dependency or remove script; lint green both packages | ✅ | Flat config (TS recommended); baseline = 50 errors (43 no-explicit-any, 4 no-unused-vars, 1 no-namespace... per run 50). >30 → fixes deferred to Phase 5 per standing rule; gate = no new errors vs baseline | 5d63f1a |
+| 4.4 | Verify `build.bat`/`start.bat` cold on target Windows box | ⬜ | **BLOCKED (follow-up).** `build.bat` exits 2: (1) frontend `tsc -b && vite build` aborts on the 4 known Phase-5 tech-debt errors (EquipmentDetailPage:184, WorkOrderDetailPage:505/533/857); (2) backend `prisma generate` EPERM renaming `query_engine-windows.dll.node` while dev server holds it — stop :4000 before generate/install. Also: build.bat line 18 still calls `prisma db push` → change to `migrate deploy`. `start.bat` not reached |  |
+| 4.5 | F3: Partial unique index for soft-deletable `@unique` fields (`planCode` etc., `where isDeleted=false`) — regenerate migration, verify `verify_g4a.py` passes twice | ✅ | schema.prisma: planCode no longer `@unique` (comment documents the partial index). Migration `20260924113634_partial_unique_index`: `DROP INDEX MaintenancePlan_planCode_key` + raw `CREATE UNIQUE INDEX "MaintenancePlan_planCode_active_key" ON "MaintenancePlan"("planCode") WHERE "isDeleted"=false`. Applied. verify_g4a PASS twice back-to-back, NO purge (create 201 both runs — soft-deleted G4A-TEST freed). verify_p4 exit 0. Deferred (recorded): same pattern still needed for User.username, FunctionalLocation.locationCode, Equipment.equipmentCode, WorkCenter.code, Material.materialCode, TaskList.code, Notification.notificationNumber, WorkOrder.woNumber + @@unique([sourcePlanId,sourcePlanCycle]) | a888665 |
 
 Note: Follow-up (non-blocking) - add a one-line comment to `Craft.hourlyRate` in `schema.prisma` documenting the per-person interpretation confirmed in task 1.5 (see `WorkOrderOperation.numberOfTechnicians` costing). Add during the next schema-touching task (e.g. 4.1 migrate baseline).
 
-Note (F3, task 4.5): until the partial unique index lands, `verify_g4a.py` relies on a one-off `prisma db execute` purge of `MaintenancePlan WHERE planCode='G4A-TEST'` between runs to remain re-runnable (the API soft-delete leaves the physical row reserving the unique `planCode`).
+Note (F3, task 4.5, RESOLVED): the one-off `prisma db execute` purge of `MaintenancePlan WHERE planCode='G4A-TEST'` is no longer needed — the partial unique index `MaintenancePlan_planCode_active_key` (WHERE isDeleted=false) frees soft-deleted plan codes for reuse. `verify_g4a.py` has no embedded purge line; both consecutive runs passed with no manual purge.
 
 ## Phase 5 - Testing, moderate floor (5-8 days) - *backend route tests protected first*
 
