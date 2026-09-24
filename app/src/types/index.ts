@@ -105,6 +105,7 @@ export interface EquipmentBOM {
   equipmentId: string;
   materialId: string;
   quantity: number;
+  material?: { materialCode: string } | null;
 }
 
 // ─── Failure Code (§3.1.4) ───

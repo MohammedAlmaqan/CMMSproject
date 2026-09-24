@@ -23,12 +23,10 @@ os.makedirs(SHOTS, exist_ok=True)
 SI = {}
 FAILED = []
 
-BASELINE_TSC = {
-    "src/pages/EquipmentDetailPage.tsx(184,72)",
-    "src/pages/WorkOrderDetailPage.tsx(505,11)",
-    "src/pages/WorkOrderDetailPage.tsx(533,11)",
-    "src/pages/WorkOrderDetailPage.tsx(857,43)",
-}
+# The 4 pre-existing errors were resolved in Phase 4.4 (tsc -b exit 0).
+# BASELINE_TSC is intentionally empty: any reappearance of that class of
+# error is now NEW and must fail the gate.
+BASELINE_TSC = set()
 
 
 def norm_tsc(line):
@@ -86,7 +84,7 @@ for line in (r_b.stderr + r_b.stdout).splitlines():
         known += 1
     else:
         new_errs.append(n)
-step("tsc_build_no_new_errors", r_b.returncode == 2 and not new_errs, f"known={known} new={new_errs}")
+step("tsc_build_exit0", r_b.returncode == 0 and not new_errs, f"rc={r_b.returncode} new={new_errs}")
 
 # ── 3. API ids for detail routes ───────────────────────────────────────────
 s = requests.Session()

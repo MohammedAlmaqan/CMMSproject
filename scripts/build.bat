@@ -14,8 +14,20 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 
+REM Stop the dev backend if it holds :4000 — prisma generate must rename
+REM query_engine DLLs and EPERMs while a tsx/node process has them loaded.
+REM Narrow choice: kill only the PID listening on :4000 (dev API), so we do
+REM not nuke unrelated node processes (e.g. the frontend dev server / IDE).
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr /R /C:":4000 .*LISTENING"') do (
+    echo Stopping backend on :4000 PID %%a so prisma generate can write DLLs
+    taskkill /PID %%a /F 2>nul
+)
+REM `timeout` fails when stdin is redirected; ping is a TTY-free 2s delay
+ping -n 3 127.0.0.1 >nul
+
 call npx prisma generate
-call npx prisma db push
+REM DB is migration-managed (Phase 4.1); db push is retired
+call npx prisma migrate deploy
 call npx tsc
 if %errorlevel% neq 0 (
     echo ERROR: TypeScript build failed for backend

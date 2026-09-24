@@ -502,7 +502,7 @@ export default function WorkOrderDetailPage() {
           operationId: laborForm.operationId,
           userId: laborForm.userId,
           hoursWorked: parseFloat(laborForm.hoursWorked) || 0,
-          notes: laborForm.notes.trim() || null,
+          notes: laborForm.notes.trim() || undefined,
         });
         setLaborAdding(false);
         setLaborForm(emptyLaborForm);
@@ -530,7 +530,7 @@ export default function WorkOrderDetailPage() {
       await runMutation(`labor:edit:${l.laborEntryId}`, async () => {
         await laborService.update(l.laborEntryId, {
           hoursWorked: parseFloat(editLaborForm.hoursWorked) || 0,
-          notes: editLaborForm.notes.trim() || null,
+          notes: editLaborForm.notes.trim() || undefined,
         });
         setEditingLaborId(null);
         await afterMutation();
@@ -854,7 +854,10 @@ export default function WorkOrderDetailPage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                // tab.id comes from the fixed `tabs` list (constant DetailTab values)
+                setActiveTab(tab.id as DetailTab);
+              }}
               className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'text-primary border-amber'
