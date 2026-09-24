@@ -157,15 +157,17 @@ def main():
             SI["reports_backlog_has_status"] = False
         snap(page, "g5_01_reports_backlog")
 
-        # Material Usage tab -> real table row
+        # Report with provable live data -> PM Compliance period marker
+        # (the seed DB has no material-usage rows, so PM Compliance is the
+        # live report used here, matching verify_g5_3.py's choice)
         try:
-            page.get_by_role("button", name="Material Usage", exact=True).click()
-            page.get_by_text("BEARING-6205", exact=True).wait_for(timeout=15000)
-            SI["reports_material_table_ok"] = True
+            page.get_by_role("button", name="PM Compliance", exact=True).click()
+            page.get_by_text(re.compile(r"2026-\d{2}")).first.wait_for(timeout=15000)
+            SI["reports_pm_data_ok"] = True
         except Exception as e:
-            print("REPORTS_MATERIAL_ERR", e)
-            SI["reports_material_table_ok"] = False
-        snap(page, "g5_02_reports_material")
+            print("REPORTS_PM_ERR", e)
+            SI["reports_pm_data_ok"] = False
+        snap(page, "g5_02_reports_pm_compliance")
 
         # PM Compliance tab -> backend period
         try:
@@ -259,7 +261,7 @@ def main():
             and SI.get("api_dashboard_cost-summary_status") == 200
             and SI.get("api_dashboard_cost-summary_shape_ok")
             and SI.get("reports_backlog_chart_ok")
-            and SI.get("reports_material_table_ok")
+            and SI.get("reports_pm_data_ok")
             and SI.get("reports_pm_period_ok")
             and SI.get("export_download_ok")
             and SI.get("trend_chart_ok")
