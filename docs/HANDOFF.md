@@ -2,17 +2,18 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped; Phase 4 partially done — 4.1/4.3/4.5 ✅, 4.4 ⬜ blocked (cold-build follow-up); Phase 3 remaining pending
+**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped; **Phase 4 complete — 4.1–4.5 ✅ (DB & build hygiene)**; Phase 3 remaining pending
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
 **Standing rules:** never touch .env/.env.example; never print secrets; raw outputs not summaries; one commit per logical unit; no .catch(() => mock) anywhere; stop at each group boundary for review
+- **tsc gate:** use `tsc -b`, not `tsc --noEmit -p app` — the latter is vacuous (project root is references-only). Use `app\node_modules\.bin\tsc.cmd -b`.
 
 **Verify harness:** committed scripts/verify/verify_gN.py (Python + Playwright); assert live endpoint 200 + expected shape, not just render (e.g. /api/locations 404 → grouped G2-G3 latent bug; was masked by mock fallback; after G6a the mockData.ts delete surfaces all of them)
 
 **Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G6a will surface latent bugs
 
-**Next action for a fresh session:** read tracker + git log + this file. Next: **4.4 follow-up** — cold-build blockers (frontend 4 pre-existing tsc errors at app/src/pages/EquipmentDetailPage.tsx:184, WorkOrderDetailPage.tsx:505/533/857; prisma generate EPERM → stop :4000 backend before install/generate; change build.bat line 18 `prisma db push` → `prisma migrate deploy`). Then Phase 3 remaining (attachments, bulk import, delete strategy, WCAG). STOP before Phase 5.
+**Next action for a fresh session:** read tracker + git log + this file. Next: **Phase 3 remaining** (attachments, bulk import, delete strategy, WCAG). STOP before Phase 5.
 
 ---
 
@@ -38,8 +39,7 @@
     Loaded live now: crafts + auditLog added to `loadFromApi`.
   - Three-state (loading/error/empty) added to Materials, Work Centers, Administration, Dashboard (KPI error banner);
     all other pages already had it (G1-G5).
-  - Proof: `verify_g6a.py` PASS exit 0 — grep gates clean, tsc gates clean (only 4 pre-existing baseline errors in
-    untouched files), 14-route sweep: API up = real data, /api aborted = visible error + no fabricated records.
+  - Proof: `verify_g6a.py` PASS exit 0 — grep gates clean, tsc gates clean (4 pre-existing baseline errors at the time — since resolved in 4.4), 14-route sweep: API up = real data, /api aborted = visible error + no fabricated records.
 - **G6b** — COMPLETE. Sidebar + Swagger + refresh decision (`1631505`).
   - 2.7 Sidebar: `Sidebar.tsx` gained `Work Centers` (Briefcase, /work-centers) after Equipment and
     `Preventive Maintenance` (CalendarClock, /preventive-maintenance) after Work Orders; no other entries touched.
@@ -49,20 +49,27 @@
     Proved live: token `exp-iat=28800`; `JWT_EXPIRES_IN=28800` in `.env.example`. No refresh endpoints built.
   - Proof: `verify_g6b.py` PASS exit 0 — login UI+API, sidebar asserts, click-through both routes, direct renders,
     swagger gates, `PAGE_ERRORS=[]`. Screenshots `screenshots/g6b_01..06`.
-- **Phase 4 (partial)** — DB & Build Hygiene.
+- **Phase 4 — COMPLETE.** DB & Build Hygiene.
   - 4.1 baseline migration `20260924142537_init_baseline` (`72e8834`): DB was db-push-created so `migrate dev` demanded a
     destructive reset → adopted non-destructively (generate SQL via `migrate diff --from-empty`, then `migrate resolve --applied`);
     `migrate status` = up to date; `migrate deploy` is now the fresh-DB path; **db push retired**.
   - 4.3 backend eslint (`5d63f1a`): flat config (TS recommended). Baseline = 50 errors (mostly no-explicit-any) — >30 so fixes
     deferred to Phase 5; p4 gate = no new errors vs baseline (currently exactly 50).
-  - 4.4 **BLOCKED** (`build.bat` exit 2): see tracker row + next-action above. Follow-up required before cold-build is real.
+  - 4.4 cold-build + start verified (`5a8ed2c`): the 4 pre-existing frontend tsc errors fixed surgically
+    (`EquipmentBOM.material` type added; `notes ... || undefined` ×2; `tab.id as DetailTab` cast). `build.bat` now kills only the
+    :4000 owner before `prisma generate` (DLL EPERM fix, `ping` TTY-free wait) and runs `prisma migrate deploy` (db push retired).
+    `build.bat` exit 0 end-to-end (client regenerated, no pending migrations, frontend built, seed ok). `start.bat` → backend = `node dist/index.js`
+    on :4000 with `/api/health` 200 and vite on :3000 serving. Backend tsc + frontend `tsc -b` exit 0.
+    NOTE: seed wipes WorkOrder/Notification demo rows on every build — see tracker Finding (4.4); restored WO-000063/64 + N-000012/13 via API.
   - 4.5 F3 partial unique index for `MaintenancePlan.planCode` (`a888665`, migration `20260924113634_partial_unique_index`):
     `DROP INDEX MaintenancePlan_planCode_key` + raw `CREATE UNIQUE INDEX ... WHERE isDeleted=false`. verify_g4a passed twice with
     NO purge (G4A-TEST recreate 201 both runs). Client regenerated after stopping the dev backend (DLL EPERM fix).
   - `verify_p4.py` PASS exit 0 (`ae9c2a5`): migrations>=2, status up to date, eslint<=50, g4a x2.
-- **Findings recorded, not yet fixed:** F1 (no zod on plan create); tsc tech-debt x4 (Phase 5); eslint baseline 50 (Phase 5);
-  build.bat db push → migrate deploy (4.4 follow-up); F3 partial-index pattern still pending for 8 more models (recorded in tracker 4.5).
-- **Next action on resume:** 4.4 cold-build follow-up first (see above) → then Phase 3 remaining. STOP before Phase 5.
+  - `verify_g6a.py` tsc gate updated (baseline was resolved → now expects `tsc -b` exit 0); gate re-verified PASS.
+- **Findings recorded, not yet fixed:** F1 (no zod on plan create); eslint baseline 50 (Phase 5);
+  F3 partial-index pattern still pending for 8 more models (recorded in tracker 4.5);
+  seed.ts wipes WorkOrder/Notification without recreating them (demo WO area empties each cold build; see tracker Finding 4.4).
+- **Next action on resume:** Phase 3 remaining (attachments, bulk import, delete strategy, WCAG). STOP before Phase 5.
 
 
 ---
