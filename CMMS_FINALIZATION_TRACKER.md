@@ -208,7 +208,7 @@ Note (Swagger deferral, 2026-09-24): 2.11 executed as option (a) — WO domain o
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
 | 4.1 | Baseline `prisma migrate dev`; commit `prisma/migrations/` | ⬜ | Fresh DB via `migrate deploy` only |  |
-| 4.2 | Fix `ecosystem.config.cjs` (drop phantom `register.js`, fix `env_file`, confirm fork mode) | ⬜ | `pm2 start` serves API |  |
+| 4.2 | Fix `ecosystem.config.cjs` (drop phantom `register.js`, fix `env_file`, confirm fork mode) | ✅ | Landed in G4b-2 safeguard 3.1a: phantom `register.js` removed, `env_file` removed, `instances: 1`/`exec_mode: 'fork'` confirmed — `pm2 start` serves API | `5048a17` |
 | 4.3 | Backend eslint dependency or remove script; lint green both packages | ⬜ | Exit 0 |  |
 | 4.4 | Verify `build.bat`/`start.bat` cold on target Windows box | ⬜ | Cold build -> running app |  |
 | 4.5 | F3: Partial unique index for soft-deletable `@unique` fields (`planCode` etc., `where isDeleted=false`) — regenerate migration, verify `verify_g4a.py` passes twice | ⬜ | Soft-deleted row frees its unique code |  |

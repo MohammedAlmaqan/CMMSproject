@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 pending
+**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped (Administration remaining needs folded into Phase 4/G8); Phase 4 next
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -12,7 +12,7 @@
 
 **Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G6a will surface latent bugs
 
-**Next action for a fresh session:** read tracker + git log + this file; then complete Group 7 (Phase 4 hygiene + G7 Administration)
+**Next action for a fresh session:** read tracker + git log + this file; then Phase 4 — DB & build hygiene (4.1 prisma migrate baseline, 4.3 backend eslint, 4.4 cold-build verification, 4.5 F3 partial unique index). Then Phase 3 remaining (attachments, bulk import, delete strategy, WCAG). STOP before Phase 5.
 
 ---
 
@@ -50,7 +50,7 @@
   - Proof: `verify_g6b.py` PASS exit 0 — login UI+API, sidebar asserts, click-through both routes, direct renders,
     swagger gates, `PAGE_ERRORS=[]`. Screenshots `screenshots/g6b_01..06`.
 - **Findings recorded, not yet fixed:** F1 (no zod on plan create); F3 (soft-delete/unique conflict → Phase 4.5).
-- **Next action on resume:** Group 7 — Phase 4 (DB & build hygiene: partial unique index for planCode, health/auth contract tests) + G7 Administration. STOP before Phase 5.
+- **Next action on resume:** Phase 4 — DB & build hygiene (4.1 prisma migrate baseline, 4.3 backend eslint, 4.4 cold-build verification, 4.5 F3 partial unique index). Then Phase 3 remaining (attachments, bulk import, delete strategy, WCAG). STOP before Phase 5.
 
 
 ---
