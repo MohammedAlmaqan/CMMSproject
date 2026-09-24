@@ -21,6 +21,7 @@ import { alertService } from '@/services/alertService';
 import { commentService } from '@/services/commentService';
 import { craftService } from '@/services/craftService';
 import { auditLogService } from '@/services/auditLogService';
+import { taskListService } from '@/services/taskListService';
 
 interface AppState {
   workOrders: WorkOrder[];
@@ -149,7 +150,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     try {
       const role = useAuthStore.getState().user?.role;
       const canListUsers = role === 'Administrator';
-      const [locations, equipment, workOrders, notifications, materials, workCenters, maintenancePlans, crafts, users, auditLog] =
+      const [locations, equipment, workOrders, notifications, materials, workCenters, maintenancePlans, taskLists, crafts, users, auditLog] =
         await Promise.all([
           functionalLocationService.getAll(),
           equipmentService.getAll(),
@@ -158,13 +159,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
           materialService.getAll(),
           workCenterService.getAll(),
           maintenancePlanService.getAll(),
+          taskListService.getAll(),
           craftService.getAll(),
           canListUsers ? userService.getAll() : Promise.resolve([]),
           canListUsers ? auditLogService.getAll().then(r => r.data) : Promise.resolve([]),
         ]);
       set({
         locations, equipment, workOrders, notifications,
-        materials, workCenters, maintenancePlans, crafts, users, auditLog, loading: false,
+        materials, workCenters, maintenancePlans, taskLists, crafts, users, auditLog, loading: false,
       });
     } catch {
       set({ loading: false, error: 'Failed to load data from the server. Showing no data.' });
