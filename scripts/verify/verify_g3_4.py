@@ -344,6 +344,7 @@ def main():
 
         # ---------- Headless: deleted items no longer appear on the UI ----------
         page.goto(base + "/work-orders", wait_until="domcontentloaded")
+        page.wait_for_timeout(1000)
         try:
             page.locator("body").wait_for(timeout=10000)
             body = page.locator("body").inner_text()
@@ -351,14 +352,18 @@ def main():
         except Exception:
             SI["wo_number_hidden"] = False
         snap(page, "g3_4_01_work_orders_after_delete")
-        page.goto(base + "/task-lists", wait_until="domcontentloaded")
+        # NOTE: /task-lists is NOT a route in app/src/App.tsx — task lists render on
+        # /preventive-maintenance. Navigate there (the real UI) and settle briefly so
+        # the capture is post-bootstrap, not a mid-mount blank frame.
+        page.goto(base + "/preventive-maintenance", wait_until="domcontentloaded")
+        page.wait_for_timeout(1000)
         try:
             page.locator("body").wait_for(timeout=10000)
             body = page.locator("body").inner_text()
             SI["task_code_hidden"] = not tl_id or f"TL-G34-{stamp % 10**8}" not in body
         except Exception:
             SI["task_code_hidden"] = False
-        snap(page, "g3_4_02_task_lists_after_delete")
+        snap(page, "g3_4_02_preventive_maintenance_after_delete")
 
         print("DELETED_IDS", ",".join(DELETED_IDS))
         print("SI_JSON", json.dumps(SI))
