@@ -67,7 +67,8 @@
     `CREATE UNIQUE INDEX ... WHERE isDeleted=false`. verify_g4a passed twice with NO purge (G4A-TEST recreate 201 both runs).
     **Ordering bug fixed (3.7):** migration renamed `20260924113634_partial_unique_index` → `20260924150000_partial_unique_index`
     so it sorts AFTER `init_baseline` (`20260924142537`) — shadow/fresh DB replay (P3006) is now valid; live
-    `_prisma_migrations.migration_name` record updated alongside.
+    `_prisma_migrations.migration_name` record updated alongside. Verified on a throwaway empty DB (`cmms_fresh_gate`):
+    deploy exit 0, 3 migrations in order, `migrate diff` = "No difference detected."; test DB dropped.
   - 3.7 (`a7adf2d`, migration `20260924160000_f3_remaining_partial_indexes`): F3 partial-unique pattern extended to the
     remaining 8 soft-deletable `@unique` models (User.username, FunctionalLocation.locationCode, Equipment.equipmentCode,
     WorkCenter.code, Material.materialCode, TaskList.code, Notification.notificationNumber, WorkOrder.woNumber +
