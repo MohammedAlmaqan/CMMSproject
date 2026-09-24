@@ -26,6 +26,67 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   Cancelled: ['Draft'],
 };
 
+/**
+ * @openapi
+ * /api/work-orders:
+ *   get:
+ *     summary: List work orders (paginated with filters)
+ *     description: Returns a page of non-deleted work orders ordered by created date desc.
+ *     tags: [Work Orders]
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: priority
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: equipmentId
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: workCenterId
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: skip
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: take
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       '200':
+ *         description: Work order page
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 total:
+ *                   type: integer
+ *                 skip:
+ *                   type: integer
+ *                 take:
+ *                   type: integer
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { search, type, priority, status, equipmentId, workCenterId, skip, take } = req.query;
@@ -68,6 +129,31 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/work-orders/{id}:
+ *   get:
+ *     summary: Get a work order by id (full sub-domain detail)
+ *     description: Returns the work order with functional location, equipment, work center, supervisor, operations, materials, services, checklists, cost splits, comments and linked notifications.
+ *     tags: [Work Orders]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: Work order detail
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       '404':
+ *         description: Work order not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -113,6 +199,58 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/work-orders:
+ *   post:
+ *     summary: Create a work order
+ *     description: Creates a Draft work order. Requires role Requester or higher.
+ *     tags: [Work Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - type
+ *               - priority
+ *               - description
+ *             properties:
+ *               type:
+ *                 type: string
+ *               priority:
+ *                 type: string
+ *               functionalLocationId:
+ *                 type: string
+ *               equipmentId:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               workCenterId:
+ *                 type: string
+ *               supervisorUserId:
+ *                 type: string
+ *               plannedStart:
+ *                 type: string
+ *                 format: date-time
+ *               plannedFinish:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       '201':
+ *         description: Work order created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       '409':
+ *         description: Work order number already exists
+ *       '500':
+ *         description: Internal server error
+ */
 router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema), async (req: Request, res: Response) => {
   try {
     const {
@@ -161,6 +299,39 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
   }
 });
 
+/**
+ * @openapi
+ * /api/work-orders/{id}:
+ *   put:
+ *     summary: Update a work order
+ *     description: Partially updates a work order and recomputes cost totals. Requires role Requester or higher.
+ *     tags: [Work Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       '200':
+ *         description: Updated work order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       '404':
+ *         description: Work order not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -216,6 +387,36 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
   }
 });
 
+/**
+ * @openapi
+ * /api/work-orders/{id}:
+ *   delete:
+ *     summary: Soft-delete a work order
+ *     description: Marks the work order isDeleted (soft delete). Requires role Maintenance Supervisor or higher.
+ *     tags: [Work Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: Work order deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       '404':
+ *         description: Work order not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -244,6 +445,46 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
   }
 });
 
+/**
+ * @openapi
+ * /api/work-orders/{id}/status:
+ *   put:
+ *     summary: Transition work order status
+ *     description: Applies a valid workflow transition (Draft/Planned/Scheduled/In Progress/Completed/Suspended/Closed/Cancelled). Sets actualStart/actualFinish timestamps.
+ *     tags: [Work Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *     responses:
+ *       '200':
+ *         description: Updated work order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       '400':
+ *         description: Invalid status transition
+ *       '404':
+ *         description: Work order not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.put('/:id/status', authorizeMinRole('Technician'), validate(workOrderStatusBodySchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

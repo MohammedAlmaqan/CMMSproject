@@ -16,6 +16,8 @@ import {
   Hexagon,
   ChevronLeft,
   ChevronRight,
+  Briefcase,
+  CalendarClock,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useState } from 'react';
@@ -27,9 +29,11 @@ interface SidebarProps {
 const navigation = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
   { name: 'Work Orders', icon: ClipboardList, path: '/work-orders' },
+  { name: 'Preventive Maintenance', icon: CalendarClock, path: '/preventive-maintenance' },
   { name: 'Notifications', icon: Bell, path: '/notifications' },
   { name: 'Locations', icon: Layers, path: '/locations' },
   { name: 'Equipment', icon: Wrench, path: '/equipment' },
+  { name: 'Work Centers', icon: Briefcase, path: '/work-centers' },
   { name: 'Materials', icon: Package, path: '/materials' },
   { name: 'Reports', icon: BarChart3, path: '/reports' },
   { name: 'Administration', icon: Shield, path: '/administration' },
