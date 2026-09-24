@@ -206,6 +206,8 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
   }
 });
 
+// 3.4: WorkOrderChecklist/WorkOrderChecklistItem carry no isDeleted column — hard delete is
+// deliberate (composition children of a WorkOrder; the WO is the soft-delete boundary).
 router.delete('/work-order-checklist/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

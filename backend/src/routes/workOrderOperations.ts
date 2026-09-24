@@ -109,6 +109,10 @@ router.put('/:id', authorizeMinRole('Technician'), validate(operationUpdateSchem
   }
 });
 
+// 3.4: WorkOrderOperation rows are composition children of a WorkOrder and carry no isDeleted
+// column — hard delete is deliberate. The laborEntry cascade is hard too (and must stay hard):
+// soft-deleting labor would leave isDeleted=true rows under a hard-deleted operation (FK
+// violation on the row delete) and would keep them in cost recomputation as orphans.
 router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

@@ -100,6 +100,9 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
   }
 });
 
+// 3.4: WorkOrderMaterial rows are composition children of a WorkOrder and carry no isDeleted
+// column — hard delete is deliberate (transactional WO line item; the WO is the soft-delete
+// boundary). Cost recompute runs after removal so planned/actual costs reflect the live set.
 router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

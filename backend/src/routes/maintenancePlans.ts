@@ -58,7 +58,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       include: {
         equipment: true,
         workCenter: true,
-        taskList: { include: { operations: { include: { craft: true }, orderBy: { sequenceNumber: 'asc' } } } },
+        taskList: { include: { operations: { where: { isDeleted: false }, include: { craft: true }, orderBy: { sequenceNumber: 'asc' } } } },
         planMeters: { include: { meter: true } },
       },
     });
@@ -183,7 +183,7 @@ router.post('/:id/generate-wo', async (req: Request, res: Response) => {
     const plan = await prisma.maintenancePlan.findFirst({
       where: { planId: id, isDeleted: false },
       include: {
-        taskList: { include: { operations: true } },
+        taskList: { include: { operations: { where: { isDeleted: false } } } },
       },
     });
     if (!plan) {

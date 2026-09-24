@@ -167,8 +167,12 @@ router.put('/:id', async (req: Request, res: Response) => {
     });
 
     if (operations) {
-      await prisma.taskListOperation.deleteMany({
-        where: { taskListId: String(req.params.id) },
+      // 3.4: soft-replace operations — TaskListOperation carries isDeleted, so the previous
+      // set is soft-deleted (updateMany) instead of hard-deleted; list/detail filters below
+      // then hide them historically while the WorkOrder-PM-copy path never sees them.
+      await prisma.taskListOperation.updateMany({
+        where: { taskListId: String(req.params.id), isDeleted: false },
+        data: { isDeleted: true, modifiedBy: req.user!.userId },
       });
 
       await prisma.taskListOperation.createMany({
@@ -189,6 +193,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       where: { taskListId: String(req.params.id) },
       include: {
         operations: {
+          where: { isDeleted: false },
           orderBy: { sequenceNumber: 'asc' },
           include: { craft: true },
         },

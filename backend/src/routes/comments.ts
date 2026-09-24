@@ -55,6 +55,8 @@ router.post('/', authorizeMinRole('Requester'), validate(commentCreateSchema), a
   }
 });
 
+// 3.4: Comment carries no isDeleted column — hard delete is deliberate (user-entered text is
+// removed from the live entity thread; the entity itself is the soft-delete boundary).
 router.delete('/:id', authorizeMinRole('Requester'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

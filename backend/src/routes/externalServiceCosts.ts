@@ -93,6 +93,8 @@ router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdat
   }
 });
 
+// 3.4: ExternalServiceCost carries no isDeleted column — hard delete is deliberate
+// (transactional WO line item; the WO is the soft-delete boundary).
 router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
