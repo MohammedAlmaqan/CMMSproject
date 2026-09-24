@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, B G1-G6a complete; G6b pending
+**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 pending
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -12,7 +12,7 @@
 
 **Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G6a will surface latent bugs
 
-**Next action for a fresh session:** read tracker + git log + this file; then complete G6b (sidebar + swagger + refresh-token)
+**Next action for a fresh session:** read tracker + git log + this file; then complete Group 7 (Phase 4 hygiene + G7 Administration)
 
 ---
 
@@ -40,8 +40,17 @@
     all other pages already had it (G1-G5).
   - Proof: `verify_g6a.py` PASS exit 0 — grep gates clean, tsc gates clean (only 4 pre-existing baseline errors in
     untouched files), 14-route sweep: API up = real data, /api aborted = visible error + no fabricated records.
+- **G6b** — COMPLETE. Sidebar + Swagger + refresh decision (`1631505`).
+  - 2.7 Sidebar: `Sidebar.tsx` gained `Work Centers` (Briefcase, /work-centers) after Equipment and
+    `Preventive Maintenance` (CalendarClock, /preventive-maintenance) after Work Orders; no other entries touched.
+  - 2.11 Swagger: option (a) — `@openapi` JSDoc on all 6 WO routes (list/detail/create/update/delete/status).
+    `/api-docs.json` paths non-empty (3 paths), `/api/work-orders` group present, swagger-ui renders. tnc 20 routers deferred (Phase 3 note).
+  - 2.12 Refresh decision recorded 2026-09-24: fixed 8h session retained; RefreshToken model unwired/reserved.
+    Proved live: token `exp-iat=28800`; `JWT_EXPIRES_IN=28800` in `.env.example`. No refresh endpoints built.
+  - Proof: `verify_g6b.py` PASS exit 0 — login UI+API, sidebar asserts, click-through both routes, direct renders,
+    swagger gates, `PAGE_ERRORS=[]`. Screenshots `screenshots/g6b_01..06`.
 - **Findings recorded, not yet fixed:** F1 (no zod on plan create); F3 (soft-delete/unique conflict → Phase 4.5).
-- **Next action on resume:** Group 6b — sidebar (Work Centers/PM entries), Swagger 2.11, refresh-token decision 2.12. STOP before G7.
+- **Next action on resume:** Group 7 — Phase 4 (DB & build hygiene: partial unique index for planCode, health/auth contract tests) + G7 Administration. STOP before Phase 5.
 
 
 ---
