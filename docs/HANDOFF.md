@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped; **Phase 4 complete — 4.1–4.5 ✅ (DB & build hygiene)** + Phase 4-escalation items 3.6 (seed guard) & 3.7 (F3 extended) done; **3.4 (delete strategy) done** (`d5b016c`, verify_g3_4 PASS); 3.4b sweep >5 routes → RBAC/audit fold (2.9) deferred to Phase 5; Phase 3 remaining pending (3.2, 3.3, 3.5)
+**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped; **Phase 4 complete — 4.1–4.5 ✅ (DB & build hygiene)** + Phase 4-escalation items 3.6 (seed guard) & 3.7 (F3 extended) done; **3.2 (file attachments) done** (`d78597d`, verify_g3_2 PASS); **3.4 (delete strategy) done** (`d5b016c`, verify_g3_4 PASS); 3.4b sweep >5 routes → RBAC/audit fold (2.9) deferred to Phase 5; Phase 3 remaining pending (3.3, 3.5)
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -13,7 +13,7 @@
 
 **Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G6a will surface latent bugs
 
-**Next action for a fresh session:** read tracker + git log + this file. Next: **Phase 3 remaining** (attachments 3.2, bulk import 3.3, WCAG 3.5; delete strategy 3.4 DONE). STOP before Phase 5.
+**Next action for a fresh session:** read tracker + git log + this file. Next: **Phase 3 remaining** (bulk import 3.3, WCAG 3.5; attachments 3.2 DONE, delete strategy 3.4 DONE). STOP before Phase 5.
 
 ---
 
@@ -79,7 +79,7 @@
   - `verify_g6a.py` tsc gate updated (baseline was resolved → now expects `tsc -b` exit 0); gate re-verified PASS.
 - **Findings recorded, not yet fixed:** F1 (no zod on plan create); eslint baseline 50 (Phase 5).
   RESOLVED during Phase-4 escalation: seed.ts destructive wipe (guarded, 3.6); F3 partial indexes for remaining 8 models (3.7).
-- **Next action on resume:** Phase 3 remaining (3.2 attachments, 3.3 CSV bulk import/export, 3.5 WCAG; **3.4 delete strategy DONE — `d5b016c`**, see tracker note for the 3.4b sweep stop: read-filters+soft-delete uniform, but audit/RBAC gaps on 7 route files exceed the 5-route guardrail → 2.9 + audit fold deferred to Phase 5). STOP before Phase 5.
+- **Next action on resume:** Phase 3 remaining (3.3 CSV bulk import/export, 3.5 WCAG; **3.2 attachments DONE — `d78597d`**, **3.4 delete strategy DONE — `d5b016c`**, see tracker note for the 3.4b sweep stop: read-filters+soft-delete uniform, but audit/RBAC gaps on 7 route files exceed the 5-route guardrail → 2.9 + audit fold deferred to Phase 5). STOP before Phase 5.
 
 
 ---
