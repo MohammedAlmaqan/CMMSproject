@@ -15,6 +15,8 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
+    // F3: User.username is no longer @unique (partial unique index over active rows only);
+    // findUnique requires a unique-product key, so login resolves by active username via findFirst.
     const user = await prisma.user.findFirst({ where: { username, isDeleted: false } });
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Invalid credentials' });
