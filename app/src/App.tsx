@@ -18,6 +18,7 @@ import WorkCentersPage from '@/pages/WorkCentersPage';
 import PreventiveMaintenancePage from '@/pages/PreventiveMaintenancePage';
 import ReportsPage from '@/pages/ReportsPage';
 import AdministrationPage from '@/pages/AdministrationPage';
+import NotFoundPage from '@/pages/NotFoundPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -67,6 +68,7 @@ function App() {
                   <Route path="/preventive-maintenance" element={<PreventiveMaintenancePage />} />
                   <Route path="/reports" element={<ReportsPage />} />
                   <Route path="/administration" element={<AdministrationPage />} />
+                  <Route path="*" element={<NotFoundPage />} />
                 </Routes>
               </AppLayout>
             </AppInitializer>
