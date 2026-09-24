@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped; **Phase 4 complete — 4.1–4.5 ✅ (DB & build hygiene)** + Phase 4-escalation items 3.6 (seed guard) & 3.7 (F3 extended) done; **3.2 (file attachments) done** (`d78597d`, verify_g3_2 PASS); **3.4 (delete strategy) done** (`d5b016c`, verify_g3_4 PASS); 3.4b sweep >5 routes → RBAC/audit fold (2.9) deferred to Phase 5; Phase 3 remaining pending (3.3, 3.5)
+**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped; **Phase 4 complete — 4.1–4.5 ✅ (DB & build hygiene)** + Phase 4-escalation items 3.6 (seed guard) & 3.7 (F3 extended) done; **Phase 3 complete — 3.1–3.7 ✅** (3.1 PM scheduler `5048a17`/`cc8d11c`; 3.2 attachments `d78597d`, verify_g3_2 PASS; 3.3 CSV import/export `f4c8dcc`, verify_g3_3 PASS; 3.4 delete strategy `d5b016c`, verify_g3_4 PASS — 3.4b sweep >5 routes → RBAC/audit fold (2.9) deferred to Phase 5; 3.5 WCAG 2.1 AA light pass `1e54ae4`, verify_g3_5 PASS + docs/WCAG-AUDIT.md; 3.5a catch-all 404 `7a23409`, verify_g3_5a PASS; 3.6 seed guard `2beaeb2`/`0492ae7`; 3.7 partial indexes `a7adf2d`); NEXT phase = Phase 5 (backend route tests first), do NOT start without explicit go.
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -13,7 +13,7 @@
 
 **Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G6a will surface latent bugs
 
-**Next action for a fresh session:** read tracker + git log + this file. Next: **Phase 3 remaining** (bulk import 3.3, WCAG 3.5; attachments 3.2 DONE, delete strategy 3.4 DONE). STOP before Phase 5.
+**Next action for a fresh session:** read tracker + git log + this file. Next: **Phase 5 — Testing (backend route tests protected first: 5.1 Vitest+Supertest across all 21 routers incl. the 2.9 RBAC/audit fold; then 5.2–5.4).** STOP was observed at the end of Phase 3; do not begin Phase 5 without explicit consent.
 
 ---
 
@@ -79,7 +79,8 @@
   - `verify_g6a.py` tsc gate updated (baseline was resolved → now expects `tsc -b` exit 0); gate re-verified PASS.
 - **Findings recorded, not yet fixed:** F1 (no zod on plan create); eslint baseline 50 (Phase 5).
   RESOLVED during Phase-4 escalation: seed.ts destructive wipe (guarded, 3.6); F3 partial indexes for remaining 8 models (3.7).
-- **Next action on resume:** Phase 3 remaining (3.3 CSV bulk import/export, 3.5 WCAG; **3.2 attachments DONE — `d78597d`**, **3.4 delete strategy DONE — `d5b016c`**, see tracker note for the 3.4b sweep stop: read-filters+soft-delete uniform, but audit/RBAC gaps on 7 route files exceed the 5-route guardrail → 2.9 + audit fold deferred to Phase 5). STOP before Phase 5.
+- **Next action on resume:** Phase 5 — Testing (5.1 backend route tests first: Vitest + Supertest over all 21 routers incl. the deferred 2.9 RBAC/audit fold from the 3.4b sweep; then 5.2–5.4). STOP was observed after Phase 3; do not begin Phase 5 without explicit consent.
+- **Phase 3 — COMPLETE (this session).** 3.3 CSV bulk import/export for materials + equipment (`f4c8dcc`, `scripts/verify/verify_g3_3.py` PASS exit 0, round-trip import → export). 3.5 WCAG 2.1 AA light pass (`1e54ae4`, 21 files, `scripts/verify/verify_g3_5.py` PASS exit 0): global `*:focus-visible` amber ring, `.skip-link` + `<main id="main-content">` in AppLayout, CommandPalette as modal dialog, thin-amber status/low text raised `#52525B` → `#92929B` (root-cause substitution; contrast ≥4.5:1 on both bg colors), `#2563EB` → `#3B82F6` for in-progress, starts/links-in-page given `tabIndex=0` + Enter/Space `onKeyDown` with accessible names, aria-labels on every search box/filter/toggle/dialog/back button (~70 controls), sortable column headers keyboard-operable, audit table in `docs/WCAG-AUDIT.md`. 3.5a catch-all 404 route inside the protected `<AppLayout>` (`7a23409`): new `app/src/pages/NotFoundPage.tsx` ("Page not found" + "Back to Dashboard" link to /dashboard) + `<Route path="*">` in `app/src/App.tsx`; `scripts/verify/verify_g3_5a.py` PASS exit 0 (unauth deep link → /login; garbage paths render 404 with sidebar intact; PAGE_ERRORS=[] CONSOLE_ERRORS=[]). Frontend `tsc -b` exit 0 throughout.
 
 
 ---
