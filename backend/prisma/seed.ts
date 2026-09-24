@@ -5,6 +5,17 @@ import { v4 as uuid } from 'uuid';
 const prisma = new PrismaClient();
 
 async function main() {
+  // DESTRUCTIVE-WIPE GUARD: the deleteMany() block below removes ALL tables,
+  // including WorkOrder + Notification, which seed.ts never recreates. Only an
+  // explicit demo reseed may run it: SEED_DEMO=1 AND a non-production
+  // NODE_ENV. Plain `tsx prisma/seed.ts` (e.g. from build.bat) must NOT
+  // destroy live work orders/notifications silently.
+  const isDemo = process.env.SEED_DEMO === '1' && process.env.NODE_ENV !== 'production';
+  if (!isDemo) {
+    console.log('seed: skipping destructive wipe - set SEED_DEMO=1 to reseed demo data');
+    process.exit(0);
+  }
+
   // Clear existing data
   await prisma.workOrderChecklistItem.deleteMany();
   await prisma.workOrderChecklist.deleteMany();
