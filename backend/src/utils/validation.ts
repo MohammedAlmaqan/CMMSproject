@@ -207,6 +207,13 @@ export const meterReadingCreateSchema = z.object({
 
 export const schedulerRunSchema = z.object({}).strict();
 
+export const attachmentEntityTypeSchema = z.enum(['WorkOrder', 'Notification', 'Equipment']);
+
+export const attachmentCreateSchema = z.object({
+  entityType: attachmentEntityTypeSchema,
+  entityId: z.string().min(1).regex(/^[A-Za-z0-9-]+$/),
+});
+
 export function validate(schema: z.ZodTypeAny) {
   return (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);

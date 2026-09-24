@@ -3,7 +3,7 @@
 // Live data from API (Milestone A) + sub-domain CRUD (Milestone B)
 // ============================================================
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -26,6 +26,9 @@ import {
   MessageSquare,
   ClipboardList,
   FileText,
+  Paperclip,
+  Upload,
+  Download,
   Pencil,
   Plus,
   Check,
@@ -39,6 +42,7 @@ import { externalServiceService } from '@/services/externalServiceService';
 import { safetyChecklistService } from '@/services/safetyChecklistService';
 import { auditLogService } from '@/services/auditLogService';
 import { commentService } from '@/services/commentService';
+import { attachmentService } from '@/services/attachmentService';
 import { userService } from '@/services/userService';
 import { craftService } from '@/services/craftService';
 import { materialService } from '@/services/materialService';
@@ -54,9 +58,10 @@ import type {
   Craft,
   Material,
   SafetyChecklistTemplate,
+  Attachment,
 } from '@/types';
 
-type DetailTab = 'operations' | 'materials' | 'labor' | 'services' | 'checklists' | 'comments' | 'history';
+type DetailTab = 'operations' | 'materials' | 'labor' | 'services' | 'checklists' | 'comments' | 'attachments' | 'history';
 
 interface CraftRef { craftId: string; craftCode: string; craftName?: string; hourlyRate?: number }
 
@@ -227,6 +232,14 @@ export default function WorkOrderDetailPage() {
 
   const [attachTemplateId, setAttachTemplateId] = useState('');
 
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attBusy, setAttBusy] = useState<string | null>(null);
+  const [attError, setAttError] = useState<string | null>(null);
+  const [attSuccess, setAttSuccess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const canDeleteAttachments = hasPermission(['Maintenance Supervisor', 'Administrator']);
+
   const canEdit = useMemo(
     () => hasPermission(['Technician', 'Maintenance Supervisor', 'Maintenance Planner', 'Administrator']),
     [hasPermission]
@@ -236,7 +249,7 @@ export default function WorkOrderDetailPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [woData, laborData, auditData, usersData, craftsData, materialsData, templatesData] = await Promise.all([
+      const [woData, laborData, auditData, usersData, craftsData, materialsData, templatesData, attachmentsData] = await Promise.all([
         workOrderService.getById(id!),
         laborService.getByWorkOrder(id!),
         auditLogService.getAll({ search: id!, take: 100 }),
@@ -244,6 +257,7 @@ export default function WorkOrderDetailPage() {
         craftService.getAll(),
         materialService.getAll(),
         safetyChecklistService.getTemplates(),
+        attachmentService.getByEntity('WorkOrder', id!),
       ]);
       setWo(woData as WorkOrderDetail);
       setLabor(laborData as LaborEntryDetail[]);
@@ -252,6 +266,7 @@ export default function WorkOrderDetailPage() {
       setCrafts(craftsData);
       setMaterials(materialsData);
       setTemplates(templatesData);
+      setAttachments(attachmentsData);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Failed to load work order');
     } finally {
@@ -262,6 +277,46 @@ export default function WorkOrderDetailPage() {
   useEffect(() => {
     if (id) reload();
   }, [id, reload]);
+
+  const handleAttachmentUpload = async (file: File | undefined) => {
+    if (!file) return;
+    setAttBusy('upload');
+    setAttError(null);
+    setAttSuccess(null);
+    try {
+      const created = await attachmentService.upload('WorkOrder', id!, file);
+      setAttachments((prev) => [created, ...prev]);
+      setAttSuccess(`Uploaded ${created.originalName}`);
+    } catch (err) {
+      setAttError(err instanceof ApiError ? err.message : 'Upload failed');
+    } finally {
+      setAttBusy(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleAttachmentDownload = (att: Attachment) => {
+    setAttError(null);
+    setAttSuccess(null);
+    attachmentService.download(att).catch((err) => {
+      setAttError(err instanceof ApiError ? err.message : 'Download failed');
+    });
+  };
+
+  const handleAttachmentDelete = async (att: Attachment) => {
+    setAttBusy(`del:${att.attachmentId}`);
+    setAttError(null);
+    setAttSuccess(null);
+    try {
+      await attachmentService.remove(att.attachmentId);
+      setAttachments((prev) => prev.filter((a) => a.attachmentId !== att.attachmentId));
+      setAttSuccess(`Deleted ${att.originalName}`);
+    } catch (err) {
+      setAttError(err instanceof ApiError ? err.message : 'Delete failed');
+    } finally {
+      setAttBusy(null);
+    }
+  };
 
   const afterMutation = useCallback(async () => {
     await reload();
@@ -678,9 +733,10 @@ export default function WorkOrderDetailPage() {
       { id: 'services', label: 'Services', icon: DollarSign, count: wo.externalServices?.length || 0 },
       { id: 'checklists', label: 'Checklists', icon: Shield, count: wo.checklists?.length || 0 },
       { id: 'comments', label: 'Comments', icon: MessageSquare, count: wo.comments?.length || 0 },
+      { id: 'attachments', label: 'Attachments', icon: Paperclip, count: attachments.length },
       { id: 'history', label: 'History', icon: FileText, count: history.length },
     ];
-  }, [wo, labor, history]);
+  }, [wo, labor, history, attachments]);
 
   if (loading) {
     return (
@@ -1615,6 +1671,94 @@ export default function WorkOrderDetailPage() {
           </div>
         )}
 
+        {activeTab === 'attachments' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => handleAttachmentUpload(e.target.files?.[0])}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={attBusy === 'upload'}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all disabled:opacity-50"
+              >
+                {attBusy === 'upload' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                Upload
+              </button>
+              <span className="text-xs text-tertiary">PDF, images, text, Excel — up to 10 MB</span>
+            </div>
+            {attError && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded text-xs text-red-status border border-red-status/30"
+                style={{ backgroundColor: 'rgba(220,38,38,0.08)' }}>
+                <AlertTriangle className="w-4 h-4" />
+                {attError}
+              </div>
+            )}
+            {attSuccess && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded text-xs text-green-status border border-green-status/30"
+                style={{ backgroundColor: 'rgba(5,150,105,0.08)' }}>
+                <CheckCircle className="w-4 h-4" />
+                {attSuccess}
+              </div>
+            )}
+            {attachments.length === 0 ? (
+              <EmptyState label="No attachments" />
+            ) : (
+              <div className="industrial-card rounded overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr style={{ backgroundColor: '#27272A' }}>
+                      {['File', 'Size', 'Uploaded By', 'Uploaded At', ''].map((h) => (
+                        <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attachments.map((att, idx) => {
+                      const uploader = users.find((u) => u.userId === att.uploadedByUserId);
+                      return (
+                        <tr key={att.attachmentId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
+                          <td className={`${tdCls} font-mono text-xs text-primary`}>{att.originalName}</td>
+                          <td className={`${tdCls} text-xs text-secondary`}>{formatBytes(att.sizeBytes)}</td>
+                          <td className={`${tdCls} text-xs text-primary`}>{uploader?.fullName || att.createdBy}</td>
+                          <td className={`${tdCls} text-xs text-tertiary`}>{new Date(att.createdDate).toLocaleString()}</td>
+                          <td className={`${tdCls} text-right`}>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleAttachmentDownload(att)}
+                                className="p-1 text-tertiary hover:text-primary transition-colors"
+                                title="Download"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                              {canDeleteAttachments && (
+                                <button
+                                  onClick={() => handleAttachmentDelete(att)}
+                                  className="p-1 text-tertiary hover:text-red-status transition-colors"
+                                  title="Delete attachment"
+                                >
+                                  {attBusy === `del:${att.attachmentId}` ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'history' && (
           <div className="industrial-card rounded overflow-hidden">
             {history.length === 0 ? (
@@ -1678,6 +1822,12 @@ function EmptyState({ label }: { label: string }) {
       <span className="text-sm text-tertiary">{label}</span>
     </div>
   );
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {

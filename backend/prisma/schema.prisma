@@ -540,6 +540,24 @@ model Comment {
   user User @relation(fields: [userId], references: [userId])
 }
 
+model Attachment {
+  attachmentId      String   @id @default(uuid())
+  entityType        String   // 'WorkOrder' | 'Notification' | 'Equipment' (start with WorkOrder)
+  entityId          String
+  originalName      String
+  mimeType          String
+  sizeBytes         Int
+  storagePath       String   // relative path under backend/uploads/
+  uploadedByUserId  String
+  createdBy         String
+  createdDate       DateTime @default(now())
+  modifiedBy        String
+  modifiedDate      DateTime @default(now())
+  isDeleted         Boolean  @default(false)
+
+  @@index([entityType, entityId, isDeleted])
+}
+
 model SystemConfig {
   configId String @id @default(uuid())
   key      String @unique

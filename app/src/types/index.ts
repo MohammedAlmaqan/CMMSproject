@@ -369,12 +369,16 @@ export interface Attachment {
   attachmentId: string;
   entityType: 'WorkOrder' | 'Notification' | 'Equipment';
   entityId: string;
-  fileName: string;
-  fileSize: number;
+  originalName: string;
   mimeType: string;
-  uploadedBy: string;
-  uploadedDate: string;
-  fileUrl: string;
+  sizeBytes: number;
+  storagePath: string;
+  uploadedByUserId: string;
+  createdBy: string;
+  createdDate: string;
+  modifiedBy: string;
+  modifiedDate: string;
+  isDeleted: boolean;
 }
 
 // ─── Cost Splitting (§3.5.2) ───
