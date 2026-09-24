@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authorizeMinRole('Administrator'), async (req: Request, res: Response) => {
   try {
     const { search, tableName, action, skip, take } = req.query;
     const where: any = {};

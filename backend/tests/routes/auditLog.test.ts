@@ -7,7 +7,12 @@ describe('audit log routes', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns paged audit entries for an authenticated user', async () => {
+  it('rejects access by a non-administrator with 403 (Requester)', async () => {
+    const res = await api().get('/api/audit-log').set(authHeaders(ctx.operatorToken));
+    expect(res.status).toBe(403);
+  });
+
+  it('returns paged audit entries for an Administrator', async () => {
     const res = await api().get('/api/audit-log').set(authHeaders(ctx.adminToken));
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.data)).toBe(true);
