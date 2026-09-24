@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped; **Phase 4 complete — 4.1–4.5 ✅ (DB & build hygiene)**; Phase 3 remaining pending
+**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped; **Phase 4 complete — 4.1–4.5 ✅ (DB & build hygiene)** + Phase 4-escalation items 3.6 (seed guard) & 3.7 (F3 extended) done; Phase 3 remaining pending
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -60,16 +60,25 @@
     :4000 owner before `prisma generate` (DLL EPERM fix, `ping` TTY-free wait) and runs `prisma migrate deploy` (db push retired).
     `build.bat` exit 0 end-to-end (client regenerated, no pending migrations, frontend built, seed ok). `start.bat` → backend = `node dist/index.js`
     on :4000 with `/api/health` 200 and vite on :3000 serving. Backend tsc + frontend `tsc -b` exit 0.
-    NOTE: seed wipes WorkOrder/Notification demo rows on every build — see tracker Finding (4.4); restored WO-000063/64 + N-000012/13 via API.
-  - 4.5 F3 partial unique index for `MaintenancePlan.planCode` (`a888665`, migration `20260924113634_partial_unique_index`):
-    `DROP INDEX MaintenancePlan_planCode_key` + raw `CREATE UNIQUE INDEX ... WHERE isDeleted=false`. verify_g4a passed twice with
-    NO purge (G4A-TEST recreate 201 both runs). Client regenerated after stopping the dev backend (DLL EPERM fix).
+    NOTE: build's destructive seed step was REMOVED and the `seed.ts` wipe GUARDED behind `SEED_DEMO=1` + non-prod `NODE_ENV`
+    (3.6, `2beaeb2`/`0492ae7`) — reseed demo data only via `scripts/seed-demo.bat`. Proved: WO-000063/64 + N-000012/13
+    survived a rebuild, `/api/health` 200.
+  - 4.5 F3 partial unique index for `MaintenancePlan.planCode` (`a888665`): `DROP INDEX MaintenancePlan_planCode_key` + raw
+    `CREATE UNIQUE INDEX ... WHERE isDeleted=false`. verify_g4a passed twice with NO purge (G4A-TEST recreate 201 both runs).
+    **Ordering bug fixed (3.7):** migration renamed `20260924113634_partial_unique_index` → `20260924150000_partial_unique_index`
+    so it sorts AFTER `init_baseline` (`20260924142537`) — shadow/fresh DB replay (P3006) is now valid; live
+    `_prisma_migrations.migration_name` record updated alongside.
+  - 3.7 (`a7adf2d`, migration `20260924160000_f3_remaining_partial_indexes`): F3 partial-unique pattern extended to the
+    remaining 8 soft-deletable `@unique` models (User.username, FunctionalLocation.locationCode, Equipment.equipmentCode,
+    WorkCenter.code, Material.materialCode, TaskList.code, Notification.notificationNumber, WorkOrder.woNumber +
+    `@@unique([sourcePlanId,sourcePlanCycle])`). The ONLY `findUnique` consumer of a de-unique'd field was auth login
+    (User.username) → `findFirst`. Backend `tsc --noEmit` exit 0; verify_g4a PASS twice, NO purge. verify_g4a now resolves
+    master-data ids live — NEVER hardcode entity UUIDs in gate scripts (seeds regenerate them).
   - `verify_p4.py` PASS exit 0 (`ae9c2a5`): migrations>=2, status up to date, eslint<=50, g4a x2.
   - `verify_g6a.py` tsc gate updated (baseline was resolved → now expects `tsc -b` exit 0); gate re-verified PASS.
-- **Findings recorded, not yet fixed:** F1 (no zod on plan create); eslint baseline 50 (Phase 5);
-  F3 partial-index pattern still pending for 8 more models (recorded in tracker 4.5);
-  seed.ts wipes WorkOrder/Notification without recreating them (demo WO area empties each cold build; see tracker Finding 4.4).
-- **Next action on resume:** Phase 3 remaining (attachments, bulk import, delete strategy, WCAG). STOP before Phase 5.
+- **Findings recorded, not yet fixed:** F1 (no zod on plan create); eslint baseline 50 (Phase 5).
+  RESOLVED during Phase-4 escalation: seed.ts destructive wipe (guarded, 3.6); F3 partial indexes for remaining 8 models (3.7).
+- **Next action on resume:** Phase 3 remaining (3.2 attachments, 3.3 CSV bulk import/export, 3.4 delete strategy, 3.5 WCAG). STOP before Phase 5.
 
 
 ---
