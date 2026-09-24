@@ -2,7 +2,7 @@
 // Equipment Page — Master Data with Location Tree
 // ============================================================
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -15,6 +15,9 @@ import {
   Loader2,
   RefreshCw,
   Box,
+  Upload,
+  Download,
+  X,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { equipmentService } from '@/services/equipmentService';
@@ -40,6 +43,43 @@ export default function EquipmentPage() {
   const [classFilter, setClassFilter] = useState('All');
   const [criticalityFilter, setCriticalityFilter] = useState('All');
   const [page, setPage] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastError, setToastError] = useState(false);
+
+  const handleExport = async () => {
+    setExportBusy(true);
+    try {
+      await equipmentService.exportCsv();
+      setToastError(false);
+      setToast('Equipment CSV exported');
+    } catch (err) {
+      setToastError(true);
+      setToast(err instanceof ApiError ? err.message : 'CSV export failed');
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImportBusy(true);
+    try {
+      const res = await equipmentService.importCsv(file);
+      await reload();
+      setToastError(false);
+      setToast(`Import complete: ${res.created} created, ${res.updated} updated`);
+    } catch (err) {
+      setToastError(true);
+      setToast(err instanceof ApiError ? err.message : 'CSV import failed');
+    } finally {
+      setImportBusy(false);
+    }
+  };
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -182,6 +222,13 @@ export default function EquipmentPage() {
     <>
       <Header title="EQUIPMENT" showActions={false} />
 
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded border px-4 py-2 ${toastError ? 'border-red-500/50 bg-red-500/10' : 'border-emerald-500/50 bg-emerald-500/10'}`}>
+          <span className="text-xs text-primary">{toast}</span>
+          <button onClick={() => setToast(null)} className="text-tertiary hover:text-primary" aria-label="Dismiss message"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-hidden flex">
         {/* Left: Location Tree */}
         <div className="w-64 flex-shrink-0 border-r border-subtle overflow-y-auto" style={{ backgroundColor: '#18181B' }}>
@@ -227,9 +274,33 @@ export default function EquipmentPage() {
               <option value="B">B - Important</option>
               <option value="C">C - Normal</option>
             </select>
-            <span className="text-tertiary text-xs ml-auto">
-              {loading ? 'Loading…' : `${filteredEquipment.length} equipment`}
-            </span>
+            <div className="flex items-center gap-2 ml-auto">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                aria-label="Import equipment CSV"
+                onChange={handleImportFile}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importBusy}
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight hover:text-amber disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" /> {importBusy ? 'Importing…' : 'Import'}
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exportBusy}
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight hover:text-amber disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" /> {exportBusy ? 'Exporting…' : 'Export'}
+              </button>
+              <span className="text-tertiary text-xs">
+                {loading ? 'Loading…' : `${filteredEquipment.length} equipment`}
+              </span>
+            </div>
             {loadError && (
               <button
                 onClick={reload}

@@ -127,6 +127,28 @@ export const checklistItemUpdateSchema = z.object({
   comment: z.string().nullable().optional(),
 });
 
+export const materialImportRowSchema = z.object({
+  materialCode: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  unitOfMeasure: z.string().trim().min(1),
+  standardCost: z.coerce.number().nonnegative().optional(),
+  currentStock: z.coerce.number().nonnegative().optional(),
+});
+
+export const equipmentImportRowSchema = z.object({
+  equipmentCode: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  description: z.string().trim().optional(),
+  functionalLocationCode: z.string().trim().min(1),
+  manufacturer: z.string().trim().optional(),
+  model: z.string().trim().optional(),
+  serialNumber: z.string().trim().optional(),
+  assetTag: z.string().trim().optional(),
+  equipmentClass: z.string().trim().optional(),
+  criticality: z.enum(['A', 'B', 'C']),
+  operationalStatus: z.enum(['Active', 'Inactive', 'Decommissioned']).optional(),
+});
+
 export const notificationTypeSchema = z.enum(['M1', 'M2', 'M3']);
 
 export const notificationStatusSchema = z.enum(['Open', 'In Process', 'Completed', 'Converted']);

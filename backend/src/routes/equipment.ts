@@ -1,12 +1,206 @@
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { validate, equipmentCreateSchema, equipmentUpdateSchema } from '../utils/validation.js';
+import { validate, equipmentCreateSchema, equipmentUpdateSchema, equipmentImportRowSchema } from '../utils/validation.js';
 import { logAudit } from '../middleware/audit.js';
+import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
 
 const router = Router();
 
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype !== 'text/csv') {
+      return cb(new Error('Unsupported file type: only text/csv is allowed'));
+    }
+    cb(null, true);
+  },
+});
+
 router.use(authenticate);
+
+const EQUIPMENT_CSV_COLUMNS = [
+  'equipmentCode',
+  'name',
+  'description',
+  'functionalLocationCode',
+  'manufacturer',
+  'model',
+  'serialNumber',
+  'assetTag',
+  'equipmentClass',
+  'criticality',
+  'operationalStatus',
+] as const;
+
+router.get('/export.csv', async (req: Request, res: Response) => {
+  try {
+    const equipment = await prisma.equipment.findMany({
+      where: { isDeleted: false },
+      orderBy: { equipmentCode: 'asc' },
+      include: { functionalLocation: true },
+    });
+
+    const rows: (string | number)[][] = [
+      [...EQUIPMENT_CSV_COLUMNS],
+      ...equipment.map((e) => [
+        e.equipmentCode,
+        e.name,
+        e.description,
+        e.functionalLocation.locationCode,
+        e.manufacturer,
+        e.model,
+        e.serialNumber,
+        e.assetTag,
+        e.equipmentClass,
+        e.criticality,
+        e.operationalStatus,
+      ]),
+    ];
+
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="equipment-${date}.csv"`);
+    res.send(toCsv(rows));
+  } catch (error) {
+    console.error('Error exporting equipment:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.single('file'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const text = req.file.buffer.toString('utf8');
+    let rows: string[][];
+    try {
+      rows = parseCsv(text);
+    } catch {
+      return res.status(400).json({ error: 'Malformed CSV' });
+    }
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'CSV is empty' });
+    }
+
+    const [header, ...dataRows] = rows;
+    const headerOk = EQUIPMENT_CSV_COLUMNS.every(
+      (col, i) => (header[i] || '').trim().toLowerCase() === col.toLowerCase()
+    );
+    if (!headerOk) {
+      return res.status(400).json({ error: `CSV header must be: ${EQUIPMENT_CSV_COLUMNS.join(', ')}` });
+    }
+
+    const locations = await prisma.functionalLocation.findMany({
+      where: { isDeleted: false },
+      select: { functionalLocationId: true, locationCode: true },
+    });
+    const locationByCode = new Map(locations.map((l) => [l.locationCode, l.functionalLocationId]));
+
+    const result = await prisma.$transaction(async (tx) => {
+      let created = 0;
+      let updated = 0;
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i];
+        const lineNumber = i + 2; // 1-based, header occupies line 1
+        const record = {
+          equipmentCode: (row[0] || '').trim(),
+          name: (row[1] || '').trim(),
+          description: (row[2] || '').trim(),
+          functionalLocationCode: (row[3] || '').trim(),
+          manufacturer: (row[4] || '').trim(),
+          model: (row[5] || '').trim(),
+          serialNumber: (row[6] || '').trim(),
+          assetTag: (row[7] || '').trim(),
+          equipmentClass: (row[8] || '').trim(),
+          criticality: (row[9] || '').trim(),
+          operationalStatus: (row[10] || '').trim(),
+        };
+
+        const parsed = equipmentImportRowSchema.safeParse(record);
+        if (!parsed.success) {
+          const reason = parsed.error.issues
+            .map((iss) => `${iss.path.join('.')}: ${iss.message}`)
+            .join('; ');
+          throw new CsvRowError(lineNumber, reason);
+        }
+        const d = parsed.data;
+
+        const functionalLocationId = locationByCode.get(d.functionalLocationCode);
+        if (!functionalLocationId) {
+          throw new CsvRowError(lineNumber, `unknown functionalLocationCode '${d.functionalLocationCode}'`);
+        }
+
+        const existing = await tx.equipment.findFirst({
+          where: { equipmentCode: d.equipmentCode, isDeleted: false },
+        });
+        if (existing) {
+          await tx.equipment.update({
+            where: { equipmentId: existing.equipmentId },
+            data: {
+              name: d.name,
+              description: d.description ?? existing.description,
+              functionalLocationId,
+              manufacturer: d.manufacturer ?? existing.manufacturer,
+              model: d.model ?? existing.model,
+              serialNumber: d.serialNumber ?? existing.serialNumber,
+              assetTag: d.assetTag ?? existing.assetTag,
+              equipmentClass: d.equipmentClass ?? existing.equipmentClass,
+              criticality: d.criticality,
+              operationalStatus: d.operationalStatus ?? existing.operationalStatus,
+              modifiedBy: req.user!.userId,
+            },
+          });
+          await logAudit(
+            { tableName: 'Equipment', recordId: existing.equipmentId, action: 'Update' },
+            req.user!.userId,
+            req.ip,
+            tx
+          );
+          updated++;
+        } else {
+          const createdRow = await tx.equipment.create({
+            data: {
+              equipmentCode: d.equipmentCode,
+              name: d.name,
+              description: d.description ?? '',
+              functionalLocationId,
+              manufacturer: d.manufacturer ?? '',
+              model: d.model ?? '',
+              serialNumber: d.serialNumber ?? '',
+              assetTag: d.assetTag ?? '',
+              equipmentClass: d.equipmentClass ?? 'General',
+              criticality: d.criticality,
+              operationalStatus: d.operationalStatus || 'Active',
+              createdBy: req.user!.userId,
+              modifiedBy: req.user!.userId,
+            },
+          });
+          await logAudit(
+            { tableName: 'Equipment', recordId: createdRow.equipmentId, action: 'Create' },
+            req.user!.userId,
+            req.ip,
+            tx
+          );
+          created++;
+        }
+      }
+      return { created, updated, failed: [] };
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    if (error instanceof CsvRowError) {
+      return res.status(400).json({ error: `Row ${error.row}: ${error.reason}` });
+    }
+    console.error('Error importing equipment:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 router.get('/', async (req: Request, res: Response) => {
   try {

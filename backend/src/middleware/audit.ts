@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import type { PrismaClient } from '@prisma/client';
 import { prisma } from '../utils/prisma.js';
 
 export interface AuditEntry {
@@ -10,9 +11,16 @@ export interface AuditEntry {
   newValue?: string | null;
 }
 
-export async function logAudit(entry: AuditEntry, userId: string, ipAddress?: string) {
+// `db` lets callers route the audit row through a transaction client so bulk
+// operations (3.3 CSV import) keep audit rows atomic with the data write.
+export async function logAudit(
+  entry: AuditEntry,
+  userId: string,
+  ipAddress?: string,
+  db: Pick<PrismaClient, 'auditLogEntry'> = prisma
+) {
   try {
-    await prisma.auditLogEntry.create({
+    await db.auditLogEntry.create({
       data: {
         tableName: entry.tableName,
         recordId: entry.recordId,

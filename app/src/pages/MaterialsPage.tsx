@@ -2,16 +2,21 @@
 // Materials Page — Spare Parts Catalog
 // ============================================================
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   Search,
   Package,
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
+  Upload,
+  Download,
+  X,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { useAppStore } from '@/store/appStore';
+import { materialService } from '@/services/materialService';
+import { ApiError } from '@/lib/api';
 
 const PAGE_SIZE = 10;
 
@@ -23,6 +28,43 @@ export default function MaterialsPage() {
   const [page, setPage] = useState(0);
   const [sortField, setSortField] = useState<string>('materialCode');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastError, setToastError] = useState(false);
+
+  const handleExport = async () => {
+    setExportBusy(true);
+    try {
+      await materialService.exportCsv();
+      setToastError(false);
+      setToast('Materials CSV exported');
+    } catch (err) {
+      setToastError(true);
+      setToast(err instanceof ApiError ? err.message : 'CSV export failed');
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImportBusy(true);
+    try {
+      const res = await materialService.importCsv(file);
+      await useAppStore.getState().loadFromApi();
+      setToastError(false);
+      setToast(`Import complete: ${res.created} created, ${res.updated} updated`);
+    } catch (err) {
+      setToastError(true);
+      setToast(err instanceof ApiError ? err.message : 'CSV import failed');
+    } finally {
+      setImportBusy(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     let data = [...materials];
@@ -55,6 +97,12 @@ export default function MaterialsPage() {
   return (
     <>
       <Header title="MATERIALS" showActions={false} />
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded border px-4 py-2 ${toastError ? 'border-red-500/50 bg-red-500/10' : 'border-emerald-500/50 bg-emerald-500/10'}`}>
+          <span className="text-xs text-primary">{toast}</span>
+          <button onClick={() => setToast(null)} className="text-tertiary hover:text-primary" aria-label="Dismiss message"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto p-6">
         {loading && (
           <div className="mb-4 flex items-center gap-3 text-tertiary text-xs">
@@ -82,7 +130,31 @@ export default function MaterialsPage() {
               style={{ backgroundColor: '#27272A' }}
             />
           </div>
-          <span className="text-tertiary text-xs ml-auto">{filtered.length} materials</span>
+          <div className="flex items-center gap-2 ml-auto">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              aria-label="Import materials CSV"
+              onChange={handleImportFile}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importBusy}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight hover:text-amber disabled:opacity-50"
+            >
+              <Upload className="w-3.5 h-3.5" /> {importBusy ? 'Importing…' : 'Import'}
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={exportBusy}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight hover:text-amber disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" /> {exportBusy ? 'Exporting…' : 'Export'}
+            </button>
+            <span className="text-tertiary text-xs">{filtered.length} materials</span>
+          </div>
         </div>
 
         <div className="industrial-card rounded overflow-hidden">
