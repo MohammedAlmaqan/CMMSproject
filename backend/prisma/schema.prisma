@@ -451,7 +451,11 @@ model WorkOrderChecklistItem {
 
 model MaintenancePlan {
   planId              String   @id @default(uuid())
-  planCode            String   @unique
+  // F3: planCode is NOT `@unique` here; uniqueness is enforced for active rows only
+  // by a partial unique index (see migration `*_partial_unique_index`):
+  //   CREATE UNIQUE INDEX "MaintenancePlan_planCode_active_key"
+  //     ON "MaintenancePlan" ("planCode") WHERE "isDeleted" = false;
+  planCode            String
   description         String
   equipmentId         String?
   functionalLocationId String?
