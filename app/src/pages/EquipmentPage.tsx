@@ -166,13 +166,8 @@ export default function EquipmentPage() {
 
       return (
         <div key={node.functionalLocationId}>
-          <button
-            onClick={() => {
-              setSelectedLocationId(node.functionalLocationId);
-              setPage(0);
-            }}
-            onDoubleClick={() => toggleNode(node.functionalLocationId)}
-            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-all ${
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 text-xs transition-all ${
               isSelected
                 ? 'text-amber'
                 : 'text-secondary hover:text-primary'
@@ -183,33 +178,42 @@ export default function EquipmentPage() {
             }}
           >
             {children.length > 0 ? (
-              <span
-                onClick={(e) => { e.stopPropagation(); toggleNode(node.functionalLocationId); }}
-                onDoubleClick={(e) => { e.stopPropagation(); toggleNode(node.functionalLocationId); }}
-                className="flex-shrink-0 cursor-pointer"
+              <button
+                onClick={() => toggleNode(node.functionalLocationId)}
+                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.locationCode}`}
+                aria-expanded={isExpanded}
+                className="flex-shrink-0"
               >
                 {isExpanded ? (
                   <ChevronDown className="w-3 h-3 text-tertiary" />
                 ) : (
                   <ChevronRight className="w-3 h-3 text-tertiary" />
                 )}
-              </span>
+              </button>
             ) : (
               <span className="w-3" />
             )}
-            {children.length > 0 ? (
-              <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isSelected ? '#D97706' : '#A1A1AA' }} />
-            ) : (
-              <Tag className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isSelected ? '#D97706' : '#52525B' }} />
-            )}
-            <span className="truncate font-mono">{node.locationCode}</span>
-            <span className="text-tertiary truncate">- {node.description}</span>
-            {equipCount > 0 && (
-              <span className="ml-auto text-tertiary flex-shrink-0" style={{ fontSize: '10px' }}>
-                {equipCount}
-              </span>
-            )}
-          </button>
+            <button
+              onClick={() => {
+                setSelectedLocationId(node.functionalLocationId);
+                setPage(0);
+              }}
+              className="flex items-center gap-2 flex-1 text-left min-w-0"
+            >
+              {children.length > 0 ? (
+                <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isSelected ? '#D97706' : '#A1A1AA' }} />
+              ) : (
+                <Tag className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isSelected ? '#D97706' : '#92929B' }} />
+              )}
+              <span className="truncate font-mono">{node.locationCode}</span>
+              <span className="text-tertiary truncate">- {node.description}</span>
+              {equipCount > 0 && (
+                <span className="ml-auto text-tertiary flex-shrink-0" style={{ fontSize: '10px' }}>
+                  {equipCount}
+                </span>
+              )}
+            </button>
+          </div>
           {isExpanded && children.length > 0 && (
             <div>{renderTree(children, depth + 1)}</div>
           )}
@@ -248,6 +252,7 @@ export default function EquipmentPage() {
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
                 placeholder="Search equipment..."
+                aria-label="Search equipment"
                 className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
                 style={{ backgroundColor: '#27272A' }}
               />
@@ -255,6 +260,7 @@ export default function EquipmentPage() {
             <select
               value={classFilter}
               onChange={(e) => { setClassFilter(e.target.value); setPage(0); }}
+              aria-label="Filter by equipment class"
               className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
               style={{ backgroundColor: '#27272A' }}
             >
@@ -266,6 +272,7 @@ export default function EquipmentPage() {
             <select
               value={criticalityFilter}
               onChange={(e) => { setCriticalityFilter(e.target.value); setPage(0); }}
+              aria-label="Filter by criticality"
               className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
               style={{ backgroundColor: '#27272A' }}
             >
@@ -353,6 +360,14 @@ export default function EquipmentPage() {
                           className="border-t border-subtle cursor-pointer table-row-hover transition-colors"
                           style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}
                           onClick={() => navigate(`/equipment/${eq.equipmentId}`)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              navigate(`/equipment/${eq.equipmentId}`);
+                            }
+                          }}
+                          tabIndex={0}
+                          role="link"
                         >
                           <td className="px-4 py-2.5 font-mono text-xs text-primary">{eq.equipmentCode}</td>
                           <td className="px-4 py-2.5 text-xs text-primary">{eq.name}</td>
@@ -389,9 +404,9 @@ export default function EquipmentPage() {
               <div className="flex items-center justify-between mt-4">
                 <span className="text-tertiary text-xs">Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filteredEquipment.length)} of {filteredEquipment.length}</span>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><CPLeft className="w-4 h-4" /></button>
+                  <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><CPLeft className="w-4 h-4" /></button>
                   <span className="text-xs text-secondary px-2">{page + 1} / {totalPages}</span>
-                  <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><CPRight className="w-4 h-4" /></button>
+                  <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} aria-label="Next page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><CPRight className="w-4 h-4" /></button>
                 </div>
               </div>
             </>

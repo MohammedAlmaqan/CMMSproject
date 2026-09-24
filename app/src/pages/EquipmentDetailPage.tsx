@@ -103,7 +103,7 @@ export default function EquipmentDetailPage() {
         {/* Header */}
         <div className="px-6 py-4 border-b border-subtle" style={{ backgroundColor: '#18181B' }}>
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate('/equipment')} className="p-1.5 text-secondary hover:text-primary transition-colors">
+            <button onClick={() => navigate('/equipment')} aria-label="Back to equipment" className="p-1.5 text-secondary hover:text-primary transition-colors">
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div>
@@ -217,7 +217,9 @@ export default function EquipmentDetailPage() {
                   .slice()
                   .sort((a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime())
                   .map((wo) => (
-                    <div key={wo.workOrderId} className="industrial-card rounded p-3 cursor-pointer hover:bg-surface-tertiary transition-colors" onClick={() => navigate(`/work-orders/${wo.workOrderId}`)}>
+                    <div key={wo.workOrderId} className="industrial-card rounded p-3 cursor-pointer hover:bg-surface-tertiary transition-colors" onClick={() => navigate(`/work-orders/${wo.workOrderId}`)} role="button" tabIndex={0} onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/work-orders/${wo.workOrderId}`); }
+                    }}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs text-amber">{wo.woNumber}</span>

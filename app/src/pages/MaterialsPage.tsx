@@ -126,6 +126,7 @@ export default function MaterialsPage() {
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
               placeholder="Search materials..."
+              aria-label="Search materials"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
               style={{ backgroundColor: '#27272A' }}
             />
@@ -174,6 +175,15 @@ export default function MaterialsPage() {
                     className="text-left px-4 py-2.5 font-medium text-tertiary cursor-pointer select-none"
                     style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}
                     onClick={() => col.key !== 'value' && handleSort(col.key)}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ' ') && col.key !== 'value') {
+                        e.preventDefault();
+                        handleSort(col.key);
+                      }
+                    }}
+                    tabIndex={col.key !== 'value' ? 0 : undefined}
+                    role={col.key !== 'value' ? 'button' : undefined}
+                    aria-label={col.key !== 'value' ? `Sort by ${col.label}` : undefined}
                   >
                     <div className="flex items-center gap-1">
                       {col.label}
@@ -215,9 +225,9 @@ export default function MaterialsPage() {
             Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
           </span>
           <div className="flex items-center gap-1">
-            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronLeft className="w-4 h-4" /></button>
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronLeft className="w-4 h-4" /></button>
             <span className="text-xs text-secondary px-2">{page + 1} / {totalPages}</span>
-            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronRight className="w-4 h-4" /></button>
+            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} aria-label="Next page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
       </div>

@@ -121,7 +121,7 @@ export default function LocationsPage() {
             style={{ paddingLeft: `${12 + depth * 20}px`, backgroundColor: depth % 2 === 0 ? '#1E1E22' : '#111113' }}
           >
             {children.length > 0 ? (
-              <button onClick={() => toggleNode(node.functionalLocationId)} className="flex-shrink-0">
+              <button onClick={() => toggleNode(node.functionalLocationId)} aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.locationCode}`} aria-expanded={isExpanded} className="flex-shrink-0">
                 {isExpanded ? <ChevronDown className="w-3 h-3 text-tertiary" /> : <ChevronRight className="w-3 h-3 text-tertiary" />}
               </button>
             ) : <span className="w-3 flex-shrink-0" />}
@@ -168,6 +168,7 @@ export default function LocationsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search locations..."
+              aria-label="Search locations"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
               style={{ backgroundColor: '#27272A' }}
             />

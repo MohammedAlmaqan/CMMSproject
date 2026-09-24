@@ -86,7 +86,7 @@ export default function PreventiveMaintenancePage() {
       {toast && (
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded border border-emerald-500/50 bg-emerald-500/10 px-4 py-2">
           <span className="text-xs text-primary">{toast}</span>
-          <button onClick={() => setToast(null)} className="text-tertiary hover:text-primary"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setToast(null)} aria-label="Dismiss message" className="text-tertiary hover:text-primary"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
       <div className="flex-1 overflow-y-auto p-6">
@@ -126,6 +126,7 @@ export default function PreventiveMaintenancePage() {
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
               placeholder="Search maintenance plans..."
+              aria-label="Search maintenance plans"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
               style={{ backgroundColor: '#27272A' }}
             />
@@ -133,6 +134,7 @@ export default function PreventiveMaintenancePage() {
           <select
             value={strategyFilter}
             onChange={(e) => { setStrategyFilter(e.target.value); setPage(0); }}
+            aria-label="Filter by strategy"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
             style={{ backgroundColor: '#27272A' }}
           >
@@ -144,6 +146,7 @@ export default function PreventiveMaintenancePage() {
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+            aria-label="Filter by status"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
             style={{ backgroundColor: '#27272A' }}
           >
@@ -168,7 +171,7 @@ export default function PreventiveMaintenancePage() {
                   <AlertTriangle className="w-4 h-4 text-amber" />
                   <p className="text-secondary text-sm">{storeError}</p>
                 </div>
-                <button onClick={() => setErrorDismissed(true)} className="text-tertiary hover:text-primary"><X className="w-4 h-4" /></button>
+                <button onClick={() => setErrorDismissed(true)} aria-label="Dismiss error" className="text-tertiary hover:text-primary"><X className="w-4 h-4" /></button>
               </div>
               <button onClick={() => { setErrorDismissed(false); loadFromApi(); }} className="flex items-center gap-1 text-amber text-xs mt-2 hover:underline"><RefreshCw className="w-3 h-3" /> Retry</button>
             </div>
@@ -250,9 +253,9 @@ export default function PreventiveMaintenancePage() {
         <div className="flex items-center justify-between mt-4">
           <span className="text-tertiary text-xs">Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}</span>
           <div className="flex items-center gap-1">
-            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronLeft className="w-4 h-4" /></button>
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronLeft className="w-4 h-4" /></button>
             <span className="text-xs text-secondary px-2">{page + 1} / {totalPages}</span>
-            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronRight className="w-4 h-4" /></button>
+            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} aria-label="Next page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
         )}

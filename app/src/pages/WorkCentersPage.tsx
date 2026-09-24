@@ -49,28 +49,29 @@ export default function WorkCentersPage() {
             return (
               <div key={wc.workCenterId} className="industrial-card rounded overflow-hidden">
                 <div
-                  className="flex items-center justify-between px-4 py-3 border-b border-subtle cursor-pointer hover:bg-surface-tertiary transition-colors"
+                  className="flex items-center justify-between px-4 py-3 border-b border-subtle"
                   style={{ backgroundColor: '#27272A' }}
-                  onClick={() => toggleWC(wc.workCenterId)}
                 >
-                  <div className="flex items-center gap-3">
-                    <button onClick={(e) => { e.stopPropagation(); toggleWC(wc.workCenterId); }}>
-                      {isExpanded ? <ChevronDown className="w-4 h-4 text-tertiary" /> : <ChevronRight className="w-4 h-4 text-tertiary" />}
-                    </button>
+                  <button
+                    onClick={() => toggleWC(wc.workCenterId)}
+                    aria-expanded={isExpanded}
+                    className="flex items-center gap-3 text-left flex-1 cursor-pointer hover:bg-surface-tertiary transition-colors"
+                  >
+                    {isExpanded ? <ChevronDown className="w-4 h-4 text-tertiary" /> : <ChevronRight className="w-4 h-4 text-tertiary" />}
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm text-primary font-semibold">{wc.code}</span>
                         <span className="text-xs text-secondary">{wc.name}</span>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-tertiary text-xs flex items-center gap-1"><Clock className="w-3 h-3" />{wc.dailyCapacityHours}h/day</span>
-                    <span className="text-tertiary text-xs flex items-center gap-1"><DollarSign className="w-3 h-3" />${wc.costRatePerHour}/hr</span>
-                    <span className={`text-xs px-2 py-0.5 rounded ${wc.isActive ? 'badge-completed' : 'badge-cancelled'}`}>
-                      {wc.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
+                    <div className="flex items-center gap-4 ml-auto">
+                      <span className="text-tertiary text-xs flex items-center gap-1"><Clock className="w-3 h-3" />{wc.dailyCapacityHours}h/day</span>
+                      <span className="text-tertiary text-xs flex items-center gap-1"><DollarSign className="w-3 h-3" />${wc.costRatePerHour}/hr</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${wc.isActive ? 'badge-completed' : 'badge-cancelled'}`}>
+                        {wc.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                  </button>
                 </div>
                 {isExpanded && (
                   <div>

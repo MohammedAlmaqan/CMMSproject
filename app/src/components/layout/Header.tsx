@@ -86,6 +86,7 @@ export default function Header({ title, onCreate, tabs, showActions = true }: He
               markAllAlertsRead();
               navigate('/notifications');
             }}
+            aria-label="Notifications"
             className="relative p-2 text-secondary hover:text-primary transition-colors"
           >
             <Bell className="w-[18px] h-[18px]" strokeWidth={1.5} />

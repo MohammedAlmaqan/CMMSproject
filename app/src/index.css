@@ -15,6 +15,30 @@
     overflow: hidden;
   }
 
+  /* 3.5 WCAG: visible keyboard-only focus ring on every focused element */
+  *:focus-visible {
+    outline: 2px solid #F59E0B;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* 3.5 WCAG: skip link hidden until focused */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    padding: 8px 16px;
+    background-color: #27272A;
+    color: #FAFAFA;
+    font-size: 12px;
+    text-decoration: none;
+  }
+
+  .skip-link:focus-visible {
+    left: 0;
+  }
+
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -67,7 +91,7 @@
 
   .badge-in-progress {
     background: rgba(37, 99, 235, 0.1);
-    color: #2563EB;
+    color: #3B82F6;
     border: 1px solid rgba(37, 99, 235, 0.3);
   }
 
@@ -85,7 +109,7 @@
 
   .badge-cancelled {
     background: rgba(82, 82, 91, 0.1);
-    color: #52525B;
+    color: #92929B;
     border: 1px solid rgba(82, 82, 91, 0.3);
   }
 
@@ -100,7 +124,7 @@
   }
 
   .badge-low {
-    color: #52525B;
+    color: #92929B;
     border: 1px solid rgba(82, 82, 91, 0.5);
   }
 
@@ -167,7 +191,7 @@
 @layer utilities {
   .text-primary { color: #FAFAFA; }
   .text-secondary { color: #A1A1AA; }
-  .text-tertiary { color: #52525B; }
+  .text-tertiary { color: #92929B; }
   .bg-base { background-color: #111113; }
   .bg-surface { background-color: #18181B; }
   .bg-surface-secondary { background-color: #1E1E22; }
@@ -178,5 +202,5 @@
   .bg-amber { background-color: #D97706; }
   .text-green-status { color: #059669; }
   .text-red-status { color: #DC2626; }
-  .text-blue-status { color: #2563EB; }
+  .text-blue-status { color: #3B82F6; }
 }

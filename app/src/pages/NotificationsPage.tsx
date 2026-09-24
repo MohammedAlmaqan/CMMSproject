@@ -96,6 +96,7 @@ export default function NotificationsPage() {
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
               placeholder="Search notifications..."
+              aria-label="Search notifications"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors"
               style={{ backgroundColor: '#27272A' }}
             />
@@ -103,6 +104,7 @@ export default function NotificationsPage() {
           <select
             value={typeFilter}
             onChange={(e) => { setTypeFilter(e.target.value); setPage(0); }}
+            aria-label="Filter by type"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
             style={{ backgroundColor: '#27272A' }}
           >
@@ -114,6 +116,7 @@ export default function NotificationsPage() {
           <select
             value={priorityFilter}
             onChange={(e) => { setPriorityFilter(e.target.value); setPage(0); }}
+            aria-label="Filter by priority"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
             style={{ backgroundColor: '#27272A' }}
           >
@@ -125,6 +128,7 @@ export default function NotificationsPage() {
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+            aria-label="Filter by status"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
             style={{ backgroundColor: '#27272A' }}
           >
@@ -189,6 +193,14 @@ export default function NotificationsPage() {
                         className="border-t border-subtle cursor-pointer table-row-hover transition-colors"
                         style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}
                         onClick={() => navigate(`/notifications/${notif.notificationId}`)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            navigate(`/notifications/${notif.notificationId}`);
+                          }
+                        }}
+                        tabIndex={0}
+                        role="link"
                       >
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2">
@@ -233,11 +245,11 @@ export default function NotificationsPage() {
                 Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
               </span>
               <div className="flex items-center gap-1">
-                <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="p-1 text-secondary hover:text-primary disabled:text-tertiary">
+                <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary">
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <span className="text-xs text-secondary px-2">{page + 1} / {totalPages}</span>
-                <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="p-1 text-secondary hover:text-primary disabled:text-tertiary">
+                <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} aria-label="Next page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary">
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>

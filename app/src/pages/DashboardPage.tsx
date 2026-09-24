@@ -28,14 +28,14 @@ const TacticalDashboardGrid = lazy(
 );
 
 const STATUS_COLORS: Record<WorkOrderStatus, string> = {
-  Draft: '#52525B',
+  Draft: '#92929B',
   Planned: '#D97706',
   Scheduled: '#2563EB',
   'In Progress': '#2563EB',
   Suspended: '#DC2626',
   Completed: '#059669',
   Closed: '#059669',
-  Cancelled: '#52525B',
+  Cancelled: '#92929B',
 };
 
 const TYPE_COLORS: Record<WorkOrderType, string> = {
@@ -82,7 +82,7 @@ export default function DashboardPage() {
     return Object.entries(counts).map(([name, value]) => ({
       name,
       value,
-      color: STATUS_COLORS[name as WorkOrderStatus] || '#52525B',
+      color: STATUS_COLORS[name as WorkOrderStatus] || '#92929B',
     }));
   }, [workOrders]);
 
@@ -94,7 +94,7 @@ export default function DashboardPage() {
     return Object.entries(counts).map(([name, value]) => ({
       name,
       value,
-      color: TYPE_COLORS[name as WorkOrderType] || '#52525B',
+      color: TYPE_COLORS[name as WorkOrderType] || '#92929B',
     }));
   }, [workOrders]);
 
@@ -234,8 +234,8 @@ export default function DashboardPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                  <XAxis dataKey="month" stroke="#52525B" fontSize={11} />
-                  <YAxis stroke="#52525B" fontSize={11} />
+                  <XAxis dataKey="month" stroke="#92929B" fontSize={11} />
+                  <YAxis stroke="#92929B" fontSize={11} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#18181B',
@@ -259,8 +259,8 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={typeData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                  <XAxis type="number" stroke="#52525B" fontSize={11} />
-                  <YAxis dataKey="name" type="category" stroke="#52525B" fontSize={11} width={30} />
+                  <XAxis type="number" stroke="#92929B" fontSize={11} />
+                  <YAxis dataKey="name" type="category" stroke="#92929B" fontSize={11} width={30} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#18181B',
@@ -287,8 +287,8 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={backlogByCenter}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                  <XAxis dataKey="name" stroke="#52525B" fontSize={11} />
-                  <YAxis stroke="#52525B" fontSize={11} />
+                  <XAxis dataKey="name" stroke="#92929B" fontSize={11} />
+                  <YAxis stroke="#92929B" fontSize={11} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#18181B',

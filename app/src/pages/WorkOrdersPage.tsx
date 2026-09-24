@@ -52,7 +52,7 @@ const statusColors: Record<WorkOrderStatus, string> = {
   Suspended: '#DC2626',
   Completed: '#059669',
   Closed: '#059669',
-  Cancelled: '#52525B',
+  Cancelled: '#92929B',
 };
 
 const priorityClasses: Record<Priority, string> = {
@@ -226,6 +226,7 @@ export default function WorkOrdersPage() {
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
               placeholder="Search work orders..."
+              aria-label="Search work orders"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors"
               style={{ backgroundColor: '#27272A' }}
             />
@@ -233,6 +234,7 @@ export default function WorkOrdersPage() {
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+            aria-label="Filter by status"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
             style={{ backgroundColor: '#27272A' }}
           >
@@ -244,6 +246,7 @@ export default function WorkOrdersPage() {
           <select
             value={priorityFilter}
             onChange={(e) => { setPriorityFilter(e.target.value); setPage(0); }}
+            aria-label="Filter by priority"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
             style={{ backgroundColor: '#27272A' }}
           >
@@ -287,8 +290,17 @@ export default function WorkOrdersPage() {
                       <th
                         key={col.key + col.label}
                         className="text-left px-4 py-2.5 font-medium cursor-pointer select-none"
-                        style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#52525B' }}
+                        style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92929B' }}
                         onClick={() => col.key && handleSort(col.key)}
+                        onKeyDown={(e) => {
+                          if ((e.key === 'Enter' || e.key === ' ') && col.key) {
+                            e.preventDefault();
+                            handleSort(col.key);
+                          }
+                        }}
+                        tabIndex={col.key ? 0 : undefined}
+                        role={col.key ? 'button' : undefined}
+                        aria-label={col.key ? `Sort by ${col.label}` : undefined}
                       >
                         <div className="flex items-center gap-1">
                           {col.label}
@@ -305,6 +317,14 @@ export default function WorkOrdersPage() {
                       className="table-row-hover cursor-pointer transition-colors border-t border-subtle"
                       style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}
                       onClick={() => navigate(`/work-orders/${wo.workOrderId}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          navigate(`/work-orders/${wo.workOrderId}`);
+                        }
+                      }}
+                      tabIndex={0}
+                      role="link"
                     >
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2">
@@ -453,6 +473,7 @@ export default function WorkOrdersPage() {
                 <button
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
+                  aria-label="Previous page"
                   className="p-1 text-secondary hover:text-primary disabled:text-tertiary disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -463,6 +484,7 @@ export default function WorkOrdersPage() {
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
+                  aria-label="Next page"
                   className="p-1 text-secondary hover:text-primary disabled:text-tertiary disabled:cursor-not-allowed"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -498,6 +520,14 @@ export default function WorkOrdersPage() {
                         <div
                           key={wo.workOrderId}
                           onClick={() => navigate(`/work-orders/${wo.workOrderId}`)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              navigate(`/work-orders/${wo.workOrderId}`);
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
                           className="p-2.5 rounded cursor-pointer hover:bg-surface-tertiary transition-colors border border-subtle"
                         >
                           <div className="flex items-center justify-between mb-1">

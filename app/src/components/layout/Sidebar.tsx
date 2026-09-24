@@ -144,6 +144,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
       {/* Collapse Toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         className="absolute -right-3 top-20 w-6 h-6 rounded-full flex items-center justify-center text-secondary hover:text-primary transition-all z-50"
         style={{ backgroundColor: '#27272A', border: '1px solid #27272A' }}
       >

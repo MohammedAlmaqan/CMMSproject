@@ -128,6 +128,7 @@ export default function AdministrationPage() {
                     value={userSearch}
                     onChange={(e) => { setUserSearch(e.target.value); setUserPage(0); }}
                     placeholder="Search users..."
+                    aria-label="Search users"
                     className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
                     style={{ backgroundColor: '#27272A' }}
                   />
@@ -183,9 +184,9 @@ export default function AdministrationPage() {
               <div className="flex items-center justify-between mt-4">
                 <span className="text-tertiary text-xs">Showing {userPage * PAGE_SIZE + 1}-{Math.min((userPage + 1) * PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length}</span>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setUserPage((p) => Math.max(0, p - 1))} disabled={userPage === 0} className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronLeft className="w-4 h-4" /></button>
+                  <button onClick={() => setUserPage((p) => Math.max(0, p - 1))} disabled={userPage === 0} aria-label="Previous page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronLeft className="w-4 h-4" /></button>
                   <span className="text-xs text-secondary px-2">{userPage + 1} / {userTotalPages}</span>
-                  <button onClick={() => setUserPage((p) => Math.min(userTotalPages - 1, p + 1))} disabled={userPage >= userTotalPages - 1} className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronRight className="w-4 h-4" /></button>
+                  <button onClick={() => setUserPage((p) => Math.min(userTotalPages - 1, p + 1))} disabled={userPage >= userTotalPages - 1} aria-label="Next page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronRight className="w-4 h-4" /></button>
                 </div>
               </div>
             </div>
@@ -200,6 +201,7 @@ export default function AdministrationPage() {
                     value={auditFilter}
                     onChange={(e) => { setAuditFilter(e.target.value); setAuditPage(0); }}
                     placeholder="Filter audit log..."
+                    aria-label="Filter audit log"
                     className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
                     style={{ backgroundColor: '#27272A' }}
                   />
@@ -250,9 +252,9 @@ export default function AdministrationPage() {
               <div className="flex items-center justify-between mt-4">
                 <span className="text-tertiary text-xs">Showing {auditPage * PAGE_SIZE + 1}-{Math.min((auditPage + 1) * PAGE_SIZE, filteredAudit.length)} of {filteredAudit.length}</span>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setAuditPage((p) => Math.max(0, p - 1))} disabled={auditPage === 0} className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronLeft className="w-4 h-4" /></button>
+                  <button onClick={() => setAuditPage((p) => Math.max(0, p - 1))} disabled={auditPage === 0} aria-label="Previous page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronLeft className="w-4 h-4" /></button>
                   <span className="text-xs text-secondary px-2">{auditPage + 1} / {auditTotalPages}</span>
-                  <button onClick={() => setAuditPage((p) => Math.min(auditTotalPages - 1, p + 1))} disabled={auditPage >= auditTotalPages - 1} className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronRight className="w-4 h-4" /></button>
+                  <button onClick={() => setAuditPage((p) => Math.min(auditTotalPages - 1, p + 1))} disabled={auditPage >= auditTotalPages - 1} aria-label="Next page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronRight className="w-4 h-4" /></button>
                 </div>
               </div>
             </div>

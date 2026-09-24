@@ -103,7 +103,7 @@ export default function NotificationDetailPage() {
       <div className="px-6 py-4 border-b border-subtle" style={{ backgroundColor: '#18181B' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate('/notifications')} className="p-1.5 text-secondary hover:text-primary transition-colors">
+            <button onClick={() => navigate('/notifications')} aria-label="Back to notifications" className="p-1.5 text-secondary hover:text-primary transition-colors">
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div>
@@ -198,6 +198,14 @@ export default function NotificationDetailPage() {
                   <div
                     key={wo.workOrderId}
                     onClick={() => navigate(`/work-orders/${wo.workOrderId}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(`/work-orders/${wo.workOrderId}`);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                     className="p-3 rounded border border-subtle cursor-pointer hover:bg-surface-tertiary transition-colors"
                   >
                     <div className="flex items-center justify-between mb-1">

@@ -780,6 +780,7 @@ export default function WorkOrderDetailPage() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/work-orders')}
+              aria-label="Back to work orders"
               className="p-1.5 text-secondary hover:text-primary transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -884,7 +885,7 @@ export default function WorkOrderDetailPage() {
       {/* WO Info Cards */}
       <div className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-subtle">
         <InfoCard label="Type" value={wo.type} color={wo.type === 'EM' ? '#DC2626' : wo.type === 'PM' ? '#2563EB' : '#A1A1AA'} />
-        <InfoCard label="Priority" value={wo.priority} color={wo.priority === 'High' ? '#DC2626' : wo.priority === 'Medium' ? '#D97706' : '#52525B'} />
+        <InfoCard label="Priority" value={wo.priority} color={wo.priority === 'High' ? '#DC2626' : wo.priority === 'Medium' ? '#D97706' : '#92929B'} />
         <InfoCard label="Location" value={wo.functionalLocation?.locationCode || '-'} />
         <InfoCard label="Equipment" value={wo.equipment?.equipmentCode || '-'} />
         <InfoCard label="Work Center" value={wo.workCenter?.code || '-'} />
@@ -948,18 +949,18 @@ export default function WorkOrderDetailPage() {
               <form onSubmit={handleAddOperation} className="industrial-card rounded p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-primary">New Operation</span>
-                  <button type="button" onClick={() => { setOpAdding(false); setOpForm(emptyOpForm); }} className="text-tertiary hover:text-primary">
+                  <button type="button" onClick={() => { setOpAdding(false); setOpForm(emptyOpForm); }} aria-label="Close new operation form" className="text-tertiary hover:text-primary">
                     <XCircle className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="grid grid-cols-12 gap-3">
                   <div className="col-span-4">
                     <FieldLabel>Description</FieldLabel>
-                    <input className={inputCls} value={opForm.description} onChange={(e) => setOpForm({ ...opForm, description: e.target.value })} placeholder="Task description" />
+                    <input className={inputCls} value={opForm.description} onChange={(e) => setOpForm({ ...opForm, description: e.target.value })} placeholder="Task description" aria-label="Operation description" />
                   </div>
                   <div className="col-span-2">
                     <FieldLabel>Craft</FieldLabel>
-                    <select className={selectCls} value={opForm.craftId} onChange={(e) => setOpForm({ ...opForm, craftId: e.target.value })}>
+                    <select className={selectCls} value={opForm.craftId} onChange={(e) => setOpForm({ ...opForm, craftId: e.target.value })} aria-label="Craft">
                       <option value="">Select craft</option>
                       {crafts.map((c) => (
                         <option key={c.craftId} value={c.craftId}>{c.craftCode} (${c.hourlyRate}/h)</option>
@@ -968,11 +969,11 @@ export default function WorkOrderDetailPage() {
                   </div>
                   <div className="col-span-2">
                     <FieldLabel>Planned Hours</FieldLabel>
-                    <input className={inputCls} type="number" min={0} step="0.5" value={opForm.plannedHours} onChange={(e) => setOpForm({ ...opForm, plannedHours: e.target.value })} />
+                    <input className={inputCls} type="number" min={0} step="0.5" value={opForm.plannedHours} onChange={(e) => setOpForm({ ...opForm, plannedHours: e.target.value })} aria-label="Planned hours" />
                   </div>
                   <div className="col-span-2">
                     <FieldLabel>Technicians</FieldLabel>
-                    <input className={inputCls} type="number" min={1} value={opForm.numberOfTechnicians} onChange={(e) => setOpForm({ ...opForm, numberOfTechnicians: e.target.value })} />
+                    <input className={inputCls} type="number" min={1} value={opForm.numberOfTechnicians} onChange={(e) => setOpForm({ ...opForm, numberOfTechnicians: e.target.value })} aria-label="Number of technicians" />
                   </div>
                   <div className="col-span-2 flex items-end">
                     <button
@@ -1008,20 +1009,20 @@ export default function WorkOrderDetailPage() {
                               <span className="font-mono text-xs text-secondary">{op.sequenceNumber}</span>
                             </td>
                             <td className={tdCls}>
-                              <input className={inputCls} value={editOpForm.description} onChange={(e) => setEditOpForm({ ...editOpForm, description: e.target.value })} />
+                              <input className={inputCls} value={editOpForm.description} onChange={(e) => setEditOpForm({ ...editOpForm, description: e.target.value })} aria-label="Edit operation description" />
                             </td>
                             <td className={tdCls}>
-                              <select className={selectCls} value={editOpForm.craftId} onChange={(e) => setEditOpForm({ ...editOpForm, craftId: e.target.value })}>
+                              <select className={selectCls} value={editOpForm.craftId} onChange={(e) => setEditOpForm({ ...editOpForm, craftId: e.target.value })} aria-label="Edit craft">
                                 {crafts.map((c) => (
                                   <option key={c.craftId} value={c.craftId}>{c.craftCode} (${c.hourlyRate}/h)</option>
                                 ))}
                               </select>
                             </td>
                             <td className={tdCls}>
-                              <input className={inputCls} type="number" min={0} step="0.5" value={editOpForm.plannedHours} onChange={(e) => setEditOpForm({ ...editOpForm, plannedHours: e.target.value })} />
+                              <input className={inputCls} type="number" min={0} step="0.5" value={editOpForm.plannedHours} onChange={(e) => setEditOpForm({ ...editOpForm, plannedHours: e.target.value })} aria-label="Edit planned hours" />
                             </td>
                             <td className={tdCls}>
-                              <input className={inputCls} type="number" min={1} value={editOpForm.numberOfTechnicians} onChange={(e) => setEditOpForm({ ...editOpForm, numberOfTechnicians: e.target.value })} />
+                              <input className={inputCls} type="number" min={1} value={editOpForm.numberOfTechnicians} onChange={(e) => setEditOpForm({ ...editOpForm, numberOfTechnicians: e.target.value })} aria-label="Edit number of technicians" />
                             </td>
                             <td className={tdCls}><span className="font-mono text-xs text-primary">{op.actualHours || '-'}</span></td>
                             <td className={tdCls}>{op.status}</td>
@@ -1103,7 +1104,7 @@ export default function WorkOrderDetailPage() {
               <form onSubmit={handleAddMaterial} className="industrial-card rounded p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-primary">Add Material</span>
-                  <button type="button" onClick={() => { setMatAdding(false); setMatForm(emptyMatForm); }} className="text-tertiary hover:text-primary">
+                  <button type="button" onClick={() => { setMatAdding(false); setMatForm(emptyMatForm); }} aria-label="Close add material form" className="text-tertiary hover:text-primary">
                     <XCircle className="w-4 h-4" />
                   </button>
                 </div>
@@ -1114,6 +1115,7 @@ export default function WorkOrderDetailPage() {
                       className={selectCls}
                       value={matForm.materialId}
                       onChange={(e) => handleMaterialSelect(matForm, setMatForm, e.target.value)}
+                      aria-label="Material"
                     >
                       <option value="">Select material</option>
                       {materials.map((m) => (
@@ -1123,11 +1125,11 @@ export default function WorkOrderDetailPage() {
                   </div>
                   <div className="col-span-2">
                     <FieldLabel>Planned Qty</FieldLabel>
-                    <input className={inputCls} type="number" min={0} step="0.01" value={matForm.plannedQuantity} onChange={(e) => setMatForm({ ...matForm, plannedQuantity: e.target.value })} />
+                    <input className={inputCls} type="number" min={0} step="0.01" value={matForm.plannedQuantity} onChange={(e) => setMatForm({ ...matForm, plannedQuantity: e.target.value })} aria-label="Planned quantity" />
                   </div>
                   <div className="col-span-2">
                     <FieldLabel>Unit Cost $</FieldLabel>
-                    <input className={inputCls} type="number" min={0} step="0.01" value={matForm.unitCost} onChange={(e) => setMatForm({ ...matForm, unitCost: e.target.value })} />
+                    <input className={inputCls} type="number" min={0} step="0.01" value={matForm.unitCost} onChange={(e) => setMatForm({ ...matForm, unitCost: e.target.value })} aria-label="Unit cost" />
                   </div>
                   <div className="col-span-3 flex items-end">
                     <button
@@ -1162,14 +1164,14 @@ export default function WorkOrderDetailPage() {
                             <td className={`${tdCls} font-mono text-xs text-primary`}>{wm.material?.materialCode || '-'}</td>
                             <td className={`${tdCls} text-xs text-secondary`}>{wm.material?.description || '-'}</td>
                             <td className={tdCls}>
-                              <input className={inputCls} type="number" min={0} step="0.01" value={editMatForm.plannedQuantity} onChange={(e) => setEditMatForm({ ...editMatForm, plannedQuantity: e.target.value })} />
+                              <input className={inputCls} type="number" min={0} step="0.01" value={editMatForm.plannedQuantity} onChange={(e) => setEditMatForm({ ...editMatForm, plannedQuantity: e.target.value })} aria-label="Edit planned quantity" />
                             </td>
                             <td className={tdCls}>
-                              <input className={inputCls} type="number" min={0} step="0.01" value={editMatForm.actualQuantity} onChange={(e) => setEditMatForm({ ...editMatForm, actualQuantity: e.target.value })} />
+                              <input className={inputCls} type="number" min={0} step="0.01" value={editMatForm.actualQuantity} onChange={(e) => setEditMatForm({ ...editMatForm, actualQuantity: e.target.value })} aria-label="Edit actual quantity" />
                             </td>
                             <td className={`${tdCls} text-xs text-amber`}>{wm.reservationQuantity}</td>
                             <td className={tdCls}>
-                              <input className={inputCls} type="number" min={0} step="0.01" value={editMatForm.unitCost} onChange={(e) => setEditMatForm({ ...editMatForm, unitCost: e.target.value })} />
+                              <input className={inputCls} type="number" min={0} step="0.01" value={editMatForm.unitCost} onChange={(e) => setEditMatForm({ ...editMatForm, unitCost: e.target.value })} aria-label="Edit unit cost" />
                             </td>
                             <td className={`${tdCls} font-mono text-xs text-primary`}>${(wm.actualQuantity * wm.unitCost).toLocaleString()}</td>
                             <td className={tdCls}>
@@ -1241,14 +1243,14 @@ export default function WorkOrderDetailPage() {
               <form onSubmit={handleAddLabor} className="industrial-card rounded p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-primary">Log Labor</span>
-                  <button type="button" onClick={() => { setLaborAdding(false); setLaborForm(emptyLaborForm); }} className="text-tertiary hover:text-primary">
+                  <button type="button" onClick={() => { setLaborAdding(false); setLaborForm(emptyLaborForm); }} aria-label="Close log labor form" className="text-tertiary hover:text-primary">
                     <XCircle className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="grid grid-cols-12 gap-3">
                   <div className="col-span-3">
                     <FieldLabel>Operation</FieldLabel>
-                    <select className={selectCls} value={laborForm.operationId} onChange={(e) => setLaborForm({ ...laborForm, operationId: e.target.value })}>
+                    <select className={selectCls} value={laborForm.operationId} onChange={(e) => setLaborForm({ ...laborForm, operationId: e.target.value })} aria-label="Operation">
                       <option value="">Select operation</option>
                       {(wo.operations || []).map((op) => (
                         <option key={op.operationId} value={op.operationId}>{op.sequenceNumber} — {op.description}</option>
@@ -1257,7 +1259,7 @@ export default function WorkOrderDetailPage() {
                   </div>
                   <div className="col-span-3">
                     <FieldLabel>Technician</FieldLabel>
-                    <select className={selectCls} value={laborForm.userId} onChange={(e) => setLaborForm({ ...laborForm, userId: e.target.value })}>
+                    <select className={selectCls} value={laborForm.userId} onChange={(e) => setLaborForm({ ...laborForm, userId: e.target.value })} aria-label="Technician">
                       <option value="">Select user</option>
                       {users.map((u) => (
                         <option key={u.userId} value={u.userId}>{u.fullName}</option>
@@ -1266,11 +1268,11 @@ export default function WorkOrderDetailPage() {
                   </div>
                   <div className="col-span-2">
                     <FieldLabel>Hours</FieldLabel>
-                    <input className={inputCls} type="number" min={0.5} step="0.25" value={laborForm.hoursWorked} onChange={(e) => setLaborForm({ ...laborForm, hoursWorked: e.target.value })} />
+                    <input className={inputCls} type="number" min={0.5} step="0.25" value={laborForm.hoursWorked} onChange={(e) => setLaborForm({ ...laborForm, hoursWorked: e.target.value })} aria-label="Hours worked" />
                   </div>
                   <div className="col-span-2">
                     <FieldLabel>Notes</FieldLabel>
-                    <input className={inputCls} value={laborForm.notes} onChange={(e) => setLaborForm({ ...laborForm, notes: e.target.value })} placeholder="Optional" />
+                    <input className={inputCls} value={laborForm.notes} onChange={(e) => setLaborForm({ ...laborForm, notes: e.target.value })} placeholder="Optional" aria-label="Notes" />
                   </div>
                   <div className="col-span-2 flex items-end">
                     <button
@@ -1305,11 +1307,11 @@ export default function WorkOrderDetailPage() {
                             <td className={`${tdCls} text-xs text-primary`}>{l.user?.fullName || l.userId}</td>
                             <td className={`${tdCls} text-xs text-secondary`}>{l.operation?.description || '-'}</td>
                             <td className={tdCls}>
-                              <input className={inputCls} type="number" min={0.5} step="0.25" value={editLaborForm.hoursWorked} onChange={(e) => setEditLaborForm({ ...editLaborForm, hoursWorked: e.target.value })} />
+                              <input className={inputCls} type="number" min={0.5} step="0.25" value={editLaborForm.hoursWorked} onChange={(e) => setEditLaborForm({ ...editLaborForm, hoursWorked: e.target.value })} aria-label="Edit hours worked" />
                             </td>
                             <td className={`${tdCls} font-mono text-xs text-secondary`}>{new Date(l.entryDateTime).toLocaleString()}</td>
                             <td className={tdCls}>
-                              <input className={inputCls} value={editLaborForm.notes} onChange={(e) => setEditLaborForm({ ...editLaborForm, notes: e.target.value })} />
+                              <input className={inputCls} value={editLaborForm.notes} onChange={(e) => setEditLaborForm({ ...editLaborForm, notes: e.target.value })} aria-label="Edit notes" />
                             </td>
                             <td className={tdCls}>
                               <div className="flex items-center gap-2">
@@ -1378,31 +1380,32 @@ export default function WorkOrderDetailPage() {
               <form onSubmit={handleAddService} className="industrial-card rounded p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-primary">Add External Service</span>
-                  <button type="button" onClick={() => { setSvcAdding(false); setSvcForm(emptySvcForm); }} className="text-tertiary hover:text-primary">
+                  <button type="button" onClick={() => { setSvcAdding(false); setSvcForm(emptySvcForm); }} aria-label="Close add external service form" className="text-tertiary hover:text-primary">
                     <XCircle className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="grid grid-cols-12 gap-3">
                   <div className="col-span-3">
                     <FieldLabel>Vendor</FieldLabel>
-                    <input className={inputCls} value={svcForm.vendor} onChange={(e) => setSvcForm({ ...svcForm, vendor: e.target.value })} placeholder="Vendor name" />
+                    <input className={inputCls} value={svcForm.vendor} onChange={(e) => setSvcForm({ ...svcForm, vendor: e.target.value })} placeholder="Vendor name" aria-label="Vendor" />
                   </div>
                   <div className="col-span-4">
                     <FieldLabel>Description</FieldLabel>
-                    <input className={inputCls} value={svcForm.description} onChange={(e) => setSvcForm({ ...svcForm, description: e.target.value })} placeholder="Service description" />
+                    <input className={inputCls} value={svcForm.description} onChange={(e) => setSvcForm({ ...svcForm, description: e.target.value })} placeholder="Service description" aria-label="Service description" />
                   </div>
                   <div className="col-span-2">
                     <FieldLabel>Cost $</FieldLabel>
-                    <input className={inputCls} type="number" min={0} step="0.01" value={svcForm.cost} onChange={(e) => setSvcForm({ ...svcForm, cost: e.target.value })} />
+                    <input className={inputCls} type="number" min={0} step="0.01" value={svcForm.cost} onChange={(e) => setSvcForm({ ...svcForm, cost: e.target.value })} aria-label="Service cost" />
                   </div>
                   <div className="col-span-2">
                     <FieldLabel>Invoice Ref</FieldLabel>
-                    <input className={inputCls} value={svcForm.invoiceRef} onChange={(e) => setSvcForm({ ...svcForm, invoiceRef: e.target.value })} placeholder="Optional" />
+                    <input className={inputCls} value={svcForm.invoiceRef} onChange={(e) => setSvcForm({ ...svcForm, invoiceRef: e.target.value })} placeholder="Optional" aria-label="Invoice reference" />
                   </div>
                   <div className="col-span-1 flex items-end">
                     <button
                       type="submit"
                       disabled={!svcForm.vendor.trim() || !svcForm.description.trim() || busy === 'svc:add'}
+                      aria-label="Add service"
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold w-full justify-center transition-all hover:brightness-110 disabled:opacity-50"
                       style={{ backgroundColor: '#D97706', color: '#111113' }}
                     >
@@ -1430,16 +1433,16 @@ export default function WorkOrderDetailPage() {
                         {editingSvcId === s.serviceCostId ? (
                           <>
                             <td className={tdCls}>
-                              <input className={inputCls} value={editSvcForm.vendor} onChange={(e) => setEditSvcForm({ ...editSvcForm, vendor: e.target.value })} />
+                              <input className={inputCls} value={editSvcForm.vendor} onChange={(e) => setEditSvcForm({ ...editSvcForm, vendor: e.target.value })} aria-label="Edit vendor" />
                             </td>
                             <td className={tdCls}>
-                              <input className={inputCls} value={editSvcForm.description} onChange={(e) => setEditSvcForm({ ...editSvcForm, description: e.target.value })} />
+                              <input className={inputCls} value={editSvcForm.description} onChange={(e) => setEditSvcForm({ ...editSvcForm, description: e.target.value })} aria-label="Edit service description" />
                             </td>
                             <td className={tdCls}>
-                              <input className={inputCls} type="number" min={0} step="0.01" value={editSvcForm.cost} onChange={(e) => setEditSvcForm({ ...editSvcForm, cost: e.target.value })} />
+                              <input className={inputCls} type="number" min={0} step="0.01" value={editSvcForm.cost} onChange={(e) => setEditSvcForm({ ...editSvcForm, cost: e.target.value })} aria-label="Edit service cost" />
                             </td>
                             <td className={tdCls}>
-                              <input className={inputCls} value={editSvcForm.invoiceRef} onChange={(e) => setEditSvcForm({ ...editSvcForm, invoiceRef: e.target.value })} />
+                              <input className={inputCls} value={editSvcForm.invoiceRef} onChange={(e) => setEditSvcForm({ ...editSvcForm, invoiceRef: e.target.value })} aria-label="Edit invoice reference" />
                             </td>
                             <td className={tdCls}>
                               <div className="flex items-center gap-2">
@@ -1496,7 +1499,7 @@ export default function WorkOrderDetailPage() {
             {canEdit && (
               <form onSubmit={handleAttachChecklist} className="industrial-card rounded p-4 flex items-center gap-3">
                 <Shield className="w-4 h-4 text-amber" />
-                <select className={selectCls} value={attachTemplateId} onChange={(e) => setAttachTemplateId(e.target.value)}>
+                <select className={selectCls} value={attachTemplateId} onChange={(e) => setAttachTemplateId(e.target.value)} aria-label="Checklist template">
                   <option value="">Select checklist template...</option>
                   {templates.map((t) => (
                     <option key={t.checklistTemplateId} value={t.checklistTemplateId}>
@@ -1621,6 +1624,7 @@ export default function WorkOrderDetailPage() {
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Add a comment..."
+                aria-label="Add a comment"
                 className="flex-1 px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors"
                 style={{ backgroundColor: '#27272A' }}
               />

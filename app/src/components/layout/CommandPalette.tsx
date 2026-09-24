@@ -109,6 +109,9 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
       style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
     >
       <div
         className="w-full max-w-xl rounded-lg overflow-hidden"
@@ -128,6 +131,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
             value={query}
             onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
             placeholder="Search commands, navigate, or create..."
+            aria-label="Search commands, navigate, or create"
             className="flex-1 bg-transparent text-primary text-sm outline-none placeholder:text-tertiary"
           />
           <kbd
