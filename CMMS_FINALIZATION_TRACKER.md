@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (F1/F2 recorded); Group 4b: PM scheduler complete (3.1a–3.1g ✅); Group 5: Dashboard + Reports complete (2.4/2.5/2.6 ✅); **Group 6a: mockData deletion + fallback removal complete (2.3 ✅, trust property); Group 6b: sidebar + Swagger + refresh decision complete (2.7/2.11/2.12 ✅); Group 7 dropped — Administration remaining needs folded into Phase 4/G8 | **Phase 4 - DB & Build Hygiene: complete (4.1–4.5 ✅)**; **Phase 3 - Missing SOW Features: complete (3.1–3.7 ✅, incl. 3.3 CSV, 3.5 WCAG, 3.5a 404)**; Phase 5 - Testing: pending**)
+**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (F1/F2 recorded); Group 4b: PM scheduler complete (3.1a–3.1g ✅); Group 5: Dashboard + Reports complete (2.4/2.5/2.6 ✅); **Group 6a: mockData deletion + fallback removal complete (2.3 ✅, trust property); Group 6b: sidebar + Swagger + refresh decision complete (2.7/2.11/2.12 ✅); Group 7 dropped — Administration remaining needs folded into Phase 4/G8 | **Phase 4 - DB & Build Hygiene: complete (4.1–4.5 ✅)**; **Phase 3 - Missing SOW Features: complete (3.1–3.7 ✅, incl. 3.3 CSV, 3.5 WCAG, 3.5a 404)**; **Phase 5 - Testing: in progress — 5.1 complete (Vitest+Supertest, 149 tests green, 2.9 RBAC/audit fold done); 5.2–5.4 pending**)
 
 ## Status Legend
 
@@ -56,6 +56,7 @@
 | f4c8dcc | feat(g3.3): CSV bulk import/export for materials + equipment |
 | 1e54ae4 | fix(a11y): WCAG 2.1 AA light pass + audit doc (3.5) |
 | 7a23409 | fix(app): catch-all 404 route inside protected layout (3.5a) |
+| 9460b9d | test(backend): vitest+supertest across all 21 routers + RBAC/audit fold (5.1, 2.9) |
 
 ---
 
@@ -99,7 +100,7 @@ Note: Phase 1 tasks 1.2, 1.7, 1.8, 1.9, 1.10 were verified by build/lint only. T
 | 2.6 | Dashboard: feed trend chart from `/dashboard/cost-summary`; alerts from API | ✅ | Trend = 2 live Area series + Sep tick, alerts = live PM rows (verify_g5 PASS) | e047a40 |
 | 2.7 | Add missing sidebar entries: Work Centers, Preventive Maintenance | ✅ | verify_g6b PASS exit 0: both entries visible in nav ('Work Centers', 'Preventive Maintenance'), click-through to /work-centers + /preventive-maintenance renders, PAGE_ERRORS=[] | 1631505 |
 | 2.8 | Wire `auditMiddleware`/`logAudit` onto all mutating routes | ✅ | Milestone A rewrote mutating routes with `logAudit` (create/update/delete/status); Administration audit tab reads live entries | 367b59d, 9876e67 |
-| 2.9 | Apply `authorizeMinRole` per SOW role matrix | 🔶 | WO-domain RBAC confirmed (Milestone A/Group 1). Deferred to Phase 5: full RBAC matrix sweep and complete zod coverage across all 21 routers. WO domain verified in G1. Decision recorded 2026-09-24. | 367b59d |
+| 2.9 | Apply `authorizeMinRole` per SOW role matrix | ✅ | WO-domain RBAC confirmed (Milestone A/Group 1). Gap sweep + full fold completed 2026-09-24 in Phase 5 (5.1): `authorizeMinRole` + zod validation + `logAudit` added on the SEVEN deferred files — materials (create/update Requester, delete Supervisor), workCenters, taskLists, failureCodes (same pattern), maintenancePlans (create/update Requester + delete Supervisor + generate-wo Planner + run-scheduler Administrator already), users (PUT `/` Administrator + zod, PUT `/password` self-or-admin + audit), alerts (read-all + per-read Requester). Each folded route has a test proving wrong role → 403, right role → success + AuditLogEntry row. Residual gap (documented, not folded): `GET /api/audit-log` is `authenticate`-only, not Administrator-gated (outside the 7-file fold scope; revisit in hardening). | 9460b9d |
 | 2.10 | Zod validation on all request bodies/params | 🔶 | Schemas centralized in `validation.ts` (WO, notifications, equipment, locations, meters, checklists). Deferred to Phase 5: full RBAC matrix sweep and complete zod coverage across all 21 routers. WO domain verified in G1. Decision recorded 2026-09-24. | 367b59d |
 | 2.11 | Annotate all routes with Swagger JSDoc (or regenerate spec) | ✅ | WO domain annotated (option a): 6 routes (list/detail/create/update/delete/status); /api-docs.json paths=3, /api/work-orders group present, swagger-ui renders. Remaining 20 routers deferred — see Phase 3 note | 1631505 |
 | 2.12 | Decide refresh-token scope: implement refresh endpoints **or** document fixed 8h session | ✅ | Decision 2026-09-24: fixed 8h JWT session retained. RefreshToken model remains in schema but unwired; refresh endpoints deferred to post-go-live if UX requires. SOW §4.2 requires session timeout, not refresh tokens — 8h fixed satisfies the requirement. Verified: JWT_EXPIRES_IN=28800 in .env.example; live token exp-iat=28800 (jwt_8h True) | 1631505 |
@@ -231,7 +232,7 @@ Note (3.4, sweep stop — 2.9 NOT folded): the 3.4b route-uniformity sweep audit
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 5.1 | **Priority:** Vitest + Supertest covering all 21 routers: auth, RBAC matrix, WO lifecycle transitions, convert-to-wo, scheduler idempotency, reports | ⬜ | `npm test` green in backend |  |
+| 5.1 | **Priority:** Vitest + Supertest covering all 21 routers: auth, RBAC matrix, WO lifecycle transitions, convert-to-wo, scheduler idempotency, reports | ✅ | `npm test` green in backend — 24 files, 149 tests, exit 0 (vitest 5.0.1); full RBAC/audit fold (2.9) + audit-increment proofs; also fixed 2 pre-existing app bugs surfaced by tests (equipment.ts create 500 on omitted optional manufacturer/model/serialNumber/assetTag/equipmentClass). See 2.9 row + commit log. | 9460b9d |
 | 5.2 | Vitest + Testing Library for 5 key pages (login, WO list/detail, guard) - *deferrable* | ⬜ | Green, or explicitly deferred |  |
 | 5.3 | One Playwright E2E: login -> create WO -> transition -> convert notification -> report | ⬜ | Passes against seeded DB |  |
 | 5.4 | Regression pass re-verifying every Phase 1 defect | ⬜ | Checklist signed off |  |
