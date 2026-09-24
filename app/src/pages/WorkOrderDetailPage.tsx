@@ -249,11 +249,12 @@ export default function WorkOrderDetailPage() {
     setLoading(true);
     setLoadError(null);
     try {
+      const isAdmin = hasPermission(['Administrator']);
       const [woData, laborData, auditData, usersData, craftsData, materialsData, templatesData, attachmentsData] = await Promise.all([
         workOrderService.getById(id!),
         laborService.getByWorkOrder(id!),
-        auditLogService.getAll({ search: id!, take: 100 }),
-        userService.getAll(),
+        isAdmin ? auditLogService.getAll({ search: id!, take: 100 }) : Promise.resolve({ data: [] }),
+        isAdmin ? userService.getAll() : Promise.resolve([]),
         craftService.getAll(),
         materialService.getAll(),
         safetyChecklistService.getTemplates(),

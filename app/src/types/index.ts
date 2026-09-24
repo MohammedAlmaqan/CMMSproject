@@ -342,6 +342,13 @@ export interface User {
   lastLogin: string | null;
 }
 
+export interface UserOption {
+  userId: string;
+  username: string;
+  fullName: string;
+  role: UserRole;
+}
+
 // ─── System Alert (§3.8) ───
 export interface SystemAlert {
   alertId: string;

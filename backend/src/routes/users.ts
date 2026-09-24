@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../utils/prisma.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate, authorize, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { userUpdateSchema, validate } from '../utils/validation.js';
 
@@ -24,6 +24,23 @@ router.get('/', authorize('Administrator'), async (_req: Request, res: Response)
     res.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/options', authorizeMinRole('Requester'), async (_req: Request, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { isActive: true, isDeleted: false },
+      select: {
+        userId: true, username: true, fullName: true, role: true,
+      },
+      orderBy: { fullName: 'asc' },
+    });
+
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching user options:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

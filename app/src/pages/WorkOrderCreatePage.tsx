@@ -8,7 +8,7 @@ import { equipmentService } from '@/services/equipmentService';
 import { workCenterService } from '@/services/workCenterService';
 import { userService } from '@/services/userService';
 import { ApiError } from '@/lib/api';
-import type { FunctionalLocation, Equipment, WorkCenter, User, Priority, WorkOrderType } from '@/types';
+import type { FunctionalLocation, Equipment, WorkCenter, UserOption, Priority, WorkOrderType } from '@/types';
 
 const inputClass =
   'w-full px-3 py-2 rounded text-primary text-sm outline-none border border-subtle focus:border-highlight transition-colors';
@@ -19,7 +19,7 @@ export default function WorkOrderCreatePage() {
   const [locations, setLocations] = useState<FunctionalLocation[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -56,7 +56,7 @@ export default function WorkOrderCreatePage() {
           functionalLocationService.getAll(),
           equipmentService.getAll(),
           workCenterService.getAll(),
-          userService.getAll(),
+          userService.getOptions(),
         ]);
         if (cancelled) return;
         setLocations(locData);
@@ -224,9 +224,7 @@ export default function WorkOrderCreatePage() {
               <label className={labelClass}>Supervisor</label>
               <select value={supervisorUserId} onChange={(e) => setSupervisorUserId(e.target.value)} className={inputClass} style={{ backgroundColor: '#27272A' }} required>
                 <option value="">Select supervisor</option>
-                {users
-                  .filter((u) => u.isActive)
-                  .map((u) => (
+                {users.map((u) => (
                     <option key={u.userId} value={u.userId}>
                       {u.fullName}
                     </option>

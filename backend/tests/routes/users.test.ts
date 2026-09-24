@@ -36,6 +36,24 @@ describe('users routes', () => {
     expect(Array.isArray(res.body)).toBe(true);
   });
 
+  it('serves narrow user options to Requester+ without exposing sensitive keys', async () => {
+    const res = await api().get('/api/users/options').set(authHeaders(ctx.operatorToken));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThan(0);
+    for (const u of res.body) {
+      expect(Object.keys(u).sort()).toEqual(['fullName', 'role', 'userId', 'username']);
+      expect(u).not.toHaveProperty('passwordHash');
+      expect(u).not.toHaveProperty('email');
+      expect(u).not.toHaveProperty('lastLogin');
+    }
+  });
+
+  it('rejects user options without a token', async () => {
+    const res = await api().get('/api/users/options');
+    expect(res.status).toBe(401);
+  });
+
   it('allows any authenticated user to view a user by id', async () => {
     const res = await api().get(`/api/users/${tempUserId}`).set(authHeaders(ctx.operatorToken));
     expect(res.status).toBe(200);
