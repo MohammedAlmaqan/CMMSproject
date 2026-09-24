@@ -15,7 +15,7 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
-    const user = await prisma.user.findUnique({ where: { username, isDeleted: false } });
+    const user = await prisma.user.findFirst({ where: { username, isDeleted: false } });
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }

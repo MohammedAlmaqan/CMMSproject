@@ -18,13 +18,16 @@ BASE_PORT = 3000
 API_PORT = 4000
 SCREEN = r"C:\Users\Injaz\Documents\Default Project\CMMSproject\screenshots"
 
+# NOTE: equipmentId / functionalLocationId / workCenterId / taskListId are
+# None here — they are resolved at runtime from the live API (the demo seed
+# regenerates UUIDs on every reseed, so hardcoded ids drift stale).
 PLAN_BODY = {
     "planCode": "G4A-TEST",
     "description": "G4a verify",
-    "equipmentId": "27fbcebc-b922-4b71-b8df-349d98d8955a",
-    "functionalLocationId": "3c26edce-b5d3-4448-a547-e9e04a674581",
-    "workCenterId": "0a4cf365-5fce-4262-a1f2-b1d0ddc2a53c",
-    "taskListId": "4343f060-5b81-41c8-9b9f-01c462c0dbf1",
+    "equipmentId": None,
+    "functionalLocationId": None,
+    "workCenterId": None,
+    "taskListId": None,
     "strategyType": "Time",
     "intervalValue": 30,
     "intervalUnit": "Days",
@@ -127,6 +130,28 @@ def main():
 
         hdrs = {**hdrs, "Content-Type": "application/json"}
         admin_hdrs = {**admin_hdrs, "Content-Type": "application/json"}
+
+        # ---------- Resolve live master-data ids (seed regenerates UUIDs) ----------
+        def one_id(url, key):
+            try:
+                r = page.request.get(api + url, headers=admin_hdrs)
+                d = r.json()
+                if isinstance(d, dict):
+                    d = d.get("data") or d.get("items") or []
+                return d[0].get(key) if isinstance(d, list) and d else None
+            except Exception:
+                return None
+
+        resolved = {}
+        for url, key in [
+            ("/api/equipment?take=1", "equipmentId"),
+            ("/api/functional-locations?take=1", "functionalLocationId"),
+            ("/api/work-centers?take=1", "workCenterId"),
+            ("/api/task-lists?take=1", "taskListId"),
+        ]:
+            resolved[key] = one_id(url, key)
+        SI["test_ids_resolved"] = all(resolved.values())
+        PLAN_BODY.update({k: v for k, v in resolved.items() if v})
 
         plan_id = None
         wo1_id = None

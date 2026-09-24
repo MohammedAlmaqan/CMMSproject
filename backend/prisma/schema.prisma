@@ -9,7 +9,7 @@ datasource db {
 
 model User {
   userId        String   @id @default(uuid())
-  username      String   @unique
+  username      String   // F3: partial unique index (isDeleted=false)
   passwordHash  String
   fullName      String
   email         String
@@ -47,7 +47,7 @@ model RefreshToken {
 
 model FunctionalLocation {
   functionalLocationId String   @id @default(uuid())
-  locationCode         String   @unique
+  locationCode         String   // F3: partial unique index (isDeleted=false)
   description          String
   parentLocationId     String?
   locationType         String   // Plant, Area, Unit, Sub-unit, System
@@ -70,7 +70,7 @@ model FunctionalLocation {
 
 model Equipment {
   equipmentId          String   @id @default(uuid())
-  equipmentCode        String   @unique
+  equipmentCode        String   // F3: partial unique index (isDeleted=false)
   name                 String
   description          String
   functionalLocationId String
@@ -133,7 +133,7 @@ model MeterReading {
 
 model WorkCenter {
   workCenterId       String   @id @default(uuid())
-  code               String   @unique
+  code               String   // F3: partial unique index (isDeleted=false)
   name               String
   dailyCapacityHours Float
   costRatePerHour    Float
@@ -170,7 +170,7 @@ model Craft {
 
 model Material {
   materialId   String   @id @default(uuid())
-  materialCode String   @unique
+  materialCode String   // F3: partial unique index (isDeleted=false)
   description  String
   unitOfMeasure String
   standardCost Float
@@ -223,7 +223,7 @@ model CauseCode {
 
 model TaskList {
   taskListId     String   @id @default(uuid())
-  code           String   @unique
+  code           String   // F3: partial unique index (isDeleted=false)
   description    String
   equipmentClass String?
   equipmentId    String?
@@ -260,7 +260,7 @@ model TaskListOperation {
 
 model Notification {
   notificationId      String   @id @default(uuid())
-  notificationNumber  String   @unique
+  notificationNumber  String   // F3: partial unique index (isDeleted=false)
   type                String   // M1, M2, M3
   priority            String   // High, Medium, Low
   functionalLocationId String
@@ -283,7 +283,7 @@ model Notification {
 
 model WorkOrder {
   workOrderId         String   @id @default(uuid())
-  woNumber            String   @unique
+  woNumber            String   // F3: partial unique index (isDeleted=false)
   type                String   // CM, PM, PdM, EM, CAL
   priority            String   // High, Medium, Low
   status              String   @default("Draft") // Draft, Planned, Scheduled, In Progress, Suspended, Completed, Closed, Cancelled
@@ -310,7 +310,7 @@ model WorkOrder {
   sourcePlanId        String?
   sourcePlanCycle     String?
 
-  @@unique([sourcePlanId, sourcePlanCycle])
+  // F3: @@unique([sourcePlanId, sourcePlanCycle]) replaced by partial index (isDeleted=false)
 
   functionalLocation FunctionalLocation @relation(fields: [functionalLocationId], references: [functionalLocationId])
   equipment          Equipment?         @relation(fields: [equipmentId], references: [equipmentId])
