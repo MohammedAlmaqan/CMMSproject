@@ -41,20 +41,31 @@ def step(name, cond, detail=""):
     print(f"{name} {bool(cond)} {detail}")
 
 
-# ── 1. Grep assertions (no mockData, no .catch(() =>) ──────────────────────
+# ── 1. Grep assertions (narrowed scope per 5.4 adjudication) ───────────────
+#    Production-only checks (skip __tests__/ and *.test.*). Test files may
+#    name identifiers mockX freely. Banned in PRODUCTION app code:
+#      Ban 1: silent store fallback on error: `.catch(() => get().` — the
+#             shape used to swallow an API error and fall back to cached
+#             in-memory store data instead of surfacing the error state.
+#      Ban 2: silent fallback to mock imports — any `data/mockData` import
+#             (e.g. `from '@/data/mockData'` or `from '../data/mockData'`).
+#    Generic defensive `.catch(() => ({ error: ... }))` parse fallbacks are
+#    NOT banned; they return a real error object and are legitimate.
 mock_hits = []
 catch_hits = []
 for root, _dirs, files in os.walk(os.path.join(APP, "src")):
+    if "__tests__" in root:
+        continue
     for f in files:
-        if not (f.endswith(".ts") or f.endswith(".tsx")):
+        if not (f.endswith(".ts") or f.endswith(".tsx")) or f.endswith(".test.ts") or f.endswith(".test.tsx"):
             continue
         p = os.path.join(root, f)
         rel = os.path.relpath(p, APP)
         with open(p, encoding="utf-8", errors="ignore") as fh:
             for ln, line in enumerate(fh, 1):
-                if "mockData" in line or re.search(r"mock[A-Z]", line):
+                if re.search(r"from\s+['\"][^'\"]*data/mockData['\"]", line):
                     mock_hits.append(f"{rel}:{ln}")
-                if re.search(r"\.catch\(\(\) =>", line):
+                if re.search(r"\.catch\(\(\) => get\(\)\.", line):
                     catch_hits.append(f"{rel}:{ln}")
 
 step("grep_mockdata_absent", not mock_hits and not os.path.exists(os.path.join(APP, "src", "data", "mockData.ts")), mock_hits[:5])
