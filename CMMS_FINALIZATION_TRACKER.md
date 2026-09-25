@@ -305,6 +305,19 @@ Non-blocking follow-ups: (1) when `actions/checkout@v5` and `actions/setup-node@
 - Full-scale load testing at 500K-WO volume
 - **Prisma connection-pool exhaustion on the login path (Prisma P2028 "Unable to start a transaction in the given time")** — surfaced by the 6.5 k6 smoke run, where 15 of ~140 concurrent logins returned HTTP 500 while the read path stayed healthy. This is a **Phase 8 blocker for the SOW §4.1 200-user load test only; it is NOT a v1.0.0 release blocker.** Requires Prisma connection-pool sizing + PostgreSQL `max_connections` tuning before the SOW §4.1 200-VU test. No fix attempted in Phase 6.
 
+## Post-Go-Live Backlog (v1.1)
+
+Schema findings raised during Phase 7 documentation (7.3). Triaged 2026-09-25: **no v1.0.0 scope change** — all are v1.1 items. Recorded against the SOW compliance matrix in 7.6.
+
+| # | Finding | Impact | Status |
+|---|---|---|---|
+| v1.1-1 | `CauseCode` and `FailureCode` are orphaned — no column on `WorkOrder`, `Notification` or `WorkOrderOperation` references either table, so failure/cause cannot be captured against a work order. | SOW compliance matrix (7.6) records this as **Partial — failure/cause capture not wired to WO**. | Deferred to v1.1 |
+| v1.1-2 | `MaintenancePlan.functionalLocationId` is a nullable column with no `@relation`, unlike the required `workCenterId` and `taskListId`. The database does not enforce it. | Low — plans are already anchored to a required work centre and task list. | Deferred to v1.1 |
+| v1.1-3 | **Financial and quantity fields are `Float`, not `Decimal`** — `standardCost`, `currentCost`, `unitCost`, `plannedCost`, `actualCost`, `cost`, `percentage`, `hourlyRate`, `costRatePerHour` and all quantity columns are binary floating point. | **Flagged prominently: v1.0.0 ships with `Float`-typed financial fields. The `Decimal` migration is a v1.1 remediation item.** Rounding differences are expected in cost reporting and must not be treated as a v1.0.0 defect. | **Priority — deferred to v1.1** |
+| v1.1-4 | Status and type columns are unenforced free text; permitted values exist only in schema comments. | Low — values are validated in the zod request schemas at the API boundary. | Deferred to v1.1 |
+
+**Verified, not deferred:** work orders are soft-deleted and their children are retained, per rule 3.4. Confirmed empirically against the database on 2026-09-25 for every populated child table — `WorkOrderOperation` (122 rows), `ExternalServiceCost` (1) and `WorkOrderNotifLink` (4) all retained their rows across `UPDATE "WorkOrder" SET "isDeleted"=true` with the parent row still present. `WorkOrderMaterial`, `CostSplit` and `WorkOrderChecklist` are currently empty, so they hold by the same mechanism but were not exercised. No action.
+
 ## Excluded (client clarifications)
 
 - i18n / multilingual text (English only)
