@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** Phase 0/1, Milestone A, B G1-G6b complete; G7 dropped; **Phase 4 complete — 4.1–4.5 ✅ (DB & build hygiene)** + Phase 4-escalation items 3.6 (seed guard) & 3.7 (F3 extended) done; **Phase 3 complete — 3.1–3.7 ✅** (3.1 PM scheduler `5048a17`/`cc8d11c`; 3.2 attachments `d78597d`, verify_g3_2 PASS; 3.3 CSV import/export `f4c8dcc`, verify_g3_3 PASS; 3.4 delete strategy `d5b016c`, verify_g3_4 PASS — 3.4b sweep >5 routes → RBAC/audit fold (2.9) deferred to Phase 5; 3.5 WCAG 2.1 AA light pass `1e54ae4`, verify_g3_5 PASS + docs/WCAG-AUDIT.md; 3.5a catch-all 404 `7a23409`, verify_g3_5a PASS; 3.6 seed guard `2beaeb2`/`0492ae7`; 3.7 partial indexes `a7adf2d`); **Phase 5 — COMPLETE — 5.1 ✅ (`9460b9d`): Vitest+Supertest 24 files/149 tests + 2.9 fold; 5.2 ✅ (`31070ce`): Vitest+Testing-Library 5 pages; 5.3 ✅ (`ba4c1fc`, `dfbfe2e`): verify_g5_3 PASS — full WO lifecycle E2E; 5.4 ✅: all 11 verify scripts green — first fleet 7/11 PASS, 4 FAILs triaged + adjudicated + fixed (`c30845f`, `7413dc2`, `75295d5`, `ca2072b`, `73bbb1c` + sign-off commit); final sign-off below.** NEXT = Phase 6 (CI/CD, ops & security) — do NOT start without explicit go.
+**State:** **Phase 6 complete (6.1–6.5 ✅) + Phase 7 in progress.** Phase 7 documentation: 7.1 README rewrite `6d56b7b`; 7.2 System Architecture `2643cb8`; 7.3 ER diagram + data dictionary `7c093d8`; **7.4 API reference — in progress.** Phase 6 follow-ups landed after close-out: `.tsbuildinfo` gitignored `69af740`; uploads included in backup `d37daa0`; trust-proxy + `PM_SCHEDULER_CRON` documented `bcb7b1f`; `BIND_HOST` + firewall guidance `fbbfd87` (empirically verified on both bind values). **B.2 and B.3 accepted by client. Four schema findings triaged and deferred to v1.1 — no v1.0.0 scope change.** NEXT = 7.4 → 7.5 → 7.6 → 7.7; do NOT start 7.5 without explicit go.
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -11,13 +11,62 @@
 
 **Verify harness:** committed scripts/verify/verify_gN.py (Python + Playwright); assert live endpoint 200 + expected shape, not just render (e.g. /api/locations 404 → grouped G2-G3 latent bug; was masked by mock fallback; after G6a the mockData.ts delete surfaces all of them)
 
-**Open risks:** latent mock-fallback bugs potentially still in unvisited/mock pages; verify scripts must remain committed; mockData.ts deletion at G6a will surface latent bugs
+**Open risks:** the two Phase-7 residuals below (P2028 pool exhaustion for the SOW §4.1 200-user test; untested IIS `curl` verification). The old mock-fallback risk is closed — `mockData.ts` was deleted at G6a and the fleet has been green since.
 
-**Next action for a fresh session:** read tracker + git log + this file. Next: **Phase 6 — CI/CD, Ops & Security Hardening (6.1 GitHub Actions → 6.2 pg_dump drill → 6.3 HTTPS/lockout/session-timeout → 6.4 logging → 6.5 k6 smoke).** Phase 5 is complete (5.1–5.4 ✅, all 11 verify scripts green); do not begin Phase 6 without explicit consent.
+**Next action for a fresh session:** read tracker + git log + this file. Next: **7.4 API reference** — export `/api-docs.json`, add `@openapi` JSDoc to the 23 un-annotated routers in `backend/src/routes/` (only `workOrders.ts` is annotated today; 108 endpoints across those 23), regenerate the spec, write `docs/API_REFERENCE.md`. Then 7.5 User Manual + Administrator Guide, 7.6 SOW compliance matrix (must record failure/cause capture as **Partial**), 7.7 tag `v1.0.0`. **Test floor to re-confirm at each commit: `tsc -b` clean, backend Vitest 24 files / 156 tests.**
 
 ---
 
-## Current position (2026-09-23)
+## Current position (2026-09-25)
+
+### Phase 6 — COMPLETE (6.1–6.5 ✅)
+
+- **6.1 CI/CD** — GitHub Actions pipeline `be52072`; runner Node bumped to 24 to match the lockfile `25107b0`; green `5050fa9`. Tracked in `.github/workflows/`.
+- **6.2 Backup/restore** — scheduled `pg_dump` + restore drill `f562d0a`; lint reconcile + tracker fix + PG version align `7f4a26f`. **Follow-up:** `backend/uploads` now snapshotted alongside the SQL dump, same 14-generation retention, with paired restore assertions (`d37daa0`).
+  - Limitation: the full `backup.bat` / restore-drill was never executed against live PostgreSQL because that needs `PGPASSWORD` and `.env` must not be read. The new upload logic was verified with isolated batch harnesses (20-file snapshot, 16→14 retention, restore-drill 0/20, 20/20, 0/0). **A first real run on the target server is still owed.**
+- **6.3 Security** — account lockout after 5 failed logins `6d983d3`; 30-min idle session timeout `bd8faeb`; HTTPS/TLS reverse-proxy steps `3380466`.
+  - **Idle timeout is client-side only** — clears local state and redirects, but the JWT stays valid server-side for its full 8-hour expiry. Documented honestly in `7448f93`; do not describe it as server-side session termination.
+  - **Follow-ups:** `app.set('trust proxy', 1)` + `PM_SCHEDULER_CRON` documented `bcb7b1f`; `BIND_HOST` env + Windows Firewall guidance `fbbfd87`.
+- **6.4 Logging** — structured pino logging + PM2 rotation `e890a92`.
+- **6.5 k6 smoke** — 50 VU smoke + `K6_MODE` login-limiter override `96abd8a`; P2028 deferred to post-go-live `16a16d7`; `K6_MODE` guard hardened against production `703ad77`.
+
+### Phase 7 — IN PROGRESS
+
+- **7.1 README rewrite** `6d56b7b` — matched to reality: **35 models** (not 32), 7 seed accounts, honest feature list, `npm audit` not clean.
+- **7.2 System Architecture** `2643cb8` — `docs/ARCHITECTURE.md`. Accepted as B.2.
+- **7.3 ER diagram + data dictionary** `7c093d8` — `docs/ER_DIAGRAM.md` (hand-authored Mermaid, no new deps) + `docs/DATA_DICTIONARY.md` (35 models, 7 domains). Accepted as B.3.
+  - Verification method worth reusing: the diagram was **cross-checked programmatically against `schema.prisma`** — entity count, braces, cardinality tokens, 45 FK columns matched per table and per column, and 45 relationship edges matched 45 `@relation`s with none invented and none missing. That check caught a genuinely dropped `MAINTENANCE_PLAN → TASK_LIST` edge. **This is the standard for future generated docs.**
+- **7.4 API reference** — IN PROGRESS. Only `workOrders.ts` is annotated; 23 routers / 108 endpoints still lack `@openapi` blocks.
+
+### Deferred to v1.1 (triaged 2026-09-25, no v1.0.0 scope change)
+
+Recorded in `CMMS_FINALIZATION_TRACKER.md` under **Post-Go-Live Backlog (v1.1)**:
+
+1. **`CauseCode` / `FailureCode` are orphaned** — no column on `WorkOrder`, `Notification` or `WorkOrderOperation` references either, so failure/cause cannot be captured against a work order. **7.6 must record this as Partial — failure/cause capture not wired to WO.**
+2. **`MaintenancePlan.functionalLocationId` has no `@relation`** — nullable and unenforced, unlike the required `workCenterId` / `taskListId`.
+3. **`Float` not `Decimal` for financial fields** — `standardCost`, `currentStock`, `unitCost`, `plannedCost`, `actualCost`, `cost`, `percentage`, `hourlyRate`, `costRatePerHour` and all quantity columns. **Flagged prominently: v1.0.0 ships with Float-typed financial fields; the Decimal migration is a v1.1 remediation item.** Rounding drift in cost reporting is expected, not a v1.0.0 defect. Marked **Priority** in the backlog.
+4. **Unenforced free-text status/type columns** — permitted values live only in schema comments; validated at the API boundary by zod instead.
+
+### Verified good — not a defect
+
+Work orders are soft-deleted and **children are retained**, per rule 3.4. Verified empirically against the live DB on 2026-09-25 for every populated child table: `WorkOrderOperation` (122 rows), `ExternalServiceCost` (1) and `WorkOrderNotifLink` (4) all kept their rows across `UPDATE "WorkOrder" SET "isDeleted"=true`, with the parent row still present. `WorkOrderMaterial`, `CostSplit` and `WorkOrderChecklist` are empty, so they hold by the same mechanism but were not exercised. All rows restored afterwards.
+
+### Open residuals (2)
+
+1. **P2028 Prisma pool exhaustion** — 15 of ~140 concurrent logins returned HTTP 500 under the 6.5 k6 run. **Phase 8 blocker for the SOW §4.1 200-user load test only; NOT a v1.0.0 release blocker.** Needs Prisma pool sizing + PostgreSQL `max_connections` tuning.
+2. **IIS `curl` verification untested** — the 6.3/Item-4 IIS reverse-proxy steps (ARR `X-Forwarded-For` overwrite, `BIND_HOST=127.0.0.1`, firewall rule) are documented but have **never been executed against a real IIS deployment**. Needs a live Windows server with ARR installed.
+
+### Housekeeping
+
+- `*.tsbuildinfo` is now gitignored (`69af740`), so `tsc -b` no longer dirties the worktree.
+- Ports 3000/4000 confirmed free at the end of this session.
+
+---
+
+## Phase 0–5 archive (historical — see tracker for full detail)
+
+Retained for context. Phases 0–5 are complete and closed out; the authoritative state is
+the section above.
 
 - **G4a** — COMPLETE. Gate `4beb2fb`.
 - **G4b-1** — COMPLETE. Scheduler core + idempotency (`cc8d11c`).
