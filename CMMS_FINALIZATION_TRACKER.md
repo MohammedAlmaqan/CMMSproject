@@ -114,6 +114,8 @@ Note: Phase 1 tasks 1.2, 1.7, 1.8, 1.9, 1.10 were verified by build/lint only. T
 | 2.11 | Annotate all routes with Swagger JSDoc (or regenerate spec) | ✅ | WO domain annotated (option a): 6 routes (list/detail/create/update/delete/status); /api-docs.json paths=3, /api/work-orders group present, swagger-ui renders. Remaining 20 routers deferred — see Phase 3 note | 1631505 |
 | 2.12 | Decide refresh-token scope: implement refresh endpoints **or** document fixed 8h session | ✅ | Decision 2026-09-24: fixed 8h JWT session retained. RefreshToken model remains in schema but unwired; refresh endpoints deferred to post-go-live if UX requires. SOW §4.2 requires session timeout, not refresh tokens — 8h fixed satisfies the requirement. Verified: JWT_EXPIRES_IN=28800 in .env.example; live token exp-iat=28800 (jwt_8h True) | 1631505 |
 
+**2.10 Phase 6 pre-flight residual (2026-09-25):** The strict audit found 45 gaps, so 2.10 remains 🔶. The current `validate(...)` middleware validates only `req.body`, not path params. Unvalidated parameterized mutations are: `PUT/DELETE /functional-locations/:id`; `PUT/DELETE /equipment/:id`; `PUT/DELETE /equipment-meters/:id`; `POST /equipment-meters/:id/readings`; `PUT/DELETE /work-centers/:id`; `PUT/DELETE /materials/:id`; `PUT/DELETE /failure-codes/:id`; `PUT/DELETE /task-lists/:id`; `PUT/DELETE /notifications/:id`; `POST /notifications/:id/convert-to-wo`; `PUT/DELETE /work-orders/:id`; `PUT /work-orders/:id/status`; `PUT/DELETE /work-order-operations/:id`; `PUT/DELETE /work-order-materials/:id`; `PUT/DELETE /labor/:id`; `PUT/DELETE /external-services/:id`; `PUT/DELETE /maintenance-plans/:id`; `POST /maintenance-plans/:id/generate-wo`; `POST /safety-checklists/work-order/:woId/attach`; `PUT/DELETE /safety-checklists/work-order-checklist/:id`; `PUT/DELETE /safety-checklists/work-order-checklist-item/:id`; `PUT/DELETE /alerts/:id/read`; `DELETE /comments/:id`; `DELETE /attachments/:id`; `PUT /users/:id`; `PUT /users/:id/password`. Direct body/multipart/no-input exceptions are `POST /auth/login`, `POST /equipment/import.csv`, `POST /materials/import.csv`, and `PUT /alerts/read-all`; `generate-wo` also reads an unvalidated optional body and the password route uses manual checks. `workOrderUpdateSchema` and `operationUpdateSchema` omit fields their handlers accept. Residual work: add parameter-aware Zod validation, explicit multipart/no-input handling, and align the two update schemas.
+
 Note: 2.2 fully resolved in `9876e67` (taskLists live) + `8022546` (live task-lists); the remaining collections cited below landed with 2.2.
 
 ### Milestone A - WO domain end-to-end pilot (COMPLETE, awaiting approval)
@@ -274,7 +276,7 @@ Note (5.4 resolution ledger): (1) `verify_g4a.py` generate-wo + plan-delete now 
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 6.1 | GitHub Actions: install -> lint -> typecheck -> **backend tests** -> build | ⬜ | Green on `main` |  |
+| 6.1 | GitHub Actions: install -> lint -> typecheck -> **backend tests** -> build | 🔶 | Local gates green; first `main` Actions run pending | pending |
 | 6.2 | Scheduled `pg_dump` backup + documented restore drill | ⬜ | Drill succeeds; RPO/RTO recorded |  |
 | 6.3 | **Security:** HTTPS/TLS, account lockout (5 failures), 30-min idle session timeout (SOW §4.2) | ⬜ | All three enforced and tested |  |
 | 6.4 | Structured logging + rotation under PM2 | ⬜ | Rotated logs on disk |  |
