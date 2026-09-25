@@ -164,22 +164,58 @@ curl -X POST http://localhost:4000/api/auth/login ^
 
 ## 5. Backup & Recovery
 
-### Database Backup
+### Automated Database Backup
+
+`scripts\backup.bat` creates a plain SQL dump of the local `cmms` database at `localhost:5432` as `cmms-YYYY-MM-DD-HHmm.sql` under `backups\`. The password is read only from the `PGPASSWORD` environment variable and is never stored in the script or repository.
+
+Run the following from an elevated Command Prompt after provisioning the machine-scoped credential. Replace the placeholder without committing the real value:
 
 ```cmd
-REM Full backup
-pg_dump -U postgres cmms > cmms_backup_YYYYMMDD.sql
-
-REM Restore
-psql -U postgres -d cmms < cmms_backup_YYYYMMDD.sql
+setx PGPASSWORD "<postgres-password>" /M
 ```
 
-### Application Backup
+Close and reopen the Command Prompt or OpenCode host so the new process inherits `PGPASSWORD`; `setx` does not update an already-running process. Do not print the variable. Then run a backup immediately with:
 
 ```cmd
-REM Backup entire project directory
-xcopy C:\CMMSproject C:\backup\CMMSproject_YYYYMMDD /E /I
+cd /d C:\CMMSproject
+scripts\backup.bat
 ```
+
+The script uses `pg_dump` from `PATH`; if it is unavailable, it falls back to the locally installed PostgreSQL 18 client at `C:\Program Files\PostgreSQL\18\bin\pg_dump.exe`.
+
+### Retention Policy
+
+The backup script keeps the newest 14 timestamped dumps and deletes older dumps after each successful backup. With one scheduled run per day, this provides 14 daily generations.
+
+### Daily Schedule
+
+Create a Windows Task Scheduler job that runs every day at 02:00. Replace both placeholders with the installed project path and a dedicated noninteractive service account. The account can read the machine-scoped `PGPASSWORD` and needs write access to the repository backup directory; `schtasks` prompts for that account's password without placing it in this command.
+
+```cmd
+set "CMMSPROJECT=C:\CMMSproject"
+schtasks /Create /TN "CommandPulse CMMS Daily Backup" /TR "%CMMSPROJECT%\scripts\backup.bat" /SC DAILY /ST 02:00 /RU "BACKUP-SERVICE-ACCOUNT" /RL LIMITED /F
+```
+
+### Restore Drill
+
+Run the restore drill periodically and after backup-policy changes:
+
+```cmd
+cd /d C:\CMMSproject
+scripts\restore-drill.bat
+```
+
+The script selects the newest valid timestamped dump, restores it only into the disposable `cmms_restore_test` database, runs `SELECT count(*) FROM "WorkOrder";`, records elapsed restore time, drops the drill database, and verifies that it no longer exists. It never restores over the live `cmms` database.
+
+### Recovery Objectives
+
+- **RPO:** ≤ 24 hours because the database backup runs daily.
+- **RTO:** 5.35 seconds measured on 2026-09-25 from drill start through the successful `WorkOrder` count query on the local dataset (84 rows; 306,826-byte dump). Re-run the drill after material database growth or infrastructure changes and update this measurement.
+
+### Application Files
+
+A PostgreSQL dump does not include physical files under `backend\uploads\`. Back up that directory separately with access controls that exclude `.env`, dependency folders, build output, and logs.
+
 
 ---
 

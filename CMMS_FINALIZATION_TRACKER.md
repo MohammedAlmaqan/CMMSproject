@@ -277,10 +277,12 @@ Note (5.4 resolution ledger): (1) `verify_g4a.py` generate-wo + plan-delete now 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
 | 6.1 | GitHub Actions: install -> lint -> typecheck -> **backend tests** -> build | ✅ | Run #2 green on Node 24: Backend + Frontend jobs successful. Evidence: https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36137610937 | be52072, 25107b0 |
-| 6.2 | Scheduled `pg_dump` backup + documented restore drill | ⬜ | Drill succeeds; RPO/RTO recorded |  |
+| 6.2 | Scheduled `pg_dump` backup + documented restore drill | ✅ | Daily 02:00 schedule + newest-14 retention documented. Drill PASS: 306,826-byte dump, `WorkOrder` count 84, elapsed 5.35 s, `cmms_restore_test` absent after drop (`psql -l \| findstr` exit 1). RPO ≤ 24 h; measured RTO 5.35 s. | this commit |
 | 6.3 | **Security:** HTTPS/TLS, account lockout (5 failures), 30-min idle session timeout (SOW §4.2) | ⬜ | All three enforced and tested |  |
 | 6.4 | Structured logging + rotation under PM2 | ⬜ | Rotated logs on disk |  |
 | 6.5 | k6 smoke: login + WO list at target concurrency; record vs SOW §4.1 | ⬜ | Results documented |  |
+
+Non-blocking follow-ups: (1) when `actions/checkout@v5` and `actions/setup-node@v5` ship, upgrade from the current v4 actions, which run on Node 20 and emit a deprecation warning; (2) Phase 7 should migrate from the `PGPASSWORD` environment variable to PostgreSQL-native `%APPDATA%\postgresql\pgpass.conf` with file-permission restrictions.
 
 ## Phase 7 - Documentation & Delivery (3-5 days)
 
