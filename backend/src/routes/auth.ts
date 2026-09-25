@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { JWT_SECRET, JWT_EXPIRES_IN } from '../utils/config.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -157,7 +158,7 @@ router.post('/login', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error({ err: error }, 'Login error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

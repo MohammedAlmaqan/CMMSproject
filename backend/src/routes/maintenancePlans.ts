@@ -5,6 +5,7 @@ import { logAudit } from '../middleware/audit.js';
 import { validate, schedulerRunSchema, maintenancePlanCreateSchema, maintenancePlanUpdateSchema } from '../utils/validation.js';
 import { runSchedulerOnce } from '../services/scheduler.js';
 import { generateWoNumber } from '../utils/sequence.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(plans);
   } catch (error) {
-    console.error('Error fetching maintenance plans:', error);
+    logger.error({ err: error }, 'Error fetching maintenance plans');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -45,7 +46,7 @@ router.post('/run-scheduler', authorizeMinRole('Administrator'), validate(schedu
     );
     res.json(result);
   } catch (error) {
-    console.error('Error running scheduler:', error);
+    logger.error({ err: error }, 'Error running scheduler');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -69,7 +70,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(plan);
   } catch (error) {
-    console.error('Error fetching maintenance plan:', error);
+    logger.error({ err: error }, 'Error fetching maintenance plan');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -116,7 +117,7 @@ router.post('/', authorizeMinRole('Requester'), validate(maintenancePlanCreateSc
     if (error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced entity not found (equipment, location, work center, or task list)' });
     }
-    console.error('Error creating maintenance plan:', error);
+    logger.error({ err: error }, 'Error creating maintenance plan');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -168,7 +169,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdate
     if ((error as { code?: string })?.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced entity not found (equipment, location, work center, or task list)' });
     }
-    console.error('Error updating maintenance plan:', error);
+    logger.error({ err: error }, 'Error updating maintenance plan');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -196,7 +197,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     res.json({ message: 'Maintenance plan deleted successfully' });
   } catch (error) {
-    console.error('Error deleting maintenance plan:', error);
+    logger.error({ err: error }, 'Error deleting maintenance plan');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -285,7 +286,7 @@ router.post('/:id/generate-wo', authorizeMinRole('Maintenance Planner'), async (
 
     res.status(201).json(workOrder);
   } catch (error) {
-    console.error('Error generating work order from plan:', error);
+    logger.error({ err: error }, 'Error generating work order from plan');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

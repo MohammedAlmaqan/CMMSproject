@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+import pinoHttp from 'pino-http';
 
 import authRoutes from './routes/auth.js';
 import functionalLocationRoutes from './routes/functionalLocations.js';
@@ -31,6 +32,7 @@ import userRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
 import { acquireStartupLock, runSchedulerOnce, startScheduler } from './services/scheduler.js';
 import { prisma } from './utils/prisma.js';
+import { logger } from './utils/logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -58,6 +60,42 @@ app.use(cors({
   },
 }));
 app.use(express.json({ limit: '10mb' }));
+
+// Inside a mounted router `req.url` is relative to the mount point, so the raw
+// value would log as `/tree` instead of `/api/failure-codes/tree`. `originalUrl`
+// keeps the full path. The query string is dropped because it can carry tokens.
+function loggedPath(req: express.Request): string {
+  return (req.originalUrl || req.url || '').split('?')[0];
+}
+
+// Registered before the routes so it wraps the full request lifecycle. `req.user`
+// is populated by the per-route `authenticate` middleware, so it is already set
+// by the time the response finishes and the access line is emitted.
+app.use(pinoHttp({
+  logger,
+  serializers: {
+    req(req) {
+      return { method: req.method, path: loggedPath(req) };
+    },
+    res(res) {
+      return { status: res.statusCode };
+    },
+  },
+  customProps(req) {
+    return req.user?.userId ? { userId: req.user.userId } : {};
+  },
+  customLogLevel(_req, res, err) {
+    if (err || res.statusCode >= 500) return 'error';
+    if (res.statusCode >= 400) return 'warn';
+    return 'info';
+  },
+  customSuccessMessage(req, res) {
+    return `${req.method} ${loggedPath(req)} ${res.statusCode}`;
+  },
+  customErrorMessage(req, res, err) {
+    return `${req.method} ${loggedPath(req)} ${res.statusCode} ${err.message}`;
+  },
+}));
 
 app.use('/api/auth/login', authLimiter);
 
@@ -106,7 +144,7 @@ async function createSchedulerStaleAlert(): Promise<void> {
       message: 'PM scheduler has not reported a successful run within 25 hours.',
     },
   });
-  console.log('[scheduler] stale health detected — SystemAlert created');
+  logger.info('[scheduler] stale health detected — SystemAlert created');
 }
 
 app.get('/api/health/scheduler', async (_req, res) => {
@@ -134,7 +172,7 @@ app.get('/api/health/scheduler', async (_req, res) => {
       minutesSinceSuccess,
     });
   } catch (err) {
-    console.error('Error checking scheduler health:', err);
+    logger.error({ err }, 'Error checking scheduler health');
     res.status(503).json({ status: 'stale', lastSuccessAt: null, minutesSinceSuccess: null });
   }
 });
@@ -167,7 +205,7 @@ app.use('/api/dashboard', dashboardRoutes);
 
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('Unhandled error:', err);
+  logger.error({ err }, 'Unhandled error');
   res.status(500).json({ error: 'Internal server error' });
 });
 
@@ -175,19 +213,19 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // supertest can import `app` without binding :4000 or taking the scheduler lock.
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    console.log(`CMMS API server running on port ${PORT}`);
-    console.log(`API docs: http://localhost:${PORT}/api-docs`);
+    logger.info(`CMMS API server running on port ${PORT}`);
+    logger.info(`API docs: http://localhost:${PORT}/api-docs`);
     setImmediate(async () => {
       try {
         const acquired = await acquireStartupLock();
         if (!acquired) {
-          console.log('[scheduler] startup skipped — lock refused; API serving without scheduler');
+          logger.info('[scheduler] startup skipped — lock refused; API serving without scheduler');
           return;
         }
-        await runSchedulerOnce().catch((err) => console.error('[scheduler] startup run failed', err));
+        await runSchedulerOnce().catch((err) => logger.error({ err }, '[scheduler] startup run failed'));
         startScheduler();
       } catch (err) {
-        console.error('[scheduler] startup wiring failed', err);
+        logger.error({ err }, '[scheduler] startup wiring failed');
       }
     });
   });

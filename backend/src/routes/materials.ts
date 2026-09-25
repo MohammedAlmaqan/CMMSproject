@@ -5,6 +5,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { materialImportRowSchema, materialCreateSchema, materialUpdateSchema, validate } from '../utils/validation.js';
 import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.get('/export.csv', async (req: Request, res: Response) => {
     res.setHeader('Content-Disposition', `attachment; filename="materials-${date}.csv"`);
     res.send(toCsv(rows));
   } catch (error) {
-    console.error('Error exporting materials:', error);
+    logger.error({ err: error }, 'Error exporting materials');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -155,7 +156,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
     if (error instanceof CsvRowError) {
       return res.status(400).json({ error: `Row ${error.row}: ${error.reason}` });
     }
-    console.error('Error importing materials:', error);
+    logger.error({ err: error }, 'Error importing materials');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -179,7 +180,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(materials);
   } catch (error) {
-    console.error('Error fetching materials:', error);
+    logger.error({ err: error }, 'Error fetching materials');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -196,7 +197,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(material);
   } catch (error) {
-    console.error('Error fetching material:', error);
+    logger.error({ err: error }, 'Error fetching material');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -228,7 +229,7 @@ router.post('/', authorizeMinRole('Requester'), validate(materialCreateSchema), 
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Material code already exists' });
     }
-    console.error('Error creating material:', error);
+    logger.error({ err: error }, 'Error creating material');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -267,7 +268,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(materialUpdateSchema)
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Material code already exists' });
     }
-    console.error('Error updating material:', error);
+    logger.error({ err: error }, 'Error updating material');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -297,7 +298,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     res.json({ message: 'Material deleted successfully' });
   } catch (error) {
-    console.error('Error deleting material:', error);
+    logger.error({ err: error }, 'Error deleting material');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

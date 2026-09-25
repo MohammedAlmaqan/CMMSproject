@@ -4,6 +4,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorize, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { userUpdateSchema, validate } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get('/', authorize('Administrator'), async (_req: Request, res: Response)
 
     res.json(users);
   } catch (error) {
-    console.error('Error fetching users:', error);
+    logger.error({ err: error }, 'Error fetching users');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -40,7 +41,7 @@ router.get('/options', authorizeMinRole('Requester'), async (_req: Request, res:
 
     res.json(users);
   } catch (error) {
-    console.error('Error fetching user options:', error);
+    logger.error({ err: error }, 'Error fetching user options');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -63,7 +64,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(user);
   } catch (error) {
-    console.error('Error fetching user:', error);
+    logger.error({ err: error }, 'Error fetching user');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -105,7 +106,7 @@ router.put('/:id', authorize('Administrator'), validate(userUpdateSchema), async
 
     res.json(user);
   } catch (error) {
-    console.error('Error updating user:', error);
+    logger.error({ err: error }, 'Error updating user');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -163,7 +164,7 @@ router.put('/:id/password', async (req: Request, res: Response) => {
 
     res.json({ message: 'Password updated successfully' });
   } catch (error) {
-    console.error('Error changing password:', error);
+    logger.error({ err: error }, 'Error changing password');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

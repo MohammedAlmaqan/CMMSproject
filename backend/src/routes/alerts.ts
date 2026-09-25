@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -16,7 +17,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(alerts);
   } catch (error) {
-    console.error('Error fetching alerts:', error);
+    logger.error({ err: error }, 'Error fetching alerts');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -29,7 +30,7 @@ router.get('/unread-count', async (req: Request, res: Response) => {
 
     res.json({ count });
   } catch (error) {
-    console.error('Error fetching unread alert count:', error);
+    logger.error({ err: error }, 'Error fetching unread alert count');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -49,7 +50,7 @@ router.put('/read-all', authorizeMinRole('Requester'), async (req: Request, res:
 
     res.json({ message: 'All alerts marked as read' });
   } catch (error) {
-    console.error('Error marking all alerts as read:', error);
+    logger.error({ err: error }, 'Error marking all alerts as read');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -77,7 +78,7 @@ router.put('/:id/read', authorizeMinRole('Requester'), async (req: Request, res:
 
     res.json(alert);
   } catch (error) {
-    console.error('Error marking alert as read:', error);
+    logger.error({ err: error }, 'Error marking alert as read');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

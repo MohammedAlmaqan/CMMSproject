@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -79,7 +80,7 @@ router.get('/kpis', async (_req: Request, res: Response) => {
       pmCompliance,
     });
   } catch (error) {
-    console.error('Error fetching dashboard KPIs:', error);
+    logger.error({ err: error }, 'Error fetching dashboard KPIs');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -94,7 +95,7 @@ router.get('/alerts', async (req: Request, res: Response) => {
 
     res.json(alerts);
   } catch (error) {
-    console.error('Error fetching dashboard alerts:', error);
+    logger.error({ err: error }, 'Error fetching dashboard alerts');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -134,7 +135,7 @@ router.get('/cost-summary', async (_req: Request, res: Response) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error fetching dashboard cost summary:', error);
+    logger.error({ err: error }, 'Error fetching dashboard cost summary');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

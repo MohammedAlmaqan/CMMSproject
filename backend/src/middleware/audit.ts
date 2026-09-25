@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { prisma } from '../utils/prisma.js';
+import { logger } from '../utils/logger.js';
 
 export interface AuditEntry {
   tableName: string;
@@ -33,7 +34,7 @@ export async function logAudit(
       },
     });
   } catch (error) {
-    console.error('Audit log error:', error);
+    logger.error({ err: error }, 'Audit log error');
   }
 }
 

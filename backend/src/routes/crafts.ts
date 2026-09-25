@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
     res.json(crafts);
   } catch (error) {
-    console.error('Error fetching crafts:', error);
+    logger.error({ err: error }, 'Error fetching crafts');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

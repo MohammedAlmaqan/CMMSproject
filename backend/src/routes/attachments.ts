@@ -8,6 +8,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { validate, attachmentCreateSchema } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -70,7 +71,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(attachments);
   } catch (error) {
-    console.error('Error fetching attachments:', error);
+    logger.error({ err: error }, 'Error fetching attachments');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -114,7 +115,7 @@ router.post('/', authorizeMinRole('Requester'), uploadFile, validate(attachmentC
 
     res.status(201).json(attachment);
   } catch (error) {
-    console.error('Error uploading attachment:', error);
+    logger.error({ err: error }, 'Error uploading attachment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -135,7 +136,7 @@ router.get('/:id/download', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', attachment.mimeType);
     res.download(fullPath, attachment.originalName);
   } catch (error) {
-    console.error('Error downloading attachment:', error);
+    logger.error({ err: error }, 'Error downloading attachment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -164,7 +165,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     res.json({ message: 'Attachment deleted successfully' });
   } catch (error) {
-    console.error('Error deleting attachment:', error);
+    logger.error({ err: error }, 'Error deleting attachment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

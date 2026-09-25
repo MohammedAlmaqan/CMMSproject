@@ -4,6 +4,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { validate, operationCreateSchema, operationUpdateSchema } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(operations);
   } catch (error) {
-    console.error('Error fetching operations:', error);
+    logger.error({ err: error }, 'Error fetching operations');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -63,7 +64,7 @@ router.post('/', authorizeMinRole('Technician'), validate(operationCreateSchema)
 
     res.status(201).json(operation);
   } catch (error) {
-    console.error('Error creating operation:', error);
+    logger.error({ err: error }, 'Error creating operation');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -104,7 +105,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(operationUpdateSchem
 
     res.json(operation);
   } catch (error) {
-    console.error('Error updating operation:', error);
+    logger.error({ err: error }, 'Error updating operation');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -141,7 +142,7 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
 
     res.json({ message: 'Operation deleted successfully' });
   } catch (error) {
-    console.error('Error deleting operation:', error);
+    logger.error({ err: error }, 'Error deleting operation');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

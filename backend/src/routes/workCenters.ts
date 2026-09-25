@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { workCenterCreateSchema, workCenterUpdateSchema, validate } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
     res.json(workCenters);
   } catch (error) {
-    console.error('Error fetching work centers:', error);
+    logger.error({ err: error }, 'Error fetching work centers');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -47,7 +48,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(workCenter);
   } catch (error) {
-    console.error('Error fetching work center:', error);
+    logger.error({ err: error }, 'Error fetching work center');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -79,7 +80,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workCenterCreateSchema)
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Work center code already exists' });
     }
-    console.error('Error creating work center:', error);
+    logger.error({ err: error }, 'Error creating work center');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -118,7 +119,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workCenterUpdateSchem
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Work center code already exists' });
     }
-    console.error('Error updating work center:', error);
+    logger.error({ err: error }, 'Error updating work center');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -148,7 +149,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     res.json({ message: 'Work center deleted successfully' });
   } catch (error) {
-    console.error('Error deleting work center:', error);
+    logger.error({ err: error }, 'Error deleting work center');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

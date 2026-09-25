@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import os from 'os';
 import { prisma } from '../utils/prisma.js';
 import { generateWoNumber } from '../utils/sequence.js';
+import { logger } from '../utils/logger.js';
 
 export interface SchedulerRunResult {
   ranAt: string;
@@ -28,7 +29,7 @@ export async function acquireStartupLock(): Promise<boolean> {
   });
 
   if (foreign) {
-    console.log(`[scheduler] disabled — lock held by ${foreign.pid}@${foreign.hostname}`);
+    logger.info(`[scheduler] disabled — lock held by ${foreign.pid}@${foreign.hostname}`);
     return false;
   }
 
@@ -42,7 +43,7 @@ export async function acquireStartupLock(): Promise<boolean> {
     },
   });
   currentRunRecordId = record.schedulerRunId;
-  console.log(`[scheduler] startup lock acquired (${pid}@${hostname}, run ${record.schedulerRunId})`);
+  logger.info(`[scheduler] startup lock acquired (${pid}@${hostname}, run ${record.schedulerRunId})`);
   return true;
 }
 
@@ -106,7 +107,7 @@ export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
     },
   });
   if (deferred > 0) {
-    console.log(`[scheduler] ${deferred} meter-strategy plans deferred (meter strategy not yet implemented)`);
+    logger.info(`[scheduler] ${deferred} meter-strategy plans deferred (meter strategy not yet implemented)`);
   }
 
   const plans = await prisma.maintenancePlan.findMany({
@@ -187,23 +188,23 @@ export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
         result.wosCreated += 1;
       } catch (err: any) {
         if (err && err.code === 'P2002') {
-          console.log(`[scheduler] ${plan.planCode} cycle ${cycleKey} skipped (idempotent)`);
+          logger.info(`[scheduler] ${plan.planCode} cycle ${cycleKey} skipped (idempotent)`);
           result.wosSkipped += 1;
         } else {
           result.errors.push(`${plan.planCode}: ${err?.message ?? String(err)}`);
-          console.error(`[scheduler] plan ${plan.planCode} failed:`, err);
+          logger.error({ err }, `[scheduler] plan ${plan.planCode} failed`);
         }
       }
     } catch (err: any) {
       result.errors.push(`${plan.planCode}: ${err?.message ?? String(err)}`);
-      console.error(`[scheduler] plan ${plan.planCode} threw:`, err);
+      logger.error({ err }, `[scheduler] plan ${plan.planCode} threw`);
     }
     }
     await new Promise((r) => setImmediate(r));
-    console.log(`[scheduler] batch ${b + 1}/${batches.length} complete`);
+    logger.info(`[scheduler] batch ${b + 1}/${batches.length} complete`);
   }
 
-  console.log(
+  logger.info(
     `[scheduler] run complete: plansEvaluated=${result.plansEvaluated} wosCreated=${result.wosCreated} wosSkipped=${result.wosSkipped} errors=${result.errors.length}`
   );
 
@@ -226,11 +227,11 @@ export function startScheduler(): void {
   scheduledTask = cron.schedule(cronExpr, () => {
     runSchedulerOnce()
       .then((res) => {
-        console.log(`[scheduler] cron run: ${JSON.stringify(res)}`);
+        logger.info(`[scheduler] cron run: ${JSON.stringify(res)}`);
       })
       .catch((err) => {
-        console.error('[scheduler] cron run failed', err);
+        logger.error({ err }, '[scheduler] cron run failed');
       });
   });
-  console.log(`[scheduler] started cron="${cronExpr}"`);
+  logger.info(`[scheduler] started cron="${cronExpr}"`);
 }

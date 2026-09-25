@@ -4,6 +4,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { validate, laborCreateSchema, laborUpdateSchema } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -34,7 +35,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(laborEntries);
   } catch (error) {
-    console.error('Error fetching labor entries:', error);
+    logger.error({ err: error }, 'Error fetching labor entries');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -77,7 +78,7 @@ router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), as
 
     res.status(201).json(entry);
   } catch (error) {
-    console.error('Error creating labor entry:', error);
+    logger.error({ err: error }, 'Error creating labor entry');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -117,7 +118,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(laborUpdateSchema), 
 
     res.json(entry);
   } catch (error) {
-    console.error('Error updating labor entry:', error);
+    logger.error({ err: error }, 'Error updating labor entry');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -148,7 +149,7 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
 
     res.json({ message: 'Labor entry deleted successfully' });
   } catch (error) {
-    console.error('Error deleting labor entry:', error);
+    logger.error({ err: error }, 'Error deleting labor entry');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

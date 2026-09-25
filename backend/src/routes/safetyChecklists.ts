@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
+import { logger } from '../utils/logger.js';
 import {
   validate,
   checklistTemplateCreateSchema,
@@ -24,7 +25,7 @@ router.get('/templates', async (_req: Request, res: Response) => {
 
     res.json(templates);
   } catch (error) {
-    console.error('Error fetching checklist templates:', error);
+    logger.error({ err: error }, 'Error fetching checklist templates');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -58,7 +59,7 @@ router.post('/templates', authorizeMinRole('Maintenance Planner'), validate(chec
 
     res.status(201).json(template);
   } catch (error) {
-    console.error('Error creating checklist template:', error);
+    logger.error({ err: error }, 'Error creating checklist template');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -77,7 +78,7 @@ router.get('/work-order/:woId', async (req: Request, res: Response) => {
 
     res.json(checklists);
   } catch (error) {
-    console.error('Error fetching work order checklists:', error);
+    logger.error({ err: error }, 'Error fetching work order checklists');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -123,7 +124,7 @@ router.post('/work-order/:woId/attach', authorizeMinRole('Technician'), validate
 
     res.status(201).json(checklist);
   } catch (error) {
-    console.error('Error attaching checklist to work order:', error);
+    logger.error({ err: error }, 'Error attaching checklist to work order');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -168,7 +169,7 @@ router.put('/work-order-checklist/:id', authorizeMinRole('Technician'), validate
 
     res.json(checklist);
   } catch (error) {
-    console.error('Error updating work order checklist:', error);
+    logger.error({ err: error }, 'Error updating work order checklist');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -201,7 +202,7 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
 
     res.json(item);
   } catch (error) {
-    console.error('Error updating checklist item:', error);
+    logger.error({ err: error }, 'Error updating checklist item');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -234,7 +235,7 @@ router.delete('/work-order-checklist/:id', authorizeMinRole('Technician'), async
 
     res.json({ message: 'Work order checklist deleted successfully' });
   } catch (error) {
-    console.error('Error deleting work order checklist:', error);
+    logger.error({ err: error }, 'Error deleting work order checklist');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, equipmentMeterCreateSchema, equipmentMeterUpdateSchema, meterReadingCreateSchema } from '../utils/validation.js';
 import { logAudit } from '../middleware/audit.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -29,7 +30,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(meters);
   } catch (error) {
-    console.error('Error fetching meters:', error);
+    logger.error({ err: error }, 'Error fetching meters');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -55,7 +56,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(meter);
   } catch (error) {
-    console.error('Error fetching meter:', error);
+    logger.error({ err: error }, 'Error fetching meter');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -87,7 +88,7 @@ router.post('/', authorizeMinRole('Technician'), validate(equipmentMeterCreateSc
     if (error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced equipment not found' });
     }
-    console.error('Error creating meter:', error);
+    logger.error({ err: error }, 'Error creating meter');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -126,7 +127,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(equipmentMeterUpdate
     if (error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced equipment not found' });
     }
-    console.error('Error updating meter:', error);
+    logger.error({ err: error }, 'Error updating meter');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -170,7 +171,7 @@ router.post('/:id/readings', authorizeMinRole('Technician'), validate(meterReadi
 
     res.status(201).json(reading);
   } catch (error) {
-    console.error('Error adding meter reading:', error);
+    logger.error({ err: error }, 'Error adding meter reading');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -200,7 +201,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     res.json({ message: 'Meter deleted successfully' });
   } catch (error) {
-    console.error('Error deleting meter:', error);
+    logger.error({ err: error }, 'Error deleting meter');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { validate, commentCreateSchema } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(comments);
   } catch (error) {
-    console.error('Error fetching comments:', error);
+    logger.error({ err: error }, 'Error fetching comments');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -50,7 +51,7 @@ router.post('/', authorizeMinRole('Requester'), validate(commentCreateSchema), a
 
     res.status(201).json(comment);
   } catch (error) {
-    console.error('Error creating comment:', error);
+    logger.error({ err: error }, 'Error creating comment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -82,7 +83,7 @@ router.delete('/:id', authorizeMinRole('Requester'), async (req: Request, res: R
 
     res.json({ message: 'Comment deleted successfully' });
   } catch (error) {
-    console.error('Error deleting comment:', error);
+    logger.error({ err: error }, 'Error deleting comment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

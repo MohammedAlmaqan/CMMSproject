@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { generateNotifNumber, generateWoNumber } from '../utils/sequence.js';
+import { logger } from '../utils/logger.js';
 import {
   validate,
   notificationCreateSchema,
@@ -49,7 +50,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json({ data: notifications, total, skip: skipNum, take: takeNum });
   } catch (error) {
-    console.error('Error fetching notifications:', error);
+    logger.error({ err: error }, 'Error fetching notifications');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -83,7 +84,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json({ ...notification, comments });
   } catch (error) {
-    console.error('Error fetching notification:', error);
+    logger.error({ err: error }, 'Error fetching notification');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -124,7 +125,7 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Notification number already exists' });
     }
-    console.error('Error creating notification:', error);
+    logger.error({ err: error }, 'Error creating notification');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -167,7 +168,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(notificationUpdateSch
 
     res.json(notification);
   } catch (error) {
-    console.error('Error updating notification:', error);
+    logger.error({ err: error }, 'Error updating notification');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -195,7 +196,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     res.json({ message: 'Notification deleted successfully' });
   } catch (error) {
-    console.error('Error deleting notification:', error);
+    logger.error({ err: error }, 'Error deleting notification');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -268,7 +269,7 @@ router.post('/:id/convert-to-wo', authorizeMinRole('Maintenance Planner'), valid
 
     res.status(201).json(workOrder);
   } catch (error) {
-    console.error('Error converting notification to work order:', error);
+    logger.error({ err: error }, 'Error converting notification to work order');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

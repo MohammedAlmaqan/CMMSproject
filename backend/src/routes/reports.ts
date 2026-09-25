@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -47,7 +48,7 @@ router.get('/backlog', async (_req: Request, res: Response) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error generating backlog report:', error);
+    logger.error({ err: error }, 'Error generating backlog report');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -88,7 +89,7 @@ router.get('/pm-compliance', async (req: Request, res: Response) => {
       complianceRate: Math.round(complianceRate * 100) / 100,
     });
   } catch (error) {
-    console.error('Error generating PM compliance report:', error);
+    logger.error({ err: error }, 'Error generating PM compliance report');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -147,7 +148,7 @@ router.get('/mtbf', async (_req: Request, res: Response) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error generating MTBF report:', error);
+    logger.error({ err: error }, 'Error generating MTBF report');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -194,7 +195,7 @@ router.get('/mttr', async (_req: Request, res: Response) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error generating MTTR report:', error);
+    logger.error({ err: error }, 'Error generating MTTR report');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -229,7 +230,7 @@ router.get('/cost-summary', async (_req: Request, res: Response) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error generating cost summary:', error);
+    logger.error({ err: error }, 'Error generating cost summary');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -273,7 +274,7 @@ router.get('/downtime', async (_req: Request, res: Response) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error generating downtime report:', error);
+    logger.error({ err: error }, 'Error generating downtime report');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -313,7 +314,7 @@ router.get('/material-consumption', async (_req: Request, res: Response) => {
 
     res.json(result);
   } catch (error) {
-    console.error('Error generating material consumption report:', error);
+    logger.error({ err: error }, 'Error generating material consumption report');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

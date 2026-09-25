@@ -4,6 +4,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { validate, woMaterialCreateSchema, woMaterialUpdateSchema } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(materials);
   } catch (error) {
-    console.error('Error fetching work order materials:', error);
+    logger.error({ err: error }, 'Error fetching work order materials');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -58,7 +59,7 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
 
     res.status(201).json(material);
   } catch (error) {
-    console.error('Error creating work order material:', error);
+    logger.error({ err: error }, 'Error creating work order material');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -95,7 +96,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
 
     res.json(material);
   } catch (error) {
-    console.error('Error updating work order material:', error);
+    logger.error({ err: error }, 'Error updating work order material');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -127,7 +128,7 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
 
     res.json({ message: 'Work order material deleted successfully' });
   } catch (error) {
-    console.error('Error deleting work order material:', error);
+    logger.error({ err: error }, 'Error deleting work order material');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

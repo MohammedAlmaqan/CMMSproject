@@ -292,14 +292,53 @@ pm2 restart cmms-api
 
 ### Logs
 
+The API logs structured JSON. Every access line carries the HTTP method, full path, response status, duration in milliseconds, and the acting `userId` when the request was authenticated:
+
+```json
+{"level":30,"time":"2026-09-25T15:52:06.797Z","service":"cmms-api","req":{"method":"GET","path":"/api/failure-codes"},"userId":"7b1fcaa3-76e5-4489-850a-5f7f9fd2b081","res":{"status":200},"responseTime":14,"msg":"GET /api/failure-codes 200"}
+```
+
+Levels are `info` (30) for 2xx, `warn` (40) for 4xx, and `error` (50) for 5xx. Application code uses the shared `backend\src\utils\logger.ts` instance instead of `console.*`, so the whole stream is machine-parseable. Set `LOG_LEVEL` to `debug` or `trace` for more detail; it defaults to `info` and an unrecognised value falls back to `info` rather than failing to boot. Authorization headers, cookies, and password fields are redacted before a line is written, and query strings are dropped from the logged path, so tokens must never be passed in a URL.
+
 ```cmd
-REM PM2 logs
+REM Stream logs
 pm2 logs cmms-api
 
 REM Application logs are in:
-CMMSproject\backend\logs\error.log
-CMMSproject\backend\logs\out.log
+CMMSproject\backend\logs\api-out.log
+CMMSproject\backend\logs\api-err.log
 ```
+
+`ecosystem.config.cjs` sets `merge_logs: true`, so PM2 keeps one combined stream; `api-err.log` only receives entries PM2 itself routes to stderr (for example, crashes before the logger is ready).
+
+### Log Rotation (pm2-logrotate)
+
+PM2 writes to disk forever unless rotation is configured, so install `pm2-logrotate` once per host and keep it running alongside PM2:
+
+```cmd
+cd C:\CMMSproject\backend
+npm install -g pm2-logrotate
+pm2 install pm2-logrotate
+```
+
+Configure it to rotate daily, retain 14 generations, cap each file at 10 MB, and gzip archives:
+
+```cmd
+pm2 set pm2-logrotate:rotationInterval daily
+pm2 set pm2-logrotate:max_size 10M
+pm2 set pm2-logrotate:retain 14
+pm2 set pm2-logrotate:compress true
+pm2 set pm2-logrotate:dateFormat YYYY-MM-DD_HH-mm
+```
+
+The retained archives land next to the live file as `api-out.log.YYYY-MM-DD_HH-mm.gz` and are pruned to the newest 14. Confirm the module is attached and check the schedule with:
+
+```cmd
+pm2 list
+pm2 conf pm2-logrotate:retain
+```
+
+Rotate on size as well as on schedule, since a burst of traffic can exceed 10 MB inside a single day. `pm2 set pm2-logrotate:max_size 10M` is evaluated continuously by the module, so the daily interval and the size cap apply together.
 
 ---
 

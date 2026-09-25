@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, functionalLocationCreateSchema, functionalLocationUpdateSchema } from '../utils/validation.js';
 import { logAudit } from '../middleware/audit.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(locations);
   } catch (error) {
-    console.error('Error fetching functional locations:', error);
+    logger.error({ err: error }, 'Error fetching functional locations');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -62,7 +63,7 @@ router.get('/tree', async (_req: Request, res: Response) => {
     const tree = buildTree(locations);
     res.json(tree);
   } catch (error) {
-    console.error('Error fetching location tree:', error);
+    logger.error({ err: error }, 'Error fetching location tree');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -84,7 +85,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(location);
   } catch (error) {
-    console.error('Error fetching functional location:', error);
+    logger.error({ err: error }, 'Error fetching functional location');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -131,7 +132,7 @@ router.post('/', authorizeMinRole('Technician'), validate(functionalLocationCrea
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Location code already exists' });
     }
-    console.error('Error creating functional location:', error);
+    logger.error({ err: error }, 'Error creating functional location');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -173,7 +174,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(functionalLocationUp
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Location code already exists' });
     }
-    console.error('Error updating functional location:', error);
+    logger.error({ err: error }, 'Error updating functional location');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -203,7 +204,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     res.json({ message: 'Functional location deleted successfully' });
   } catch (error) {
-    console.error('Error deleting functional location:', error);
+    logger.error({ err: error }, 'Error deleting functional location');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

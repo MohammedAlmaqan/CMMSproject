@@ -4,6 +4,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber } from '../utils/sequence.js';
+import { logger } from '../utils/logger.js';
 import {
   validate,
   workOrderCreateSchema,
@@ -124,7 +125,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json({ data: workOrders, total, skip: skipNum, take: takeNum });
   } catch (error) {
-    console.error('Error fetching work orders:', error);
+    logger.error({ err: error }, 'Error fetching work orders');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -194,7 +195,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json({ ...workOrder, comments });
   } catch (error) {
-    console.error('Error fetching work order:', error);
+    logger.error({ err: error }, 'Error fetching work order');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -294,7 +295,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Work order number already exists' });
     }
-    console.error('Error creating work order:', error);
+    logger.error({ err: error }, 'Error creating work order');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -382,7 +383,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
 
     res.json(await prisma.workOrder.findUnique({ where: { workOrderId: id } }));
   } catch (error) {
-    console.error('Error updating work order:', error);
+    logger.error({ err: error }, 'Error updating work order');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -440,7 +441,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     res.json({ message: 'Work order deleted successfully' });
   } catch (error) {
-    console.error('Error deleting work order:', error);
+    logger.error({ err: error }, 'Error deleting work order');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -529,7 +530,7 @@ router.put('/:id/status', authorizeMinRole('Technician'), validate(workOrderStat
 
     res.json(updated);
   } catch (error) {
-    console.error('Error updating work order status:', error);
+    logger.error({ err: error }, 'Error updating work order status');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

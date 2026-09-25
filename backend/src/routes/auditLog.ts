@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -39,7 +40,7 @@ router.get('/', authorizeMinRole('Administrator'), async (req: Request, res: Res
 
     res.json({ data: entries, total, skip: skipNum, take: takeNum });
   } catch (error) {
-    console.error('Error fetching audit log:', error);
+    logger.error({ err: error }, 'Error fetching audit log');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

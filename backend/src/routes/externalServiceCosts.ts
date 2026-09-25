@@ -4,6 +4,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { validate, externalServiceCreateSchema, externalServiceUpdateSchema } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(services);
   } catch (error) {
-    console.error('Error fetching external services:', error);
+    logger.error({ err: error }, 'Error fetching external services');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -51,7 +52,7 @@ router.post('/', authorizeMinRole('Technician'), validate(externalServiceCreateS
 
     res.status(201).json(service);
   } catch (error) {
-    console.error('Error creating external service:', error);
+    logger.error({ err: error }, 'Error creating external service');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -88,7 +89,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdat
 
     res.json(service);
   } catch (error) {
-    console.error('Error updating external service:', error);
+    logger.error({ err: error }, 'Error updating external service');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -119,7 +120,7 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
 
     res.json({ message: 'External service deleted successfully' });
   } catch (error) {
-    console.error('Error deleting external service:', error);
+    logger.error({ err: error }, 'Error deleting external service');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -5,6 +5,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, equipmentCreateSchema, equipmentUpdateSchema, equipmentImportRowSchema } from '../utils/validation.js';
 import { logAudit } from '../middleware/audit.js';
 import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -65,7 +66,7 @@ router.get('/export.csv', async (req: Request, res: Response) => {
     res.setHeader('Content-Disposition', `attachment; filename="equipment-${date}.csv"`);
     res.send(toCsv(rows));
   } catch (error) {
-    console.error('Error exporting equipment:', error);
+    logger.error({ err: error }, 'Error exporting equipment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -197,7 +198,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
     if (error instanceof CsvRowError) {
       return res.status(400).json({ error: `Row ${error.row}: ${error.reason}` });
     }
-    console.error('Error importing equipment:', error);
+    logger.error({ err: error }, 'Error importing equipment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -238,7 +239,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(equipment);
   } catch (error) {
-    console.error('Error fetching equipment:', error);
+    logger.error({ err: error }, 'Error fetching equipment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -274,7 +275,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(equipment);
   } catch (error) {
-    console.error('Error fetching equipment:', error);
+    logger.error({ err: error }, 'Error fetching equipment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -323,7 +324,7 @@ router.post('/', authorizeMinRole('Technician'), validate(equipmentCreateSchema)
     if (error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced functional location not found' });
     }
-    console.error('Error creating equipment:', error);
+    logger.error({ err: error }, 'Error creating equipment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -379,7 +380,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(equipmentUpdateSchem
     if (error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced functional location not found' });
     }
-    console.error('Error updating equipment:', error);
+    logger.error({ err: error }, 'Error updating equipment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -409,7 +410,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     res.json({ message: 'Equipment deleted successfully' });
   } catch (error) {
-    console.error('Error deleting equipment:', error);
+    logger.error({ err: error }, 'Error deleting equipment');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
