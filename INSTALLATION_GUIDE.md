@@ -375,7 +375,7 @@ set K6_MODE=1
 node --env-file=.env dist\index.js
 ```
 
-The override activates only when `K6_MODE` is exactly `1`; unset (or any other value) keeps the production limit of 20. **Never set `K6_MODE` on a production host** — it weakens brute-force protection that the account lockout depends on. Remove it with `set K6_MODE=` when finished.
+The override requires `NODE_ENV !== 'production'`; setting `K6_MODE=1` on a production host has no effect. It activates only when `K6_MODE` is exactly `1` **and** `NODE_ENV` is not `production`; on a production host the limit stays at 20 regardless. **Never set `K6_MODE` on a production host** — it weakens brute-force protection that the account lockout depends on. Remove it with `set K6_MODE=` when finished.
 
 ### Run the smoke test
 
