@@ -1,4 +1,4 @@
-import { getAuthToken, ApiError } from '@/lib/api';
+import { getAuthToken, ApiError, notifyApiActivity } from '@/lib/api';
 import type { Attachment } from '@/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -12,6 +12,7 @@ export const attachmentService = {
         const body = await res.json().catch(() => ({ error: res.statusText }));
         throw new ApiError(res.status, body.error || res.statusText);
       }
+      notifyApiActivity();
       return res.json() as Promise<Attachment[]>;
     }),
 
@@ -29,6 +30,7 @@ export const attachmentService = {
         const body = await res.json().catch(() => ({ error: res.statusText }));
         throw new ApiError(res.status, body.error || res.statusText);
       }
+      notifyApiActivity();
       return res.json() as Promise<Attachment>;
     });
   },
@@ -41,6 +43,7 @@ export const attachmentService = {
       const body = await res.json().catch(() => ({ error: res.statusText }));
       throw new ApiError(res.status, body.error || res.statusText);
     }
+    notifyApiActivity();
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -61,6 +64,7 @@ export const attachmentService = {
         const body = await res.json().catch(() => ({ error: res.statusText }));
         throw new ApiError(res.status, body.error || res.statusText);
       }
+      notifyApiActivity();
       return res.json();
     }),
 };

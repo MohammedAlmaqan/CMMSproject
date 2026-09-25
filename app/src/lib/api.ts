@@ -1,6 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 let authToken: string | null = localStorage.getItem('cmms-api-token');
+let apiActivityHandler: (() => void) | null = null;
 
 export function setAuthToken(token: string | null) {
   authToken = token;
@@ -13,6 +14,19 @@ export function setAuthToken(token: string | null) {
 
 export function getAuthToken() {
   return authToken;
+}
+
+export function registerApiActivityHandler(handler: () => void) {
+  apiActivityHandler = handler;
+  return () => {
+    if (apiActivityHandler === handler) {
+      apiActivityHandler = null;
+    }
+  };
+}
+
+export function notifyApiActivity() {
+  apiActivityHandler?.();
 }
 
 export class ApiError extends Error {
@@ -57,8 +71,13 @@ async function request<T>(
     throw new ApiError(res.status, body.error || res.statusText);
   }
 
-  if (res.status === 204) return {} as T;
-  return res.json();
+  if (res.status === 204) {
+    notifyApiActivity();
+    return {} as T;
+  }
+  const data = await res.json();
+  notifyApiActivity();
+  return data;
 }
 
 export const api = {

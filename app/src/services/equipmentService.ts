@@ -1,4 +1,4 @@
-import { api, getAuthToken, ApiError } from '@/lib/api';
+import { api, getAuthToken, ApiError, notifyApiActivity } from '@/lib/api';
 import type { Equipment } from '@/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -25,6 +25,7 @@ export const equipmentService = {
       const body = await res.json().catch(() => ({ error: res.statusText }));
       throw new ApiError(res.status, body.error || res.statusText);
     }
+    notifyApiActivity();
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -48,6 +49,7 @@ export const equipmentService = {
         const body = await res.json().catch(() => ({ error: res.statusText }));
         throw new ApiError(res.status, body.error || res.statusText);
       }
+      notifyApiActivity();
       return res.json() as Promise<CsvImportResult>;
     });
   },
