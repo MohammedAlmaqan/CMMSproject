@@ -126,6 +126,35 @@ serve dist -l 3000
 
 IIS terminates TLS and forwards plaintext to the Express API on loopback. The API never handles TLS itself, so no certificate configuration belongs in `backend\`.
 
+**Bind the API to loopback first.** The API sets `trust proxy = 1`, which makes it trust one hop of `X-Forwarded-For`. That is correct behind a proxy, but it also means any client that can reach port 4000 *directly* can forge that header and defeat the login rate limiter entirely. Binding to loopback removes the direct route. Before starting the API behind IIS, set this in `backend\.env`:
+
+```ini
+# Use 127.0.0.1 so port 4000 is not externally reachable. Leave the 0.0.0.0
+# default only for direct-access development.
+BIND_HOST=127.0.0.1
+```
+
+Restart the API after changing it and confirm the startup log records the bind address:
+
+```
+CMMS API server running on port 4000 (bound to 127.0.0.1)
+```
+
+> Leave `BIND_HOST=0.0.0.0` only for local development with no reverse proxy. It is the default in `.env.example` purely so a fresh dev checkout works without extra steps — it is **not** a safe production value.
+
+**Firewall rule (defense-in-depth)** — even bound to loopback, block inbound TCP 4000 from anywhere but the local host. Run PowerShell as Administrator, replacing the profile names with those in use on the host:
+
+```powershell
+New-NetFirewallRule -DisplayName "CMMS API 4000 loopback only" -Direction Inbound -Action Block -Protocol TCP -LocalPort 4000 -RemoteAddress 127.0.0.1,::1 -Profile Any
+New-NetFirewallRule -DisplayName "CMMS API 4000 block external" -Direction Inbound -Action Block -Protocol TCP -LocalPort 4000 -RemoteAddress Any -Profile Any
+```
+
+The second rule is the important one: it denies inbound 4000 from every non-loopback address, so the port stays unreachable even if `BIND_HOST` is later mis-set or IIS is removed. Verify the effective state with:
+
+```powershell
+Get-NetFirewallRule -DisplayName "CMMS API 4000*" | Get-NetFirewallPortFilter
+```
+
 **Prerequisites** — install both features (Server Manager > Add Features):
 
 | Feature | Purpose |

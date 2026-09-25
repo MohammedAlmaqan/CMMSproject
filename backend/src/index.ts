@@ -36,6 +36,13 @@ import { logger } from './utils/logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+// `trust proxy = 1` means the API trusts one hop of X-Forwarded-For, so a client
+// able to reach port 4000 directly can spoof its source IP and defeat the login
+// rate limiter. Binding to loopback removes that route entirely. The default stays
+// 0.0.0.0 for direct-access dev; deployments behind a reverse proxy MUST set
+// BIND_HOST=127.0.0.1 in backend/.env. See INSTALLATION_GUIDE.md and the Windows
+// Firewall rule documented there.
+const BIND_HOST = process.env.BIND_HOST ?? '0.0.0.0';
 
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
@@ -223,8 +230,8 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // The scheduler startup wiring and the HTTP listener are skipped under tests so
 // supertest can import `app` without binding :4000 or taking the scheduler lock.
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    logger.info(`CMMS API server running on port ${PORT}`);
+  app.listen(Number(PORT), BIND_HOST, () => {
+    logger.info(`CMMS API server running on port ${PORT} (bound to ${BIND_HOST})`);
     logger.info(`API docs: http://localhost:${PORT}/api-docs`);
     setImmediate(async () => {
       try {
