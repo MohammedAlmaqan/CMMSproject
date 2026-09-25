@@ -41,9 +41,15 @@ const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
   : ['http://localhost:3000'];
 
+// A load test signs in once per VU from a single source IP, which the 20/15min
+// production limit would reject. The higher ceiling applies ONLY when K6_MODE is
+// explicitly set to '1'. It is never the default and must not be set on a
+// production host; without the variable the limit stays at 20.
+const LOGIN_LIMIT = process.env.K6_MODE === '1' ? 200 : 20;
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: LOGIN_LIMIT,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' },

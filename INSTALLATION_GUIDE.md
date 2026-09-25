@@ -342,7 +342,59 @@ Rotate on size as well as on schedule, since a burst of traffic can exceed 10 MB
 
 ---
 
-## 7. Troubleshooting
+## 7. Load Testing (k6)
+
+### Install the k6 portable binary
+
+k6 is not required on the server. Download the portable Windows archive, extract the single executable into `scripts\k6\`, and invoke it by path. **Do not add it to `PATH`** and do not run the installer.
+
+| Item | Value |
+|------|-------|
+| Download URL (k6 v2.3.0) | `https://github.com/grafana/k6/releases/download/v2.3.0/k6-v2.3.0-windows-amd64.zip` |
+| Extracted binary | `scripts\k6\k6.exe` |
+| Latest release index | `https://github.com/grafana/k6/releases/latest` |
+
+```powershell
+cd C:\CMMSproject
+Invoke-WebRequest -Uri "https://github.com/grafana/k6/releases/download/v2.3.0/k6-v2.3.0-windows-amd64.zip" -OutFile "$env:TEMP\k6.zip"
+Expand-Archive -LiteralPath "$env:TEMP\k6.zip" -DestinationPath "scripts\k6" -Force
+Move-Item "scripts\k6\k6-v2.3.0-windows-amd64\k6.exe" "scripts\k6\k6.exe" -Force
+Remove-Item "scripts\k6\k6-v2.3.0-windows-amd64" -Recurse -Force
+scripts\k6\k6.exe version
+```
+
+`k6.exe` is about 67 MB and is deliberately listed in `.gitignore`; only `scripts\k6\smoke.js` is version-controlled.
+
+### K6_MODE login rate-limit override
+
+The login endpoint allows 20 attempts per 15 minutes per source IP, which a 50-VU run would trip immediately. Setting `K6_MODE=1` raises that ceiling to 200 per 15 minutes:
+
+```cmd
+cd C:\CMMSproject\backend
+set K6_MODE=1
+node --env-file=.env dist\index.js
+```
+
+The override activates only when `K6_MODE` is exactly `1`; unset (or any other value) keeps the production limit of 20. **Never set `K6_MODE` on a production host** — it weakens brute-force protection that the account lockout depends on. Remove it with `set K6_MODE=` when finished.
+
+### Run the smoke test
+
+```cmd
+cd C:\CMMSproject
+scripts\k6\k6.exe run scripts\k6\smoke.js
+```
+
+The script drives 50 VUs through a 2-minute ramp, 5 minutes at steady state, and a 1-minute ramp-down, exercising login → `GET /api/work-orders?take=10` → `GET /api/work-orders/:id`. Each VU signs in once and then loops the read path; signing in on every iteration would exceed even the 200/15min ceiling. There is no server-side logout endpoint because access tokens are stateless JWTs, so the session ends client-side in `teardown()`. Override the target and credentials with `BASE_URL`, `CMMS_USER`, `CMMS_PASS`, and `THINK_TIME`.
+
+Thresholds that fail the run: `http_req_duration{scenario:steady}` p95 must stay under 2000 ms, and `http_req_failed` must stay under 1%.
+
+### Scope: this is not the SOW §4.1 capacity proof
+
+SOW §4.1 requires the system to support **200 concurrent users**. That requirement is **deferred to post-go-live** and is not demonstrated by this test. The 50-VU run is a smoke sanity check that the main authenticated read path stays healthy and responsive against a single local backend; it is not a capacity or saturation measurement, and its numbers must not be quoted as evidence for the 200-user clause. Closing the §4.1 gap requires a production-like environment and a separate capacity exercise.
+
+---
+
+## 8. Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
