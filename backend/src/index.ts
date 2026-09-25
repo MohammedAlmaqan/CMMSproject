@@ -56,6 +56,10 @@ const authLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 
+// Running behind the documented IIS reverse proxy. Without this, express-rate-limit
+// and req.ip collapse all traffic into the proxy IP and the login limiter becomes shared.
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({

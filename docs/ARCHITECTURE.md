@@ -128,6 +128,7 @@ Ordering is enforced by construction, not convention: `authenticate` is register
 | CORS | Comma-separated allow-list, default `http://localhost:3000` | `index.ts:40` |
 | Security headers | `helmet()` with **CSP disabled** | `index.ts:60` |
 | Login rate limit | 20 per 15 min per IP | `index.ts:48` |
+| Proxy trust | `trust proxy = 1` (one hop) — see caveat below | `index.ts:60` |
 | Account lockout | 5 failures in 15 min ⇒ 30 min lock + `Account_Lockout` alert | `routes/auth.ts` |
 | Audit trail | `logAudit` on mutating handlers | `middleware/audit.ts` |
 
@@ -157,7 +158,7 @@ Stating these plainly matters more than the table above:
 
 - **The idle timeout is client-side only.** A 30-minute idle timeout with a 60-second warning does exist and is wired into `AppLayout` (`app/src/hooks/useIdleTimeout.ts`, 3 passing tests), keyed on `mousemove`, `mousedown`, `keydown`, `scroll`, and `touchstart` plus API activity. On expiry it calls the client-side `logout()` store action and redirects to `/login`. **It invalidates nothing server-side.** There is no logout endpoint and no token revocation, so the JWT stays cryptographically valid for its full 8 hours; a client that discards its token does not stop anyone else from replaying a captured one. Treat this as a convenience logout, not a session control.
 - **No refresh tokens and no logout endpoint.** `auth.ts` exposes only `POST /login` and `GET /me`. A `RefreshToken` model exists in the schema and is unused. Because auth is stateless, a logout cannot invalidate an already-issued token; the 30-minute account lockout and the 8-hour expiry are the only server-side brakes.
-- **No `trust proxy`.** With the documented IIS proxy in front, `express-rate-limit` keys on the proxy's address rather than the real client, so the login limiter and lockout would degrade to a single shared bucket. This must be fixed — `app.set('trust proxy', 1)` — before the IIS path is put into service.
+- **No `trust proxy` hardening beyond `1`.** `app.set('trust proxy', 1)` is set so that `req.ip` and `express-rate-limit` see the real client behind IIS. The consequence must be understood: with exactly one hop trusted, a client that can reach the API **directly** and supply its own `X-Forwarded-For` fully bypasses the login rate limit. Measured on this host with the limiter active — direct requests with no header: 20 allowed then 429; the same 24 requests each carrying a distinct `X-Forwarded-For`: **24 allowed, 0 rejected.** This is safe only while ARR *overwrites* the header and the API is unreachable except through it. Never expose port 4000 directly, and confirm the ARR rewrite does not append to an inbound `X-Forwarded-For`.
 - **Content-Security-Policy is off** while `helmet()` is otherwise enabled.
 
 ## PM scheduler data flow
@@ -245,7 +246,7 @@ Names and purposes only. No values are reproduced here, and no `.env` file was r
 
 Two gaps in this table's own coverage:
 
-- `PM_SCHEDULER_CRON` is honoured by the code but **absent from `backend/.env.example`**, so it is effectively undocumented for operators.
+- `PM_SCHEDULER_CRON` is now present in `backend/.env.example`. Note that the unquoted value `0 2 * * *` is parsed correctly by Node's `--env-file`, but any tooling that treats spaces as value separators will mangle it; quote it if you introduce such a tool.
 - `SEED_DEMO` is not an API variable. `seed.ts` refuses to run without it and a non-production `NODE_ENV`, and exits 0 with a skip message otherwise. The supported entry point is `scripts\seed-demo.bat`.
 
 `backend/.env` is loaded by Node's own `--env-file` flag at launch; no `dotenv` dependency is present. Consequently the API reads no configuration file itself — omitting `--env-file` means the process starts with defaults and, for `JWT_SECRET`, fails fast rather than running insecurely.
