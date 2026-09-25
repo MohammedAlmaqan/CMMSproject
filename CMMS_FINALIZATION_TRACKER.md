@@ -276,7 +276,7 @@ Note (5.4 resolution ledger): (1) `verify_g4a.py` generate-wo + plan-delete now 
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 6.1 | GitHub Actions: install -> lint -> typecheck -> **backend tests** -> build | 🔶 | Run #1: backend green; frontend `Test` exits 1. Blocker evidence: https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36136074831 (logs require GitHub sign-in) | be52072 |
+| 6.1 | GitHub Actions: install -> lint -> typecheck -> **backend tests** -> build | ✅ | Run #2 green on Node 24: Backend + Frontend jobs successful. Evidence: https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36137610937 | be52072, 25107b0 |
 | 6.2 | Scheduled `pg_dump` backup + documented restore drill | ⬜ | Drill succeeds; RPO/RTO recorded |  |
 | 6.3 | **Security:** HTTPS/TLS, account lockout (5 failures), 30-min idle session timeout (SOW §4.2) | ⬜ | All three enforced and tested |  |
 | 6.4 | Structured logging + rotation under PM2 | ⬜ | Rotated logs on disk |  |
