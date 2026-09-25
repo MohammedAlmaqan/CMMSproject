@@ -36,6 +36,45 @@ const EQUIPMENT_CSV_COLUMNS = [
   'operationalStatus',
 ] as const;
 
+
+/**
+ * @openapi
+ * /api/equipment/export.csv:
+ *   get:
+ *     summary: Export the equipment register as CSV
+ *     description: >
+ *       Streams the full non-deleted equipment register as text/csv with a Content-Disposition
+ *       filename, suitable for Excel. Honours the same search, functionalLocationId,
+ *       criticality and equipmentClass filters as the JSON list endpoint. No role
+ *       restriction beyond authentication.
+ *     tags: [Equipment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive match on equipmentCode, name, description, manufacturer, model or serialNumber
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: criticality
+ *         schema: { type: string, enum: [A, B, C] }
+ *       - in: query
+ *         name: equipmentClass
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: CSV file
+ *         content:
+ *           text/csv:
+ *             schema: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/export.csv', async (req: Request, res: Response) => {
   try {
     const equipment = await prisma.equipment.findMany({
@@ -71,6 +110,45 @@ router.get('/export.csv', async (req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/equipment/import.csv:
+ *   post:
+ *     summary: Bulk import equipment from CSV
+ *     description: >
+ *       Multipart upload with a single `file` part. Requires the Maintenance Planner role.
+ *       Each row is validated by the zod schema `equipmentImportRowSchema` (see
+ *       utils/validation.ts). Valid rows are inserted and invalid rows are reported back per
+ *       line so a partial import is still usable. A duplicate equipmentCode returns HTTP 409
+ *       rather than failing the whole file.
+ *     tags: [Equipment]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Multipart form; each CSV row validated by zod `equipmentImportRowSchema`"
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       '200':
+ *         description: Import completed; per-row outcome reported
+ *       '400':
+ *         description: Malformed CSV, or every row failed validation
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '409':
+ *         description: One or more equipmentCode values already exist
+ *       '500':
+ *         description: Internal server error
+ */
 router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.single('file'), async (req: Request, res: Response) => {
   try {
     if (!req.file || !req.file.buffer) {
@@ -203,6 +281,116 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
   }
 });
 
+
+/**
+ * @openapi
+ * /api/equipment:
+ *   get:
+ *     summary: List equipment
+ *     description: >
+ *       Returns the non-deleted equipment register with its parent functional location.
+ *       All filters are optional and combine with AND. businessCodes are unique only among
+ *       live rows (partial unique index), so a soft-deleted code may be reused.
+ *     tags: [Equipment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive match on equipmentCode, name, description, manufacturer, model or serialNumber
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: criticality
+ *         schema: { type: string, enum: [A, B, C] }
+ *       - in: query
+ *         name: equipmentClass
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Array of equipment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   equipmentId: { type: string }
+ *                   equipmentCode: { type: string }
+ *                   name: { type: string }
+ *                   description: { type: string }
+ *                   manufacturer: { type: string }
+ *                   model: { type: string }
+ *                   serialNumber: { type: string }
+ *                   assetTag: { type: string }
+ *                   equipmentClass: { type: string }
+ *                   criticality: { type: string, enum: [A, B, C] }
+ *                   operationalStatus: { type: string, enum: [Active, Inactive, Decommissioned] }
+ *                   installationDate: { type: string, format: date-time, nullable: true }
+ *                   warrantyExpiryDate: { type: string, format: date-time, nullable: true }
+ *                   technicalParameters: { type: object, additionalProperties: true }
+ *                   functionalLocationId: { type: string }
+ *                   createdBy: { type: string }
+ *                   createdDate: { type: string, format: date-time }
+ *                   modifiedBy: { type: string }
+ *                   modifiedDate: { type: string, format: date-time }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ *   post:
+ *     summary: Create an equipment record
+ *     description: >
+ *       Validated by the zod schema `equipmentCreateSchema` (see utils/validation.ts).
+ *       Requires the Technician role. functionalLocationId is mandatory; a missing location
+ *       surfaces as Prisma P2003 and is translated to HTTP 400. A duplicate equipmentCode
+ *       returns HTTP 409. Writes an AuditLogEntry.
+ *     tags: [Equipment]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `equipmentCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [equipmentCode, name, functionalLocationId, criticality]
+ *             properties:
+ *               equipmentCode: { type: string }
+ *               name: { type: string }
+ *               description: { type: string, default: '' }
+ *               manufacturer: { type: string }
+ *               model: { type: string }
+ *               serialNumber: { type: string }
+ *               assetTag: { type: string }
+ *               equipmentClass: { type: string }
+ *               criticality: { type: string, enum: [A, B, C] }
+ *               operationalStatus: { type: string, enum: [Active, Inactive, Decommissioned] }
+ *               installationDate: { type: string, format: date-time, nullable: true }
+ *               warrantyExpiryDate: { type: string, format: date-time, nullable: true }
+ *               technicalParameters: { type: object, additionalProperties: { type: string } }
+ *               functionalLocationId: { type: string }
+ *     responses:
+ *       '201':
+ *         description: Equipment created
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or referenced location not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '409':
+ *         description: equipmentCode already exists among active rows
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const search = req.query.search as string | undefined;
@@ -244,6 +432,37 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/equipment/{id}:
+ *   get:
+ *     summary: Get one equipment record
+ *     description: >
+ *       Returns a single non-deleted equipment row with its functional location, meters and
+ *       bill of materials.
+ *     tags: [Equipment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Equipment equipmentId
+ *     responses:
+ *       '200':
+ *         description: Equipment detail
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '404':
+ *         description: Equipment not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const equipment = await prisma.equipment.findFirst({
@@ -329,6 +548,66 @@ router.post('/', authorizeMinRole('Technician'), validate(equipmentCreateSchema)
   }
 });
 
+
+/**
+ * @openapi
+ * /api/equipment/{id}:
+ *   put:
+ *     summary: Update an equipment record
+ *     description: >
+ *       Partial update - only fields present in the body are written. Validated by the zod
+ *       schema `equipmentUpdateSchema` (see utils/validation.ts). Requires the Technician
+ *       role. Writes an AuditLogEntry.
+ *     tags: [Equipment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Equipment equipmentId
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `equipmentUpdateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               equipmentCode: { type: string }
+ *               name: { type: string }
+ *               description: { type: string }
+ *               manufacturer: { type: string }
+ *               model: { type: string }
+ *               serialNumber: { type: string }
+ *               assetTag: { type: string }
+ *               equipmentClass: { type: string }
+ *               criticality: { type: string, enum: [A, B, C] }
+ *               operationalStatus: { type: string, enum: [Active, Inactive, Decommissioned] }
+ *               installationDate: { type: string, format: date-time, nullable: true }
+ *               warrantyExpiryDate: { type: string, format: date-time, nullable: true }
+ *               technicalParameters: { type: object, additionalProperties: true }
+ *               functionalLocationId: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Equipment updated
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or referenced location not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '404':
+ *         description: Equipment not found
+ *       '409':
+ *         description: equipmentCode already in use by another active row
+ *       '500':
+ *         description: Internal server error
+ */
 router.put('/:id', authorizeMinRole('Technician'), validate(equipmentUpdateSchema), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.equipment.findFirst({
@@ -385,6 +664,43 @@ router.put('/:id', authorizeMinRole('Technician'), validate(equipmentUpdateSchem
   }
 });
 
+
+/**
+ * @openapi
+ * /api/equipment/{id}:
+ *   delete:
+ *     summary: Soft delete an equipment record
+ *     description: >
+ *       Marks the equipment isDeleted=true. Per rule 3.4 child rows (meters, BOM, work
+ *       orders) are retained, not cascaded. Requires the Maintenance Supervisor role.
+ *       Writes an AuditLogEntry with action Delete.
+ *     tags: [Equipment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Equipment equipmentId
+ *     responses:
+ *       '200':
+ *         description: Equipment soft deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Supervisor
+ *       '404':
+ *         description: Equipment not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.equipment.findFirst({

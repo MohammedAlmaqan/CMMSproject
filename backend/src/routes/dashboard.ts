@@ -7,6 +7,106 @@ const router = Router();
 
 router.use(authenticate);
 
+/**
+ * @openapi
+ * /api/dashboard/kpis:
+ *   get:
+ *     summary: Dashboard KPI counters
+ *     description: >
+ *       Aggregated counts for the dashboard tiles. Active means Draft, Planned, Scheduled,
+ *       In Progress or Suspended. Overdue means plannedFinish is in the past and the status
+ *       is not Completed, Closed or Cancelled. completionRate and pmCompliance are
+ *       percentages rounded to two decimals; pmCompliance covers PM work orders created in
+ *       the current calendar month. Soft-deleted rows are excluded throughout.
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: KPI counters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 activeWorkOrders: { type: integer }
+ *                 overdueWorkOrders: { type: integer }
+ *                 scheduledToday: { type: integer }
+ *                 completionRate: { type: number, description: "Percent, 2dp" }
+ *                 openNotifications: { type: integer }
+ *                 pmCompliance: { type: number, description: "Percent of current-month PM work orders Completed or Closed, 2dp" }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+/**
+ * @openapi
+ * /api/dashboard/alerts:
+ *   get:
+ *     summary: Alerts addressed to the current user
+ *     description: >
+ *       Returns up to 20 SystemAlert rows for the authenticated user only, newest first.
+ *       Alerts are raised by the work order assignment/overdue rules, the PM scheduler and
+ *       account lockout.
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Recent alerts for the current user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   alertId: { type: string }
+ *                   alertType: { type: string, description: "WO_Assigned, WO_Overdue, PM_Generation, High_Priority_Notification, Account_Lockout" }
+ *                   userId: { type: string }
+ *                   title: { type: string }
+ *                   message: { type: string }
+ *                   isRead: { type: boolean }
+ *                   createdDate: { type: string, format: date-time }
+ *                   relatedEntityType: { type: string, nullable: true }
+ *                   relatedEntityId: { type: string, nullable: true }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+/**
+ * @openapi
+ * /api/dashboard/cost-summary:
+ *   get:
+ *     summary: Monthly planned vs actual cost trend
+ *     description: >
+ *       Buckets every non-deleted work order by the calendar month of its createdDate and
+ *       sums plannedCost and actualCost. Months are returned in ascending order as
+ *       "YYYY-MM". Values are rounded to two decimals; the underlying columns are
+ *       Float-typed in v1.0.0, so small rounding drift is expected.
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Monthly cost trend
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   month: { type: string, example: "2026-09" }
+ *                   plannedCost: { type: number }
+ *                   actualCost: { type: number }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/kpis', async (_req: Request, res: Response) => {
   try {
     const now = new Date();

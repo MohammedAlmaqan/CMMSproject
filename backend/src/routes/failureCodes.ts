@@ -29,6 +29,83 @@ function buildTree(flat: any[]): any[] {
   return roots;
 }
 
+
+/**
+ * @openapi
+ * /api/failure-codes:
+ *   get:
+ *     summary: List failure codes
+ *     description: >
+ *       Returns non-deleted failure codes, optionally filtered by a case-insensitive search
+ *       over code and description. Note: as of v1.0.0 no work order column references this
+ *       table, so failure/cause capture against a work order is not yet wired up - tracked
+ *       as a v1.1 backlog item.
+ *     tags: [Failure Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive match on code or description
+ *     responses:
+ *       '200':
+ *         description: Array of failure codes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   failureCodeId: { type: string }
+ *                   parentCodeId: { type: string, nullable: true }
+ *                   code: { type: string }
+ *                   description: { type: string }
+ *                   createdBy: { type: string }
+ *                   createdDate: { type: string, format: date-time }
+ *                   modifiedBy: { type: string }
+ *                   modifiedDate: { type: string, format: date-time }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ *   post:
+ *     summary: Create a failure code
+ *     description: >
+ *       Validated by the zod schema `failureCodeCreateSchema` (see utils/validation.ts).
+ *       Requires the Requester role. parentCodeId is optional and self-referential; a missing
+ *       parent surfaces as Prisma P2003 and is translated to HTTP 400.
+ *     tags: [Failure Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `failureCodeCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [code, description]
+ *             properties:
+ *               code: { type: string }
+ *               description: { type: string }
+ *               parentCodeId: { type: string, nullable: true }
+ *     responses:
+ *       '201':
+ *         description: Failure code created
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or parent code not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Requester
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const search = req.query.search as string | undefined;
@@ -53,6 +130,40 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/failure-codes/tree:
+ *   get:
+ *     summary: Failure code hierarchy as a tree
+ *     description: >
+ *       Returns the self-referencing FailureCode hierarchy assembled into nested nodes, for
+ *       indented pickers. Declared before /:id so the literal segment is not captured by
+ *       the parameterised route.
+ *     tags: [Failure Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Nested failure code tree
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   failureCodeId: { type: string }
+ *                   code: { type: string }
+ *                   description: { type: string }
+ *                   children:
+ *                     type: array
+ *                     items: { type: object, additionalProperties: true }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/tree', async (_req: Request, res: Response) => {
   try {
     const codes = await prisma.failureCode.findMany({
@@ -68,6 +179,35 @@ router.get('/tree', async (_req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/failure-codes/{id}:
+ *   get:
+ *     summary: Get one failure code
+ *     description: Returns a single non-deleted failure code row.
+ *     tags: [Failure Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: FailureCode failureCodeId
+ *     responses:
+ *       '200':
+ *         description: Failure code detail
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '404':
+ *         description: Failure code not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const code = await prisma.failureCode.findFirst({
@@ -119,6 +259,52 @@ router.post('/', authorizeMinRole('Requester'), validate(failureCodeCreateSchema
   }
 });
 
+
+/**
+ * @openapi
+ * /api/failure-codes/{id}:
+ *   put:
+ *     summary: Update a failure code
+ *     description: >
+ *       Validated by the zod schema `failureCodeUpdateSchema` (see utils/validation.ts).
+ *       Requires the Requester role.
+ *     tags: [Failure Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: FailureCode failureCodeId
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `failureCodeUpdateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code: { type: string }
+ *               description: { type: string }
+ *               parentCodeId: { type: string, nullable: true }
+ *     responses:
+ *       '200':
+ *         description: Failure code updated
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or parent code not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Requester
+ *       '404':
+ *         description: Failure code not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.put('/:id', authorizeMinRole('Requester'), validate(failureCodeUpdateSchema), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.failureCode.findFirst({
@@ -156,6 +342,41 @@ router.put('/:id', authorizeMinRole('Requester'), validate(failureCodeUpdateSche
   }
 });
 
+
+/**
+ * @openapi
+ * /api/failure-codes/{id}:
+ *   delete:
+ *     summary: Soft delete a failure code
+ *     description: >
+ *       Marks the failure code isDeleted=true. Requires the Maintenance Supervisor role.
+ *     tags: [Failure Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: FailureCode failureCodeId
+ *     responses:
+ *       '200':
+ *         description: Failure code soft deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Supervisor
+ *       '404':
+ *         description: Failure code not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.failureCode.findFirst({

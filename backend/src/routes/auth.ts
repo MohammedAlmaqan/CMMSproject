@@ -14,6 +14,104 @@ const ACCOUNT_LOCK_MS = 30 * 60 * 1000;
 const INVALID_CREDENTIALS = { error: 'Invalid credentials' };
 const ACCOUNT_LOCKED = { error: 'Account temporarily locked. Try again later.' };
 
+/**
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     summary: Sign in and obtain a JWT
+ *     description: >
+ *       Public endpoint - no bearer token required. Verifies bcrypt credentials against an
+ *       active, non-deleted user. Five failed attempts within a 15-minute window lock the
+ *       account for 30 minutes (HTTP 423) and raise a SystemAlert. A successful login resets
+ *       the failure counter, clears any lock, and records an AuditLogEntry for lastLogin.
+ *       Rate limited per IP by express-rate-limit; the limit is raised by the k6 smoke run
+ *       via K6_MODE.
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, password]
+ *             properties:
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       '200':
+ *         description: Authenticated. Returns the signed JWT and the user profile.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                   description: JWT bearer token (expires per JWT_EXPIRES_IN, 8h by default)
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     userId: { type: string }
+ *                     username: { type: string }
+ *                     fullName: { type: string }
+ *                     email: { type: string }
+ *                     role: { type: string }
+ *                     workCenterId: { type: string, nullable: true }
+ *                     isActive: { type: boolean }
+ *                     lastLogin: { type: string, format: date-time }
+ *       '400':
+ *         description: Username or password missing
+ *       '401':
+ *         description: Invalid credentials
+ *       '423':
+ *         description: Account temporarily locked after five failed attempts
+ *       '429':
+ *         description: Rate limit exceeded for this IP
+ *       '500':
+ *         description: Internal server error
+ */
+/**
+ * @openapi
+ * /api/auth/me:
+ *   get:
+ *     summary: Return the current user's profile
+ *     description: >
+ *       Requires a valid bearer token. Returns the authenticated user's own record,
+ *       including audit columns. Use this to populate the session after a page reload.
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Current user profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 userId: { type: string }
+ *                 username: { type: string }
+ *                 fullName: { type: string }
+ *                 email: { type: string }
+ *                 role: { type: string }
+ *                 workCenterId: { type: string, nullable: true }
+ *                 isActive: { type: boolean }
+ *                 lastLogin: { type: string, format: date-time, nullable: true }
+ *                 createdBy: { type: string }
+ *                 createdDate: { type: string, format: date-time }
+ *                 modifiedBy: { type: string }
+ *                 modifiedDate: { type: string, format: date-time }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '404':
+ *         description: User not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.post('/login', async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;

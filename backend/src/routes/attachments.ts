@@ -57,6 +57,184 @@ function uploadFile(req: Request, res: Response, next: NextFunction) {
 
 router.use(authenticate);
 
+/**
+ * @openapi
+ * /api/attachments:
+ *   get:
+ *     summary: List attachments for an entity
+ *     description: >
+ *       Attachments are polymorphic: the target is identified by entityType plus entityId,
+ *       with no foreign key. Both query parameters are required; the endpoint returns HTTP
+ *       400 without them. Soft-deleted attachments are excluded. Ordered newest first.
+ *     tags: [Attachments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: entityType
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Target type - WorkOrder, Notification or Equipment
+ *         example: WorkOrder
+ *       - in: query
+ *         name: entityId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: Attachments for the entity
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   attachmentId: { type: string }
+ *                   entityType: { type: string }
+ *                   entityId: { type: string }
+ *                   originalName: { type: string }
+ *                   mimeType: { type: string }
+ *                   sizeBytes: { type: integer }
+ *                   storagePath: { type: string, description: "Relative path under backend/uploads/" }
+ *                   uploadedByUserId: { type: string }
+ *                   createdDate: { type: string, format: date-time }
+ *       '400':
+ *         description: entityType or entityId missing
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ *   post:
+ *     summary: Upload a file and attach it to an entity
+ *     description: >
+ *       Multipart upload with a single `file` part. Validated by the zod schema
+ *       `attachmentCreateSchema` (see utils/validation.ts). Size limit 10 MB; allowed MIME
+ *       types are image/jpeg, image/png, image/webp, application/pdf, text/plain,
+ *       application/vnd.openxmlformats-officedocument.spreadsheetml.sheet and
+ *       application/vnd.ms-excel. The stored filename is a fresh UUID plus a sanitised
+ *       original name, written under uploads/<entityType>/<entityId>/. Because the file is
+ *       buffered in memory, keep the limit in mind for large batches.
+ *     tags: [Attachments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Multipart form. Text fields validated by zod `attachmentCreateSchema`."
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file, entityType, entityId]
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *               entityType:
+ *                 type: string
+ *                 example: WorkOrder
+ *               entityId:
+ *                 type: string
+ *     responses:
+ *       '201':
+ *         description: Attachment metadata created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 attachmentId: { type: string }
+ *                 entityType: { type: string }
+ *                 entityId: { type: string }
+ *                 originalName: { type: string }
+ *                 mimeType: { type: string }
+ *                 sizeBytes: { type: integer }
+ *                 storagePath: { type: string }
+ *                 uploadedByUserId: { type: string }
+ *                 createdDate: { type: string, format: date-time }
+ *       '400':
+ *         description: No file, file too large (10 MB), unsupported MIME type, or zod validation failed
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Requester
+ *       '500':
+ *         description: Internal server error
+ */
+/**
+ * @openapi
+ * /api/attachments/{id}/download:
+ *   get:
+ *     summary: Download an attachment
+ *     description: >
+ *       Streams the stored file with Content-Type set from the recorded mimeType and the
+ *       sanitised original filename as the download name. Returns HTTP 404 both when the
+ *       row is missing/soft-deleted and when the row exists but the file is absent from
+ *       disk, so callers cannot distinguish the two.
+ *     tags: [Attachments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Attachment attachmentId
+ *     responses:
+ *       '200':
+ *         description: The file contents
+ *         content:
+ *           application/octet-stream:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '404':
+ *         description: Attachment not found, or file missing on disk
+ *       '500':
+ *         description: Internal server error
+ */
+/**
+ * @openapi
+ * /api/attachments/{id}:
+ *   delete:
+ *     summary: Soft delete an attachment
+ *     description: >
+ *       Marks the row isDeleted=true. The physical file is deliberately KEPT on disk so the
+ *       operation stays reversible and auditable, per the soft-delete philosophy. Requires
+ *       the Maintenance Supervisor role. Writes an AuditLogEntry with action Delete.
+ *     tags: [Attachments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Attachment attachmentId
+ *     responses:
+ *       '200':
+ *         description: Attachment soft deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string, example: "Attachment deleted successfully" }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Supervisor
+ *       '404':
+ *         description: Attachment not found or already soft deleted
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { entityType, entityId } = req.query;

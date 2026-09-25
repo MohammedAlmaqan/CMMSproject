@@ -9,6 +9,299 @@ const router = Router();
 
 router.use(authenticate);
 
+/**
+ * @openapi
+ * /api/equipment-meters:
+ *   get:
+ *     summary: List equipment meters
+ *     description: >
+ *       Returns non-deleted meters ordered by meterName ascending, each with its parent
+ *       equipment's id, code and name. Optionally filtered to one asset.
+ *     tags: [Equipment Meters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: equipmentId
+ *         schema:
+ *           type: string
+ *         description: Restrict to a single asset
+ *     responses:
+ *       '200':
+ *         description: Array of meters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   meterId: { type: string }
+ *                   equipmentId: { type: string }
+ *                   meterName: { type: string }
+ *                   unitOfMeasure: { type: string }
+ *                   lastReading: { type: number, format: float }
+ *                   lastReadingDate: { type: string, format: date-time, nullable: true }
+ *                   createdDate: { type: string, format: date-time }
+ *                   modifiedDate: { type: string, format: date-time }
+ *                   equipment:
+ *                     type: object
+ *                     properties:
+ *                       equipmentId: { type: string }
+ *                       equipmentCode: { type: string }
+ *                       name: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ *   post:
+ *     summary: Create an equipment meter
+ *     description: >
+ *       Validated by the zod schema `equipmentMeterCreateSchema` (see utils/validation.ts).
+ *       Requires the Technician role. A missing parent equipment surfaces as Prisma P2003
+ *       and is translated to HTTP 400 rather than 500. Writes an AuditLogEntry.
+ *     tags: [Equipment Meters]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `equipmentMeterCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [equipmentId, meterName, unitOfMeasure]
+ *             properties:
+ *               equipmentId: { type: string }
+ *               meterName: { type: string }
+ *               unitOfMeasure: { type: string, example: "kWh" }
+ *               lastReading: { type: number, format: float, default: 0 }
+ *               lastReadingDate: { type: string, format: date-time }
+ *     responses:
+ *       '201':
+ *         description: Meter created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 meterId: { type: string }
+ *                 equipmentId: { type: string }
+ *                 meterName: { type: string }
+ *                 unitOfMeasure: { type: string }
+ *                 lastReading: { type: number, format: float }
+ *                 lastReadingDate: { type: string, format: date-time, nullable: true }
+ *                 createdDate: { type: string, format: date-time }
+ *                 modifiedDate: { type: string, format: date-time }
+ *       '400':
+ *         description: zod validation failed, or referenced equipment not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '500':
+ *         description: Internal server error
+ */
+/**
+ * @openapi
+ * /api/equipment-meters/{id}:
+ *   get:
+ *     summary: Get one meter with its reading history
+ *     description: >
+ *       Returns the meter with its parent equipment and all non-deleted readings ordered by
+ *       readingDate descending. This is the endpoint the PM meter-based strategy reads to
+ *       decide whether a plan is due.
+ *     tags: [Equipment Meters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: EquipmentMeter meterId
+ *     responses:
+ *       '200':
+ *         description: Meter with readings
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 meterId: { type: string }
+ *                 equipmentId: { type: string }
+ *                 meterName: { type: string }
+ *                 unitOfMeasure: { type: string }
+ *                 lastReading: { type: number, format: float }
+ *                 lastReadingDate: { type: string, format: date-time, nullable: true }
+ *                 equipment:
+ *                   type: object
+ *                   properties:
+ *                     equipmentId: { type: string }
+ *                     equipmentCode: { type: string }
+ *                     name: { type: string }
+ *                 readings:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       readingId: { type: string }
+ *                       meterId: { type: string }
+ *                       readingValue: { type: number, format: float }
+ *                       readingDate: { type: string, format: date-time }
+ *                       notes: { type: string, nullable: true }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '404':
+ *         description: Meter not found
+ *       '500':
+ *         description: Internal server error
+ *   put:
+ *     summary: Update an equipment meter
+ *     description: >
+ *       Partial update - only the fields present in the body are written. Validated by the
+ *       zod schema `equipmentMeterUpdateSchema` (see utils/validation.ts). Requires the
+ *       Technician role. Writes an AuditLogEntry.
+ *     tags: [Equipment Meters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: EquipmentMeter meterId
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `equipmentMeterUpdateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               equipmentId: { type: string }
+ *               meterName: { type: string }
+ *               unitOfMeasure: { type: string }
+ *               lastReading: { type: number, format: float }
+ *               lastReadingDate: { type: string, format: date-time, nullable: true }
+ *     responses:
+ *       '200':
+ *         description: Meter updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 meterId: { type: string }
+ *                 equipmentId: { type: string }
+ *                 meterName: { type: string }
+ *                 unitOfMeasure: { type: string }
+ *                 lastReading: { type: number, format: float }
+ *                 lastReadingDate: { type: string, format: date-time, nullable: true }
+ *                 modifiedDate: { type: string, format: date-time }
+ *       '400':
+ *         description: zod validation failed, or referenced equipment not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '404':
+ *         description: Meter not found
+ *       '500':
+ *         description: Internal server error
+ *   delete:
+ *     summary: Soft delete an equipment meter
+ *     description: >
+ *       Marks the meter isDeleted=true. Per rule 3.4 the meter's MeterReading children are
+ *       retained, not cascaded. Requires the Maintenance Supervisor role. Writes an
+ *       AuditLogEntry with action Delete.
+ *     tags: [Equipment Meters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: EquipmentMeter meterId
+ *     responses:
+ *       '200':
+ *         description: Meter soft deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string, example: "Meter deleted successfully" }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Supervisor
+ *       '404':
+ *         description: Meter not found
+ *       '500':
+ *         description: Internal server error
+ */
+/**
+ * @openapi
+ * /api/equipment-meters/{id}/readings:
+ *   post:
+ *     summary: Record a meter reading
+ *     description: >
+ *       Validated by the zod schema `meterReadingCreateSchema` (see utils/validation.ts).
+ *       Creates the MeterReading row and, in the same request, updates the parent meter's
+ *       lastReading and lastReadingDate to match. When readingDate is omitted the current
+ *       server time is used. Requires the Technician role.
+ *     tags: [Equipment Meters]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: EquipmentMeter meterId
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `meterReadingCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [readingValue]
+ *             properties:
+ *               readingValue: { type: number, format: float }
+ *               readingDate: { type: string, format: date-time, description: "Defaults to now" }
+ *               notes: { type: string, nullable: true }
+ *     responses:
+ *       '201':
+ *         description: Reading recorded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 readingId: { type: string }
+ *                 meterId: { type: string }
+ *                 readingValue: { type: number, format: float }
+ *                 readingDate: { type: string, format: date-time }
+ *                 notes: { type: string, nullable: true }
+ *                 createdDate: { type: string, format: date-time }
+ *       '400':
+ *         description: zod validation failed
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '404':
+ *         description: Meter not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const equipmentId = req.query.equipmentId as string | undefined;

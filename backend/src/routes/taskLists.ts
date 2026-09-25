@@ -9,6 +9,105 @@ const router = Router();
 
 router.use(authenticate);
 
+
+/**
+ * @openapi
+ * /api/task-lists:
+ *   get:
+ *     summary: List task lists
+ *     description: >
+ *       Returns non-deleted task lists with their operations. Filter by a case-insensitive
+ *       search over code and description, by equipmentClass, by a specific equipmentId, or
+ *       by workCenterId.
+ *     tags: [Task Lists]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive match on code or description
+ *       - in: query
+ *         name: equipmentClass
+ *         schema: { type: string }
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Array of task lists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   taskListId: { type: string }
+ *                   code: { type: string }
+ *                   description: { type: string }
+ *                   equipmentClass: { type: string, nullable: true }
+ *                   equipmentId: { type: string, nullable: true }
+ *                   workCenterId: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ *   post:
+ *     summary: Create a task list
+ *     description: >
+ *       Creates a task list and, when supplied, its operations in one transaction. Each
+ *       operation is validated by the zod schema `taskListOperationItemSchema` (see
+ *       utils/validation.ts). Requires the Requester role. Missing references surface as
+ *       Prisma P2003 and are translated to HTTP 400.
+ *     tags: [Task Lists]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `taskListCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [code, description, workCenterId]
+ *             properties:
+ *               code: { type: string }
+ *               description: { type: string }
+ *               equipmentClass: { type: string, nullable: true }
+ *               equipmentId: { type: string, nullable: true }
+ *               workCenterId: { type: string }
+ *               operations:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [sequenceNumber, description, craftId]
+ *                   properties:
+ *                     sequenceNumber: { type: integer, minimum: 1 }
+ *                     description: { type: string }
+ *                     craftId: { type: string }
+ *                     plannedHours: { type: number, minimum: 0 }
+ *                     numberOfTechnicians: { type: integer, minimum: 1 }
+ *     responses:
+ *       '201':
+ *         description: Task list created
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or a referenced record was not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Requester
+ *       '409':
+ *         description: code already exists among active rows
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const search = req.query.search as string | undefined;
@@ -60,6 +159,37 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/task-lists/{id}:
+ *   get:
+ *     summary: Get one task list
+ *     description: >
+ *       Returns a single non-deleted task list with its non-deleted operations ordered by
+ *       sequenceNumber, each with the resolved craft.
+ *     tags: [Task Lists]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: TaskList taskListId
+ *     responses:
+ *       '200':
+ *         description: Task list detail
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '404':
+ *         description: Task list not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const taskList = await prisma.taskList.findFirst({
@@ -146,6 +276,68 @@ router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), 
   }
 });
 
+
+/**
+ * @openapi
+ * /api/task-lists/{id}:
+ *   put:
+ *     summary: Update a task list
+ *     description: >
+ *       Partial update of the task list header and, when supplied, its operations. Validated
+ *       by the zod schema `taskListUpdateSchema` (see utils/validation.ts). Requires the
+ *       Requester role.
+ *     tags: [Task Lists]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: TaskList taskListId
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `taskListUpdateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code: { type: string }
+ *               description: { type: string }
+ *               equipmentClass: { type: string, nullable: true }
+ *               equipmentId: { type: string, nullable: true }
+ *               workCenterId: { type: string }
+ *               operations:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [sequenceNumber, description, craftId]
+ *                   properties:
+ *                     sequenceNumber: { type: integer, minimum: 1 }
+ *                     description: { type: string }
+ *                     craftId: { type: string }
+ *                     plannedHours: { type: number, minimum: 0 }
+ *                     numberOfTechnicians: { type: integer, minimum: 1 }
+ *     responses:
+ *       '200':
+ *         description: Task list updated
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or a referenced record was not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Requester
+ *       '404':
+ *         description: Task list not found
+ *       '409':
+ *         description: code already in use by another active row
+ *       '500':
+ *         description: Internal server error
+ */
 router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.taskList.findFirst({
@@ -234,6 +426,42 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
   }
 });
 
+
+/**
+ * @openapi
+ * /api/task-lists/{id}:
+ *   delete:
+ *     summary: Soft delete a task list
+ *     description: >
+ *       Marks the task list isDeleted=true. Work orders already generated from the list are
+ *       retained. Requires the Maintenance Supervisor role.
+ *     tags: [Task Lists]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: TaskList taskListId
+ *     responses:
+ *       '200':
+ *         description: Task list soft deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Supervisor
+ *       '404':
+ *         description: Task list not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const existing = await prisma.taskList.findFirst({

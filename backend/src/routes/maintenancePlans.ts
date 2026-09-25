@@ -11,6 +11,104 @@ const router = Router();
 
 router.use(authenticate);
 
+
+/**
+ * @openapi
+ * /api/maintenance-plans:
+ *   get:
+ *     summary: List maintenance plans
+ *     description: >
+ *       Returns non-deleted PM plans with their equipment, work center and task list.
+ *       Filter by strategyType (Time, Meter, Combined) and by activeFlag.
+ *     tags: [Maintenance Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: strategy
+ *         schema: { type: string, enum: [Time, Meter, Combined] }
+ *         description: Filter by strategyType
+ *       - in: query
+ *         name: active
+ *         schema: { type: string, enum: ["true", "false"] }
+ *         description: Filter by activeFlag
+ *     responses:
+ *       '200':
+ *         description: Array of maintenance plans
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   planId: { type: string }
+ *                   planCode: { type: string }
+ *                   description: { type: string }
+ *                   equipmentId: { type: string, nullable: true }
+ *                   functionalLocationId: { type: string, nullable: true, description: "Not enforced as a foreign key; v1.1 backlog" }
+ *                   workCenterId: { type: string }
+ *                   taskListId: { type: string }
+ *                   strategyType: { type: string, enum: [Time, Meter, Combined] }
+ *                   intervalValue: { type: integer }
+ *                   intervalUnit: { type: string, enum: [Days, Weeks, Months] }
+ *                   callHorizonValue: { type: integer, nullable: true }
+ *                   callHorizonUnit: { type: string, enum: [Days, Units], nullable: true }
+ *                   startDate: { type: string, format: date-time }
+ *                   endDate: { type: string, format: date-time, nullable: true }
+ *                   activeFlag: { type: boolean }
+ *                   lastGeneratedDate: { type: string, format: date-time, nullable: true }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ *   post:
+ *     summary: Create a maintenance plan
+ *     description: >
+ *       Validated by the zod schema `maintenancePlanCreateSchema` (see utils/validation.ts).
+ *       Requires the Requester role. References that do not resolve surface as Prisma P2003
+ *       and are translated to HTTP 400.
+ *     tags: [Maintenance Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `maintenancePlanCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [planCode, description, workCenterId, taskListId, strategyType, intervalValue, intervalUnit, startDate]
+ *             properties:
+ *               planCode: { type: string }
+ *               description: { type: string }
+ *               equipmentId: { type: string, nullable: true }
+ *               functionalLocationId: { type: string, nullable: true }
+ *               workCenterId: { type: string }
+ *               taskListId: { type: string }
+ *               strategyType: { type: string, enum: [Time, Meter, Combined] }
+ *               intervalValue: { type: integer, minimum: 0 }
+ *               intervalUnit: { type: string, enum: [Days, Weeks, Months] }
+ *               callHorizonValue: { type: integer, minimum: 0 }
+ *               callHorizonUnit: { type: string, enum: [Days, Units] }
+ *               startDate: { type: string }
+ *               endDate: { type: string, nullable: true }
+ *               activeFlag: { type: boolean }
+ *     responses:
+ *       '201':
+ *         description: Maintenance plan created
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or a referenced record was not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Requester
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { strategy, active } = req.query;
@@ -36,6 +134,45 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/maintenance-plans/run-scheduler:
+ *   post:
+ *     summary: Run the PM scheduler immediately
+ *     description: >
+ *       On-demand trigger for the preventive maintenance scheduler. The body is validated
+ *       by the zod schema `schedulerRunSchema`, which is a strict empty object, so the
+ *       scheduler always runs against its current configuration. Requires the Administrator
+ *       role. Returns the number of work orders generated.
+ *     tags: [Maintenance Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       description: "Validated by zod `schedulerRunSchema` (strict empty object)"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       '200':
+ *         description: Scheduler run completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 generated: { type: integer, description: Number of work orders generated }
+ *       '400':
+ *         description: Request body failed `schedulerRunSchema` validation
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Administrator
+ *       '500':
+ *         description: Internal server error
+ */
 router.post('/run-scheduler', authorizeMinRole('Administrator'), validate(schedulerRunSchema), async (req: Request, res: Response) => {
   try {
     const result = await runSchedulerOnce();
@@ -51,6 +188,37 @@ router.post('/run-scheduler', authorizeMinRole('Administrator'), validate(schedu
   }
 });
 
+
+/**
+ * @openapi
+ * /api/maintenance-plans/{id}:
+ *   get:
+ *     summary: Get one maintenance plan
+ *     description: >
+ *       Returns a single non-deleted plan including its task list operations, each with the
+ *       resolved craft, ordered by sequenceNumber.
+ *     tags: [Maintenance Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: MaintenancePlan planId
+ *     responses:
+ *       '200':
+ *         description: Plan detail
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '404':
+ *         description: Maintenance plan not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -122,6 +290,63 @@ router.post('/', authorizeMinRole('Requester'), validate(maintenancePlanCreateSc
   }
 });
 
+
+/**
+ * @openapi
+ * /api/maintenance-plans/{id}:
+ *   put:
+ *     summary: Update a maintenance plan
+ *     description: >
+ *       Validated by the zod schema `maintenancePlanUpdateSchema` (see
+ *       utils/validation.ts). Requires the Requester role.
+ *     tags: [Maintenance Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: MaintenancePlan planId
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `maintenancePlanUpdateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               planCode: { type: string }
+ *               description: { type: string }
+ *               equipmentId: { type: string, nullable: true }
+ *               functionalLocationId: { type: string, nullable: true }
+ *               workCenterId: { type: string }
+ *               taskListId: { type: string }
+ *               strategyType: { type: string, enum: [Time, Meter, Combined] }
+ *               intervalValue: { type: integer, minimum: 0 }
+ *               intervalUnit: { type: string, enum: [Days, Weeks, Months] }
+ *               callHorizonValue: { type: integer, minimum: 0, nullable: true }
+ *               callHorizonUnit: { type: string, enum: [Days, Units], nullable: true }
+ *               startDate: { type: string }
+ *               endDate: { type: string, nullable: true }
+ *               activeFlag: { type: boolean }
+ *     responses:
+ *       '200':
+ *         description: Maintenance plan updated
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or a referenced record was not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Requester
+ *       '404':
+ *         description: Maintenance plan not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -174,6 +399,42 @@ router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdate
   }
 });
 
+
+/**
+ * @openapi
+ * /api/maintenance-plans/{id}:
+ *   delete:
+ *     summary: Soft delete a maintenance plan
+ *     description: >
+ *       Marks the plan isDeleted=true. Work orders already generated from the plan are
+ *       retained. Requires the Maintenance Supervisor role.
+ *     tags: [Maintenance Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: MaintenancePlan planId
+ *     responses:
+ *       '200':
+ *         description: Maintenance plan soft deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Supervisor
+ *       '404':
+ *         description: Maintenance plan not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -202,6 +463,51 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
   }
 });
 
+
+/**
+ * @openapi
+ * /api/maintenance-plans/{id}/generate-wo:
+ *   post:
+ *     summary: Generate a work order from a maintenance plan
+ *     description: >
+ *       Creates a single PM work order from the plan and its task list operations, bumping
+ *       lastGeneratedDate. supervisorUserId defaults to the authenticated user; workCenterId
+ *       is taken from the plan. Requires the Maintenance Planner role.
+ *     tags: [Maintenance Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: MaintenancePlan planId
+ *     requestBody:
+ *       required: false
+ *       description: Optional overrides; not zod-validated on this route
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               supervisorUserId: { type: string, description: "Defaults to the authenticated user" }
+ *     responses:
+ *       '201':
+ *         description: Work order generated from the plan
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: Plan has no task list operations, or the plan is inactive
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '404':
+ *         description: Maintenance plan not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.post('/:id/generate-wo', authorizeMinRole('Maintenance Planner'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

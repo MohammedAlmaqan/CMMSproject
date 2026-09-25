@@ -10,6 +10,90 @@ const router = Router();
 
 router.use(authenticate);
 
+
+/**
+ * @openapi
+ * /api/labor:
+ *   get:
+ *     summary: List labor entries
+ *     description: >
+ *       Returns labour bookings for a single work order, resolving that work order's
+ *       operations and matching entries newest first. workOrderId is mandatory and returns
+ *       HTTP 400 when omitted, so this endpoint is always scoped to one work order.
+ *     tags: [Labor]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: workOrderId
+ *         required: true
+ *         schema: { type: string }
+ *         description: WorkOrder workOrderId - required; this endpoint is always scoped to one work order
+ *     responses:
+ *       '200':
+ *         description: Array of labor entries
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   laborEntryId: { type: string }
+ *                   operationId: { type: string }
+ *                   userId: { type: string }
+ *                   hoursWorked: { type: number, format: float }
+ *                   entryDateTime: { type: string, format: date-time }
+ *                   notes: { type: string, nullable: true }
+ *                   createdBy: { type: string }
+ *                   createdDate: { type: string, format: date-time }
+ *                   modifiedBy: { type: string }
+ *                   modifiedDate: { type: string, format: date-time }
+ *       '400':
+ *         description: workOrderId query parameter is required
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ *   post:
+ *     summary: Book labour against an operation
+ *     description: >
+ *       Validated by the zod schema \`laborCreateSchema\` (see utils/validation.ts).
+ *       Requires the Technician role. The referenced operation and user must both exist,
+ *       otherwise HTTP 404 is returned. The owning work order's cost is recomputed from
+ *       the craft hourly rate once the entry is saved.
+ *     tags: [Labor]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `laborCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [operationId, userId, hoursWorked]
+ *             properties:
+ *               operationId: { type: string }
+ *               userId: { type: string }
+ *               hoursWorked: { type: number, format: float }
+ *               entryDateTime: { type: string, format: date-time, description: "Defaults to now" }
+ *               notes: { type: string }
+ *     responses:
+ *       '201':
+ *         description: Labor entry created
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { workOrderId } = req.query;
@@ -83,6 +167,52 @@ router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), as
   }
 });
 
+
+/**
+ * @openapi
+ * /api/labor/{id}:
+ *   put:
+ *     summary: Update a labor entry
+ *     description: >
+ *       Validated by the zod schema `laborUpdateSchema` (see utils/validation.ts). Requires
+ *       the Technician role. The work order's cost is recomputed afterwards.
+ *     tags: [Labor]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: LaborEntry laborEntryId
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `laborUpdateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               hoursWorked: { type: number, format: float }
+ *               entryDateTime: { type: string, format: date-time }
+ *               notes: { type: string, nullable: true }
+ *     responses:
+ *       '200':
+ *         description: Labor entry updated
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '404':
+ *         description: Labor entry not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.put('/:id', authorizeMinRole('Technician'), validate(laborUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -123,6 +253,43 @@ router.put('/:id', authorizeMinRole('Technician'), validate(laborUpdateSchema), 
   }
 });
 
+
+/**
+ * @openapi
+ * /api/labor/{id}:
+ *   delete:
+ *     summary: Delete a labor entry
+ *     description: >
+ *       Marks the labor entry isDeleted=true, so it is filtered out of later reads but the
+ *       row is retained. Requires the Technician role. The work order's cost is recomputed
+ *       afterwards.
+ *     tags: [Labor]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: LaborEntry laborEntryId
+ *     responses:
+ *       '200':
+ *         description: Labor entry deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '404':
+ *         description: Labor entry not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

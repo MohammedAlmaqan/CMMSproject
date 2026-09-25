@@ -15,6 +15,105 @@ const router = Router();
 
 router.use(authenticate);
 
+
+/**
+ * @openapi
+ * /api/notifications:
+ *   get:
+ *     summary: List notifications
+ *     description: >
+ *       Returns non-deleted notifications, newest first, with optional search across
+ *       notificationNumber and description and optional type, priority and status filters.
+ *       skip and take are passed straight through to the database for paging.
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive match on notificationNumber or description
+ *       - in: query
+ *         name: type
+ *         schema: { type: string, enum: [M1, M2, M3] }
+ *       - in: query
+ *         name: priority
+ *         schema: { type: string, enum: [High, Medium, Low] }
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [Open, "In Process", Completed, Converted] }
+ *       - in: query
+ *         name: skip
+ *         schema: { type: integer, minimum: 0 }
+ *       - in: query
+ *         name: take
+ *         schema: { type: integer, minimum: 1 }
+ *     responses:
+ *       '200':
+ *         description: Array of notifications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   notificationId: { type: string }
+ *                   notificationNumber: { type: string }
+ *                   type: { type: string, enum: [M1, M2, M3] }
+ *                   priority: { type: string, enum: [High, Medium, Low] }
+ *                   status: { type: string, enum: [Open, "In Process", Completed, Converted] }
+ *                   description: { type: string }
+ *                   reportedDateTime: { type: string, format: date-time }
+ *                   functionalLocationId: { type: string }
+ *                   equipmentId: { type: string, nullable: true }
+ *                   reportedByUserId: { type: string }
+ *                   breakdownFlag: { type: boolean }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ *   post:
+ *     summary: Raise a notification
+ *     description: >
+ *       Creates a notification and generates the next notificationNumber automatically.
+ *       Validated by the zod schema `notificationCreateSchema` (see
+ *       utils/validation.ts). Requires the Requester role. Missing references surface as
+ *       Prisma P2003 and are translated to HTTP 400.
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `notificationCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [type, priority, description, functionalLocationId, reportedByUserId]
+ *             properties:
+ *               type: { type: string, enum: [M1, M2, M3] }
+ *               priority: { type: string, enum: [High, Medium, Low] }
+ *               description: { type: string, minLength: 3 }
+ *               functionalLocationId: { type: string }
+ *               equipmentId: { type: string, nullable: true }
+ *               reportedByUserId: { type: string }
+ *               breakdownFlag: { type: boolean }
+ *     responses:
+ *       '201':
+ *         description: Notification created
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or a referenced record was not found (P2003)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Requester
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { search, type, priority, status, skip, take } = req.query;
@@ -55,6 +154,37 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/notifications/{id}:
+ *   get:
+ *     summary: Get one notification
+ *     description: >
+ *       Returns a single non-deleted notification with its functional location, equipment
+ *       and reporting user.
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Notification notificationId
+ *     responses:
+ *       '200':
+ *         description: Notification detail
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '404':
+ *         description: Notification not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -130,6 +260,57 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
   }
 });
 
+
+/**
+ * @openapi
+ * /api/notifications/{id}:
+ *   put:
+ *     summary: Update a notification
+ *     description: >
+ *       Validated by the zod schema `notificationUpdateSchema` (see
+ *       utils/validation.ts). Requires the Requester role.
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Notification notificationId
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `notificationUpdateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               type: { type: string, enum: [M1, M2, M3] }
+ *               priority: { type: string, enum: [High, Medium, Low] }
+ *               description: { type: string, minLength: 3 }
+ *               functionalLocationId: { type: string }
+ *               equipmentId: { type: string, nullable: true }
+ *               reportedByUserId: { type: string }
+ *               breakdownFlag: { type: boolean }
+ *               status: { type: string, enum: [Open, "In Process", Completed, Converted] }
+ *     responses:
+ *       '200':
+ *         description: Notification updated
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Requester
+ *       '404':
+ *         description: Notification not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.put('/:id', authorizeMinRole('Requester'), validate(notificationUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -173,6 +354,43 @@ router.put('/:id', authorizeMinRole('Requester'), validate(notificationUpdateSch
   }
 });
 
+
+/**
+ * @openapi
+ * /api/notifications/{id}:
+ *   delete:
+ *     summary: Soft delete a notification
+ *     description: >
+ *       Marks the notification isDeleted=true. A notification that has already been
+ *       converted to a work order should not be deleted; the converted work order is
+ *       retained regardless. Requires the Maintenance Supervisor role.
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Notification notificationId
+ *     responses:
+ *       '200':
+ *         description: Notification soft deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Supervisor
+ *       '404':
+ *         description: Notification not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -201,6 +419,61 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
   }
 });
 
+
+/**
+ * @openapi
+ * /api/notifications/{id}/convert-to-wo:
+ *   post:
+ *     summary: Convert a notification into a corrective work order
+ *     description: >
+ *       Creates a CM work order from the notification, copies the location, equipment,
+ *       priority and breakdown flag, links the notification to the new work order and
+ *       sets the notification status to Converted. workCenterId defaults to the first
+ *       available work center; supervisorUserId defaults to the reporting user, then the
+ *       authenticated user. Validated by the zod schema `convertNotificationSchema`
+ *       (see utils/validation.ts). Requires the Maintenance Planner role.
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Notification notificationId
+ *     requestBody:
+ *       required: false
+ *       description: "Validated by zod `convertNotificationSchema`; both fields optional"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               workCenterId: { type: string, description: "Defaults to the first available work center" }
+ *               supervisorUserId: { type: string, description: "Defaults to the reporter, then the authenticated user" }
+ *     responses:
+ *       '201':
+ *         description: Work order created from the notification
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *                 workOrder: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or no work center is available
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '404':
+ *         description: Notification not found
+ *       '409':
+ *         description: Notification has already been converted
+ *       '500':
+ *         description: Internal server error
+ */
 router.post('/:id/convert-to-wo', authorizeMinRole('Maintenance Planner'), validate(convertNotificationSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

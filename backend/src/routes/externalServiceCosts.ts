@@ -10,6 +10,86 @@ const router = Router();
 
 router.use(authenticate);
 
+
+/**
+ * @openapi
+ * /api/external-services:
+ *   get:
+ *     summary: List external service cost lines
+ *     description: >
+ *       Returns the vendor invoice lines charged to a single work order. workOrderId is
+ *       mandatory and returns HTTP 400 when omitted, so this endpoint is always scoped to
+ *       one work order. External service costs are hard-deleted, so they carry no audit
+ *       columns or isDeleted flag.
+ *     tags: [External Services]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: workOrderId
+ *         required: true
+ *         schema: { type: string }
+ *         description: WorkOrder workOrderId - required; this endpoint is always scoped to one work order
+ *     responses:
+ *       '200':
+ *         description: Array of external service cost lines
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   serviceCostId: { type: string }
+ *                   workOrderId: { type: string }
+ *                   vendor: { type: string }
+ *                   description: { type: string }
+ *                   cost: { type: number, format: float, description: "Float-typed in v1.0.0; Decimal migration is v1.1" }
+ *                   invoiceRef: { type: string }
+ *       '400':
+ *         description: workOrderId query parameter is required
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ *   post:
+ *     summary: Record an external service cost
+ *     description: >
+ *       Validated by the zod schema `externalServiceCreateSchema` (see utils/validation.ts).
+ *       Requires the Technician role. The work order's actualCost is recomputed after the
+ *       line is added.
+ *     tags: [External Services]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `externalServiceCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [workOrderId, vendor, description, cost]
+ *             properties:
+ *               workOrderId: { type: string }
+ *               vendor: { type: string }
+ *               description: { type: string }
+ *               cost: { type: number, format: float }
+ *               invoiceRef: { type: string }
+ *     responses:
+ *       '201':
+ *         description: Cost line created
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { workOrderId } = req.query;
@@ -57,6 +137,53 @@ router.post('/', authorizeMinRole('Technician'), validate(externalServiceCreateS
   }
 });
 
+
+/**
+ * @openapi
+ * /api/external-services/{id}:
+ *   put:
+ *     summary: Update an external service cost line
+ *     description: >
+ *       Validated by the zod schema `externalServiceUpdateSchema` (see utils/validation.ts).
+ *       Requires the Technician role. The work order's actualCost is recomputed afterwards.
+ *     tags: [External Services]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: ExternalServiceCost serviceCostId
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `externalServiceUpdateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               vendor: { type: string }
+ *               description: { type: string }
+ *               cost: { type: number, format: float }
+ *               invoiceRef: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Cost line updated
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '404':
+ *         description: Cost line not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -96,6 +223,43 @@ router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdat
 
 // 3.4: ExternalServiceCost carries no isDeleted column — hard delete is deliberate
 // (transactional WO line item; the WO is the soft-delete boundary).
+
+/**
+ * @openapi
+ * /api/external-services/{id}:
+ *   delete:
+ *     summary: Delete an external service cost line
+ *     description: >
+ *       Hard delete - the table has no isDeleted column, per rule 3.4 the parent work order
+ *       is the soft-delete boundary. The work order's actualCost is recomputed afterwards.
+ *       Requires the Technician role.
+ *     tags: [External Services]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: ExternalServiceCost serviceCostId
+ *     responses:
+ *       '200':
+ *         description: Cost line deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '404':
+ *         description: Cost line not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

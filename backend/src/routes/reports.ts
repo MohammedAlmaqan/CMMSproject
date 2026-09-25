@@ -7,6 +7,37 @@ const router = Router();
 
 router.use(authenticate);
 
+
+/**
+ * @openapi
+ * /api/reports/backlog:
+ *   get:
+ *     summary: Work order backlog by status
+ *     description: >
+ *       Counts open work orders per status, excluding Completed, Closed and Cancelled, and
+ *       sums the planned hours of their operations into the same buckets. Read-only and
+ *       available to any authenticated role.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Backlog grouped by status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   status: { type: string }
+ *                   count: { type: integer }
+ *                   totalPlannedHours: { type: number, format: float }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/backlog', async (_req: Request, res: Response) => {
   try {
     const backlog = await prisma.workOrder.groupBy({
@@ -53,6 +84,45 @@ router.get('/backlog', async (_req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/reports/pm-compliance:
+ *   get:
+ *     summary: PM compliance rate for a month
+ *     description: >
+ *       For the given calendar month, reports how many PM work orders were raised and how
+ *       many reached Completed or Closed, and the resulting compliance percentage. Defaults
+ *       to the current month when year or month is omitted.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: year
+ *         schema: { type: integer }
+ *         description: Four-digit year; defaults to the current year
+ *       - in: query
+ *         name: month
+ *         schema: { type: integer, minimum: 1, maximum: 12 }
+ *         description: Month number 1-12; defaults to the current month
+ *     responses:
+ *       '200':
+ *         description: PM compliance for the period
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 period: { type: string, example: "2026-03" }
+ *                 totalPM: { type: integer }
+ *                 completedPM: { type: integer }
+ *                 complianceRate: { type: number, format: float, description: Percentage rounded to two decimals }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/pm-compliance', async (req: Request, res: Response) => {
   try {
     const { year, month } = req.query;
@@ -94,6 +164,38 @@ router.get('/pm-compliance', async (req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/reports/mtbf:
+ *   get:
+ *     summary: Mean time between failures
+ *     description: >
+ *       Computes mean time between failures from the completed breakdown work orders and
+ *       their failure dates, reported per equipment. Read-only and available to any
+ *       authenticated role.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: MTBF per equipment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   equipmentId: { type: string }
+ *                   equipmentName: { type: string }
+ *                   failureCount: { type: integer }
+ *                   mtbfDays: { type: number, format: float }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/mtbf', async (_req: Request, res: Response) => {
   try {
     const breakdowns = await prisma.workOrder.findMany({
@@ -153,6 +255,38 @@ router.get('/mtbf', async (_req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/reports/mttr:
+ *   get:
+ *     summary: Mean time to repair
+ *     description: >
+ *       Computes mean time to repair from completed work orders, measured between the
+ *       reported failure and the completion date, reported per equipment. Read-only and
+ *       available to any authenticated role.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: MTTR per equipment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   equipmentId: { type: string }
+ *                   equipmentName: { type: string }
+ *                   completedCount: { type: integer }
+ *                   mttrHours: { type: number, format: float }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/mttr', async (_req: Request, res: Response) => {
   try {
     const breakdowns = await prisma.workOrder.findMany({
@@ -200,6 +334,39 @@ router.get('/mttr', async (_req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/reports/cost-summary:
+ *   get:
+ *     summary: Work order cost summary for a month
+ *     description: >
+ *       For the given calendar month, totals estimated and actual cost across work orders
+ *       and breaks the result down by priority and work center. Defaults to the current
+ *       month when year or month is omitted. Monetary values are Float in v1.0.0.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: year
+ *         schema: { type: integer }
+ *         description: Four-digit year; defaults to the current year
+ *       - in: query
+ *         name: month
+ *         schema: { type: integer, minimum: 1, maximum: 12 }
+ *         description: Month number 1-12; defaults to the current month
+ *     responses:
+ *       '200':
+ *         description: Cost summary for the period
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/cost-summary', async (_req: Request, res: Response) => {
   try {
     const workOrders = await prisma.workOrder.findMany({
@@ -235,6 +402,47 @@ router.get('/cost-summary', async (_req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/reports/downtime:
+ *   get:
+ *     summary: Equipment downtime for a month
+ *     description: >
+ *       For the given calendar month, aggregates downtime hours per equipment from the
+ *       interval between a work order being reported and completed. Defaults to the
+ *       current month when year or month is omitted.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: year
+ *         schema: { type: integer }
+ *         description: Four-digit year; defaults to the current year
+ *       - in: query
+ *         name: month
+ *         schema: { type: integer, minimum: 1, maximum: 12 }
+ *         description: Month number 1-12; defaults to the current month
+ *     responses:
+ *       '200':
+ *         description: Downtime per equipment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   equipmentId: { type: string }
+ *                   equipmentName: { type: string }
+ *                   downtimeHours: { type: number, format: float }
+ *                   workOrderCount: { type: integer }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/downtime', async (_req: Request, res: Response) => {
   try {
     const workOrders = await prisma.workOrder.findMany({
@@ -279,6 +487,48 @@ router.get('/downtime', async (_req: Request, res: Response) => {
   }
 });
 
+
+/**
+ * @openapi
+ * /api/reports/material-consumption:
+ *   get:
+ *     summary: Material consumption for a month
+ *     description: >
+ *       For the given calendar month, totals actual material quantities and cost consumed
+ *       on work orders, grouped by material. Defaults to the current month when year or
+ *       month is omitted.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: year
+ *         schema: { type: integer }
+ *         description: Four-digit year; defaults to the current year
+ *       - in: query
+ *         name: month
+ *         schema: { type: integer, minimum: 1, maximum: 12 }
+ *         description: Month number 1-12; defaults to the current month
+ *     responses:
+ *       '200':
+ *         description: Consumption per material
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   materialId: { type: string }
+ *                   materialCode: { type: string }
+ *                   materialName: { type: string }
+ *                   quantityConsumed: { type: number, format: float }
+ *                   totalCost: { type: number, format: float }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
 router.get('/material-consumption', async (_req: Request, res: Response) => {
   try {
     const materials = await prisma.workOrderMaterial.groupBy({
