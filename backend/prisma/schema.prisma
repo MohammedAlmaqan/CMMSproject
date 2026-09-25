@@ -15,8 +15,10 @@ model User {
   email         String
   role          String   // Administrator, Maintenance Planner, Maintenance Supervisor, Technician, Requester, View-Only
   workCenterId  String?
-  isActive      Boolean  @default(true)
-  lastLogin     DateTime?
+  isActive         Boolean    @default(true)
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  lastLogin        DateTime?
   createdBy     String   @default("system")
   createdDate   DateTime @default(now())
   modifiedBy    String   @default("system")
