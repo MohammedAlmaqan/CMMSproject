@@ -278,7 +278,7 @@ Note (5.4 resolution ledger): (1) `verify_g4a.py` generate-wo + plan-delete now 
 |---|---|---|---|---|
 | 6.1 | GitHub Actions: install -> lint -> typecheck -> **backend tests** -> build | ✅ | Run #2 green on Node 24: Backend + Frontend jobs successful. Evidence: https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36137610937 | be52072, 25107b0 |
 | 6.2 | Scheduled `pg_dump` backup + documented restore drill | ✅ | Daily 02:00 schedule + newest-14 retention documented. Initial drill PASS: 306,826-byte dump, `WorkOrder` count 84, elapsed 5.35 s, `cmms_restore_test` absent after drop (`psql -l \| findstr` exit 1). RPO ≤ 24 h; measured RTO 5.35 s. A.1 current-script re-drill: `PASS: dump restored, WorkOrder query succeeded, drill database dropped.`, exit 0. PostgreSQL server references aligned to 15+; client detection is PATH first, then the documented PostgreSQL 18 local fallback. | 7f4a26f |
-| 6.3 | **Security:** HTTPS/TLS, account lockout (5 failures), 30-min idle session timeout (SOW §4.2) | ⬜ | All three enforced and tested |  |
+| 6.3 | **Security:** HTTPS/TLS, account lockout (5 failures), 30-min idle session timeout (SOW §4.2) | ✅ (partial) | A.2.1 complete: five failures within 15 minutes trigger a 30-minute lock, HTTP 423, and an `Account_Lockout` alert; success/expiry reset state. Focused lockout tests 3/3 and full backend suite 156/156 passed. A.2.2 idle timeout and A.2.3 IIS/TLS documentation remain pending. | 6d983d3 |
 | 6.4 | Structured logging + rotation under PM2 | ⬜ | Rotated logs on disk |  |
 | 6.5 | k6 smoke: login + WO list at target concurrency; record vs SOW §4.1 | ⬜ | Results documented |  |
 
