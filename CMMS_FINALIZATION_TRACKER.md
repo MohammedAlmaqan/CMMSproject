@@ -303,6 +303,7 @@ Non-blocking follow-ups: (1) when `actions/checkout@v5` and `actions/setup-node@
 - ERP integration
 - Ad-hoc query builder / ad-hoc reporting
 - Full-scale load testing at 500K-WO volume
+- **Prisma connection-pool exhaustion on the login path (Prisma P2028 "Unable to start a transaction in the given time")** — surfaced by the 6.5 k6 smoke run, where 15 of ~140 concurrent logins returned HTTP 500 while the read path stayed healthy. This is a **Phase 8 blocker for the SOW §4.1 200-user load test only; it is NOT a v1.0.0 release blocker.** Requires Prisma connection-pool sizing + PostgreSQL `max_connections` tuning before the SOW §4.1 200-VU test. No fix attempted in Phase 6.
 
 ## Excluded (client clarifications)
 
