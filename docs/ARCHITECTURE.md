@@ -122,6 +122,7 @@ Ordering is enforced by construction, not convention: `authenticate` is register
 | JWT bearer tokens | HS256 via `jsonwebtoken`; `jwt.verify` per request | `middleware/auth.ts` |
 | Secret fail-closed | `JWT_SECRET` missing ⇒ throw at boot, no default | `utils/config.ts` |
 | Token lifetime | Fixed absolute expiry, default 28800 s (8 h) | `utils/config.ts` |
+| Idle timeout | 30 min + 60 s warning, **client-side only** | `app/src/hooks/useIdleTimeout.ts` |
 | RBAC | 6-rank hierarchy, `authorizeMinRole` | `middleware/auth.ts` |
 | Exact-role guard | `authorize(...)` for Administrator-only routes | `middleware/auth.ts` |
 | CORS | Comma-separated allow-list, default `http://localhost:3000` | `index.ts:40` |
@@ -154,8 +155,8 @@ Both conditions are required. Since PM2 pins `NODE_ENV: 'production'`, **any pro
 
 Stating these plainly matters more than the table above:
 
-- **No idle session timeout.** There is no last-activity tracking anywhere in the backend. Sessions end only at the fixed 8-hour expiry or on restart of the client. The Administration → Settings screen advertises a "30 minutes" session timeout, but that is hardcoded markup and is not enforced by any code.
-- **No refresh tokens and no logout endpoint.** `auth.ts` exposes only `POST /login` and `GET /me`. A `RefreshToken` model exists in the schema and is unused. Because auth is stateless, a logout cannot invalidate an already-issued token; the 30-minute account lockout is the only server-side brake.
+- **The idle timeout is client-side only.** A 30-minute idle timeout with a 60-second warning does exist and is wired into `AppLayout` (`app/src/hooks/useIdleTimeout.ts`, 3 passing tests), keyed on `mousemove`, `mousedown`, `keydown`, `scroll`, and `touchstart` plus API activity. On expiry it calls the client-side `logout()` store action and redirects to `/login`. **It invalidates nothing server-side.** There is no logout endpoint and no token revocation, so the JWT stays cryptographically valid for its full 8 hours; a client that discards its token does not stop anyone else from replaying a captured one. Treat this as a convenience logout, not a session control.
+- **No refresh tokens and no logout endpoint.** `auth.ts` exposes only `POST /login` and `GET /me`. A `RefreshToken` model exists in the schema and is unused. Because auth is stateless, a logout cannot invalidate an already-issued token; the 30-minute account lockout and the 8-hour expiry are the only server-side brakes.
 - **No `trust proxy`.** With the documented IIS proxy in front, `express-rate-limit` keys on the proxy's address rather than the real client, so the login limiter and lockout would degrade to a single shared bucket. This must be fixed — `app.set('trust proxy', 1)` — before the IIS path is put into service.
 - **Content-Security-Policy is off** while `helmet()` is otherwise enabled.
 
