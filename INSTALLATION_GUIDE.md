@@ -38,9 +38,9 @@ npm --version
 
 ### Step 2: Install PostgreSQL
 
-1. Download PostgreSQL 17+ from https://www.postgresql.org/download/windows/
+1. Download PostgreSQL 15 or later from https://www.postgresql.org/download/windows/
 2. Run installer, set postgres password when prompted
-3. Add PostgreSQL `bin` directory to system PATH (typically `C:\Program Files\PostgreSQL\17\bin`)
+3. Add the installed PostgreSQL version's `bin` directory to system PATH
 4. Create database:
 ```cmd
 psql -U postgres -c "CREATE DATABASE cmms;"
@@ -181,7 +181,7 @@ cd /d C:\CMMSproject
 scripts\backup.bat
 ```
 
-The script uses `pg_dump` from `PATH`; if it is unavailable, it falls back to the locally installed PostgreSQL 18 client at `C:\Program Files\PostgreSQL\18\bin\pg_dump.exe`.
+The supported PostgreSQL server baseline is 15+. The backup script resolves `pg_dump` in this exact order: (1) use the first `pg_dump.exe` found on `PATH`; (2) only when the `PATH` lookup fails, use the local fallback `C:\Program Files\PostgreSQL\18\bin\pg_dump.exe`. The fallback identifies this machine's installed client and does not raise the server minimum above 15+.
 
 ### Retention Policy
 
