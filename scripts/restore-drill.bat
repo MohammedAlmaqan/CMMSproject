@@ -66,6 +66,56 @@ echo WorkOrder count query:
 "%PSQL%" -w -h "%PGHOST%" -p "%PGPORT%" -U "%PGUSER%" -d "%DRILL_DATABASE%" -v ON_ERROR_STOP=1 --tuples-only --no-align --command "SELECT count(*) FROM ""WorkOrder"";"
 if errorlevel 1 goto drill_failed
 
+REM ============================================
+REM Attachment snapshot assertion (6.2 follow-up)
+REM ============================================
+REM A successful SQL restore is NOT a successful backup: the dump holds only
+REM Attachment.storagePath. This asserts the paired -uploads snapshot exists and
+REM carries files whenever the live tree has any, so a "green" drill can no
+REM longer hide missing attachment bytes.
+set "CMMS_DRILL_SQL=%BACKUP_FILE%"
+set "CMMS_PROJECT_ROOT=%PROJECT_ROOT%"
+set "UPLOAD_COUNT_FILE=%TEMP%\cmms-upload-counts-%RANDOM%-%RANDOM%.txt"
+REM Both counts are emitted on ONE space-separated line: with two lines, the second
+REM for/f iteration would assign an empty token and `set "VAR="` undefines the
+REM variable, silently losing the live count. Written without a scriptblock because
+REM `$sb.Invoke()` returns a collection whose .ToString() is the type name, not a count.
+powershell.exe -NoProfile -Command "$ErrorActionPreference = 'Stop'; $sql = $env:CMMS_DRILL_SQL; $stem = [System.IO.Path]::GetFileNameWithoutExtension($sql); $snap = Join-Path (Split-Path -Parent $sql) ($stem + '-uploads'); $live = Join-Path $env:CMMS_PROJECT_ROOT 'backend\uploads'; $snapCount = 0; if (Test-Path -LiteralPath $snap) { $snapCount = @(Get-ChildItem -LiteralPath $snap -Recurse -File).Count }; $liveCount = 0; if (Test-Path -LiteralPath $live) { $liveCount = @(Get-ChildItem -LiteralPath $live -Recurse -File).Count }; Write-Output ($snapCount.ToString() + ' ' + $liveCount.ToString())" > "%UPLOAD_COUNT_FILE%"
+if errorlevel 1 (
+    del /q "%UPLOAD_COUNT_FILE%" >nul 2>nul
+    echo ERROR: Could not measure the attachment snapshot.
+    goto drill_failed
+)
+
+set "SNAPSHOT_FILE_COUNT="
+set "LIVE_FILE_COUNT="
+for /f "usebackq tokens=1,2" %%A in ("%UPLOAD_COUNT_FILE%") do (
+    if not defined SNAPSHOT_FILE_COUNT set "SNAPSHOT_FILE_COUNT=%%A"
+    if not defined LIVE_FILE_COUNT set "LIVE_FILE_COUNT=%%B"
+)
+del /q "%UPLOAD_COUNT_FILE%" >nul 2>nul
+if not defined SNAPSHOT_FILE_COUNT goto drill_failed
+if not defined LIVE_FILE_COUNT goto drill_failed
+
+echo Attachment snapshot files: %SNAPSHOT_FILE_COUNT% (live tree: %LIVE_FILE_COUNT%)
+
+REM Only a mismatch is a failure. A dataset that genuinely has no attachments
+REM must not fail the drill, otherwise fresh installs report a false red.
+if not "%SNAPSHOT_FILE_COUNT%"=="0" goto attachments_ok
+if not "%LIVE_FILE_COUNT%"=="0" goto attachments_missing
+echo No attachments in this dataset - nothing to assert.
+goto attachments_ok
+
+:attachments_missing
+echo FAIL: %LIVE_FILE_COUNT% attachment file(s) exist under backend\uploads but the
+echo       snapshot paired with this dump is missing or empty. A restore from
+echo       this dump alone would leave every attachment 404-ing.
+goto drill_failed
+
+:attachments_ok
+echo Attachment snapshot verified.
+
+
 set "ELAPSED_SECONDS="
 for /f "usebackq delims=" %%E in (`powershell.exe -NoProfile -Command "$elapsed = [math]::Round(([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() - [int64]$env:CMMS_DRILL_START_MS) / 1000, 2); $elapsed.ToString([System.Globalization.CultureInfo]::InvariantCulture)"`) do if not defined ELAPSED_SECONDS set "ELAPSED_SECONDS=%%E"
 if not defined ELAPSED_SECONDS (
@@ -90,7 +140,7 @@ if not defined DRILL_DB_COUNT goto drill_failed
 if not "%DRILL_DB_COUNT%"=="0" goto drill_failed
 
 set "DRILL_DB_CREATED=0"
-echo PASS: dump restored, WorkOrder query succeeded, drill database dropped.
+echo PASS: dump restored, WorkOrder query succeeded, attachment snapshot verified, drill database dropped.
 echo Elapsed seconds: %ELAPSED_SECONDS%
 exit /b 0
 

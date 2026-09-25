@@ -76,8 +76,64 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM ============================================
+REM Attachment files (6.2 follow-up)
+REM ============================================
+REM pg_dump captures only Attachment.storagePath - a relative pointer. The bytes
+REM live under backend\uploads\<EntityType>\<entityId>\ and would NOT survive a
+REM restore, so they are snapshotted beside the dump under a derivable name:
+REM cmms-<timestamp>-uploads\ pairs with cmms-<timestamp>.sql.
+REM Gotos are used instead of if/else blocks because this script runs with
+REM DisableDelayedExpansion, where %VAR% inside a block would expand at parse time.
+set "UPLOADS_SRC=%PROJECT_ROOT%\backend\uploads"
+set "UPLOADS_DEST=%BACKUP_DIR%\cmms-%TIMESTAMP%-uploads"
+set "UPLOADS_STATE=ABSENT"
+
+if not exist "%UPLOADS_SRC%" goto uploads_absent
+if exist "%UPLOADS_DEST%" rd /s /q "%UPLOADS_DEST%" >nul 2>nul
+xcopy "%UPLOADS_SRC%" "%UPLOADS_DEST%" /I /E /Y /Q >nul
+REM Measured on this host: xcopy returns 0 for a successful copy (whether or not
+REM any file was transferred) and 4 for "File not found" / init failure. The
+REM documented 1 = "files copied" code is NOT emitted here, so the OK/EMPTY
+REM distinction is made by counting the snapshot rather than by exit code.
+set "XCOPY_EXIT=%ERRORLEVEL%"
+if not "%XCOPY_EXIT%"=="0" goto uploads_failed
+
+set "CMMS_UPLOADS_DEST=%UPLOADS_DEST%"
+set "UPLOADS_FILE_COUNT_RAW="
+for /f "usebackq delims=" %%C in (`powershell.exe -NoProfile -Command "$ErrorActionPreference = 'Stop'; if (Test-Path -LiteralPath $env:CMMS_UPLOADS_DEST) { @(Get-ChildItem -LiteralPath $env:CMMS_UPLOADS_DEST -Recurse -File).Count } else { 0 }"`) do if not defined UPLOADS_FILE_COUNT_RAW set "UPLOADS_FILE_COUNT_RAW=%%C"
+set "UPLOADS_FILE_COUNT=%UPLOADS_FILE_COUNT_RAW%"
+if not defined UPLOADS_FILE_COUNT set "UPLOADS_FILE_COUNT=0"
+if "%UPLOADS_FILE_COUNT%"=="0" goto uploads_empty
+set "UPLOADS_STATE=OK, %UPLOADS_FILE_COUNT% file(s)"
+echo Attachment snapshot: %UPLOADS_DEST% (%UPLOADS_FILE_COUNT% file(s))
+goto uploads_prune
+
+:uploads_failed
+echo ERROR: xcopy of "%UPLOADS_SRC%" failed with exit code %XCOPY_EXIT%.
+echo        The SQL dump exists, but its attachment snapshot is incomplete.
+exit /b %XCOPY_EXIT%
+
+:uploads_absent
+echo No "%UPLOADS_SRC%" yet - no attachments have ever been uploaded, skipping snapshot.
+goto uploads_prune
+
+:uploads_empty
+set "UPLOADS_STATE=EMPTY, 0 file(s)"
+echo Attachment snapshot created but the source tree held no files.
+goto uploads_prune
+
+:uploads_prune
+set "CMMS_BACKUP_DIR=%BACKUP_DIR%"
+powershell.exe -NoProfile -Command "$ErrorActionPreference = 'Stop'; $dirs = @(Get-ChildItem -LiteralPath $env:CMMS_BACKUP_DIR -Directory | Where-Object { $_.Name -match '^cmms-\d{4}-\d{2}-\d{2}-\d{4}-uploads$' } | Sort-Object Name -Descending); @($dirs | Select-Object -Skip 14) | Remove-Item -Recurse -Force -ErrorAction Stop"
+if errorlevel 1 (
+    echo ERROR: Backup was created, but attachment retention cleanup failed.
+    exit /b 1
+)
+
 echo Backup completed successfully.
 echo File: %BACKUP_FILE%
 echo Size: %DUMP_SIZE% bytes
-echo Retention: newest 14 dumps
+echo Attachments: %UPLOADS_STATE%
+echo Retention: newest 14 dumps + newest 14 attachment snapshots
 exit /b 0

@@ -230,9 +230,24 @@ scripts\backup.bat
 
 The supported PostgreSQL server baseline is 15+. The backup script resolves `pg_dump` in this exact order: (1) use the first `pg_dump.exe` found on `PATH`; (2) only when the `PATH` lookup fails, use the local fallback `C:\Program Files\PostgreSQL\18\bin\pg_dump.exe`. The fallback identifies this machine's installed client and does not raise the server minimum above 15+.
 
+### Application Files (attachments)
+
+A PostgreSQL dump contains only `Attachment.storagePath` — a relative pointer. The attachment **bytes** live on disk under `backend\uploads\<EntityType>\<entityId>\`, so a SQL dump alone cannot restore them.
+
+`scripts\backup.bat` therefore snapshots that directory in the same run, immediately after the SQL dump is finalised, into a folder whose name pairs with the dump:
+
+```
+backups\cmms-2026-09-25-0200.sql            <- SQL
+backups\cmms-2026-09-25-0200-uploads\       <- matching attachment snapshot
+```
+
+The snapshot is produced with `xcopy /I /E /Y` and is subject to the same 14-generation retention, so the two always age out together. If `backend\uploads\` does not yet exist (nothing has ever been uploaded), the snapshot is skipped with a notice and the SQL backup still succeeds. An `xcopy` failure is fatal: the script reports the error and exits non-zero rather than leaving a dump that silently implies its attachments are safe.
+
+> **Restoring onto a fresh host requires BOTH halves.** Restore the SQL dump **and** the `-uploads` folder with the matching timestamp. Restoring only the SQL leaves every attachment row pointing at a file that is not there, and every download 404s. Copy the `-uploads` folder to `backend\uploads\` on the target host before starting the API.
+
 ### Retention Policy
 
-The backup script keeps the newest 14 timestamped dumps and deletes older dumps after each successful backup. With one scheduled run per day, this provides 14 daily generations.
+The backup script keeps the newest 14 timestamped dumps and the newest 14 `-uploads` snapshots, deleting older ones after each successful backup. With one scheduled run per day, this provides 14 daily generations of each.
 
 ### Daily Schedule
 
@@ -254,6 +269,8 @@ scripts\restore-drill.bat
 
 The script selects the newest valid timestamped dump, restores it only into the disposable `cmms_restore_test` database, runs `SELECT count(*) FROM "WorkOrder";`, records elapsed restore time, drops the drill database, and verifies that it no longer exists. It never restores over the live `cmms` database.
 
+It also asserts the paired attachment snapshot. After the `WorkOrder` query it measures file counts in the `-uploads` folder belonging to the same timestamp and in the live `backend\uploads\` tree. If attachments exist live but the paired snapshot is missing or empty, the drill **fails** — a green SQL restore is not evidence that the backup is complete. A dataset with no attachments at all passes with an explicit "nothing to assert" note, so fresh installs do not report a false red.
+
 ### Recovery Objectives
 
 - **RPO:** ≤ 24 hours because the database backup runs daily.
@@ -261,7 +278,7 @@ The script selects the newest valid timestamped dump, restores it only into the 
 
 ### Application Files
 
-A PostgreSQL dump does not include physical files under `backend\uploads\`. Back up that directory separately with access controls that exclude `.env`, dependency folders, build output, and logs.
+See [Application Files (attachments)](#application-files-attachments) above — attachment snapshots are now produced automatically by `scripts\backup.bat` and verified by the restore drill.
 
 
 ---
