@@ -122,6 +122,53 @@ npm install -g serve
 serve dist -l 3000
 ```
 
+### Step 7: Enable HTTPS / TLS (IIS Reverse Proxy)
+
+IIS terminates TLS and forwards plaintext to the Express API on loopback. The API never handles TLS itself, so no certificate configuration belongs in `backend\`.
+
+**Prerequisites** — install both features (Server Manager > Add Features):
+
+| Feature | Purpose |
+|---------|---------|
+| IIS URL Rewrite | Evaluates the inbound `/api/*` and SPA fallback rules |
+| IIS Application Request Routing (ARR) | Proxies matched requests to the Node.js API on `http://localhost:4000` |
+
+After installing ARR, open **IIS Manager > Server > Application Request Routing Cache > Proxy Settings**, tick **Enable proxy**, then set the action to **Rewrite to** `http://localhost:4000/api/*`.
+
+**Test certificate** — for evaluation hosts create a self-signed certificate on the machine. Run PowerShell as Administrator, and replace the subject name if you use a different host:
+
+```powershell
+New-SelfSignedCertificate -DnsName "cmms.local" -CertStoreLocation "Cert:\LocalMachine\My" -NotAfter (Get-Date).AddYears(5)
+```
+
+For production, request a certificate from a public CA instead and never commit certificate files or private keys to this repository.
+
+**Site binding** — create the site in IIS Manager with:
+
+| Setting | Value |
+|---------|-------|
+| Site name | `cmms.local` |
+| Physical path | `C:\CMMSproject\app\dist` (replace with the deployed path) |
+| Binding | HTTPS, port 443, host header `cmms.local`, the certificate from the previous step |
+| Backend | Node.js API already listening on `http://localhost:4000` |
+
+**URL Rewrite rules** — add the following in IIS Manager under **cmms.local > URL Rewrite**, in this order:
+
+1. Proxy API traffic (match URL `api/(.*)`, action **Rewrite** to `http://localhost:4000/api/{R:1}`).
+2. SPA fallback for client-side routes (match URL `.*`, action **Rewrite** to `C:\CMMSproject\app\dist\index.html`, using the same deployed path as the site binding).
+
+The first rule must stay above the second, otherwise every API call is rewritten to `index.html` and returns HTML instead of JSON.
+
+**Forwarded headers** — IIS must tell the app that the original request was HTTPS, so add custom headers on the site: `X-Forwarded-Proto = https` and `X-Forwarded-For = {REMOTE_ADDR}`. Express does not read `req.protocol` today, so no backend change is required; if a future feature needs to build absolute HTTPS URLs, enable Express `trust proxy` at that time rather than now.
+
+**Verify** — open the site over HTTPS and confirm the API is reachable through the proxy:
+
+```cmd
+curl -k https://cmms.local/api/health
+```
+
+The command must return HTTP 200 with the health payload. `-k` is required only for the self-signed test certificate; drop it once a trusted certificate is installed. Also add `127.0.0.1 cmms.local` to `C:\Windows\System32\drivers\etc\hosts` on the client machine so the name resolves locally.
+
 ---
 
 ## 3. Configuration
