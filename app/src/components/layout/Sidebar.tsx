@@ -34,6 +34,7 @@ const navigation = [
   { name: 'Locations', icon: Layers, path: '/locations' },
   { name: 'Equipment', icon: Wrench, path: '/equipment' },
   { name: 'Work Centers', icon: Briefcase, path: '/work-centers' },
+  { name: 'Task Lists', icon: ClipboardList, path: '/task-lists' },
   { name: 'Materials', icon: Package, path: '/materials' },
   { name: 'Reports', icon: BarChart3, path: '/reports' },
   { name: 'Administration', icon: Shield, path: '/administration' },

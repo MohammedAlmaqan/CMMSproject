@@ -137,8 +137,47 @@ export interface TaskList extends Auditable {
   taskListId: string;
   code: string;
   description: string;
+  workCenterId: string;
   equipmentClass: string | null;
   equipmentId: string | null;
+  /**
+   * SOW 3.1.4. Each step carries the materials it requires; the read resolves
+   * the material, so the screen can show a code and a description rather than an
+   * id.
+   */
+  operations?: TaskListOperationDetail[];
+}
+
+export interface TaskListMaterialRequirement {
+  taskListMaterialId: string;
+  taskOperationId: string;
+  materialId: string;
+  quantity: number;
+  material?: Pick<Material, 'materialId' | 'materialCode' | 'description' | 'unitOfMeasure'>;
+}
+
+export interface TaskListOperationDetail extends TaskListOperation {
+  craft?: Craft;
+  materials?: TaskListMaterialRequirement[];
+}
+
+/** What the create and update endpoints accept for one step. */
+export interface TaskListOperationInput {
+  sequenceNumber: number;
+  description: string;
+  craftId: string;
+  plannedHours?: number;
+  numberOfTechnicians?: number;
+  materials?: { materialId: string; quantity: number }[];
+}
+
+export interface TaskListInput {
+  code: string;
+  description: string;
+  equipmentClass?: string | null;
+  equipmentId?: string | null;
+  workCenterId: string;
+  operations?: TaskListOperationInput[];
 }
 
 export interface TaskListOperation extends Auditable {
@@ -230,6 +269,14 @@ export interface WorkOrderMaterial {
   woMaterialId: string;
   workOrderId: string;
   materialId: string;
+  /**
+   * SOW 3.1.5. The operation this part is issued to, or null for a part that is
+   * common to the whole job. The read resolves the operation so the materials tab
+   * can group lines under the step that needs them.
+   */
+  operationId?: string | null;
+  operation?: WorkOrderOperation;
+  material?: Material;
   plannedQuantity: number;
   actualQuantity: number;
   unitCost: number;

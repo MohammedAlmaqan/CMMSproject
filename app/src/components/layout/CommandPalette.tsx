@@ -46,6 +46,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       { id: 'nav-loc', label: 'Go to Locations', icon: Layers, category: 'Navigation', action: () => { navigate('/locations'); onClose(); } },
       { id: 'nav-eq', label: 'Go to Equipment', icon: Wrench, category: 'Navigation', action: () => { navigate('/equipment'); onClose(); } },
       { id: 'nav-mat', label: 'Go to Materials', icon: Package, category: 'Navigation', action: () => { navigate('/materials'); onClose(); } },
+      { id: 'nav-tl', label: 'Go to Task Lists', icon: ClipboardList, category: 'Navigation', action: () => { navigate('/task-lists'); onClose(); } },
       { id: 'nav-rep', label: 'Go to Reports', icon: BarChart3, category: 'Navigation', action: () => { navigate('/reports'); onClose(); } },
       { id: 'nav-admin', label: 'Go to Administration', icon: Shield, category: 'Navigation', action: () => { navigate('/administration'); onClose(); } },
       { id: 'act-cwo', label: 'Create Work Order', icon: Plus, category: 'Actions', action: () => { navigate('/work-orders'); onClose(); } },
