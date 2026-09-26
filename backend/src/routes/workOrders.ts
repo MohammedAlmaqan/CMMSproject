@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
@@ -447,11 +447,29 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 });
 
 /**
+ * Closing a work order is a sign-off, not a field action, so it is held to a
+ * higher role than the other transitions: Maintenance Supervisor or
+ * Administrator. Every other transition keeps the Technician floor. Placed
+ * after validate() so the parsed body is available, and before the handler.
+ */
+function requireSupervisorForClose(req: Request, res: Response, next: NextFunction) {
+  if (req.body?.status === 'Closed') {
+    return authorizeMinRole('Maintenance Supervisor')(req, res, next);
+  }
+  next();
+}
+
+/**
  * @openapi
  * /api/work-orders/{id}/status:
  *   put:
  *     summary: Transition work order status
- *     description: Applies a valid workflow transition (Draft/Planned/Scheduled/In Progress/Completed/Suspended/Closed/Cancelled). Sets actualStart/actualFinish timestamps.
+ *     description: >
+ *       Applies a valid workflow transition (Draft/Planned/Scheduled/In Progress/Completed/Suspended/Closed/Cancelled).
+ *       Sets actualStart/actualFinish timestamps. Transitioning to In Progress
+ *       requires every mandatory safety checklist on the work order to be
+ *       Completed, otherwise 409. Transitioning to Closed requires the
+ *       Maintenance Supervisor or Administrator role, otherwise 403.
  *     tags: [Work Orders]
  *     security:
  *       - bearerAuth: []
@@ -481,6 +499,8 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
  *               type: object
  *       '400':
  *         description: Invalid status transition
+ *       '403':
+ *         description: Insufficient permissions (closing requires Maintenance Supervisor or Administrator)
  *       '409':
  *         description: Mandatory safety checklist not completed (transition to In Progress)
  *       '404':
@@ -488,7 +508,12 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
  *       '500':
  *         description: Internal server error
  */
-router.put('/:id/status', authorizeMinRole('Technician'), validate(workOrderStatusBodySchema), async (req: Request, res: Response) => {
+router.put(
+  '/:id/status',
+  authorizeMinRole('Technician'),
+  validate(workOrderStatusBodySchema),
+  requireSupervisorForClose,
+  async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const { status: newStatus } = req.body;
@@ -572,6 +597,7 @@ router.put('/:id/status', authorizeMinRole('Technician'), validate(workOrderStat
     logger.error({ err: error }, 'Error updating work order status');
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+  }
+);
 
 export default router;

@@ -174,6 +174,57 @@ describe('work orders routes', () => {
     ).toBe(1);
   });
 
+  it('requires Supervisor+ to close a work order and lets Technician run every other transition', async () => {
+    const made = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body());
+    extraIds.push(made.body.workOrderId);
+    const id = made.body.workOrderId;
+
+    for (const step of ['Planned', 'Scheduled', 'In Progress', 'Completed']) {
+      const r = await api()
+        .put(`/api/work-orders/${id}/status`)
+        .set(authHeaders(ctx.technicianToken))
+        .send({ status: step });
+      expect(r.status).toBe(200);
+    }
+
+    const tech = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.technicianToken))
+      .send({ status: 'Closed' });
+    expect(tech.status).toBe(403);
+
+    const sup = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.supervisorToken))
+      .send({ status: 'Closed' });
+    expect(sup.status).toBe(200);
+    expect(sup.body.status).toBe('Closed');
+
+    const stillOpen = await prisma.workOrder.findUnique({ where: { workOrderId: id } });
+    expect(stillOpen!.status).toBe('Closed');
+  });
+
+  it('allows Administrator to close a work order', async () => {
+    const made = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body());
+    extraIds.push(made.body.workOrderId);
+    const id = made.body.workOrderId;
+
+    for (const step of ['Planned', 'Scheduled', 'In Progress', 'Completed']) {
+      const r = await api()
+        .put(`/api/work-orders/${id}/status`)
+        .set(authHeaders(ctx.adminToken))
+        .send({ status: step });
+      expect(r.status).toBe(200);
+    }
+
+    const adm = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Closed' });
+    expect(adm.status).toBe(200);
+    expect(adm.body.status).toBe('Closed');
+  });
+
   it('updates a work order (Requester+) and writes an audit row', async () => {
     const before = await prisma.auditLogEntry.count({
       where: { tableName: 'WorkOrder', recordId: createdId, action: 'Update' },
