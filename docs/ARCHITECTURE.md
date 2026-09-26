@@ -32,7 +32,7 @@ Runs the API in **fork mode with `instances: 1`**. This is mandatory, not incide
 
 ### IIS reverse proxy (documented only)
 
-Described in `INSTALLATION_GUIDE.md` §"Enable HTTPS / TLS". IIS terminates TLS and forwards plaintext to `http://localhost:4000`; the API performs no TLS itself and holds no certificate. IIS serves `app/dist/` as static content and proxies only `/api/*` to the API via ARR plus URL Rewrite. **This deployment has not been executed end to end.** One consequence of that gap is recorded under [Security boundaries](#security-boundaries): the API never sets Express `trust proxy`.
+Described in `INSTALLATION_GUIDE.md` §"Enable HTTPS / TLS". IIS terminates TLS and forwards plaintext to `http://localhost:4000`; the API performs no TLS itself and holds no certificate. IIS serves `app/dist/` as static content and proxies only `/api/*` to the API via ARR plus URL Rewrite. **This deployment has not been executed end to end.** The API does set Express `trust proxy = 1`, so `req.ip` and the login rate limiter see the real client behind IIS; what that setting makes load-bearing, and what is still unverified, is recorded under [Security boundaries](#security-boundaries).
 
 ### PM scheduler (node-cron, in-process)
 
@@ -55,8 +55,8 @@ flowchart TB
         PM2["PM2 'cmms-api'<br/>fork, instances=1<br/>NODE_ENV=production<br/>max_memory_restart=512M"]
         API["Express API :4000<br/>+ in-process PM scheduler<br/>(node-cron, 0 2 * * *)"]
         LOGS["logs/api-out.log<br/>logs/api-err.log<br/>(JSON lines)"]
-        UPL["backend/uploads/<br/>attachment files on disk<br/>NOT in the SQL backup"]
-        BK["backups/<br/>cmms-YYYY-MM-DD-HHmm.sql<br/>newest 14 kept"]
+        UPL["backend/uploads/<br/>attachment files on disk<br/>snapshotted alongside the SQL dump"]
+        BK["backups/<br/>cmms-YYYY-MM-DD-HHmm.sql<br/>+ matching -uploads folder<br/>newest 14 of each kept"]
     end
 
     DB[("PostgreSQL 15+ - database cmms<br/>35 models / 5 migrations")]
@@ -72,7 +72,7 @@ flowchart TB
     BK -.->|restore drill| DB
 ```
 
-Two data stores fall **outside** the database and are not covered by the SQL backup: `backend/uploads/` and `backups/`. See [Backup strategy](#backup-strategy) for the risk this creates.
+Two data stores fall **outside** the database: `backend/uploads/` and `backups/`. Neither is captured by `pg_dump` itself, but `backup.bat` now snapshots `backend/uploads/` alongside every SQL dump, so both are recoverable. See [Backup strategy](#backup-strategy).
 
 ## Request lifecycle
 
@@ -226,11 +226,15 @@ Implemented in `scripts/backup.bat` and rehearsed by `scripts/restore-drill.bat`
 - **RTO:** 5.35 s measured in the initial drill, on a ~307 KB dump containing 84 work orders. Read that as a smoke-level restore time for a small dataset, not a production RTO commitment for a full-size database.
 - **Restore drill:** `restore-drill.bat` restores a dump into `cmms_restore_test`, runs a real `WorkOrder` query against it, drops the database, and asserts it is gone. This is what turns "we have backups" into evidence.
 
-### Gap: uploaded files are not backed up
+### Attachments are backed up as a paired snapshot
 
-`backup.bat` dumps **only** the database. Attachments are real files written to `backend/uploads/` by multer (`routes/attachments.ts`); the `Attachment` row stores only `storagePath`, a relative path. A `pg_dump` therefore preserves the *pointer* and none of the *bytes*.
+`pg_dump` alone captures only the database. Attachments are real files written to `backend/uploads/` by multer (`routes/attachments.ts`), and the `Attachment` row stores only `storagePath`, a relative path, so a SQL dump preserves the *pointer* and none of the *bytes*.
 
-No script under `scripts/` references `uploads` at all. Restoring the database onto a fresh host yields attachments that 404 on download. `backend/uploads/` is also gitignored, so there is no second copy. Until a file-level backup is added, treat attachment durability as **unprotected** and do not promise it in any SOW or client-facing commitment.
+`backup.bat` therefore takes two artefacts per run: the SQL dump, and a `xcopy /I /E /Y` snapshot of `backend/uploads\` in a matching `-uploads` folder. Both are subject to the same 14-generation retention, so the two halves always age out together. If `backend\uploads\` does not exist yet, the snapshot is skipped with a notice and the SQL backup still succeeds; an `xcopy` failure is fatal, so the script exits non-zero rather than leaving a dump that silently implies its attachments are safe.
+
+`restore-drill.bat` asserts the pair. After restoring the SQL side it compares file counts in the `-uploads` folder for that timestamp against the live tree, and fails if attachments exist but the paired snapshot is missing or empty. A dataset with no attachments passes with an explicit note, so a fresh install does not report a false red.
+
+**A restore onto a fresh host needs both halves.** Restoring only the SQL leaves every attachment row pointing at a file that is not there, and every download 404s. Copy the `-uploads` folder to `backend\uploads\` on the target before starting the API. See `INSTALLATION_GUIDE.md` → [Application Files (attachments)](#application-files-attachments).
 
 ## Environment & configuration
 
@@ -264,8 +268,8 @@ The batch scripts use a separate set of PostgreSQL client variables — `PGHOST`
 - **200-user load test deferred.** The SOW §4.1 200-VU test is not performed and cannot be signed off until the pool issue above is resolved. The k6 smoke test that found it is `scripts/k6/smoke.js`.
 - **2.10 Zod validation gaps — still open.** The `validate()` middleware validates `req.body` only; path parameters are not validated. A pre-flight audit counted **45 gaps**, covering parameterized `PUT`/`DELETE` mutations across functional locations, equipment, meters, work centers, materials, failure codes, task lists, notifications, work orders and their child collections, labour, external services, maintenance plans, safety checklists, alerts, comments, attachments, and users. Additionally `workOrderUpdateSchema` and `operationUpdateSchema` omit fields their handlers accept. Unvalidated identifiers reach Prisma directly.
 - **ESLint baselines are not clean.** Backend reports 49 errors, frontend 32 errors and 2 warnings. Types and tests pass; the debt is tracked and unfixed. Do not read a green type-check as a clean lint.
-- **IIS HTTPS documented but not executed.** The reverse-proxy path, including the ARR rewrite and the TLS binding, has never been run end to end. Treat it as untested, and resolve the `trust proxy` omission before relying on it.
-- **Uploaded files have no backup.** See [Gap: uploaded files are not backed up](#gap-uploaded-files-are-not-backed-up).
+- **IIS HTTPS documented but not executed.** The reverse-proxy path, including the ARR rewrite and the TLS binding, has never been run end to end. `trust proxy = 1` is already set in code, so what remains unverified is the deployment around it: that ARR overwrites rather than appends `X-Forwarded-For`, and that port 4000 is unreachable except through the proxy. Until that is exercised, treat the path as untested.
+- **Attachment backup is paired, and the pair is only as good as the restore.** `backup.bat` snapshots `backend/uploads/` next to every dump and `restore-drill.bat` asserts the pair, so attachment durability is no longer unprotected. The remaining risk is procedural: restoring only the SQL half leaves every attachment 404ing. See [Attachments are backed up as a paired snapshot](#attachments-are-backed-up-as-a-paired-snapshot).
 - **Meter and Combined PM strategies are unimplemented.** Such plans are stored, counted, and logged as deferred on every run, but never generate work orders.
 - **In-memory rate limiting.** The login limiter uses the default in-process store, so limits reset on restart and are not shared across instances. This is acceptable only because PM2 is pinned to one instance.
 
