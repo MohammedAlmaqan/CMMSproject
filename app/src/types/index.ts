@@ -89,6 +89,39 @@ export interface WorkCenter extends Auditable {
   isActive: boolean;
 }
 
+/** SOW 3.1.3: work centre capacity board. See backend/src/utils/capacity.ts. */
+export interface CapacityCraftLoad {
+  craftId: string;
+  plannedHours: number;
+}
+
+export interface CapacityDay {
+  date: string;
+  plannedHours: number;
+  capacityHours: number;
+  /** null when the centre has no daily capacity set. */
+  utilisation: number | null;
+  overCapacity: boolean;
+  crafts: CapacityCraftLoad[];
+}
+
+export interface CapacityBoardEntry {
+  workCenterId: string;
+  workCenterCode: string;
+  name: string;
+  capacityHours: number;
+  days: CapacityDay[];
+  /** Committed hours that have no planned start and so sit on no day. */
+  unscheduledHours: number;
+  unscheduledWorkOrders: string[];
+}
+
+export interface CapacityBoard {
+  from: string;
+  to: string;
+  entries: CapacityBoardEntry[];
+}
+
 // ─── Craft (§3.1.3) ───
 export interface Craft extends Auditable {
   craftId: string;

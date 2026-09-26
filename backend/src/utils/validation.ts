@@ -423,6 +423,50 @@ export const attachmentCreateSchema = z.object({
   entityId: z.string().min(1).regex(/^[A-Za-z0-9-]+$/),
 });
 
+/**
+ * YYYY-MM-DD, and a real calendar date rather than 2026-02-31.
+ *
+ * The round trip is the check that matters: `new Date('2026-02-31T00:00:00Z')`
+ * is not an Invalid Date in V8, it quietly rolls over to 3 March, so a
+ * Number.isNaN test would wave 31 February straight through and the board would
+ * then start on a day the caller never asked for.
+ */
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a YYYY-MM-DD date')
+  .refine((s) => {
+    const d = new Date(`${s}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+  }, 'Not a real calendar date');
+
+/**
+ * Query schema for GET /api/work-centers/capacity.
+ *
+ * Both bounds default so the board is useful with no parameters at all, and the
+ * 90-day ceiling bounds the response: the board emits one row per centre per day
+ * with a per-craft breakdown, so an unbounded range would be a trivially
+ * available way to ask the API for a very large payload.
+ */
+export const capacityQuerySchema = z
+  .object({
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+  })
+  .transform((q) => {
+    const from = q.from ?? new Date().toISOString().slice(0, 10);
+    const to =
+      q.to ??
+      new Date(new Date(`${from}T00:00:00Z`).getTime() + 13 * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+    return { from, to };
+  })
+  .refine((r) => r.to >= r.from, { message: 'The range end date must not precede the start date' })
+  .refine(
+    (r) => new Date(`${r.to}T00:00:00Z`).getTime() - new Date(`${r.from}T00:00:00Z`).getTime() <= 89 * 86_400_000,
+    { message: 'The range may not exceed 90 days' }
+  );
+
 export function validate(schema: z.ZodTypeAny) {
   return (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);

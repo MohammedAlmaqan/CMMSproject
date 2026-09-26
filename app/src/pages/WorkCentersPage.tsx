@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { Users, Clock, DollarSign, ChevronDown, ChevronRight, Wrench } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import CapacityBoardPanel from '@/components/capacity/CapacityBoardPanel';
 import { useAppStore } from '@/store/appStore';
 
 export default function WorkCentersPage() {
@@ -42,6 +43,7 @@ export default function WorkCentersPage() {
         {!loading && !storeError && workCenters.length === 0 && (
           <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No work centers found in the system.</div>
         )}
+        <CapacityBoardPanel crafts={crafts} />
         <div className="grid grid-cols-2 gap-4">
           {workCenters.map((wc) => {
             const wcCrafts = crafts.filter((c) => c.workCenterId === wc.workCenterId);

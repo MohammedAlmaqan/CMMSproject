@@ -2,7 +2,8 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
-import { workCenterCreateSchema, workCenterUpdateSchema, validate } from '../utils/validation.js';
+import { workCenterCreateSchema, workCenterUpdateSchema, capacityQuerySchema, validate } from '../utils/validation.js';
+import { buildCapacityBoard, CAPACITY_CONSUMING_STATUSES } from '../utils/capacity.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -94,6 +95,137 @@ router.get('/', async (_req: Request, res: Response) => {
     res.json(workCenters);
   } catch (error) {
     logger.error({ err: error }, 'Error fetching work centers');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+/**
+ * @openapi
+ * /api/work-centers/capacity:
+ *   get:
+ *     summary: Work centre capacity board
+ *     description: >
+ *       Loads each work centre's daily capacity (WorkCenter.dailyCapacityHours) with the
+ *       planned hours of the work orders in a capacity-consuming status, spread evenly across
+ *       the days of each work order's planned window, and split by craft.
+ *
+ *
+ *       Draft work orders are excluded: a draft is a proposal, and a board that counts
+ *       proposals cannot be used to decide what to schedule next. Completed, Closed and
+ *       Cancelled are excluded because those hours are spent or will not be spent.
+ *
+ *       Work orders in a consuming status with no plannedStart cannot be placed on a day and
+ *       are reported per centre as `unscheduledHours` and `unscheduledWorkOrders` rather than
+ *       dropped, so undated committed work stays visible.
+ *
+ *       The range defaults to the next 14 days. Both bounds are inclusive and capped at 90
+ *       days by `capacityQuerySchema` (see utils/validation.ts). Read-only: this endpoint
+ *       books nothing and can be called by any authenticated role.
+ *     tags: [Work Centers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: First day of the board, YYYY-MM-DD. Defaults to today.
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: Last day of the board, inclusive. Defaults to from + 13 days.
+ *     responses:
+ *       '200':
+ *         description: Capacity board
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: Validation failed, or the range is inverted
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get('/capacity', async (req: Request, res: Response) => {
+  try {
+    const parsed = capacityQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+      });
+    }
+
+    const { from, to } = parsed.data;
+    if (to < from) {
+      return res.status(400).json({ error: 'The range end date must not precede the start date' });
+    }
+
+    const workCenters = await prisma.workCenter.findMany({
+      where: { isDeleted: false },
+      orderBy: { code: 'asc' },
+      select: {
+        workCenterId: true,
+        code: true,
+        name: true,
+        dailyCapacityHours: true,
+      },
+    });
+
+    // The window is fetched wider than the board on purpose. A work order that
+    // starts before `from` and ends inside it still has to be spread over its
+    // whole window, so its days-per-hour share depends on days the board never
+    // shows. Querying only the visible range would make long jobs look far
+    // heavier than they are.
+    const rangeStart = new Date(`${from}T00:00:00Z`);
+    const rangeEnd = new Date(`${to}T23:59:59.999Z`);
+
+    const workOrders = await prisma.workOrder.findMany({
+      where: {
+        isDeleted: false,
+        status: { in: [...CAPACITY_CONSUMING_STATUSES] },
+        OR: [
+          { plannedFinish: { gte: rangeStart } },
+          { plannedStart: { lte: rangeEnd } },
+        ],
+      },
+      select: {
+        workOrderId: true,
+        woNumber: true,
+        status: true,
+        workCenterId: true,
+        plannedStart: true,
+        plannedFinish: true,
+        operations: {
+          select: { craftId: true, plannedHours: true },
+        },
+      },
+    });
+
+    const board = buildCapacityBoard(
+      workCenters.map((wc) => ({
+        workCenterId: wc.workCenterId,
+        workCenterCode: wc.code,
+        name: wc.name,
+        dailyCapacityHours: wc.dailyCapacityHours,
+      })),
+      workOrders.map((w) => ({
+        workOrderId: w.workOrderId,
+        woNumber: w.woNumber,
+        status: w.status,
+        workCenterId: w.workCenterId,
+        plannedStart: w.plannedStart ? w.plannedStart.toISOString() : null,
+        plannedFinish: w.plannedFinish ? w.plannedFinish.toISOString() : null,
+        operations: w.operations,
+      })),
+      from,
+      to,
+    );
+
+    res.json(board);
+  } catch (error) {
+    logger.error({ err: error }, 'Error building work center capacity board');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
