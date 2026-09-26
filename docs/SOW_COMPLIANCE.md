@@ -10,6 +10,8 @@
 
 ## How to read this document
 
+Clause splitting: the SOW was decomposed at the sentence level. A single paragraph with N requirements became N rows. This is deliberately granular so a Partial can pinpoint which sub-requirement is missing; it also means the percentage counts weight each sub-requirement equally. A reviewer who reads the SOW at paragraph level may see fewer Met clauses than this table reports, not more.
+
 **Status legend**
 
 | Status | Meaning |
