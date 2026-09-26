@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../utils/config.js';
+import { roleLevel } from '../utils/roles.js';
 
 export interface AuthPayload {
   userId: string;
@@ -42,20 +43,11 @@ export function authorize(...roles: string[]) {
   };
 }
 
-const roleHierarchy: Record<string, number> = {
-  'View-Only': 1,
-  'Requester': 2,
-  'Technician': 3,
-  'Maintenance Supervisor': 4,
-  'Maintenance Planner': 5,
-  'Administrator': 6,
-};
-
 export function authorizeMinRole(minRole: string) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-    const userLevel = roleHierarchy[req.user.role] || 0;
-    const minLevel = roleHierarchy[minRole] || 0;
+    const userLevel = roleLevel(req.user.role);
+    const minLevel = roleLevel(minRole);
     if (userLevel < minLevel) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }

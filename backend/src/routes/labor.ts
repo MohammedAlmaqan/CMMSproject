@@ -3,12 +3,19 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
+import { resolveAttributedUser } from '../utils/attribution.js';
 import { validate, laborCreateSchema, laborUpdateSchema } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
 
 router.use(authenticate);
+
+// SOW 3.3.5 attribution lives in utils/attribution.ts as a pure function so it
+// can be unit tested without a database; see tests/unit/laborAttribution.test.ts.
+// In short: labour is attributed to the authenticated caller. Booking it for
+// somebody else needs Maintenance Supervisor or above and is audited, and a
+// Technician attempting it is rejected with 403 rather than silently coerced.
 
 
 /**
@@ -58,10 +65,15 @@ router.use(authenticate);
  *   post:
  *     summary: Book labour against an operation
  *     description: >
- *       Validated by the zod schema \`laborCreateSchema\` (see utils/validation.ts).
- *       Requires the Technician role. The referenced operation and user must both exist,
- *       otherwise HTTP 404 is returned. The owning work order's cost is recomputed from
- *       the craft hourly rate once the entry is saved.
+ *       Validated by the zod schema `laborCreateSchema` (see utils/validation.ts).
+ *       Requires the Technician role. SOW 3.3.5: the entry is attributed to the
+ *       authenticated caller, not to a client-supplied id. A `userId` naming
+ *       somebody else is honoured only for Maintenance Supervisor and above and is
+ *       then written to the audit trail with the old and new values; for a
+ *       Technician it is rejected with 403 and a Blocked audit entry rather than
+ *       silently coerced. The referenced operation must exist, otherwise 404, and
+ *       a supervisor override must name an existing user. The owning work order's
+ *       cost is recomputed from the craft hourly rate once the entry is saved.
  *     tags: [Labor]
  *     security:
  *       - bearerAuth: []
@@ -72,10 +84,10 @@ router.use(authenticate);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [operationId, userId, hoursWorked]
+ *             required: [operationId, hoursWorked]
  *             properties:
  *               operationId: { type: string }
- *               userId: { type: string }
+ *               userId: { type: string, description: "Optional, and defaults to the authenticated caller. Naming another user requires Maintenance Supervisor or above; a Technician naming another user is rejected with 403" }
  *               hoursWorked: { type: number, format: float }
  *               entryDateTime: { type: string, format: date-time, description: "Defaults to now" }
  *               notes: { type: string }
@@ -90,7 +102,9 @@ router.use(authenticate);
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
- *         description: Caller role is below Technician
+ *         description: Caller role is below Technician, or a Technician tried to attribute the entry to another user
+ *       '404':
+ *         description: Operation not found, or a supervisor override named a user that does not exist
  *       '500':
  *         description: Internal server error
  */
@@ -128,21 +142,44 @@ router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), as
   try {
     const { operationId, userId, hoursWorked, entryDateTime, notes } = req.body;
 
-    const [opExists, userExists] = await Promise.all([
-      prisma.workOrderOperation.findUnique({ where: { operationId } }),
-      prisma.user.findUnique({ where: { userId } }),
-    ]);
+    const attributed = resolveAttributedUser(req.user!, userId);
+
+    if (attributed.rejected) {
+      await logAudit(
+        {
+          tableName: 'LaborEntry',
+          recordId: 'uncreated',
+          action: 'Blocked',
+          fieldName: 'userId',
+          oldValue: req.user!.userId,
+          newValue: userId,
+        },
+        req.user!.userId,
+        req.ip
+      );
+      return res.status(403).json({
+        error:
+          'Labour is attributed to the authenticated user; booking hours for another user requires the Maintenance Supervisor role',
+        attributedUserId: req.user!.userId,
+        requestedUserId: userId,
+      });
+    }
+
+    const opExists = await prisma.workOrderOperation.findUnique({ where: { operationId } });
     if (!opExists) {
       return res.status(404).json({ error: 'Operation not found' });
     }
-    if (!userExists) {
-      return res.status(404).json({ error: 'User not found' });
+    if (attributed.outcome === 'override') {
+      const overrideTarget = await prisma.user.findUnique({ where: { userId: attributed.userId } });
+      if (!overrideTarget) {
+        return res.status(404).json({ error: 'User not found' });
+      }
     }
 
     const entry = await prisma.laborEntry.create({
       data: {
         operationId,
-        userId,
+        userId: attributed.userId,
         hoursWorked,
         entryDateTime: entryDateTime ? new Date(entryDateTime) : new Date(),
         notes: notes || null,
@@ -160,6 +197,21 @@ router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), as
       req.ip
     );
 
+    if (attributed.outcome === 'override') {
+      await logAudit(
+        {
+          tableName: 'LaborEntry',
+          recordId: entry.laborEntryId,
+          action: 'Update',
+          fieldName: 'userId',
+          oldValue: req.user!.userId,
+          newValue: attributed.userId,
+        },
+        req.user!.userId,
+        req.ip
+      );
+    }
+
     res.status(201).json(entry);
   } catch (error) {
     logger.error({ err: error }, 'Error creating labor entry');
@@ -175,7 +227,10 @@ router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), as
  *     summary: Update a labor entry
  *     description: >
  *       Validated by the zod schema `laborUpdateSchema` (see utils/validation.ts). Requires
- *       the Technician role. The work order's cost is recomputed afterwards.
+ *       the Technician role. The same SOW 3.3.5 attribution rule as POST applies:
+ *       reassigning the entry to another user requires Maintenance Supervisor or above
+ *       and is audited, and a Technician attempting it is rejected with 403. The work
+ *       order's cost is recomputed afterwards.
  *     tags: [Labor]
  *     security:
  *       - bearerAuth: []
@@ -207,9 +262,9 @@ router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), as
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
- *         description: Caller role is below Technician
+ *         description: Caller role is below Technician, or a Technician tried to reassign the entry to another user
  *       '404':
- *         description: Labor entry not found
+ *         description: Labor entry not found, or a supervisor override named a user that does not exist
  *       '500':
  *         description: Internal server error
  */
@@ -225,11 +280,42 @@ router.put('/:id', authorizeMinRole('Technician'), validate(laborUpdateSchema), 
 
     const { operationId, userId, hoursWorked, entryDateTime, notes } = req.body;
 
+    const attributed =
+      userId !== undefined ? resolveAttributedUser(req.user!, userId) : null;
+
+    if (attributed?.rejected) {
+      await logAudit(
+        {
+          tableName: 'LaborEntry',
+          recordId: id,
+          action: 'Blocked',
+          fieldName: 'userId',
+          oldValue: existing.userId,
+          newValue: userId,
+        },
+        req.user!.userId,
+        req.ip
+      );
+      return res.status(403).json({
+        error:
+          'Labour is attributed to the authenticated user; reassigning an entry to another user requires the Maintenance Supervisor role',
+        attributedUserId: req.user!.userId,
+        requestedUserId: userId,
+      });
+    }
+
+    if (attributed && attributed.outcome === 'override') {
+      const overrideTarget = await prisma.user.findUnique({ where: { userId: attributed.userId } });
+      if (!overrideTarget) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+    }
+
     const entry = await prisma.laborEntry.update({
       where: { laborEntryId: id },
       data: {
         ...(operationId !== undefined && { operationId }),
-        ...(userId !== undefined && { userId }),
+        ...(attributed && { userId: attributed.userId }),
         ...(hoursWorked !== undefined && { hoursWorked }),
         ...(entryDateTime ? { entryDateTime: new Date(entryDateTime) } : {}),
         ...(notes !== undefined && { notes }),
@@ -245,6 +331,21 @@ router.put('/:id', authorizeMinRole('Technician'), validate(laborUpdateSchema), 
       req.user!.userId,
       req.ip
     );
+
+    if (attributed && attributed.outcome === 'override') {
+      await logAudit(
+        {
+          tableName: 'LaborEntry',
+          recordId: id,
+          action: 'Update',
+          fieldName: 'userId',
+          oldValue: existing.userId,
+          newValue: attributed.userId,
+        },
+        req.user!.userId,
+        req.ip
+      );
+    }
 
     res.json(entry);
   } catch (error) {

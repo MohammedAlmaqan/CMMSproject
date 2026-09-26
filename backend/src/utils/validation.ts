@@ -69,7 +69,11 @@ export const woMaterialUpdateSchema = woMaterialCreateSchema.partial();
 
 export const laborCreateSchema = z.object({
   operationId: z.string().min(1),
-  userId: z.string().min(1),
+  // SOW 3.3.5: labour is identified by the technician's login, so userId is
+  // optional here and the route fills it from the authenticated caller. It stays
+  // accepted so a supervisor can book on someone's behalf, which the route
+  // audits, and a Technician naming somebody else is rejected with 403.
+  userId: z.string().min(1).optional(),
   hoursWorked: z.number().positive(),
   entryDateTime: z.string().min(1).optional(),
   notes: z.string().nullable().optional(),
