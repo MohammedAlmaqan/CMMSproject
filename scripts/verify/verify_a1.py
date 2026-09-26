@@ -18,6 +18,7 @@ import sys
 
 ROOT = r"C:\Users\Injaz\Documents\Default Project\CMMSproject"
 MATRIX = os.path.join(ROOT, "docs", "SOW_COMPLIANCE.md")
+REGISTER = os.path.join(ROOT, "docs", "DECISION_REGISTER.md")
 SCREEN = os.path.join(ROOT, "screenshots")
 
 STATUSES = ["Met", "Partial", "Not Met", "Deferred", "Excluded"]
@@ -44,6 +45,8 @@ EXPECT_S3 = {
 # Client agreement, and therefore must reach Met or carry a signed waiver.
 EXPECT_S3_GAP = 77
 GAP_STATUSES = ("Partial", "Not Met")
+PHASES = ("B", "C", "D", "E", "F", "G", "H")
+EXPECT_DECISIONS = [f"D-{n}" for n in range(2, 17)]
 
 SI = {}
 OUT = []
@@ -82,6 +85,43 @@ def parse_matrix(path):
 
 def is_s3(clause):
     return clause == "3" or clause.startswith("3.")
+
+
+def clean(text):
+    """Normalise a matrix cell for comparison against the register copy."""
+    for ch in ("**", "`"):
+        text = text.replace(ch, "")
+    text = text.replace("|", "/")
+    return " ".join(text.split())
+
+
+def parse_register(path):
+    """Return the disposition worksheet rows and the decision IDs defined."""
+    rows = []
+    decisions = []
+    with open(path, "r", encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.strip()
+            if not line.startswith("|"):
+                continue
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            # worksheet row: | n | clause | requirement | status | phase | decision | ...
+            if len(cells) >= 6 and cells[0].isdigit():
+                rows.append(
+                    {
+                        "n": int(cells[0]),
+                        "clause": cells[1].lstrip("§").strip(),
+                        "requirement": cells[2],
+                        "status": cells[3],
+                        "phase": cells[4],
+                        "decision": cells[5],
+                        "disposition": cells[6] if len(cells) > 6 else "",
+                    }
+                )
+            # decision table row: | **D-2** | clause | question | ...
+            elif len(cells) >= 3 and cells[0].strip("*").startswith("D-"):
+                decisions.append(cells[0].strip("*").strip())
+    return rows, decisions
 
 
 def tally(rows):
@@ -202,6 +242,73 @@ def main():
         if len(req) > 96:
             req = req[:93] + "..."
         emit(f"{i:>3}. {r['clause']:<8} {r['status']:<9} {req}")
+
+    # ---------- register cross-check ----------
+    emit()
+    emit("-" * 70)
+    emit("REGISTER CROSS-CHECK — docs/DECISION_REGISTER.md vs the matrix")
+    emit("-" * 70)
+    if not os.path.exists(REGISTER):
+        emit("FATAL: register not found")
+        return 1
+
+    reg_rows, reg_decisions = parse_register(REGISTER)
+    SI["register_rows"] = len(reg_rows)
+    emit(f"worksheet rows        : {len(reg_rows)}   expected {EXPECT_S3_GAP}   "
+         f"{'OK' if len(reg_rows) == EXPECT_S3_GAP else 'MISMATCH'}")
+    SI["register_rows_ok"] = len(reg_rows) == EXPECT_S3_GAP
+
+    emit(f"decisions defined     : {len(reg_decisions)}   expected {len(EXPECT_DECISIONS)}   "
+         f"{'OK' if len(reg_decisions) == len(EXPECT_DECISIONS) else 'MISMATCH'}")
+    emit(f"                       {', '.join(reg_decisions)}")
+    SI["register_decisions_ok"] = sorted(reg_decisions) == sorted(EXPECT_DECISIONS)
+
+    # every worksheet row must match the matrix gap row at the same position
+    clause_mismatch = []
+    status_mismatch = []
+    req_mismatch = []
+    phase_bad = []
+    decision_bad = []
+    for i, (g, r) in enumerate(zip(gaps, reg_rows)):
+        if g["clause"] != r["clause"]:
+            clause_mismatch.append((i + 1, g["clause"], r["clause"]))
+        if g["status"] != r["status"]:
+            status_mismatch.append((i + 1, g["status"], r["status"]))
+        if clean(g["requirement"]) != r["requirement"]:
+            req_mismatch.append((i + 1, clean(g["requirement"])[:50], r["requirement"][:50]))
+        if r["phase"] not in PHASES:
+            phase_bad.append((i + 1, r["phase"]))
+        if r["decision"] != "-" and r["decision"] not in reg_decisions:
+            decision_bad.append((i + 1, r["decision"]))
+
+    for label, bad in (
+        ("clause", clause_mismatch),
+        ("status", status_mismatch),
+        ("requirement text", req_mismatch),
+        ("phase value", phase_bad),
+        ("decision reference", decision_bad),
+    ):
+        ok = not bad
+        SI[f"register_{label.replace(' ', '_')}_ok"] = ok
+        emit(f"  {label:<20}: {'OK' if ok else str(len(bad)) + ' MISMATCH'}")
+        for entry in bad[:10]:
+            emit(f"      row {entry[0]}: {entry[1]!r} vs {entry[2]!r}")
+
+    # phase distribution
+    dist = {}
+    for r in reg_rows:
+        dist[r["phase"]] = dist.get(r["phase"], 0) + 1
+    emit()
+    emit("  phase distribution (worksheet rows):")
+    for p in PHASES:
+        emit(f"    {p}: {dist.get(p, 0)}")
+    SI["register_phase_total_ok"] = sum(dist.values()) == EXPECT_S3_GAP
+    emit(f"    total: {sum(dist.values())}   "
+         f"{'OK' if sum(dist.values()) == EXPECT_S3_GAP else 'MISMATCH'}")
+
+    gated = [r for r in reg_rows if r["decision"] != "-"]
+    emit(f"  rows gated on a decision: {len(gated)}   "
+         f"ungated: {len(reg_rows) - len(gated)}")
 
     # ---------- verdict ----------
     failures = [k for k, v in SI.items() if k.endswith("_ok") and v is False]
