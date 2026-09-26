@@ -26,6 +26,15 @@ export interface FunctionalLocation extends Auditable {
   parent?: FunctionalLocation | null;
   children?: FunctionalLocation[];
   equipment?: Equipment[];
+  /**
+   * SOW 3.1.1 counts, computed server-side by GET /functional-locations/tree.
+   * The unsuffixed pair is the node's own count; the Total pair rolls up the
+   * node's descendants, which is what the tree badge shows.
+   */
+  openWorkOrderCount?: number;
+  openNotificationCount?: number;
+  openWorkOrderCountTotal?: number;
+  openNotificationCountTotal?: number;
 }
 
 // ─── Equipment (§3.1.2) ───

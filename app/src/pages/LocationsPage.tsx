@@ -19,10 +19,8 @@ import {
 import Header from '@/components/layout/Header';
 import { functionalLocationService } from '@/services/functionalLocationService';
 import { equipmentService } from '@/services/equipmentService';
-import { workOrderService } from '@/services/workOrderService';
-import { notificationService } from '@/services/notificationService';
 import { ApiError } from '@/lib/api';
-import type { FunctionalLocation, Equipment, WorkOrder, Notification } from '@/types';
+import type { FunctionalLocation, Equipment } from '@/types';
 
 const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   Plant: Factory,
@@ -35,8 +33,12 @@ const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
 export default function LocationsPage() {
   const [locations, setLocations] = useState<FunctionalLocation[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  // SOW 3.1.1 counts, keyed by location id, taken from the tree endpoint rather
+  // than recomputed here. The previous version fetched every work order and
+  // every notification and filtered them per node, and its definitions were
+  // also inconsistent: the work order count included closed work orders, and
+  // the notification count ignored In Process and Converted.
+  const [counts, setCounts] = useState<Record<string, { openWorkOrders: number; openNotifications: number }>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -47,16 +49,28 @@ export default function LocationsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [locRes, eqRes, woRes, notifRes] = await Promise.all([
+      const [locRes, eqRes, treeRes] = await Promise.all([
         functionalLocationService.getAll(),
         equipmentService.getAll(),
-        workOrderService.getAll({ take: 200 }),
-        notificationService.getAll({ take: 250 }),
+        functionalLocationService.getTree(),
       ]);
       setLocations(locRes);
       setEquipment(eqRes);
-      setWorkOrders(woRes.data);
-      setNotifications(notifRes.data);
+
+      // Flatten the tree once to build the lookup, so a node's counts are a map
+      // hit rather than a walk of the whole tree on every render.
+      const flat: Record<string, { openWorkOrders: number; openNotifications: number }> = {};
+      const walk = (nodes: FunctionalLocation[]) => {
+        for (const node of nodes) {
+          flat[node.functionalLocationId] = {
+            openWorkOrders: node.openWorkOrderCountTotal ?? 0,
+            openNotifications: node.openNotificationCountTotal ?? 0,
+          };
+          if (node.children?.length) walk(node.children);
+        }
+      };
+      walk(treeRes);
+      setCounts(flat);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Failed to load locations');
     } finally {
@@ -91,10 +105,15 @@ export default function LocationsPage() {
   const getStats = (locId: string) => {
     const allIds = getAllDescendants(locId);
     const eqCount = equipment.filter((e) => allIds.includes(e.functionalLocationId)).length;
-    const woCount = workOrders.filter((w) => allIds.includes(w.functionalLocationId)).length;
-    const openWOs = workOrders.filter((w) => allIds.includes(w.functionalLocationId) && !['Closed', 'Cancelled'].includes(w.status)).length;
-    const notifCount = notifications.filter((n) => allIds.includes(n.functionalLocationId) && n.status === 'Open').length;
-    return { eqCount, woCount, openWOs, notifCount };
+    // Counts come from the server, which is also where the definition of
+    // "open" now lives. Equipment is still counted here because it is a small
+    // list and there is no aggregate endpoint for it.
+    const server = counts[locId];
+    return {
+      eqCount,
+      woCount: server?.openWorkOrders ?? 0,
+      notifCount: server?.openNotifications ?? 0,
+    };
   };
 
   const filteredLocations = useMemo(() => {
@@ -140,9 +159,8 @@ export default function LocationsPage() {
             )}
             <div className="flex items-center gap-3 flex-shrink-0 ml-4">
               <span className="text-tertiary" style={{ fontSize: '10px' }} title="Equipment">EQ: {stats.eqCount}</span>
-              <span className="text-tertiary" style={{ fontSize: '10px' }} title="Work Orders">WO: {stats.woCount}</span>
-              {stats.openWOs > 0 && (
-                <span className="text-amber" style={{ fontSize: '10px' }} title="Open WOs">Open: {stats.openWOs}</span>
+              {stats.woCount > 0 && (
+                <span className="text-amber" style={{ fontSize: '10px' }} title="Open work orders, including child locations">Open WO: {stats.woCount}</span>
               )}
               {stats.notifCount > 0 && (
                 <span className="text-red-status flex items-center gap-0.5" style={{ fontSize: '10px' }} title="Open Notifications">

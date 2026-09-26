@@ -4,6 +4,12 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, functionalLocationCreateSchema, functionalLocationUpdateSchema } from '../utils/validation.js';
 import { logAudit } from '../middleware/audit.js';
 import { checkChildAddition } from '../utils/locationRules.js';
+import {
+  OPEN_WORK_ORDER_STATUSES,
+  OPEN_NOTIFICATION_STATUSES,
+  toCountMap,
+  attachCounts,
+} from '../utils/locationCounts.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -179,12 +185,34 @@ function buildTree(flat: any[]): any[] {
  */
 router.get('/tree', async (_req: Request, res: Response) => {
   try {
-    const locations = await prisma.functionalLocation.findMany({
-      where: { isDeleted: false },
-      orderBy: { locationCode: 'asc' },
-    });
+    // SOW 3.1.1: one grouped query per entity instead of one request per node.
+    // The previous screen assembled these counts client-side, which meant a real
+    // plant hierarchy cost hundreds of round trips to render a single tree.
+    const [locations, workOrderGroups, notificationGroups] = await Promise.all([
+      prisma.functionalLocation.findMany({
+        where: { isDeleted: false },
+        orderBy: { locationCode: 'asc' },
+      }),
+      prisma.workOrder.groupBy({
+        by: ['functionalLocationId'],
+        where: {
+          isDeleted: false,
+          status: { in: [...OPEN_WORK_ORDER_STATUSES] },
+        },
+        _count: { _all: true },
+      }),
+      prisma.notification.groupBy({
+        by: ['functionalLocationId'],
+        where: {
+          isDeleted: false,
+          status: { in: [...OPEN_NOTIFICATION_STATUSES] },
+        },
+        _count: { _all: true },
+      }),
+    ]);
 
     const tree = buildTree(locations);
+    attachCounts(tree, toCountMap(workOrderGroups), toCountMap(notificationGroups));
     res.json(tree);
   } catch (error) {
     logger.error({ err: error }, 'Error fetching location tree');
