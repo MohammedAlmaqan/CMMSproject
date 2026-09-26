@@ -3,7 +3,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, functionalLocationCreateSchema, functionalLocationUpdateSchema } from '../utils/validation.js';
 import { logAudit } from '../middleware/audit.js';
-import { checkChildAddition } from '../utils/locationRules.js';
+import { checkChildAddition, checkLocationMove } from '../utils/locationRules.js';
 import {
   OPEN_WORK_ORDER_STATUSES,
   OPEN_NOTIFICATION_STATUSES,
@@ -388,9 +388,11 @@ router.post('/', authorizeMinRole('Technician'), validate(functionalLocationCrea
  *       '403':
  *         description: Caller role is below Technician
  *       '404':
- *         description: Location not found
+ *         description: Location not found, or the named parent location does not exist
  *       '409':
- *         description: locationCode already in use by another active row
+ *         description: locationCode already in use, or the move would place the location beneath a parent that holds equipment
+ *       '400':
+ *         description: The move would make a location its own parent or create a cycle
  *       '500':
  *         description: Internal server error
  */
@@ -404,6 +406,57 @@ router.put('/:id', authorizeMinRole('Technician'), validate(functionalLocationUp
     }
 
     const { locationCode, description, parentLocationId, locationType, operationalStatus, installationDate, gpsCoordinates, safetyCritical } = req.body;
+
+    // A re-parent must satisfy the same lowest-level invariant that adding a
+    // child does, or the invariant is only enforced on one of the two paths that
+    // can break it. Guarding create but not move leaves the cheaper edit as the
+    // way around the rule.
+    if (parentLocationId !== undefined && (parentLocationId || null) !== existing.parentLocationId) {
+      const selfId = String(req.params.id);
+      const newParentId = parentLocationId ? String(parentLocationId) : null;
+
+      if (newParentId === selfId) {
+        return res.status(400).json({ error: 'A functional location cannot be its own parent' });
+      }
+
+      if (newParentId) {
+        // Walk up from the proposed parent. Reaching the location being moved
+        // means the move would close a loop, which would make the tree walk in
+        // the tree endpoint spin and the subtree unlistable.
+        let cursor: string | null = newParentId;
+        let cycle = false;
+        while (cursor) {
+          if (cursor === selfId) {
+            cycle = true;
+            break;
+          }
+          const node: { parentLocationId: string | null } | null = await prisma.functionalLocation.findFirst({
+            where: { functionalLocationId: cursor, isDeleted: false },
+            select: { parentLocationId: true },
+          });
+          if (!node) {
+            return res.status(400).json({ error: 'Parent functional location not found' });
+          }
+          cursor = node.parentLocationId;
+        }
+
+        const newParentEquipment = await prisma.equipment.count({
+          where: { functionalLocationId: newParentId, isDeleted: false },
+        });
+        const movedEquipment = await prisma.equipment.count({
+          where: { functionalLocationId: selfId, isDeleted: false },
+        });
+
+        const moveCheck = checkLocationMove({
+          newParentHasEquipment: newParentEquipment > 0,
+          wouldCreateCycle: cycle,
+          movedHasEquipment: movedEquipment > 0,
+        });
+        if (!moveCheck.ok) {
+          return res.status(409).json({ error: moveCheck.error });
+        }
+      }
+    }
 
     const location = await prisma.functionalLocation.update({
       where: { functionalLocationId: String(req.params.id) },

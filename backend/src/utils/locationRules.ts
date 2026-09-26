@@ -54,3 +54,43 @@ export function checkChildAddition(parent: ChildAddition): ChildCheck {
   }
   return { ok: true };
 }
+
+export interface LocationMove {
+  /** Equipment held by the proposed new parent, or null when moving to root. */
+  newParentHasEquipment: boolean;
+  /** Whether the proposed new parent is this location or one of its descendants. */
+  wouldCreateCycle: boolean;
+  /** Equipment held by the location being moved. */
+  movedHasEquipment: boolean;
+}
+
+export type MoveCheck = { ok: true } | { ok: false; error: string };
+
+/**
+ * Guards a re-parenting update.
+ *
+ * The same invariant that `checkChildAddition` enforces when a child is created
+ * also has to hold when a child is moved. Guarding only creation leaves the
+ * invariant reopenable by an edit, which is the cheaper thing for a user to try
+ * and the easier thing to miss in review.
+ *
+ * A move to root is always allowed: the location is not being made a parent of
+ * anything, so its own equipment remains correctly placed at a leaf.
+ */
+export function checkLocationMove(move: LocationMove): MoveCheck {
+  if (move.wouldCreateCycle) {
+    return {
+      ok: false,
+      error:
+        'A functional location cannot be moved beneath itself or one of its own descendant locations',
+    };
+  }
+  if (move.newParentHasEquipment) {
+    return {
+      ok: false,
+      error:
+        'The chosen parent functional location holds equipment, so it is not a lowest-level location. Move the equipment down before moving this location beneath it',
+    };
+  }
+  return { ok: true };
+}

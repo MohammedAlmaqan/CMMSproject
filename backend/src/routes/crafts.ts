@@ -333,7 +333,7 @@ router.put('/:id', authorizeMinRole('Maintenance Planner'), validate(craftUpdate
  *       '404':
  *         description: Craft not found
  *       '409':
- *         description: Craft is still referenced by an operation
+ *         description: Craft is still referenced by a work order operation or a task list step
  *       '500':
  *         description: Internal server error
  */
@@ -347,9 +347,23 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       return res.status(404).json({ error: 'Craft not found' });
     }
 
-    const inUse = await prisma.workOrderOperation.count({ where: { craftId } });
-    if (inUse > 0) {
-      return res.status(409).json({ error: 'Craft is still referenced by a work order operation' });
+    // A craft referenced only by a task list must block retirement too. The
+    // template holds the id, and C.6 copies it verbatim onto every work order
+    // created from that template, so retiring the craft would silently produce
+    // work orders whose steps point at a craft that appears in no craft list.
+    // Soft-deleted steps are ignored: a retired template is not a live plan.
+    const [inWorkOrders, inTaskLists] = await Promise.all([
+      prisma.workOrderOperation.count({ where: { craftId } }),
+      prisma.taskListOperation.count({ where: { craftId, isDeleted: false } }),
+    ]);
+    if (inWorkOrders > 0 || inTaskLists > 0) {
+      const sources = [
+        inWorkOrders > 0 ? 'a work order operation' : null,
+        inTaskLists > 0 ? 'a task list step' : null,
+      ].filter(Boolean);
+      return res.status(409).json({
+        error: `Craft is still referenced by ${sources.join(' and ')}`,
+      });
     }
 
     await prisma.craft.update({

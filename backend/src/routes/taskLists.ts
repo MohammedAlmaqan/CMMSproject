@@ -551,12 +551,34 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       return res.status(404).json({ error: 'Task list not found' });
     }
 
-    await prisma.taskList.update({
-      where: { taskListId: String(req.params.id) },
-      data: {
-        isDeleted: true,
-        modifiedBy: req.user!.userId,
-      },
+    // A soft-deleted list whose steps are still live is worse than a leak. The
+    // steps keep `isDeleted: false`, so they still reference their craft, and a
+    // craft could then never be retired (crafts.ts refuses retirement while a
+    // task list step points at it). They are soft-deleted here for the same
+    // reason the update path does it, and the requirements are hard-deleted
+    // first because TaskListMaterial is a composition child with no isDeleted
+    // column, so left in place they would outlive every operation they describe.
+    const superseded = await prisma.taskListOperation.findMany({
+      where: { taskListId: String(req.params.id), isDeleted: false },
+      select: { taskOperationId: true },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      if (superseded.length > 0) {
+        await tx.taskListMaterial.deleteMany({
+          where: { taskOperationId: { in: superseded.map((o) => o.taskOperationId) } },
+        });
+      }
+
+      await tx.taskListOperation.updateMany({
+        where: { taskListId: String(req.params.id), isDeleted: false },
+        data: { isDeleted: true, modifiedBy: req.user!.userId },
+      });
+
+      await tx.taskList.update({
+        where: { taskListId: String(req.params.id) },
+        data: { isDeleted: true, modifiedBy: req.user!.userId },
+      });
     });
 
     await logAudit(
