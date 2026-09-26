@@ -14,6 +14,7 @@
 # Exit:  0 PASS  1 FAIL
 # ═══════════════════════════════════════════════════════════════════════
 import os
+import re
 import sys
 
 ROOT = r"C:\Users\Injaz\Documents\Default Project\CMMSproject"
@@ -46,7 +47,7 @@ EXPECT_S3 = {
 EXPECT_S3_GAP = 77
 GAP_STATUSES = ("Partial", "Not Met")
 PHASES = ("B", "C", "D", "E", "F", "G", "H")
-EXPECT_DECISIONS = [f"D-{n}" for n in range(2, 17)]
+EXPECT_DECISIONS = [f"D-{n}" for n in range(2, 18)]
 
 SI = {}
 OUT = []
@@ -278,7 +279,10 @@ def main():
             req_mismatch.append((i + 1, clean(g["requirement"])[:50], r["requirement"][:50]))
         if r["phase"] not in PHASES:
             phase_bad.append((i + 1, r["phase"]))
-        if r["decision"] != "-" and r["decision"] not in reg_decisions:
+        if r["decision"] != "-" and not (
+            r["decision"] in reg_decisions
+            or re.match(r"^deferred D\d+$", r["decision"])
+        ):
             decision_bad.append((i + 1, r["decision"]))
 
     for label, bad in (
