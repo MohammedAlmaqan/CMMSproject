@@ -1,4 +1,4 @@
-# CMMS Finalization Tracker
+﻿# CMMS Finalization Tracker
 
 **Project:** CommandPulse CMMS
 **Tracker created:** 2026-09-22
