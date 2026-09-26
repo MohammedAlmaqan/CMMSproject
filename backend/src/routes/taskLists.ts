@@ -18,7 +18,8 @@ router.use(authenticate);
  *     description: >
  *       Returns non-deleted task lists with their operations. Filter by a case-insensitive
  *       search over code and description, by equipmentClass, by a specific equipmentId, or
- *       by workCenterId.
+ *       by workCenterId. Each operation carries the materials that step requires
+ *       (SOW 3.1.4) with the material resolved.
  *     tags: [Task Lists]
  *     security:
  *       - bearerAuth: []
@@ -91,6 +92,19 @@ router.use(authenticate);
  *                     craftId: { type: string }
  *                     plannedHours: { type: number, minimum: 0 }
  *                     numberOfTechnicians: { type: integer, minimum: 1 }
+ *                     materials:
+ *                       description: >
+ *                         SOW 3.1.4 - the materials this step requires. Attached to the step
+ *                         rather than the list, so the store can see which step is blocked when
+ *                         a part is short. A part may appear once per step; a repeat is HTTP
+ *                         400 rather than a silent sum.
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         required: [materialId, quantity]
+ *                         properties:
+ *                           materialId: { type: string }
+ *                           quantity: { type: number, minimum: 0, description: "0 means required but not yet quantified" }
  *     responses:
  *       '201':
  *         description: Task list created
@@ -98,7 +112,7 @@ router.use(authenticate);
  *           application/json:
  *             schema: { type: object, additionalProperties: true }
  *       '400':
- *         description: zod validation failed, or a referenced record was not found (P2003)
+ *         description: zod validation failed, a referenced record was not found (P2003), or one operation lists a material twice
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
@@ -141,6 +155,8 @@ router.get('/', async (req: Request, res: Response) => {
           orderBy: { sequenceNumber: 'asc' },
           include: {
             craft: true,
+            // SOW 3.1.4: the materials this step requires.
+            materials: { include: { material: true } },
           },
         },
         workCenter: {
@@ -200,6 +216,8 @@ router.get('/:id', async (req: Request, res: Response) => {
           orderBy: { sequenceNumber: 'asc' },
           include: {
             craft: true,
+            // SOW 3.1.4: the materials this step requires.
+            materials: { include: { material: true } },
           },
         },
         workCenter: {
@@ -245,6 +263,17 @@ router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), 
               numberOfTechnicians: op.numberOfTechnicians || 1,
               createdBy: req.user!.userId,
               modifiedBy: req.user!.userId,
+              // SOW 3.1.4 required materials, attached to the step that needs them.
+              ...(op.materials?.length && {
+                materials: {
+                  create: op.materials.map((m: any) => ({
+                    materialId: m.materialId,
+                    quantity: m.quantity,
+                    createdBy: req.user!.userId,
+                    modifiedBy: req.user!.userId,
+                  })),
+                },
+              }),
             })),
           },
         }),
@@ -252,7 +281,7 @@ router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), 
       include: {
         operations: {
           orderBy: { sequenceNumber: 'asc' },
-          include: { craft: true },
+          include: { craft: true, materials: { include: { material: true } } },
         },
       },
     });
@@ -266,6 +295,14 @@ router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), 
     res.status(201).json(taskList);
   } catch (error: any) {
     if (error.code === 'P2002') {
+      // Either the task list code collided, or one operation listed the same
+      // material twice. The index is on (taskOperationId, materialId), so a
+      // duplicate requirement is a data-entry slip; the generic code message
+      // would blame the wrong field and send the caller looking at the header.
+      const target = String(error.meta?.target ?? '');
+      if (target.includes('TaskListMaterial')) {
+        return res.status(400).json({ error: 'An operation lists the same material more than once' });
+      }
       return res.status(409).json({ error: 'Task list code already exists' });
     }
     if (error.code === 'P2003') {
@@ -362,7 +399,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
       include: {
         operations: {
           orderBy: { sequenceNumber: 'asc' },
-          include: { craft: true },
+          include: { craft: true, materials: { include: { material: true } } },
         },
       },
     });
@@ -371,22 +408,57 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
       // 3.4: soft-replace operations — TaskListOperation carries isDeleted, so the previous
       // set is soft-deleted (updateMany) instead of hard-deleted; list/detail filters below
       // then hide them historically while the WorkOrder-PM-copy path never sees them.
-      await prisma.taskListOperation.updateMany({
+      //
+      // The requirements are hard-deleted first. TaskListMaterial is a composition
+      // child of the operation and, per the same rule 3.4 reasoning that applies to
+      // WorkOrderMaterial, carries no isDeleted column. Left in place they would
+      // outlive every operation they describe: the operations become invisible, the
+      // requirements do not, and the row grows on each edit of the task list.
+      const superseded = await prisma.taskListOperation.findMany({
         where: { taskListId: String(req.params.id), isDeleted: false },
-        data: { isDeleted: true, modifiedBy: req.user!.userId },
+        select: { taskOperationId: true },
       });
 
-      await prisma.taskListOperation.createMany({
-        data: operations.map((op: any) => ({
-          taskListId: String(req.params.id),
-          sequenceNumber: op.sequenceNumber,
-          description: op.description,
-          craftId: op.craftId,
-          plannedHours: op.plannedHours,
-          numberOfTechnicians: op.numberOfTechnicians || 1,
-          createdBy: req.user!.userId,
-          modifiedBy: req.user!.userId,
-        })),
+      await prisma.$transaction(async (tx) => {
+        if (superseded.length > 0) {
+          await tx.taskListMaterial.deleteMany({
+            where: { taskOperationId: { in: superseded.map((o) => o.taskOperationId) } },
+          });
+        }
+
+        await tx.taskListOperation.updateMany({
+          where: { taskListId: String(req.params.id), isDeleted: false },
+          data: { isDeleted: true, modifiedBy: req.user!.userId },
+        });
+
+        // One create per operation rather than createMany, because a requirement
+        // needs the operation's generated id and createMany cannot nest.
+        for (const op of operations as any[]) {
+          const created = await tx.taskListOperation.create({
+            data: {
+              taskListId: String(req.params.id),
+              sequenceNumber: op.sequenceNumber,
+              description: op.description,
+              craftId: op.craftId,
+              plannedHours: op.plannedHours,
+              numberOfTechnicians: op.numberOfTechnicians || 1,
+              createdBy: req.user!.userId,
+              modifiedBy: req.user!.userId,
+            },
+          });
+
+          if (op.materials?.length) {
+            await tx.taskListMaterial.createMany({
+              data: op.materials.map((m: any) => ({
+                taskOperationId: created.taskOperationId,
+                materialId: m.materialId,
+                quantity: m.quantity,
+                createdBy: req.user!.userId,
+                modifiedBy: req.user!.userId,
+              })),
+            });
+          }
+        }
       });
     }
 
@@ -396,7 +468,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
         operations: {
           where: { isDeleted: false },
           orderBy: { sequenceNumber: 'asc' },
-          include: { craft: true },
+          include: { craft: true, materials: { include: { material: true } } },
         },
         workCenter: {
           select: { workCenterId: true, code: true, name: true },
@@ -416,6 +488,14 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
     res.json(updated);
   } catch (error: any) {
     if (error.code === 'P2002') {
+      // Either the task list code collided, or one operation listed the same
+      // material twice. The index is on (taskOperationId, materialId), so a
+      // duplicate requirement is a data-entry slip; the generic code message
+      // would blame the wrong field and send the caller looking at the header.
+      const target = String(error.meta?.target ?? '');
+      if (target.includes('TaskListMaterial')) {
+        return res.status(400).json({ error: 'An operation lists the same material more than once' });
+      }
       return res.status(409).json({ error: 'Task list code already exists' });
     }
     if (error.code === 'P2003') {

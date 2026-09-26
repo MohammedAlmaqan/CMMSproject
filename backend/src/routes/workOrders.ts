@@ -168,7 +168,9 @@ router.get('/:id', async (req: Request, res: Response) => {
         workCenter: true,
         supervisor: { select: { userId: true, fullName: true, username: true } },
         operations: { include: { craft: true }, orderBy: { sequenceNumber: 'asc' } },
-        woMaterials: { include: { material: true } },
+        // operation included so the screen can group a material line under the
+        // step that needs it, which is the point of SOW 3.1.5.
+        woMaterials: { include: { material: true, operation: true } },
         externalServices: true,
         checklists: {
           include: {
@@ -290,6 +292,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
       craftId: string;
       plannedHours: number;
       numberOfTechnicians: number;
+      materials: { materialId: string; quantity: number; standardCost: number }[];
     }[] = [];
 
     if (taskListId) {
@@ -299,6 +302,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
           operations: {
             where: { isDeleted: false },
             orderBy: { sequenceNumber: 'asc' },
+            include: { materials: { include: { material: true } } },
           },
         },
       });
@@ -317,6 +321,11 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
         craftId: op.craftId,
         plannedHours: op.plannedHours,
         numberOfTechnicians: op.numberOfTechnicians,
+        materials: op.materials.map((m) => ({
+          materialId: m.materialId,
+          quantity: m.quantity,
+          standardCost: m.material.standardCost || 0,
+        })),
       }));
     }
 
@@ -346,7 +355,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
       // Copied operations start Pending with zero actual hours: the template
       // carries the PLAN, and the actuals are the technician's to record.
       for (const op of templateOperations) {
-        await tx.workOrderOperation.create({
+        const createdOperation = await tx.workOrderOperation.create({
           data: {
             workOrderId: created.workOrderId,
             sequenceNumber: op.sequenceNumber,
@@ -360,6 +369,30 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
             modifiedBy: req.user!.userId,
           },
         });
+
+        // SOW 3.1.4 requirements arrive as SOW 3.1.5 planned material lines on
+        // the copied operation. unitCost is taken from the material's standard
+        // cost rather than left at 0, because planned material cost is
+        // plannedQuantity x unitCost: a zero rate would quietly understate the
+        // work order's planned cost by the whole parts bill.
+        //
+        // A material required by two different steps becomes two lines, one per
+        // operation. That is deliberate: each line is the cost of that step, and
+        // collapsing them would put the whole quantity against whichever step
+        // happened to be copied first.
+        for (const required of op.materials) {
+          await tx.workOrderMaterial.create({
+            data: {
+              workOrderId: created.workOrderId,
+              operationId: createdOperation.operationId,
+              materialId: required.materialId,
+              plannedQuantity: required.quantity,
+              actualQuantity: 0,
+              unitCost: required.standardCost,
+              reservationQuantity: 0,
+            },
+          });
+        }
       }
 
       return created;

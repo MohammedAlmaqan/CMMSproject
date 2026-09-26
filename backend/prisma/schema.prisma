@@ -185,6 +185,7 @@ model Material {
 
   bomItems     EquipmentBOMMaterial[]
   woMaterials  WorkOrderMaterial[]
+  taskListMaterials TaskListMaterial[]
 }
 
 model EquipmentBOMMaterial {
@@ -258,6 +259,30 @@ model TaskListOperation {
 
   taskList TaskList @relation(fields: [taskListId], references: [taskListId])
   craft    Craft    @relation(fields: [craftId], references: [craftId])
+  materials TaskListMaterial[]
+}
+
+/// SOW 3.1.4: a task list carries the materials its steps require. The
+/// requirement hangs off the step rather than the list, because the part a step
+/// needs is what the store has to have on the shelf before that step starts. A
+/// list-level requirement cannot say which step is blocked when the part is
+/// missing.
+model TaskListMaterial {
+  taskListMaterialId String @id @default(uuid())
+  taskOperationId    String
+  materialId         String
+  quantity           Float
+
+  createdBy    String   @default("system")
+  createdDate  DateTime @default(now())
+  modifiedBy   String   @default("system")
+  modifiedDate DateTime @updatedAt
+
+  taskOperation TaskListOperation @relation(fields: [taskOperationId], references: [taskOperationId])
+  material      Material          @relation(fields: [materialId], references: [materialId])
+
+  @@unique([taskOperationId, materialId], name: "TaskListMaterial_op_material_key")
+  @@index([materialId], map: "TaskListMaterial_materialId_idx")
 }
 
 model Notification {
@@ -354,12 +379,19 @@ model WorkOrderOperation {
   workOrder  WorkOrder    @relation(fields: [workOrderId], references: [workOrderId])
   craft      Craft        @relation(fields: [craftId], references: [craftId])
   laborEntries LaborEntry[]
+  /// Materials issued to this operation. See WorkOrderMaterial.operationId.
+  materials WorkOrderMaterial[]
 }
 
 model WorkOrderMaterial {
   woMaterialId       String @id @default(uuid())
   workOrderId        String
   materialId         String
+  /// SOW 3.1.5: a material is issued to the operation that needs it. Nullable
+  /// because a part can be common to the whole job, and existing rows predate
+  /// the link. When set, this is the operation the issue belongs to and it must
+  /// be an operation on this same work order.
+  operationId        String?
   plannedQuantity    Float
   actualQuantity     Float  @default(0)
   unitCost           Float  @default(0)
@@ -367,6 +399,7 @@ model WorkOrderMaterial {
 
   workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId])
   material  Material  @relation(fields: [materialId], references: [materialId])
+  operation WorkOrderOperation? @relation(fields: [operationId], references: [operationId])
 }
 
 model LaborEntry {

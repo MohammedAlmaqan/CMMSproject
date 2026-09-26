@@ -130,6 +130,11 @@ export const costSplitUpdateSchema = z.object({ percentage: z.number().gt(0).lt(
 export const woMaterialCreateSchema = z.object({
   workOrderId: z.string().min(1),
   materialId: z.string().min(1),
+  // SOW 3.1.5: the operation this part is issued to. Optional, because a part can
+  // genuinely be common to the whole job. When given, the route checks it is an
+  // operation on this same work order, so a material cannot be attributed to
+  // another job's operation.
+  operationId: z.string().min(1).nullable().optional(),
   plannedQuantity: z.number().min(0),
   actualQuantity: z.number().min(0).optional(),
   unitCost: z.number().min(0).optional(),
@@ -343,12 +348,22 @@ export const workCenterCreateSchema = z.object({
 
 export const workCenterUpdateSchema = workCenterCreateSchema.partial();
 
+/// A required material on a task list step. Zero is allowed and means "the step
+/// needs this part, quantity not yet determined", which is a real state for a
+/// template; a negative quantity is not, since it would reduce stock on issue.
+export const taskListMaterialItemSchema = z.object({
+  materialId: z.string().min(1),
+  quantity: z.number().nonnegative(),
+});
 export const taskListOperationItemSchema = z.object({
   sequenceNumber: z.number().int().positive(),
   description: z.string().min(1),
   craftId: z.string().min(1),
   plannedHours: z.number().nonnegative().optional(),
   numberOfTechnicians: z.number().int().positive().optional(),
+  // SOW 3.1.4 required materials. Attached to the step, not the list, so the
+  // store can see which step is blocked when a part is short.
+  materials: z.array(taskListMaterialItemSchema).optional(),
 });
 
 export const taskListCreateSchema = z.object({

@@ -4,6 +4,11 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { validate, woMaterialCreateSchema, woMaterialUpdateSchema } from '../utils/validation.js';
+import {
+  materialOperationMessage,
+  materialOperationRejection,
+  needsOperationCheck,
+} from '../utils/materialRules.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -42,6 +47,7 @@ router.use(authenticate);
  *                   woMaterialId: { type: string }
  *                   workOrderId: { type: string }
  *                   materialId: { type: string }
+ *                   operationId: { type: string, nullable: true, description: "SOW 3.1.5 - the operation this part is issued to, null for a job-level line" }
  *                   plannedQuantity: { type: number, format: float }
  *                   actualQuantity: { type: number, format: float, nullable: true }
  *                   unitCost: { type: number, format: float, nullable: true, description: "Float-typed in v1.0.0; Decimal migration is v1.1" }
@@ -57,7 +63,9 @@ router.use(authenticate);
  *     description: >
  *       Validated by the zod schema `woMaterialCreateSchema` (see
  *       utils/validation.ts). Requires the Technician role. The referenced material must
- *       exist, otherwise HTTP 404. The work order's cost is recomputed afterwards.
+ *       exist, otherwise HTTP 404. When operationId is given it must name an operation on
+ *       THIS work order: HTTP 404 if no such operation exists, HTTP 400 if it exists but
+ *       belongs to a different work order. The work order's cost is recomputed afterwards.
  *     tags: [Work Order Materials]
  *     security:
  *       - bearerAuth: []
@@ -72,6 +80,7 @@ router.use(authenticate);
  *             properties:
  *               workOrderId: { type: string }
  *               materialId: { type: string }
+ *               operationId: { type: string, nullable: true, description: "SOW 3.1.5 - the operation this part is issued to. Optional: a part can be common to the whole job. Must belong to this work order when present." }
  *               plannedQuantity: { type: number, minimum: 0 }
  *               actualQuantity: { type: number, minimum: 0 }
  *               unitCost: { type: number, minimum: 0 }
@@ -83,13 +92,13 @@ router.use(authenticate);
  *           application/json:
  *             schema: { type: object, additionalProperties: true }
  *       '400':
- *         description: zod validation failed
+ *         description: zod validation failed, or operationId belongs to another work order
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
  *         description: Caller role is below Technician
  *       '404':
- *         description: Material not found
+ *         description: Material not found, or operationId does not exist
  *       '500':
  *         description: Internal server error
  */
@@ -102,7 +111,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     const materials = await prisma.workOrderMaterial.findMany({
       where: { workOrderId: workOrderId as string },
-      include: { material: true },
+      include: { material: true, operation: true },
     });
 
     res.json(materials);
@@ -114,17 +123,33 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema), async (req: Request, res: Response) => {
   try {
-    const { workOrderId, materialId, plannedQuantity, actualQuantity, unitCost, reservationQuantity } = req.body;
+    const { workOrderId, materialId, operationId, plannedQuantity, actualQuantity, unitCost, reservationQuantity } = req.body;
 
     const materialExists = await prisma.material.findUnique({ where: { materialId } });
     if (!materialExists) {
       return res.status(404).json({ error: 'Material not found' });
     }
 
+    // SOW 3.1.5. The link is only useful if it is true, so confirm the named
+    // operation is on this work order before storing it.
+    if (needsOperationCheck(operationId)) {
+      const operation = await prisma.workOrderOperation.findUnique({
+        where: { operationId: operationId as string },
+        select: { workOrderId: true },
+      });
+      const rejection = materialOperationRejection(operation?.workOrderId ?? null, workOrderId);
+      if (rejection) {
+        return res.status(rejection === 'operation-not-found' ? 404 : 400).json({
+          error: materialOperationMessage(rejection),
+        });
+      }
+    }
+
     const material = await prisma.workOrderMaterial.create({
       data: {
         workOrderId,
         materialId,
+        operationId: (operationId as string) || null,
         plannedQuantity,
         actualQuantity: actualQuantity || 0,
         unitCost: unitCost || 0,
@@ -205,11 +230,29 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
       return res.status(404).json({ error: 'Work order material not found' });
     }
 
-    const { plannedQuantity, actualQuantity, unitCost, reservationQuantity } = req.body;
+    const { operationId, plannedQuantity, actualQuantity, unitCost, reservationQuantity } = req.body;
+
+    // Re-pointing the operation is allowed, and gets the same check as creation.
+    // The work order the line belongs to stays existing.workOrderId: a material
+    // line is a child of its work order and is not moved between jobs here,
+    // because that would silently restate the cost history of both.
+    if (needsOperationCheck(operationId)) {
+      const operation = await prisma.workOrderOperation.findUnique({
+        where: { operationId: operationId as string },
+        select: { workOrderId: true },
+      });
+      const rejection = materialOperationRejection(operation?.workOrderId ?? null, existing.workOrderId);
+      if (rejection) {
+        return res.status(rejection === 'operation-not-found' ? 404 : 400).json({
+          error: materialOperationMessage(rejection),
+        });
+      }
+    }
 
     const material = await prisma.workOrderMaterial.update({
       where: { woMaterialId: id },
       data: {
+        ...(operationId !== undefined && { operationId: operationId || null }),
         ...(plannedQuantity !== undefined && { plannedQuantity }),
         ...(actualQuantity !== undefined && { actualQuantity }),
         ...(unitCost !== undefined && { unitCost }),
