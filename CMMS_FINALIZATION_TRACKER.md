@@ -294,7 +294,7 @@ Non-blocking follow-ups: (1) when `actions/checkout@v5` and `actions/setup-node@
 | 7.4 | API reference (generated Swagger export -> static doc) | ✅ | SOW §6.2 deliverable | `d3cfbc6` |
 | 7.5 | User Manual (per role) + Administrator Guide (config, backup, users, scheduler ops) | ✅ | SOW §6.2 deliverables | `3679aa8` |
 | 7.6 | SOW compliance matrix (clause-by-clause); ERP + ad-hoc reporting **deferred**, i18n **excluded** | ✅ | All Critical/High pass or formally waived | `f18819a` |
-| 7.7 | Tag `v1.0.0` | ⬜ | Release tag exists — **pending client decision, not started** |  |
+| 7.7 | Tag `v1.0.0` | ✅ | **Corrected 2026-09-26 — this row was factually wrong.** It previously read *"pending client decision, not started"*, but the tag exists. Verified: annotated tag `v1.0.0`, tag object `386fe3c`, pointing at commit `0d941df`, tagger date 2026-09-26. **The tag marks shipped code, not client acceptance** — SOW §6.4 is *not* met at this tag, which is what Phase 8 below now tracks. The tag is immutable and will not be re-cut; the next tag is `v1.1.0`, cut only when the §6.4 criteria are met or waived. | `0d941df` |
 
 ---
 
@@ -310,6 +310,39 @@ The SOW compliance matrix (7.6) recorded two `Not Met` clauses as release blocke
 **R1 is enforced on checklist status, not on individual item responses.** `WorkOrderChecklistItem.response` is a non-nullable `String` and the attach route pre-fills every item with `'NA'`, so an unanswered item is not representable today. Recorded as **v1.1-5**.
 
 **Documentation contradictions found in review and fixed:** `INSTALLATION_GUIDE.md` and `docs/ADMIN_GUIDE.md` still instructed readers to run `prisma db push` (retired in favour of `migrate deploy`), the install guide documented 4 of 8 backend env variables, and `docs/ARCHITECTURE.md` still described the pre-close-out state of attachment backup and Express `trust proxy`. See `2e0bddc`, `ab7040c` and the follow-up commit.
+
+---
+
+## Phase 8 — Production Readiness
+
+Started 2026-09-26. Phase 8 opens with **Phase A: scope freeze and decision register**. No feature work is scheduled until the Phase A gate passes.
+
+### Phase A — Scope Freeze (vendor preparation complete, gate NOT passed)
+
+The SOW defines its own definition of done in one place: **§6.4 Acceptance Criteria**. Of the six criteria, five are `Not Met` and one is `Partial` at `v1.0.0`. §6.4.1 requires *"all functional requirements listed in §3 … implemented and pass UAT scripts"*. Of the 126 §3 rows, 38 are `Met` and 11 are already out of scope, leaving **77 that are neither Deferred nor Excluded**. Those 77 are the entire remaining engineering question, and until each is built or waived in writing, §6.4.1 is `Not Met` by arithmetic regardless of how much is delivered.
+
+| # | Task | Status | Acceptance Criteria | Commit |
+|---|---|---|---|---|
+| A.1 | Freeze the SOW clause inventory; derive the §6.4.1 scope set | ✅ | `scripts/verify/verify_a1.py` re-derives every count from `docs/SOW_COMPLIANCE.md` and exits 0: **214** rows = 64 Met / 75 Partial / 52 Not Met / 8 Deferred / 15 Excluded; **§3 = 126** rows = 38 Met / 42 Partial / 35 Not Met / 4 Deferred / 7 Excluded; **77 in-scope §3 gaps** (42 Partial + 35 Not Met) reconciling 38 + 77 + 4 + 7 = 126. §3 gap split by subsection: 3.1=13, 3.2=9, 3.3=16, 3.4=10, 3.5=6, 3.6=3, 3.7=11, 3.8=6, 3.9=1, 3.10=2. Confirmed the `v1.0.0` tag object `386fe3c` → `0d941df` and that it is unchanged. | `66acd4f` |
+| A.2 | Decision register: 77-row disposition worksheet, D-2…D-16, unsigned sign-off | ✅ | `docs/DECISION_REGISTER.md` — 77 rows with clause text and status **transcribed from the matrix, not retyped**; a proposed phase each (B 6 / C 18 / D 11 / E 11 / F 15 / G 1 / H 15 = 77); 15 decisions posed as questions with options, a labelled vendor recommendation and a named owner; sign-off block left **unsigned**. Surfaces four SOW-internal problems: **D-2** §6.4.6 requires training completed but X7 removed it, so the criterion is unmeetable as written; **D-3** planned labour hours per technician vs per operation is unspecified and changes every planned-cost figure and the §3.7.1 summary; **D-15** §3.2.2 "any authenticated user can create a notification" contradicts §2.2 View-Only "read access"; **D-16** §3.3.5 names the work-centre rate as source while §3.5.1 names the craft rate, and the code uses `Craft.hourlyRate` while never reading `WorkCenter.costRatePerHour`. 13 of 77 rows are gated on a decision; **64 can be dispositioned immediately** on the matrix evidence alone. | `f2aebc1` |
+| A.3 | Register cross-check + Phase A sign-off gate, with a self-test | ✅ | `verify_a1.py` extended to reconcile the register against the matrix: 77 worksheet rows, 15 decisions, and **clause / status / requirement text / phase value / decision reference all OK**. `verify_a1_signed.py` added as a *separate* gate so a red signature gate is never mistaken for a broken baseline: **0/77 dispositioned, 0/15 answered, 0/4 signed → 96 outstanding → PHASE A GATE: NOT PASSED**. `verify_a1_signed_test.py` proves the gate has teeth rather than assuming it — 9/9 cases on throwaway temp copies, real register read-only: passes when fully signed, fails on a missing first/middle/last disposition, an unanswered decision, absent signatures, and a row with both Build *and* Waive ticked. backend `tsc --noEmit` exit 0; app `tsc -b` exit 0. | `3bea29f` |
+| A.4 | Tracker evidence + factual correction of row 7.7 | ✅ | This section, plus the 7.7 correction above. | `pending` |
+
+### Phase A gate — NOT PASSED
+
+| Gate condition | State |
+|---|---|
+| Baseline inventory machine-frozen and re-derivable | ✅ `verify_a1.py` exit 0 |
+| All 77 in-scope §3 rows listed with matrix-sourced clause and status | ✅ A.2 |
+| Every row carries a proposed phase and any gating decision | ✅ A.2 |
+| D-2 … D-16 posed with options, recommendation and named owner | ✅ A.2 |
+| Every one of the 77 rows dispositioned `Build` or `Waive` | ⛔ **0 of 77** |
+| D-2 … D-16 answered | ⛔ **0 of 15** |
+| Signed by the Client | ⛔ unsigned |
+
+**Phase A is blocked on a Client signature.** Vendor preparation is complete; the gate itself requires a decision the vendor cannot supply and will not simulate. No Phase B work is planned or started until it passes.
+
+**Dependencies the vendor does not hold** — none is an engineering task, and each gates a §6.4 criterion: Client signature; Windows Server with IIS + ARR (§4.2 TLS rehearsal); a live PostgreSQL target and `PGPASSWORD` for the first real backup/restore drill (`backup.bat` hardcodes its connection and has never run against a live instance); `k6.exe` (gitignored, deliberately not in the repository) for the §6.4.3 100-VU and §4.1 200-VU runs; an Azure AD tenant and app registration for D-5(a); Client legacy data for the §5.7 importers and §6.4.5 migration accuracy; a dry-run migration window for §6.4.5.
 
 ---
 
