@@ -207,7 +207,12 @@ router.get('/:id', async (req: Request, res: Response) => {
  * /api/work-orders:
  *   post:
  *     summary: Create a work order
- *     description: Creates a Draft work order. Requires role Requester or higher.
+ *     description: >
+ *       Creates a Draft work order. Requires role Requester or higher. Passing
+ *       taskListId copies that reusable task list's operations onto the new work
+ *       order (SOW 3.1.4) in the same transaction, so a work order never exists
+ *       without the operations it was created from. Copied operations carry the
+ *       template's plan and start Pending with zero actual hours.
  *     tags: [Work Orders]
  *     security:
  *       - bearerAuth: []
@@ -242,6 +247,10 @@ router.get('/:id', async (req: Request, res: Response) => {
  *               plannedFinish:
  *                 type: string
  *                 format: date-time
+ *               taskListId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Reusable task list whose operations are copied onto this work order
  *     responses:
  *       '201':
  *         description: Work order created
@@ -249,6 +258,8 @@ router.get('/:id', async (req: Request, res: Response) => {
  *           application/json:
  *             schema:
  *               type: object
+ *       '400':
+ *         description: Validation failed, or the task list was not found or has no operations
  *       '409':
  *         description: Work order number already exists
  *       '500':
@@ -260,31 +271,105 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
       type, priority, functionalLocationId, equipmentId, description,
       workCenterId, supervisorUserId, plannedStart, plannedFinish,
       costCenterCode, internalOrder, breakdownFlag, safetyCriticalFlag,
+      taskListId,
     } = req.body;
 
+    // The number is allocated before the transaction opens, because the sequence
+    // helper talks to the shared Prisma client rather than the transaction. A
+    // failed create therefore leaves a gap in the numbering, which is the right
+    // trade: a gap is visible and harmless, whereas allocating inside the
+    // transaction and rolling back would silently reuse a number.
     const woNumber = await generateWoNumber();
 
-    const workOrder = await prisma.workOrder.create({
-      data: {
-        woNumber,
-        type,
-        priority,
-        functionalLocationId,
-        equipmentId: equipmentId || null,
-        description,
-        workCenterId,
-        supervisorUserId,
-        plannedStart: plannedStart ? new Date(plannedStart) : null,
-        plannedFinish: plannedFinish ? new Date(plannedFinish) : null,
-        costCenterCode: costCenterCode || '',
-        internalOrder: internalOrder || '',
-        breakdownFlag: breakdownFlag || false,
-        safetyCriticalFlag: safetyCriticalFlag || false,
-        status: 'Draft',
-        createdBy: req.user!.userId,
-        modifiedBy: req.user!.userId,
-      },
+    // SOW 3.1.4: copy the reusable task list's operations onto the new work
+    // order. Validated before the write so a bad template cannot leave a
+    // half-built work order behind.
+    let templateOperations: {
+      sequenceNumber: number;
+      description: string;
+      craftId: string;
+      plannedHours: number;
+      numberOfTechnicians: number;
+    }[] = [];
+
+    if (taskListId) {
+      const taskList = await prisma.taskList.findFirst({
+        where: { taskListId, isDeleted: false },
+        include: {
+          operations: {
+            where: { isDeleted: false },
+            orderBy: { sequenceNumber: 'asc' },
+          },
+        },
+      });
+      if (!taskList) {
+        return res.status(400).json({ error: 'Task list not found' });
+      }
+      if (taskList.operations.length === 0) {
+        // Copying an empty template would produce a work order with no
+        // operations, which is exactly what SOW 3.3.3 forbids and what the
+        // planner did not ask for.
+        return res.status(400).json({ error: 'Task list has no operations to copy' });
+      }
+      templateOperations = taskList.operations.map((op) => ({
+        sequenceNumber: op.sequenceNumber,
+        description: op.description,
+        craftId: op.craftId,
+        plannedHours: op.plannedHours,
+        numberOfTechnicians: op.numberOfTechnicians,
+      }));
+    }
+
+    const workOrder = await prisma.$transaction(async (tx) => {
+      const created = await tx.workOrder.create({
+        data: {
+          woNumber,
+          type,
+          priority,
+          functionalLocationId,
+          equipmentId: equipmentId || null,
+          description,
+          workCenterId,
+          supervisorUserId,
+          plannedStart: plannedStart ? new Date(plannedStart) : null,
+          plannedFinish: plannedFinish ? new Date(plannedFinish) : null,
+          costCenterCode: costCenterCode || '',
+          internalOrder: internalOrder || '',
+          breakdownFlag: breakdownFlag || false,
+          safetyCriticalFlag: safetyCriticalFlag || false,
+          status: 'Draft',
+          createdBy: req.user!.userId,
+          modifiedBy: req.user!.userId,
+        },
+      });
+
+      // Copied operations start Pending with zero actual hours: the template
+      // carries the PLAN, and the actuals are the technician's to record.
+      for (const op of templateOperations) {
+        await tx.workOrderOperation.create({
+          data: {
+            workOrderId: created.workOrderId,
+            sequenceNumber: op.sequenceNumber,
+            description: op.description,
+            craftId: op.craftId,
+            plannedHours: op.plannedHours,
+            numberOfTechnicians: op.numberOfTechnicians,
+            actualHours: 0,
+            status: 'Pending',
+            createdBy: req.user!.userId,
+            modifiedBy: req.user!.userId,
+          },
+        });
+      }
+
+      return created;
     });
+
+    if (templateOperations.length > 0) {
+      // Planned cost is derived from the operations, so the new work order's
+      // totals are otherwise left at zero until something else touches them.
+      await recomputeWorkOrderCosts(workOrder.workOrderId);
+    }
 
     await logAudit(
       { tableName: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create' },

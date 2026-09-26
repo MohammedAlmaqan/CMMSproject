@@ -37,6 +37,11 @@ export const workOrderCreateSchema = z.object({
   internalOrder: z.string().optional(),
   breakdownFlag: z.boolean().optional(),
   safetyCriticalFlag: z.boolean().optional(),
+  // SOW 3.1.4: a manually created work order copies its operations from a
+  // reusable task list. Before this existed the only route to a task list's
+  // operations was preventive-maintenance generation, so the reusable-template
+  // feature was unreachable for a planner raising work by hand.
+  taskListId: z.string().min(1).nullable().optional(),
 });
 
 export const workOrderUpdateSchema = workOrderCreateSchema.partial();
