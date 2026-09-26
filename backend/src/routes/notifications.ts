@@ -3,6 +3,11 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { generateNotifNumber, generateWoNumber } from '../utils/sequence.js';
+import {
+  canTransition,
+  invalidTransitionMessage,
+  transitionTargets,
+} from '../utils/transitions.js';
 import { logger } from '../utils/logger.js';
 import {
   validate,
@@ -268,7 +273,13 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
  *     summary: Update a notification
  *     description: >
  *       Validated by the zod schema `notificationUpdateSchema` (see
- *       utils/validation.ts). Requires the Requester role.
+ *       utils/validation.ts). Requires the Requester role. SOW 3.2.1 transition
+ *       validity is enforced: a `status` change is accepted only if the
+ *       NOTIFICATION_TRANSITIONS map in utils/transitions.ts permits it
+ *       (Open to In Process/Converted/Completed, In Process to
+ *       Completed/Converted, Converted to Completed, Completed terminal). An
+ *       illegal transition is rejected with 400, the current status and the
+ *       permitted targets, and is recorded in the audit trail as Blocked.
  *     tags: [Notifications]
  *     security:
  *       - bearerAuth: []
@@ -301,7 +312,7 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
  *           application/json:
  *             schema: { type: object, additionalProperties: true }
  *       '400':
- *         description: zod validation failed
+ *         description: zod validation failed, or an illegal status transition was attempted
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
@@ -325,6 +336,31 @@ router.put('/:id', authorizeMinRole('Requester'), validate(notificationUpdateSch
       type, priority, functionalLocationId, equipmentId,
       reportedByUserId, description, breakdownFlag, status,
     } = req.body;
+
+    // SOW 3.2.1: transition validity is enforced and illegal transitions are
+    // rejected. The status used to be written straight from the request body,
+    // so any status could be reached from any other.
+    if (status !== undefined && status !== existing.status) {
+      if (!canTransition(existing.status, status)) {
+        await logAudit(
+          {
+            tableName: 'Notification',
+            recordId: id,
+            action: 'Blocked',
+            fieldName: 'status',
+            oldValue: existing.status,
+            newValue: status,
+          },
+          req.user!.userId,
+          req.ip
+        );
+        return res.status(400).json({
+          error: invalidTransitionMessage(existing.status, status),
+          currentStatus: existing.status,
+          allowedTransitions: transitionTargets(existing.status),
+        });
+      }
+    }
 
     const notification = await prisma.notification.update({
       where: { notificationId: id },
@@ -428,7 +464,9 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
  *     description: >
  *       Creates a CM work order from the notification, copies the location, equipment,
  *       priority and breakdown flag, links the notification to the new work order and
- *       sets the notification status to Converted. workCenterId defaults to the first
+ *       sets the notification status to Converted. Only a notification the lifecycle map
+ *       permits converting (Open or In Process) is accepted; a Completed notification
+ *       is rejected with 400. workCenterId defaults to the first
  *       available work center; supervisorUserId defaults to the reporting user, then the
  *       authenticated user. Validated by the zod schema `convertNotificationSchema`
  *       (see utils/validation.ts). Requires the Maintenance Planner role.
@@ -462,7 +500,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
  *                 message: { type: string }
  *                 workOrder: { type: object, additionalProperties: true }
  *       '400':
- *         description: zod validation failed, or no work center is available
+ *         description: zod validation failed, no work center is available, or the notification's current status does not permit conversion
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
@@ -486,6 +524,16 @@ router.post('/:id/convert-to-wo', authorizeMinRole('Maintenance Planner'), valid
 
     if (notification.status === 'Converted') {
       return res.status(400).json({ error: 'Notification already converted' });
+    }
+    // A completed notification is finished work; turning it back into a work
+    // order would contradict the lifecycle. Same rule as the PUT transition
+    // map, applied here so the convert path cannot bypass it.
+    if (!canTransition(notification.status, 'Converted')) {
+      return res.status(400).json({
+        error: invalidTransitionMessage(notification.status, 'Converted'),
+        currentStatus: notification.status,
+        allowedTransitions: transitionTargets(notification.status),
+      });
     }
 
     const woNumber = await generateWoNumber();
