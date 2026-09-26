@@ -80,7 +80,7 @@ Consequences you must plan for:
 
 Configuration is entirely by environment variable. The backend reads `backend/.env`; the frontend is compiled with `app/.env.local`. **There is no settings screen that writes configuration** - the Administration screen's Settings tab is read-only, and changing any value here requires an edit and a restart.
 
-> The configuration table in section 3 of the [Installation Guide](../INSTALLATION_GUIDE.md#3-configuration) lists only four variables. **This section is the complete set.** The installation guide's table is a subset, not a contradiction.
+> The configuration tables in this section and in the [Installation Guide](../INSTALLATION_GUIDE.md#3-configuration) match; both list every variable the API reads.
 
 ### 3.1 Backend variables - `backend/.env`
 

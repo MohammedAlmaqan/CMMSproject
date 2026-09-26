@@ -193,7 +193,9 @@ For production, request a certificate from a public CA instead and never commit 
 
 The first rule must stay above the second, otherwise every API call is rewritten to `index.html` and returns HTML instead of JSON.
 
-**Forwarded headers** — IIS must tell the app that the original request was HTTPS, so add custom headers on the site: `X-Forwarded-Proto = https` and `X-Forwarded-For = {REMOTE_ADDR}`. Express does not read `req.protocol` today, so no backend change is required; if a future feature needs to build absolute HTTPS URLs, enable Express `trust proxy` at that time rather than now.
+**Forwarded headers** — IIS must tell the app that the original request was HTTPS, so add custom headers on the site: `X-Forwarded-Proto = https` and `X-Forwarded-For = {REMOTE_ADDR}`. The API already sets Express `trust proxy = 1` (one hop), which is what lets `req.ip` and the login rate limiter see the real client behind the proxy rather than the proxy's own address.
+
+**ARR must overwrite `X-Forwarded-For`, not append to it.** With exactly one hop trusted, a client that can reach the API *directly* and supply its own `X-Forwarded-For` bypasses the login rate limiter completely. An appending proxy is worse than no proxy: it lets a client prepend a forged value that the single trusted hop still resolves to the attacker. Set `BIND_HOST=127.0.0.1` so port 4000 is unreachable except through IIS, and confirm the ARR rewrite replaces the inbound header rather than adding to it.
 
 **Verify** — open the site over HTTPS and confirm the API is reachable through the proxy:
 
