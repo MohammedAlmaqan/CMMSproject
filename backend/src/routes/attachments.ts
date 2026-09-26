@@ -261,6 +261,22 @@ router.post('/', authorizeMinRole('Requester'), uploadFile, validate(attachmentC
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    // An attachment is only reachable through its parent, so an attachment
+    // whose parent does not exist can never be listed, downloaded or deleted
+    // from any screen, while the file stays on disk. That is an orphan that
+    // costs storage and cannot be cleaned up from the UI, so the parent is
+    // confirmed to exist and not be soft-deleted before anything is written.
+    const parent =
+      entityType === 'Equipment'
+        ? await prisma.equipment.findFirst({ where: { equipmentId: entityId, isDeleted: false }, select: { equipmentId: true } })
+        : entityType === 'WorkOrder'
+          ? await prisma.workOrder.findFirst({ where: { workOrderId: entityId, isDeleted: false }, select: { workOrderId: true } })
+          : await prisma.notification.findFirst({ where: { notificationId: entityId, isDeleted: false }, select: { notificationId: true } });
+
+    if (!parent) {
+      return res.status(404).json({ error: `${entityType} not found` });
+    }
+
     const originalName = sanitizeName(req.file.originalname);
     const storedName = `${randomUUID()}-${originalName}`;
     const relDir = `${entityType}/${entityId}`;
