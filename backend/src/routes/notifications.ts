@@ -231,6 +231,36 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
       reportedByUserId, description, breakdownFlag,
     } = req.body;
 
+    // SOW 3.2.2 makes the location/equipment selection mandatory but does not
+    // say the two must both be typed in. The schema therefore requires at least
+    // one, and the location is derived from the equipment when the reporter
+    // names only a machine — a fault against a specific asset already knows where
+    // that asset is, and making the reporter repeat it is how the two end up
+    // contradicting each other in the data.
+    let resolvedLocationId = functionalLocationId ?? null;
+    let resolvedEquipmentId = equipmentId ?? null;
+
+    if (resolvedEquipmentId) {
+      const equipment = await prisma.equipment.findFirst({
+        where: { equipmentId: resolvedEquipmentId, isDeleted: false },
+        select: { equipmentId: true, functionalLocationId: true },
+      });
+      if (!equipment) {
+        return res.status(400).json({ error: 'Equipment not found' });
+      }
+
+      if (!resolvedLocationId) {
+        resolvedLocationId = equipment.functionalLocationId;
+      } else if (resolvedLocationId !== equipment.functionalLocationId) {
+        // Both were supplied and they disagree. Storing that produces a
+        // notification whose equipment is not at its stated location, which
+        // then misreports under both the location tree and the asset.
+        return res.status(400).json({
+          error: 'Equipment is not located at the selected functional location',
+        });
+      }
+    }
+
     const notificationNumber = await generateNotifNumber();
 
     const notification = await prisma.notification.create({
@@ -238,8 +268,8 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
         notificationNumber,
         type,
         priority,
-        functionalLocationId,
-        equipmentId: equipmentId || null,
+        functionalLocationId: resolvedLocationId!,
+        equipmentId: resolvedEquipmentId,
         reportedByUserId,
         description,
         breakdownFlag: breakdownFlag || false,
@@ -358,6 +388,29 @@ router.put('/:id', authorizeMinRole('Requester'), validate(notificationUpdateSch
           error: invalidTransitionMessage(existing.status, status),
           currentStatus: existing.status,
           allowedTransitions: transitionTargets(existing.status),
+        });
+      }
+    }
+
+    // The same contradiction the create path refuses must not be reachable by
+    // editing: moving a notification onto different equipment, or changing one
+    // side of the location/equipment pair, would otherwise leave a notification
+    // whose equipment is not at its stated location.
+    const nextEquipmentId = equipmentId !== undefined ? equipmentId || null : existing.equipmentId;
+    const nextLocationId =
+      functionalLocationId !== undefined ? functionalLocationId : existing.functionalLocationId;
+
+    if (nextEquipmentId) {
+      const equipment = await prisma.equipment.findFirst({
+        where: { equipmentId: nextEquipmentId, isDeleted: false },
+        select: { equipmentId: true, functionalLocationId: true },
+      });
+      if (!equipment) {
+        return res.status(400).json({ error: 'Equipment not found' });
+      }
+      if (nextLocationId !== equipment.functionalLocationId) {
+        return res.status(400).json({
+          error: 'Equipment is not located at the selected functional location',
         });
       }
     }

@@ -228,26 +228,45 @@ export const notificationTypeSchema = z.enum(['M1', 'M2', 'M3']);
 
 export const notificationStatusSchema = z.enum(['Open', 'In Process', 'Completed', 'Converted']);
 
-export const notificationCreateSchema = z.object({
-  type: notificationTypeSchema,
-  priority: prioritySchema,
-  description: z.string().min(3),
-  functionalLocationId: z.string().min(1),
-  equipmentId: z.string().min(1).nullable().optional(),
-  reportedByUserId: z.string().min(1),
-  breakdownFlag: z.boolean().optional(),
-});
+export const notificationCreateSchema = z
+  .object({
+    type: notificationTypeSchema,
+    priority: prioritySchema,
+    description: z.string().min(3),
+    // SOW 3.2.2 lists "Functional Location / Equipment (mandatory selection)".
+    // Requiring the location unconditionally was wrong in practice: a fault
+    // raised against a specific machine already determines its location, and
+    // forcing the reporter to pick one by hand is how a notification ends up
+    // filed under a location that contradicts its own equipment. So the location
+    // becomes optional and the route derives it from the equipment when only the
+    // equipment is given. At least one of the two is still mandatory.
+    functionalLocationId: z.string().min(1).nullable().optional(),
+    equipmentId: z.string().min(1).nullable().optional(),
+    reportedByUserId: z.string().min(1),
+    breakdownFlag: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.functionalLocationId && !data.equipmentId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['functionalLocationId'],
+        message:
+          'A functional location or an equipment must be selected: SOW 3.2.2 makes the selection mandatory',
+      });
+    }
+  });
 
-export const notificationUpdateSchema = z.object({
-  type: notificationTypeSchema.optional(),
-  priority: prioritySchema.optional(),
-  description: z.string().min(3).optional(),
-  functionalLocationId: z.string().min(1).optional(),
-  equipmentId: z.string().min(1).nullable().optional(),
-  reportedByUserId: z.string().min(1).optional(),
-  breakdownFlag: z.boolean().optional(),
-  status: notificationStatusSchema.optional(),
-});
+export const notificationUpdateSchema = z
+  .object({
+    type: notificationTypeSchema.optional(),
+    priority: prioritySchema.optional(),
+    description: z.string().min(3).optional(),
+    functionalLocationId: z.string().min(1).nullable().optional(),
+    equipmentId: z.string().min(1).nullable().optional(),
+    reportedByUserId: z.string().min(1).optional(),
+    breakdownFlag: z.boolean().optional(),
+    status: notificationStatusSchema.optional(),
+  });
 
 export const convertNotificationSchema = z.object({
   workCenterId: z.string().min(1).optional(),
