@@ -5,6 +5,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, equipmentCreateSchema, equipmentUpdateSchema, equipmentImportRowSchema, equipmentBomCreateSchema, equipmentBomUpdateSchema } from '../utils/validation.js';
 import { logAudit } from '../middleware/audit.js';
 import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
+import { checkEquipmentPlacement } from '../utils/locationRules.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -508,13 +509,20 @@ router.post('/', authorizeMinRole('Technician'), validate(equipmentCreateSchema)
       technicalParameters,
     } = req.body;
 
+    // SOW 3.1.2: the location must be the LOWEST level of the hierarchy, not
+    // merely a valid one. See utils/locationRules.ts for why this is defined
+    // structurally rather than from the locationType label.
+    const placement = await checkEquipmentIsAtLeaf(functionalLocationId);
+    if (!placement.ok) {
+      return res.status(400).json({ error: placement.error });
+    }
+
     const equipment = await prisma.equipment.create({
       data: {
         equipmentCode,
         name,
         description,
-        functionalLocationId,
-        manufacturer: manufacturer || '',
+        functionalLocationId,        manufacturer: manufacturer || '',
         model: model || '',
         serialNumber: serialNumber || '',
         assetTag: assetTag || '',
@@ -624,6 +632,15 @@ router.put('/:id', authorizeMinRole('Technician'), validate(equipmentUpdateSchem
       technicalParameters,
     } = req.body;
 
+    // Only re-checked when the location is actually moving, so an unrelated edit
+    // to a serial number is not blocked by a hierarchy rule it does not touch.
+    if (functionalLocationId !== undefined && functionalLocationId !== existing.functionalLocationId) {
+      const placement = await checkEquipmentIsAtLeaf(functionalLocationId);
+      if (!placement.ok) {
+        return res.status(400).json({ error: placement.error });
+      }
+    }
+
     const equipment = await prisma.equipment.update({
       where: { equipmentId: String(req.params.id) },
       data: {
@@ -731,8 +748,28 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
   }
 });
 
-// SOW 3.1.2 / 3.1.5: the spare-parts BOM is a maintenance-managed write path, not
-// a read-only projection. EquipmentBOMMaterial is a composition child with no
+/**
+ * SOW 3.1.2 guard, shared by the create and update paths. Confirms the location
+ * exists, is not retired, and is a leaf. Returns the check result rather than
+ * writing a response so both callers can decide the status code.
+ */
+async function checkEquipmentIsAtLeaf(
+  functionalLocationId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const location = await prisma.functionalLocation.findFirst({
+    where: { functionalLocationId, isDeleted: false },
+    select: {
+      functionalLocationId: true,
+      _count: { select: { children: { where: { isDeleted: false } } } },
+    },
+  });
+  if (!location) {
+    return { ok: false, error: 'Functional location not found' };
+  }
+  return checkEquipmentPlacement({ hasChildren: location._count.children > 0 });
+}
+
+// SOW 3.1.2 / 3.1.5: the spare-parts BOM is a maintenance-managed write path, not// a read-only projection. EquipmentBOMMaterial is a composition child with no
 // isDeleted column, so BOM lines are hard-deleted — the same treatment 3.4 gives
 // the other child tables in this file.
 //

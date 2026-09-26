@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, functionalLocationCreateSchema, functionalLocationUpdateSchema } from '../utils/validation.js';
 import { logAudit } from '../middleware/audit.js';
+import { checkChildAddition } from '../utils/locationRules.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -256,6 +257,28 @@ router.post('/', authorizeMinRole('Technician'), validate(functionalLocationCrea
       const prefix = locationType ? locationType.substring(0, 3).toUpperCase() : 'LOC';
       const nextNum = last ? String(Number(last.locationCode.replace(/[^0-9]/g, '')) + 1).padStart(4, '0') : '0001';
       code = `${prefix}-${nextNum}`;
+    }
+
+    // SOW 3.1.2 makes the lowest level the only level that may hold equipment.
+    // Adding a child beneath a location that already holds equipment would
+    // silently break that invariant from the other direction, leaving the
+    // equipment at a location that is no longer lowest level. The equipment has
+    // to be moved down first.
+    if (parentLocationId) {
+      const parent = await prisma.functionalLocation.findFirst({
+        where: { functionalLocationId: parentLocationId, isDeleted: false },
+        select: {
+          functionalLocationId: true,
+          _count: { select: { equipment: { where: { isDeleted: false } } } },
+        },
+      });
+      if (!parent) {
+        return res.status(400).json({ error: 'Parent functional location not found' });
+      }
+      const childCheck = checkChildAddition({ hasEquipment: parent._count.equipment > 0 });
+      if (!childCheck.ok) {
+        return res.status(400).json({ error: childCheck.error });
+      }
     }
 
     const location = await prisma.functionalLocation.create({
