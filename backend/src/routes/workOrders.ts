@@ -5,6 +5,7 @@ import { logAudit } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber, generateNotifNumber } from '../utils/sequence.js';
 import { canTransition } from '../utils/transitions.js';
+import { requiresAtLeastOneOperation, missingOperationMessage } from '../utils/workOrderRules.js';
 import { logger } from '../utils/logger.js';
 import {
   validate,
@@ -515,7 +516,18 @@ function requireSupervisorForClose(req: Request, res: Response, next: NextFuncti
  *       '403':
  *         description: Insufficient permissions (closing requires Maintenance Supervisor or Administrator)
  *       '409':
- *         description: Mandatory safety checklist not completed (transition to In Progress)
+ *         description: >
+ *           Transition blocked. Either a mandatory safety checklist is not
+ *           complete (transition to In Progress), or the work order has no
+ *           operations yet (any transition out of Draft into a planned,
+ *           scheduled or in-progress state, per SOW 3.3.3).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: { type: string }
+ *                 checklist: { type: string }
  *       '404':
  *         description: Work order not found
  *       '500':
@@ -543,6 +555,25 @@ router.put(
       return res.status(400).json({
         error: `Invalid transition from '${workOrder.status}' to '${newStatus}'`,
       });
+    }
+
+    if (requiresAtLeastOneOperation(workOrder.status, newStatus)) {
+      const operationCount = await prisma.workOrderOperation.count({ where: { workOrderId: id } });
+      if (operationCount === 0) {
+        await logAudit(
+          {
+            tableName: 'WorkOrder',
+            recordId: id,
+            action: 'Blocked',
+            fieldName: 'status',
+            oldValue: workOrder.status,
+            newValue: newStatus,
+          },
+          req.user!.userId,
+          req.ip
+        );
+        return res.status(409).json({ error: missingOperationMessage() });
+      }
     }
 
     if (newStatus === 'In Progress') {
