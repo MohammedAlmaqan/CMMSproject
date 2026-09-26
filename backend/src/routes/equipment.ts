@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { validate, equipmentCreateSchema, equipmentUpdateSchema, equipmentImportRowSchema } from '../utils/validation.js';
+import { validate, equipmentCreateSchema, equipmentUpdateSchema, equipmentImportRowSchema, equipmentBomCreateSchema, equipmentBomUpdateSchema } from '../utils/validation.js';
 import { logAudit } from '../middleware/audit.js';
 import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
 import { logger } from '../utils/logger.js';
@@ -727,6 +727,255 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
     res.json({ message: 'Equipment deleted successfully' });
   } catch (error) {
     logger.error({ err: error }, 'Error deleting equipment');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// SOW 3.1.2 / 3.1.5: the spare-parts BOM is a maintenance-managed write path, not
+// a read-only projection. EquipmentBOMMaterial is a composition child with no
+// isDeleted column, so BOM lines are hard-deleted — the same treatment 3.4 gives
+// the other child tables in this file.
+//
+// The duplicate-material guard below is an application-level check only:
+// EquipmentBOMMaterial has no unique index on (equipmentId, materialId), so two
+// concurrent POSTs can both pass the guard. Closing that needs a unique index,
+// which is a schema migration and is therefore out of scope for this write path.
+
+/**
+ * @openapi
+ * /api/equipment/{id}/bom:
+ *   post:
+ *     summary: Add a material from the catalog to an equipment BOM
+ *     description: >
+ *       Creates one EquipmentBOMMaterial line, associating a catalog spare part
+ *       with a piece of equipment. Rejects an unknown or deleted material, a
+ *       non-positive quantity, and a duplicate line for the same material.
+ *     tags: [Equipment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Equipment equipmentId
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [materialId, quantity]
+ *             properties:
+ *               materialId: { type: string }
+ *               quantity: { type: number, minimum: 0, exclusiveMinimum: 0 }
+ *     responses:
+ *       '201':
+ *         description: BOM line created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 bomId: { type: integer }
+ *                 equipmentId: { type: string }
+ *                 materialId: { type: string }
+ *                 quantity: { type: number }
+ *       '400':
+ *         description: Validation failed, or material is not in the catalog
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '404':
+ *         description: Equipment not found
+ *       '409':
+ *         description: This material is already on the equipment BOM
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/:id/bom', authorizeMinRole('Technician'), validate(equipmentBomCreateSchema), async (req: Request, res: Response) => {
+  try {
+    const equipmentId = String(req.params.id);
+    const { materialId, quantity } = req.body;
+
+    const equipment = await prisma.equipment.findFirst({
+      where: { equipmentId, isDeleted: false },
+      select: { equipmentId: true },
+    });
+    if (!equipment) {
+      return res.status(404).json({ error: 'Equipment not found' });
+    }
+
+    const material = await prisma.material.findFirst({
+      where: { materialId, isDeleted: false },
+      select: { materialId: true },
+    });
+    if (!material) {
+      return res.status(400).json({ error: 'Material not found in catalog' });
+    }
+
+    const existingLine = await prisma.equipmentBOMMaterial.findFirst({
+      where: { equipmentId, materialId },
+    });
+    if (existingLine) {
+      return res.status(409).json({ error: 'Material is already on this equipment BOM' });
+    }
+
+    const bomItem = await prisma.equipmentBOMMaterial.create({
+      data: { equipmentId, materialId, quantity },
+    });
+
+    await logAudit(
+      { tableName: 'EquipmentBOMMaterial', recordId: bomItem.bomId, action: 'Create' },
+      req.user!.userId,
+      req.ip
+    );
+
+    res.status(201).json(bomItem);
+  } catch (error) {
+    logger.error({ err: error }, 'Error adding equipment BOM line');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/equipment/{id}/bom/{bomId}:
+ *   put:
+ *     summary: Change the quantity on an equipment BOM line
+ *     description: >
+ *       Updates the spare-parts quantity for one BOM line. Only the quantity is
+ *       editable; the material itself is fixed by the path, so a BOM line can
+ *       never be re-pointed at a different catalog item by a typo.
+ *     tags: [Equipment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Equipment equipmentId
+ *       - in: path
+ *         name: bomId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [quantity]
+ *             properties:
+ *               quantity: { type: number, exclusiveMinimum: 0 }
+ *     responses:
+ *       '200':
+ *         description: BOM line updated
+ *       '400':
+ *         description: Validation failed
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Technician
+ *       '404':
+ *         description: Equipment or BOM line not found
+ *       '500':
+ *         description: Internal server error
+ */
+router.put('/:id/bom/:bomId', authorizeMinRole('Technician'), validate(equipmentBomUpdateSchema), async (req: Request, res: Response) => {
+  try {
+    const equipmentId = String(req.params.id);
+    const bomId = String(req.params.bomId);
+
+    const existing = await prisma.equipmentBOMMaterial.findFirst({
+      where: { bomId, equipmentId },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'BOM line not found on this equipment' });
+    }
+
+    const bomItem = await prisma.equipmentBOMMaterial.update({
+      where: { bomId },
+      data: { quantity: req.body.quantity },
+    });
+
+    await logAudit(
+      { tableName: 'EquipmentBOMMaterial', recordId: String(bomId), action: 'Update' },
+      req.user!.userId,
+      req.ip
+    );
+
+    res.json(bomItem);
+  } catch (error) {
+    logger.error({ err: error }, 'Error updating equipment BOM line');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/equipment/{id}/bom/{bomId}:
+ *   delete:
+ *     summary: Remove a spare part from an equipment BOM
+ *     description: >
+ *       Hard-deletes one BOM line. Per rule 3.4 child rows without an isDeleted
+ *       column are removed outright; the audit entry is the retained record.
+ *     tags: [Equipment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Equipment equipmentId
+ *       - in: path
+ *         name: bomId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: BOM line deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Supervisor
+ *       '404':
+ *         description: Equipment or BOM line not found
+ *       '500':
+ *         description: Internal server error
+ */
+router.delete('/:id/bom/:bomId', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
+  try {
+    const equipmentId = String(req.params.id);
+    const bomId = String(req.params.bomId);
+
+    const existing = await prisma.equipmentBOMMaterial.findFirst({
+      where: { bomId, equipmentId },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'BOM line not found on this equipment' });
+    }
+
+    await prisma.equipmentBOMMaterial.delete({ where: { bomId } });
+
+    await logAudit(
+      { tableName: 'EquipmentBOMMaterial', recordId: String(bomId), action: 'Delete' },
+      req.user!.userId,
+      req.ip
+    );
+
+    res.json({ message: 'BOM line deleted successfully' });
+  } catch (error) {
+    logger.error({ err: error }, 'Error deleting equipment BOM line');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
