@@ -6,9 +6,10 @@ import { workOrderService } from '@/services/workOrderService';
 import { functionalLocationService } from '@/services/functionalLocationService';
 import { equipmentService } from '@/services/equipmentService';
 import { workCenterService } from '@/services/workCenterService';
+import { taskListService } from '@/services/taskListService';
 import { userService } from '@/services/userService';
 import { ApiError } from '@/lib/api';
-import type { FunctionalLocation, Equipment, WorkCenter, UserOption, Priority, WorkOrderType } from '@/types';
+import type { FunctionalLocation, Equipment, WorkCenter, UserOption, Priority, WorkOrderType, TaskList } from '@/types';
 
 const inputClass =
   'w-full px-3 py-2 rounded text-primary text-sm outline-none border border-subtle focus:border-highlight transition-colors';
@@ -19,6 +20,7 @@ export default function WorkOrderCreatePage() {
   const [locations, setLocations] = useState<FunctionalLocation[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
+  const [taskLists, setTaskLists] = useState<TaskList[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -29,6 +31,7 @@ export default function WorkOrderCreatePage() {
   const [functionalLocationId, setFunctionalLocationId] = useState('');
   const [equipmentId, setEquipmentId] = useState('');
   const [workCenterId, setWorkCenterId] = useState('');
+  const [taskListId, setTaskListId] = useState('');
   const [supervisorUserId, setSupervisorUserId] = useState('');
   const [plannedStart, setPlannedStart] = useState('');
   const [plannedFinish, setPlannedFinish] = useState('');
@@ -48,21 +51,41 @@ export default function WorkOrderCreatePage() {
     setEquipmentId(value);
   };
 
+  const selectedTaskList = useMemo(
+    () => taskLists.find((t) => t.taskListId === taskListId) ?? null,
+    [taskLists, taskListId]
+  );
+
+  /**
+   * A template written for one asset applied to another is a mistake worth
+   * surfacing, but not worth blocking: the planner may have a good reason, and
+   * refusing would leave no way to record the deviation. Warned, not prevented.
+   */
+  const templateEquipmentMismatch = useMemo(() => {
+    if (!selectedTaskList?.equipmentId || !equipmentId) return null;
+    if (selectedTaskList.equipmentId === equipmentId) return null;
+    return equipment.find((e) => e.equipmentId === equipmentId)?.assetTag ?? null;
+  }, [selectedTaskList, equipmentId, equipment]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [locData, eqData, wcData, userData] = await Promise.all([
+        const [locData, eqData, wcData, userData, tlData] = await Promise.all([
           functionalLocationService.getAll(),
           equipmentService.getAll(),
           workCenterService.getAll(),
           userService.getOptions(),
+          // A failure to load templates must not block creating a work order
+          // without one, so this settles separately from the required options.
+          taskListService.getAll().catch(() => [] as TaskList[]),
         ]);
         if (cancelled) return;
         setLocations(locData);
         setEquipment(eqData);
         setWorkCenters(wcData);
         setUsers(userData);
+        setTaskLists(tlData);
       } catch (err) {
         if (!cancelled) setLoadError(err instanceof ApiError ? err.message : 'Failed to load form options');
       } finally {
@@ -86,6 +109,7 @@ export default function WorkOrderCreatePage() {
         functionalLocationId,
         equipmentId: equipmentId || null,
         workCenterId,
+        taskListId: taskListId || null,
         supervisorUserId,
         plannedStart: plannedStart ? new Date(plannedStart).toISOString() : null,
         plannedFinish: plannedFinish ? new Date(plannedFinish).toISOString() : null,
@@ -218,6 +242,49 @@ export default function WorkOrderCreatePage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="wo-tasklist">Task List Template</label>
+              <select
+                id="wo-tasklist"
+                value={taskListId}
+                onChange={(e) => setTaskListId(e.target.value)}
+                className={inputClass}
+                style={{ backgroundColor: '#27272A' }}
+              >
+                <option value="">No template (start empty)</option>
+                {taskLists.map((tl) => (
+                  <option key={tl.taskListId} value={tl.taskListId}>
+                    {tl.code} — {tl.description}
+                  </option>
+                ))}
+              </select>
+              {selectedTaskList && (
+                <p className="text-tertiary text-xs mt-1.5">
+                  {selectedTaskList.operations?.length ?? 0} steps and{' '}
+                  {selectedTaskList.operations?.reduce(
+                    (n, o) => n + (o.materials?.length ?? 0), 0) ?? 0}{' '}
+                  required materials will be copied onto this work order.
+                  {selectedTaskList.workCenterId && selectedTaskList.workCenterId !== workCenterId && (
+                    <span className="text-amber">
+                      {' '}This template belongs to a different work centre.
+                    </span>
+                  )}
+                </p>
+              )}
+              {templateEquipmentMismatch && (
+                <p className="text-amber text-xs mt-1.5 flex items-start gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    {templateEquipmentMismatch} is written for a different asset
+                    {selectedTaskList?.equipment
+                      ? ` (${selectedTaskList.equipment.equipmentCode})`
+                      : ''}
+                    . Its steps and parts may not apply here.
+                  </span>
+                </p>
+              )}
             </div>
 
             <div>

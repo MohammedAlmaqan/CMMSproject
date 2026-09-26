@@ -179,6 +179,9 @@ export interface TaskList extends Auditable {
    * id.
    */
   operations?: TaskListOperationDetail[];
+  /** Resolved by the list and detail reads so screens can show codes, not ids. */
+  workCenter?: { workCenterId: string; code: string; name: string } | null;
+  equipment?: { equipmentId: string; equipmentCode: string; name: string } | null;
 }
 
 export interface TaskListMaterialRequirement {
@@ -281,6 +284,13 @@ export interface WorkOrder extends Auditable {
   plannedCost: number;
   actualCost: number;
 }
+
+/**
+ * SOW 3.1.4. `taskListId` is accepted on create only: the server copies the
+ * template's steps onto the new work order in the same transaction and does not
+ * persist a back-reference, so it is not a field of the row that comes back.
+ */
+export type WorkOrderCreateInput = Partial<WorkOrder> & { taskListId?: string | null };
 
 // ─── Work Order Operation (§3.3.3) ───
 export type OperationStatus = 'Pending' | 'In Progress' | 'Completed';
