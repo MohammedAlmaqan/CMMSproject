@@ -54,7 +54,49 @@ export const operationCreateSchema = z.object({
   numberOfTechnicians: z.number().int().positive().optional(),
 });
 
-export const operationUpdateSchema = operationCreateSchema.partial();
+export const operationUpdateSchema = operationCreateSchema.partial().extend({
+  // SOW 3.3.3 requires a technician to be able to record actual hours and the
+  // operation's own status. These two were missing from operationCreateSchema,
+  // and because `validate()` assigns req.body = schema.safeParse(...).data, a
+  // Zod object silently DROPS keys it does not declare. The PUT handler already
+  // persisted both fields correctly, so the values never reached it: the schema
+  // was the whole defect. Declaring them here is the fix.
+  actualHours: z.number().min(0).nullable().optional(),
+  // Free text in v1.0.0; the model column is a plain String, not an enum.
+  status: z.string().trim().min(1).nullable().optional(),
+});
+
+export const equipmentBomCreateSchema = z.object({
+  materialId: z.string().min(1),
+  quantity: z.number().positive(),
+});
+
+export const equipmentBomUpdateSchema = z.object({
+  quantity: z.number().positive(),
+});
+
+export const craftCreateSchema = z.object({
+  workCenterId: z.string().min(1),
+  craftCode: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  // SOW 3.1.3 and decision D-16: each craft carries its own hourly rate, and
+  // that rate is what 3.5.1 cost estimation consumes.
+  hourlyRate: z.number().min(0),
+});
+
+export const craftUpdateSchema = craftCreateSchema.partial();
+
+export const costSplitCreateSchema = z.object({
+  costCenterCode: z.string().trim().min(1),
+  // 3.5.2 percentage allocation. Capped below so a single line can never be
+  // 100% and silently starve the other cost centres; the sum-to-100 rule is
+  // enforced across the set in the route.
+  percentage: z.number().gt(0).lt(100),
+});
+
+export const costSplitUpdateSchema = z.object({
+  percentage: z.number().gt(0).lt(100),
+});
 
 export const woMaterialCreateSchema = z.object({
   workOrderId: z.string().min(1),
