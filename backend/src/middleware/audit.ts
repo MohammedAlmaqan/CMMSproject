@@ -6,7 +6,7 @@ import { logger } from '../utils/logger.js';
 export interface AuditEntry {
   tableName: string;
   recordId: string;
-  action: 'Create' | 'Update' | 'Delete' | 'Run';
+  action: 'Create' | 'Update' | 'Delete' | 'Run' | 'Blocked';
   fieldName?: string | null;
   oldValue?: string | null;
   newValue?: string | null;

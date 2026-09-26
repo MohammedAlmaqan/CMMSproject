@@ -481,6 +481,8 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
  *               type: object
  *       '400':
  *         description: Invalid status transition
+ *       '409':
+ *         description: Mandatory safety checklist not completed (transition to In Progress)
  *       '404':
  *         description: Work order not found
  *       '500':
@@ -503,6 +505,43 @@ router.put('/:id/status', authorizeMinRole('Technician'), validate(workOrderStat
       return res.status(400).json({
         error: `Invalid transition from '${workOrder.status}' to '${newStatus}'`,
       });
+    }
+
+    if (newStatus === 'In Progress') {
+      const blockingChecklist = await prisma.workOrderChecklist.findFirst({
+        where: {
+          workOrderId: id,
+          template: { isMandatory: true },
+          OR: [
+            { status: { not: 'Completed' } },
+            { items: { some: { response: { in: ['', ' '] } } } },
+          ],
+        },
+        select: {
+          woChecklistId: true,
+          status: true,
+          template: { select: { name: true } },
+        },
+      });
+      if (blockingChecklist) {
+        await logAudit(
+          {
+            tableName: 'WorkOrder',
+            recordId: id,
+            action: 'Blocked',
+            fieldName: 'status',
+            oldValue: workOrder.status,
+            newValue: newStatus,
+          },
+          req.user!.userId,
+          req.ip
+        );
+        return res.status(409).json({
+          error: `Mandatory safety checklist '${blockingChecklist.template.name}' must be completed before starting work`,
+          checklist: blockingChecklist.template.name,
+          checklistStatus: blockingChecklist.status,
+        });
+      }
     }
 
     const updateData: any = {

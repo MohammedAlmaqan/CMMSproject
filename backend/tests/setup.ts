@@ -8,8 +8,10 @@ import { ctx } from './helpers.js';
 beforeAll(async () => {
   const admin = await prisma.user.findFirst({ where: { username: 'admin', isDeleted: false } });
   const operator = await prisma.user.findFirst({ where: { username: 'operator', isDeleted: false } });
-  if (!admin || !operator) {
-    throw new Error('seeded users admin/operator not found — cannot run tests');
+  const technician = await prisma.user.findFirst({ where: { username: 'tech1', isDeleted: false } });
+  const supervisor = await prisma.user.findFirst({ where: { username: 'supervisor', isDeleted: false } });
+  if (!admin || !operator || !technician || !supervisor) {
+    throw new Error('seeded users admin/operator/tech1/supervisor not found — cannot run tests');
   }
   ctx.adminId = admin.userId;
   ctx.operatorId = operator.userId;
@@ -18,6 +20,8 @@ beforeAll(async () => {
   ctx.adminToken = sign(admin.userId, admin.username, admin.role);
   ctx.operatorToken = sign(operator.userId, operator.username, operator.role);
   ctx.viewOnlyToken = sign(operator.userId, operator.username, 'View-Only');
+  ctx.technicianToken = sign(technician.userId, technician.username, technician.role);
+  ctx.supervisorToken = sign(supervisor.userId, supervisor.username, supervisor.role);
 });
 
 afterAll(async () => {

@@ -6,6 +6,9 @@ let createdId = '';
 let flat = '';
 let wc = '';
 let sup = '';
+let gateTemplateId = '';
+const extraIds: string[] = [];
+const checklistIds: string[] = [];
 
 describe('work orders routes', () => {
   beforeAll(async () => {
@@ -19,8 +22,16 @@ describe('work orders routes', () => {
   });
 
   afterAll(async () => {
-    if (createdId) {
-      await api().delete(`/api/work-orders/${createdId}`).set(authHeaders(ctx.adminToken)).catch(() => {});
+    for (const id of [createdId, ...extraIds]) {
+      await api().delete(`/api/work-orders/${id}`).set(authHeaders(ctx.adminToken)).catch(() => {});
+    }
+    for (const id of checklistIds) {
+      await prisma.workOrderChecklistItem.deleteMany({ where: { woChecklistId: id } }).catch(() => {});
+      await prisma.workOrderChecklist.deleteMany({ where: { woChecklistId: id } }).catch(() => {});
+    }
+    if (gateTemplateId) {
+      await prisma.checklistItem.deleteMany({ where: { checklistTemplateId: gateTemplateId } }).catch(() => {});
+      await prisma.safetyChecklistTemplate.deleteMany({ where: { checklistTemplateId: gateTemplateId } }).catch(() => {});
     }
   });
 
@@ -95,6 +106,72 @@ describe('work orders routes', () => {
         where: { tableName: 'WorkOrder', recordId: createdId, action: 'Update', fieldName: 'status' },
       })
     ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('blocks In Progress while a mandatory safety checklist is incomplete and allows it once Completed', async () => {
+    const tpl = await api()
+      .post('/api/safety-checklists/templates')
+      .set(authHeaders(ctx.adminToken))
+      .send({
+        name: `Mandatory Gate ${Date.now()}`,
+        description: 'gate test template',
+        isMandatory: true,
+        items: [{ sequenceNumber: 10, description: 'Isolate the energy source' }],
+      });
+    expect(tpl.status).toBe(201);
+    gateTemplateId = tpl.body.checklistTemplateId;
+
+    const gated = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body());
+    const plain = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body());
+    extraIds.push(gated.body.workOrderId, plain.body.workOrderId);
+
+    for (const id of [gated.body.workOrderId, plain.body.workOrderId]) {
+      for (const step of ['Planned', 'Scheduled']) {
+        const r = await api()
+          .put(`/api/work-orders/${id}/status`)
+          .set(authHeaders(ctx.technicianToken))
+          .send({ status: step });
+        expect(r.status).toBe(200);
+      }
+    }
+
+    const attached = await api()
+      .post(`/api/safety-checklists/work-order/${gated.body.workOrderId}/attach`)
+      .set(authHeaders(ctx.technicianToken))
+      .send({ checklistTemplateId: gateTemplateId });
+    expect(attached.status).toBe(201);
+    checklistIds.push(attached.body.woChecklistId);
+
+    const blocked = await api()
+      .put(`/api/work-orders/${gated.body.workOrderId}/status`)
+      .set(authHeaders(ctx.technicianToken))
+      .send({ status: 'In Progress' });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error).toContain('must be completed');
+
+    await api()
+      .put(`/api/safety-checklists/work-order-checklist/${attached.body.woChecklistId}`)
+      .set(authHeaders(ctx.technicianToken))
+      .send({ status: 'Completed' });
+
+    const allowed = await api()
+      .put(`/api/work-orders/${gated.body.workOrderId}/status`)
+      .set(authHeaders(ctx.technicianToken))
+      .send({ status: 'In Progress' });
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.status).toBe('In Progress');
+
+    const noChecklist = await api()
+      .put(`/api/work-orders/${plain.body.workOrderId}/status`)
+      .set(authHeaders(ctx.technicianToken))
+      .send({ status: 'In Progress' });
+    expect(noChecklist.status).toBe(200);
+
+    expect(
+      await prisma.auditLogEntry.count({
+        where: { tableName: 'WorkOrder', recordId: gated.body.workOrderId, action: 'Blocked' },
+      })
+    ).toBe(1);
   });
 
   it('updates a work order (Requester+) and writes an audit row', async () => {
