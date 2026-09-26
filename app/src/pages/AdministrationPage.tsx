@@ -2,7 +2,7 @@
 // Administration Page — Users, Roles, Audit Log, Settings
 // ============================================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Users,
   Shield,
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
+import { systemConfigService, type SystemSetting } from '@/services/systemConfigService';
 import Header from '@/components/layout/Header';
 
 type AdminTab = 'users' | 'audit' | 'settings';
@@ -38,6 +39,47 @@ export default function AdministrationPage() {
   const [auditPage, setAuditPage] = useState(0);
   const [auditFilter, setAuditFilter] = useState('');
   const [userSearch, setUserSearch] = useState('');
+
+  // SOW 3.3.3 / 3.2.2: the number prefixes were rendered as fixed text, so the
+  // setting looked configurable and was not. They are now loaded from the API
+  // and saved back to it.
+  const [settings, setSettings] = useState<SystemSetting[]>([]);
+  const [settingsError, setSettingsError] = useState('');
+  const [savingKey, setSavingKey] = useState('');
+  const [savedKey, setSavedKey] = useState('');
+
+  useEffect(() => {
+    if (activeTab !== 'settings') return;
+    let cancelled = false;
+    systemConfigService
+      .getAll()
+      .then((rows) => {
+        if (!cancelled) setSettings(rows);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setSettingsError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
+  const saveSetting = async (key: string, value: string) => {
+    setSavingKey(key);
+    setSettingsError('');
+    setSavedKey('');
+    try {
+      const saved = await systemConfigService.update(key, value);
+      setSettings((prev) =>
+        prev.map((row) => (row.key === key ? { ...row, value: saved.value, isDefault: false } : row))
+      );
+      setSavedKey(key);
+    } catch (err) {
+      setSettingsError((err as Error).message);
+    } finally {
+      setSavingKey('');
+    }
+  };
 
   const filteredUsers = users.filter((u) => {
     if (!userSearch) return true;
@@ -267,8 +309,22 @@ export default function AdministrationPage() {
                   <Settings className="w-4 h-4 text-amber" /> System Settings
                 </h3>
                 <div className="space-y-4">
-                  <SettingItem label="WO Number Prefix" value="WO-" description="Prefix for auto-generated work order numbers" />
-                  <SettingItem label="Notification Prefix" value="NOT-" description="Prefix for auto-generated notification numbers" />
+                  {settingsError && (
+                    <p className="text-xs text-red-400" role="alert">{settingsError}</p>
+                  )}
+                  {settings.map((setting) => (
+                    <EditableSetting
+                      key={setting.key}
+                      setting={setting}
+                      canEdit={user?.role === 'Administrator'}
+                      saving={savingKey === setting.key}
+                      saved={savedKey === setting.key}
+                      onSave={(value) => saveSetting(setting.key, value)}
+                    />
+                  ))}
+                  {settings.length === 0 && !settingsError && (
+                    <p className="text-xs text-tertiary">Loading settings...</p>
+                  )}
                   <SettingItem label="Session Timeout" value="30 minutes" description="User session timeout for inactivity" />
                   <SettingItem label="PM Scheduler" value="Daily at 06:00" description="When the PM generation scheduler runs" />
                   <SettingItem label="Audit Log Retention" value="7 years" description="How long audit logs are retained" />
@@ -317,6 +373,78 @@ function SettingItem({ label, value, description }: { label: string; value: stri
         <div className="text-tertiary" style={{ fontSize: '10px' }}>{description}</div>
       </div>
       <span className="font-mono text-xs text-amber">{value}</span>
+    </div>
+  );
+}
+
+// An editable counterpart to SettingItem. The read-only SettingItem above is
+// kept for the settings that are genuinely fixed in v1.0.0, so a fixed value is
+// still visually distinct from one that can be changed.
+function EditableSetting({
+  setting,
+  canEdit,
+  saving,
+  saved,
+  onSave,
+}: {
+  setting: SystemSetting;
+  canEdit: boolean;
+  saving: boolean;
+  saved: boolean;
+  onSave: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState(setting.value);
+  const [touched, setTouched] = useState(false);
+
+  // Re-sync when the saved value changes underneath us, so a save that the
+  // server normalised is reflected instead of being overwritten on next edit.
+  useEffect(() => {
+    if (!touched) setDraft(setting.value);
+  }, [setting.value, touched]);
+
+  const dirty = touched && draft !== setting.value;
+  const invalid = draft.trim() === '' || !/^[A-Za-z0-9_-]+$/.test(draft.trim());
+
+  return (
+    <div className="flex items-center justify-between gap-4 py-2 border-b border-subtle last:border-0">
+      <div>
+        <div className="text-primary text-xs font-medium">{setting.label}</div>
+        <div className="text-tertiary" style={{ fontSize: '10px' }}>{setting.description}</div>
+        {canEdit && invalid && touched && (
+          <div className="text-red-400" style={{ fontSize: '10px' }}>
+            Use letters, digits, hyphen or underscore only
+          </div>
+        )}
+        {saved && !dirty && (
+          <div className="text-green-500" style={{ fontSize: '10px' }}>Saved</div>
+        )}
+        {setting.isDefault && (
+          <div className="text-tertiary" style={{ fontSize: '10px' }}>Using system default</div>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={draft}
+          maxLength={setting.maxLength}
+          disabled={!canEdit}
+          aria-label={setting.label}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setTouched(true);
+          }}
+          className="industrial-input w-28 px-2 py-1 font-mono text-xs text-primary bg-surface border border-subtle rounded disabled:opacity-60"
+        />
+        {canEdit && (
+          <button
+            onClick={() => onSave(draft.trim())}
+            disabled={!dirty || invalid || saving}
+            className="text-xs px-2 py-1 rounded border border-subtle text-primary disabled:opacity-40 hover:border-amber"
+          >
+            {saving ? '...' : 'Save'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

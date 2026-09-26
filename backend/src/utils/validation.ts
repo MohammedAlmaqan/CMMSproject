@@ -91,6 +91,19 @@ export const craftCreateSchema = z.object({
 
 export const craftUpdateSchema = craftCreateSchema.partial();
 
+export const systemConfigUpdateSchema = z.object({
+  key: z.enum(['wo_number_prefix', 'notif_number_prefix']),
+  value: z
+    .string()
+    .trim()
+    .min(1)
+    .max(20)
+    // A prefix is pasted into every generated number, so it is restricted to
+    // characters that cannot break a number's readability or a downstream
+    // filter. No spaces, no separators, no path characters.
+    .regex(/^[A-Za-z0-9_-]+$/, 'Prefix may contain only letters, digits, hyphen and underscore'),
+});
+
 export const costSplitItemSchema = z.object({
   costCenterCode: z.string().trim().min(1),
   // 3.5.2 percentage allocation. A single line cannot claim the whole work
