@@ -70,9 +70,9 @@ copy .env.example .env
 REM Edit .env with your database connection string
 npm install
 npx prisma generate
-npx prisma db push
+npx prisma migrate deploy
 npx tsc
-npx tsx prisma\seed.ts
+scripts\seed-demo.bat
 
 REM Frontend
 cd CMMSproject\app
@@ -81,6 +81,11 @@ REM Edit .env.local if API URL differs
 npm install
 npm run build
 ```
+
+`scripts\seed-demo.bat` populates demo data and refuses to run against a
+production database. It sets the `SEED_DEMO` guard variable itself, so
+there is no need to export anything first. To start with an empty
+database instead, skip that line.
 
 ### Step 5: Start the Application
 
@@ -210,6 +215,21 @@ The command must return HTTP 200 with the health payload. `-k` is required only 
 | `JWT_SECRET` | JWT signing secret | Required |
 | `JWT_EXPIRES_IN` | Token lifetime (seconds) | 28800 (8h) |
 | `PORT` | API server port | 4000 |
+| `CORS_ORIGINS` | Comma-separated browser origins allowed to call the API | http://localhost:3000 |
+| `LOG_LEVEL` | Pino log level | info |
+| `BIND_HOST` | Interface the API listens on | 0.0.0.0 |
+| `PM_SCHEDULER_CRON` | Cron expression driving the PM scheduler | 0 2 * * * |
+
+These eight are every variable the API reads, and they match
+`backend\.env.example` line for line. `backend\.env` is loaded by Node's own
+`--env-file` flag at launch rather than by a dotenv library, so a missing
+variable silently falls back to its default, except `JWT_SECRET`, which
+fails fast rather than starting insecurely.
+
+`BIND_HOST` and `PM_SCHEDULER_CRON` need care on a server. See
+[Enabling HTTPS / TLS](#step-7-enable-https--tls-iis-reverse-proxy) before
+exposing the API, and confirm your ARR rewrite overwrites `X-Forwarded-For`
+rather than appending to it.
 
 ### Frontend (.env.local)
 
@@ -324,7 +344,7 @@ REM 2. Rebuild backend
 cd CMMSproject\backend
 npm install
 npx prisma generate
-npx prisma db push
+npx prisma migrate deploy
 npx tsc
 
 REM 3. Rebuild frontend

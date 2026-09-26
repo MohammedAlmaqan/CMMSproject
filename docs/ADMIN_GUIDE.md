@@ -137,15 +137,16 @@ npx prisma migrate deploy
 
 The repository carries five migrations under `backend\prisma\migrations\`, from the baseline through the account-lockout change. `migrate deploy` applies only those not yet applied and never drops data.
 
-**The documented installation path - `db push` (no history):**
+**The documented installation path - `migrate deploy`:**
 
 ```cmd
-npx prisma db push
+cd CMMSproject\backend
+npx prisma migrate deploy
 ```
 
-`db push` synchronises the database to `schema.prisma` by creating and altering tables directly. It does not record a migration history, and it will **drop a column** if one is removed from the schema. It is fine on a fresh install, which is what the installation guide uses it for.
+This is the only schema command the installation guide gives, for both a fresh install and an update. On an empty database it applies the full migration history in order, which is equivalent to creating the schema directly.
 
-**Use `migrate deploy`, not `db push`, on a database that holds real data.** The installation guide's step 4 uses `db push` because it targets a new installation; that instruction should not be repeated against a live system.
+**`db push` is retired and should not be used against this project.** `db push` synchronises the database to `schema.prisma` by creating and altering tables directly. It does not record a migration history, so a later `migrate deploy` has no baseline to work from, and it will **drop a column** if one is removed from the schema without a migration to match. If you have already run `db push` on a database that matters, resolve `_prisma_migrations` before deploying; otherwise the first `migrate deploy` will attempt to re-apply the baseline against existing tables.
 
 ### 4.2 Regenerating the client
 
