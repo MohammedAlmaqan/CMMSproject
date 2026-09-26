@@ -288,13 +288,28 @@ Non-blocking follow-ups: (1) when `actions/checkout@v5` and `actions/setup-node@
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| 7.1 | Rewrite README to match reality (32 models, honest features, real endpoints) | ⬜ | Every claim implemented |  |
-| 7.2 | System Architecture document | ⬜ | SOW §6.2 deliverable |  |
-| 7.3 | ER diagram + data dictionary (from Prisma) | ⬜ | SOW §6.2 deliverable |  |
-| 7.4 | API reference (generated Swagger export -> static doc) | ⬜ | SOW §6.2 deliverable |  |
-| 7.5 | User Manual (per role) + Administrator Guide (config, backup, users, scheduler ops) | ⬜ | SOW §6.2 deliverables |  |
-| 7.6 | SOW compliance matrix (clause-by-clause); ERP + ad-hoc reporting **deferred**, i18n **excluded** | ⬜ | All Critical/High pass or formally waived |  |
-| 7.7 | Tag `v1.0.0` | ⬜ | Release tag exists |  |
+| 7.1 | Rewrite README to match reality (35 models, honest features, real endpoints) | ✅ | Every claim implemented | `6d56b7b` |
+| 7.2 | System Architecture document | ✅ | SOW §6.2 deliverable | `2643cb8` |
+| 7.3 | ER diagram + data dictionary (from Prisma) | ✅ | SOW §6.2 deliverable | `7c093d8` |
+| 7.4 | API reference (generated Swagger export -> static doc) | ✅ | SOW §6.2 deliverable | `d3cfbc6` |
+| 7.5 | User Manual (per role) + Administrator Guide (config, backup, users, scheduler ops) | ✅ | SOW §6.2 deliverables | `3679aa8` |
+| 7.6 | SOW compliance matrix (clause-by-clause); ERP + ad-hoc reporting **deferred**, i18n **excluded** | ✅ | All Critical/High pass or formally waived | `f18819a` |
+| 7.7 | Tag `v1.0.0` | ⬜ | Release tag exists — **pending client decision, not started** |  |
+
+---
+
+## B.6 Blocker Remediation
+
+The SOW compliance matrix (7.6) recorded two `Not Met` clauses as release blockers. Both are remediated in code; the matrix rows are updated in a follow-up docs commit.
+
+| # | Clause | Finding | Fix | Commit | Tests |
+|---|---|---|---|---|---|
+| R1 | SOW §3.3.7 | A work order could be moved to `In Progress` with an attached **mandatory** safety checklist still `Pending` or `In Progress`, so the checklist was advisory only. | `PUT /api/work-orders/:id/status` now refuses `In Progress` with **409** until every mandatory checklist on the work order reads `Completed`. Runs after role auth and transition validation, before any write. Rejections write an `AuditLogEntry` with `action: 'Blocked'`. | `e049238` | 409 while incomplete; 200 once `Completed`; 200 with no mandatory checklist; `Blocked` audit row asserted |
+| R2 | SOW §3.3.2 | The status route was gated at `Technician` for every target status, so any Technician could **Close** a work order. | `Completed → Closed` now requires **Maintenance Supervisor or Administrator**; every other transition keeps the Technician floor. Enforced as a per-transition middleware reusing `authorizeMinRole`, so `roleHierarchy` stays in one place. | `206e1de` | Technician 403; Supervisor 200; Administrator 200; Technician floor unchanged on the other four transitions |
+
+**R1 is enforced on checklist status, not on individual item responses.** `WorkOrderChecklistItem.response` is a non-nullable `String` and the attach route pre-fills every item with `'NA'`, so an unanswered item is not representable today. Recorded as **v1.1-5**.
+
+**Documentation contradictions found in review and fixed:** `INSTALLATION_GUIDE.md` and `docs/ADMIN_GUIDE.md` still instructed readers to run `prisma db push` (retired in favour of `migrate deploy`), the install guide documented 4 of 8 backend env variables, and `docs/ARCHITECTURE.md` still described the pre-close-out state of attachment backup and Express `trust proxy`. See `2e0bddc`, `ab7040c` and the follow-up commit.
 
 ---
 
@@ -315,6 +330,8 @@ Schema findings raised during Phase 7 documentation (7.3). Triaged 2026-09-25: *
 | v1.1-2 | `MaintenancePlan.functionalLocationId` is a nullable column with no `@relation`, unlike the required `workCenterId` and `taskListId`. The database does not enforce it. | Low — plans are already anchored to a required work centre and task list. | Deferred to v1.1 |
 | v1.1-3 | **Financial and quantity fields are `Float`, not `Decimal`** — `standardCost`, `currentCost`, `unitCost`, `plannedCost`, `actualCost`, `cost`, `percentage`, `hourlyRate`, `costRatePerHour` and all quantity columns are binary floating point. | **Flagged prominently: v1.0.0 ships with `Float`-typed financial fields. The `Decimal` migration is a v1.1 remediation item.** Rounding differences are expected in cost reporting and must not be treated as a v1.0.0 defect. | **Priority — deferred to v1.1** |
 | v1.1-4 | Status and type columns are unenforced free text; permitted values exist only in schema comments. | Low — values are validated in the zod request schemas at the API boundary. | Deferred to v1.1 |
+| v1.1-5 | **`WorkOrderChecklistItem.response` cannot express "unanswered".** The column is a non-nullable `String` restricted by `checklistItemUpdateSchema` to `Yes`/`No`/`NA`, and the attach route pre-fills every item with `'NA'` — so a freshly attached checklist is indistinguishable from a fully answered one at the item level. | **The SOW §3.3.7 safety gate (R1, `e049238`) therefore enforces checklist `status`, not individual answers.** Every item reads `'NA'` until a technician changes it, so item-level "all answered" cannot be evaluated. Fix: make `response` nullable, drop the `'NA'` pre-fill at attach time, and require an explicit response per template item. Touches `schema.prisma`, a migration, `safetyChecklists.ts` and `validation.ts`. | Deferred to v1.1 |
+| v1.1-6 | **`'Blocked'` is missing from the audit-log action filter dropdown** in the Administration screen. | Cosmetic. Entries display and search correctly today; the filter simply cannot isolate them. Triggered by R1 (`e049238`), which introduced the new `Blocked` action value. `AuditEntry.action` in `backend/src/middleware/audit.ts` already permits it and the DB column is free text, so this is a frontend list only. | Deferred to v1.1 |
 
 **Verified, not deferred:** work orders are soft-deleted and their children are retained, per rule 3.4. Confirmed empirically against the database on 2026-09-25 for every populated child table — `WorkOrderOperation` (122 rows), `ExternalServiceCost` (1) and `WorkOrderNotifLink` (4) all retained their rows across `UPDATE "WorkOrder" SET "isDeleted"=true` with the parent row still present. `WorkOrderMaterial`, `CostSplit` and `WorkOrderChecklist` are currently empty, so they hold by the same mechanism but were not exercised. No action.
 
