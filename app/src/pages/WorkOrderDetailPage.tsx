@@ -23,6 +23,7 @@ import {
   Users,
   Wrench,
   Shield,
+  Bell,
   MessageSquare,
   ClipboardList,
   FileText,
@@ -61,7 +62,7 @@ import type {
   Attachment,
 } from '@/types';
 
-type DetailTab = 'operations' | 'materials' | 'labor' | 'services' | 'checklists' | 'comments' | 'attachments' | 'history';
+type DetailTab = 'operations' | 'materials' | 'labor' | 'services' | 'checklists' | 'notifications' | 'comments' | 'attachments' | 'history';
 
 interface CraftRef { craftId: string; craftCode: string; craftName?: string; hourlyRate?: number }
 
@@ -137,6 +138,19 @@ interface WorkOrderDetail extends WorkOrder {
   externalServices?: ExternalServiceDetail[];
   checklists?: ChecklistDetail[];
   comments?: Array<Comment & { user?: { userId: string; fullName: string } }>;
+  /**
+   * SOW 3.2.3 reverse navigation. The work order read already returned these
+   * links; nothing on this screen presented them, so a notification linked to a
+   * work order could only be reached from the notification side.
+   */
+  notifications?: Array<{
+    notification: {
+      notificationId: string;
+      notificationNumber: string;
+      description: string;
+      status: string;
+    };
+  }>;
 }
 
 const TRANSITIONS: Record<string, string[]> = {
@@ -733,6 +747,7 @@ export default function WorkOrderDetailPage() {
       { id: 'labor', label: 'Labor', icon: Users, count: labor.length },
       { id: 'services', label: 'Services', icon: DollarSign, count: wo.externalServices?.length || 0 },
       { id: 'checklists', label: 'Checklists', icon: Shield, count: wo.checklists?.length || 0 },
+      { id: 'notifications', label: 'Notifications', icon: Bell, count: wo.notifications?.length || 0 },
       { id: 'comments', label: 'Comments', icon: MessageSquare, count: wo.comments?.length || 0 },
       { id: 'attachments', label: 'Attachments', icon: Paperclip, count: attachments.length },
       { id: 'history', label: 'History', icon: FileText, count: history.length },
@@ -1614,6 +1629,56 @@ export default function WorkOrderDetailPage() {
                   </div>
                 );
               })
+            )}
+          </div>
+        )}
+
+        {activeTab === 'notifications' && (
+          <div className="space-y-3">
+            {(wo.notifications?.length || 0) === 0 ? (
+              <EmptyState label="No notifications are linked to this work order" />
+            ) : (
+              <>
+                <p className="text-xs text-tertiary">
+                  Notifications that raised this work order. Select one to open it.
+                </p>
+                {wo.notifications!.map((link) => {
+                  const n = link.notification;
+                  return (
+                    <button
+                      key={n.notificationId}
+                      onClick={() => navigate(`/notifications/${n.notificationId}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          navigate(`/notifications/${n.notificationId}`);
+                        }
+                      }}
+                      className="w-full text-left industrial-card rounded p-4 hover:border-highlight transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-amber">{n.notificationNumber}</span>
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded border"
+                              style={{
+                                color: n.status === 'Completed' ? '#22C55E' : '#D97706',
+                                backgroundColor: `${n.status === 'Completed' ? '#22C55E' : '#D97706'}20`,
+                                border: `1px solid ${n.status === 'Completed' ? '#22C55E' : '#D97706'}50`,
+                              }}
+                            >
+                              {n.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-primary mt-1 truncate">{n.description}</p>
+                        </div>
+                        <span className="text-[10px] text-tertiary flex-shrink-0">Open</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </>
             )}
           </div>
         )}
