@@ -85,6 +85,9 @@ interface WoMaterialDetail {
   woMaterialId: string;
   workOrderId: string;
   materialId: string;
+  /** SOW 3.1.5 - the step this part is issued to, null for a job-level line. */
+  operationId?: string | null;
+  operation?: { operationId: string; sequenceNumber: number; description: string } | null;
   plannedQuantity: number;
   actualQuantity: number;
   unitCost: number;
@@ -182,11 +185,13 @@ const emptyOpForm: OpFormState = { description: '', craftId: '', plannedHours: '
 
 interface MatFormState {
   materialId: string;
+  /** SOW 3.1.5 - empty means a job-level line, not a step-specific one. */
+  operationId: string;
   plannedQuantity: string;
   actualQuantity: string;
   unitCost: string;
 }
-const emptyMatForm: MatFormState = { materialId: '', plannedQuantity: '1', actualQuantity: '', unitCost: '' };
+const emptyMatForm: MatFormState = { materialId: '', operationId: '', plannedQuantity: '1', actualQuantity: '', unitCost: '' };
 
 interface LaborFormState {
   operationId: string;
@@ -500,6 +505,7 @@ export default function WorkOrderDetailPage() {
         await workOrderMaterialService.create({
           workOrderId: wo.workOrderId,
           materialId: matForm.materialId,
+          operationId: matForm.operationId || null,
           plannedQuantity: parseFloat(matForm.plannedQuantity) || 0,
           unitCost: parseFloat(matForm.unitCost) || 0,
         });
@@ -516,6 +522,7 @@ export default function WorkOrderDetailPage() {
       setEditingMatId(wm.woMaterialId);
       setEditMatForm({
         materialId: wm.materialId,
+        operationId: wm.operationId ?? '',
         plannedQuantity: String(wm.plannedQuantity),
         actualQuantity: String(wm.actualQuantity),
         unitCost: String(wm.unitCost),
@@ -540,6 +547,7 @@ export default function WorkOrderDetailPage() {
     async (wm: WoMaterialDetail) => {
       await runMutation(`mat:edit:${wm.woMaterialId}`, async () => {
         await workOrderMaterialService.update(wm.woMaterialId, {
+          operationId: editMatForm.operationId || null,
           plannedQuantity: parseFloat(editMatForm.plannedQuantity) || 0,
           actualQuantity: parseFloat(editMatForm.actualQuantity) || 0,
           unitCost: parseFloat(editMatForm.unitCost) || 0,
@@ -1125,7 +1133,7 @@ export default function WorkOrderDetailPage() {
                   </button>
                 </div>
                 <div className="grid grid-cols-12 gap-3">
-                  <div className="col-span-5">
+                  <div className="col-span-6">
                     <FieldLabel>Material</FieldLabel>
                     <select
                       className={selectCls}
@@ -1139,11 +1147,27 @@ export default function WorkOrderDetailPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-6">
+                    <FieldLabel>Issue To Step</FieldLabel>
+                    <select
+                      className={selectCls}
+                      value={matForm.operationId}
+                      onChange={(e) => setMatForm({ ...matForm, operationId: e.target.value })}
+                      aria-label="Issue to step"
+                    >
+                      <option value="">Whole work order (job-level)</option>
+                      {(wo.operations || []).map((op) => (
+                        <option key={op.operationId} value={op.operationId}>
+                          Step {op.sequenceNumber} — {op.description}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-3">
                     <FieldLabel>Planned Qty</FieldLabel>
                     <input className={inputCls} type="number" min={0} step="0.01" value={matForm.plannedQuantity} onChange={(e) => setMatForm({ ...matForm, plannedQuantity: e.target.value })} aria-label="Planned quantity" />
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <FieldLabel>Unit Cost $</FieldLabel>
                     <input className={inputCls} type="number" min={0} step="0.01" value={matForm.unitCost} onChange={(e) => setMatForm({ ...matForm, unitCost: e.target.value })} aria-label="Unit cost" />
                   </div>
@@ -1167,7 +1191,7 @@ export default function WorkOrderDetailPage() {
                 <table className="w-full">
                   <thead>
                     <tr style={{ backgroundColor: '#27272A' }}>
-                      {['Material Code', 'Description', 'Planned Qty', 'Actual Qty', 'Reserved', 'Unit Cost', 'Total', ''].map((h) => (
+                      {['Material Code', 'Description', 'Issued To', 'Planned Qty', 'Actual Qty', 'Reserved', 'Unit Cost', 'Total', ''].map((h) => (
                         <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
@@ -1180,7 +1204,21 @@ export default function WorkOrderDetailPage() {
                             <td className={`${tdCls} font-mono text-xs text-primary`}>{wm.material?.materialCode || '-'}</td>
                             <td className={`${tdCls} text-xs text-secondary`}>{wm.material?.description || '-'}</td>
                             <td className={tdCls}>
-                              <input className={inputCls} type="number" min={0} step="0.01" value={editMatForm.plannedQuantity} onChange={(e) => setEditMatForm({ ...editMatForm, plannedQuantity: e.target.value })} aria-label="Edit planned quantity" />
+                            <td className={tdCls}>
+                              <select
+                                className={selectCls}
+                                value={editMatForm.operationId}
+                                onChange={(e) => setEditMatForm({ ...editMatForm, operationId: e.target.value })}
+                                aria-label="Edit issued to step"
+                              >
+                                <option value="">Whole work order (job-level)</option>
+                                {(wo.operations || []).map((op) => (
+                                  <option key={op.operationId} value={op.operationId}>
+                                    Step {op.sequenceNumber} — {op.description}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>                              <input className={inputCls} type="number" min={0} step="0.01" value={editMatForm.plannedQuantity} onChange={(e) => setEditMatForm({ ...editMatForm, plannedQuantity: e.target.value })} aria-label="Edit planned quantity" />
                             </td>
                             <td className={tdCls}>
                               <input className={inputCls} type="number" min={0} step="0.01" value={editMatForm.actualQuantity} onChange={(e) => setEditMatForm({ ...editMatForm, actualQuantity: e.target.value })} aria-label="Edit actual quantity" />
@@ -1210,6 +1248,13 @@ export default function WorkOrderDetailPage() {
                           <>
                             <td className={`${tdCls} font-mono text-xs text-primary`}>{wm.material?.materialCode || '-'}</td>
                             <td className={`${tdCls} text-xs text-secondary`}>{wm.material?.description || '-'}</td>
+                            <td className={`${tdCls} text-xs text-secondary`}>
+                              {wm.operation ? (
+                                <span className="text-amber">Step {wm.operation.sequenceNumber}</span>
+                              ) : (
+                                <span className="text-tertiary">Job-level</span>
+                              )}
+                            </td>
                             <td className={`${tdCls} text-xs text-secondary`}>{wm.plannedQuantity}</td>
                             <td className={`${tdCls} text-xs text-secondary`}>{wm.actualQuantity || '-'}</td>
                             <td className={`${tdCls} text-xs text-amber`}>{wm.reservationQuantity}</td>
