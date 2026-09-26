@@ -86,17 +86,28 @@ export const craftCreateSchema = z.object({
 
 export const craftUpdateSchema = craftCreateSchema.partial();
 
-export const costSplitCreateSchema = z.object({
+export const costSplitItemSchema = z.object({
   costCenterCode: z.string().trim().min(1),
-  // 3.5.2 percentage allocation. Capped below so a single line can never be
-  // 100% and silently starve the other cost centres; the sum-to-100 rule is
-  // enforced across the set in the route.
+  // 3.5.2 percentage allocation. A single line cannot claim the whole work
+  // order, which is the specific mistake 3.5.2 exists to prevent; the sum to
+  // 100 is enforced across the set in the route.
   percentage: z.number().gt(0).lt(100),
 });
 
-export const costSplitUpdateSchema = z.object({
-  percentage: z.number().gt(0).lt(100),
+/**
+ * 3.5.2 allocation is replaced as a whole set, not appended to line by line.
+ * The invariant ("these total 100%") is a property of the set, so it cannot be
+ * enforced by validating each line as it is added: the first line of a two-way
+ * split is always incomplete by definition.
+ */
+export const costSplitReplaceSchema = z.object({
+  workOrderId: z.string().min(1),
+  splits: z.array(costSplitItemSchema),
 });
+
+export const costSplitCreateSchema = costSplitItemSchema;
+export const costSplitUpdateSchema = z.object({ percentage: z.number().gt(0).lt(100) });
+
 
 export const woMaterialCreateSchema = z.object({
   workOrderId: z.string().min(1),
