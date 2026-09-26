@@ -32,7 +32,7 @@ These counts are the actual current state, not aspirations:
 | Prisma migrations | 5 |
 | Backend API route files | 24 |
 | Backend route groups mounted | 24 |
-| Backend test files | 24 (156 tests) |
+| Backend test files | 24 (159 tests) |
 | Frontend pages | 16 |
 | Frontend service modules | 22 |
 | Frontend test files | 6 |
@@ -238,7 +238,7 @@ All routes are under `/api`. Full request/response schemas are in Swagger at `/a
 cd backend
 npm run dev          :: watch mode via tsx
 npm run build        :: tsc -> dist/
-npm test             :: vitest (24 files, 156 tests)
+npm test             :: vitest (24 files, 159 tests)
 npm run lint
 
 :: frontend
