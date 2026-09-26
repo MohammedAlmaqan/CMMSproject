@@ -252,8 +252,10 @@ def main():
     emit("-" * 72)
     emit("   Whether the dispositions are correct. Completeness, internal")
     emit("   consistency and traceability to the matrix are verified above.")
-    emit("   Engineering judgement is not, and cannot be. The 9 waives are")
-    emit("   proposed scope reductions and remain open to the SOW owner.")
+    emit("   Engineering judgement is not, and cannot be. The 10 waives are")
+    emit("   scope reductions; the SOW owner confirmed all six Phase A flags on")
+    emit("   2026-09-26, but a waive can still be reversed by the owner at any")
+    emit("   time, and doing so re-opens the row.")
 
     # --- verdict -----------------------------------------------------------
     emit()

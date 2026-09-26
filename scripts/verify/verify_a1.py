@@ -22,30 +22,44 @@ MATRIX = os.path.join(ROOT, "docs", "SOW_COMPLIANCE.md")
 REGISTER = os.path.join(ROOT, "docs", "DECISION_REGISTER.md")
 SCREEN = os.path.join(ROOT, "screenshots")
 
-STATUSES = ["Met", "Partial", "Not Met", "Deferred", "Excluded"]
+STATUSES = ["Met", "Partial", "Not Met", "Deferred", "Excluded", "Waived"]
 
 # Frozen v1.0.0 inventory, transcribed from the matrix summary table and
 # independently re-derived by this script on every run.
+#
+# `Waived` was added 2026-09-26. Ten section 3 rows that were open at the
+# Phase A freeze are now recorded as deliberately not built, so they carry a
+# status of their own rather than continuing to read `Not Met`. That is a
+# status change only: the v1.0.0 code is untouched, and the ten rows were
+# still absent in v1.0.0. The Phase A worksheet still covers all 77 of them.
 EXPECT_ALL_TOTAL = 214
 EXPECT_ALL = {
     "Met": 64,
-    "Partial": 75,
-    "Not Met": 52,
+    "Partial": 74,
+    "Not Met": 43,
     "Deferred": 8,
     "Excluded": 15,
+    "Waived": 10,
 }
 EXPECT_S3_TOTAL = 126
 EXPECT_S3 = {
     "Met": 38,
-    "Partial": 42,
-    "Not Met": 35,
+    "Partial": 41,
+    "Not Met": 26,
     "Deferred": 4,
     "Excluded": 7,
+    "Waived": 10,
 }
-# In-scope section 3 debt: rows that are neither Deferred nor Excluded by
-# Client agreement, and therefore must reach Met or carry a signed waiver.
-EXPECT_S3_GAP = 77
+# Three distinct sets, and conflating them is the error this gate exists to
+# catch:
+#   BUILD     rows still to be implemented. These are the 6.4.1 clause set.
+#   WAIVED    in scope, open, then deliberately not built under a decision.
+#   WORKSHEET BUILD + WAIVED = the 77 rows the Phase A register dispositioned.
+EXPECT_S3_BUILD = 67
+EXPECT_S3_WAIVED = 10
+EXPECT_S3_WORKSHEET = 77
 GAP_STATUSES = ("Partial", "Not Met")
+WORKSHEET_STATUSES = ("Partial", "Not Met", "Waived")
 PHASES = ("B", "C", "D", "E", "F", "G", "H")
 EXPECT_DECISIONS = [f"D-{n}" for n in range(2, 18)]
 
@@ -206,43 +220,71 @@ def main():
 
     # ---------- the number Phase A actually turns on ----------
     gaps = [r for r in s3_rows if r["status"] in GAP_STATUSES]
+    waived = [r for r in s3_rows if r["status"] == "Waived"]
+    worksheet = [r for r in s3_rows if r["status"] in WORKSHEET_STATUSES]
     emit()
     emit("-" * 70)
-    emit("SOW 6.4.1 SCOPE — in-scope section 3 debt (the 6.4.1 clause set)")
+    emit("SOW 6.4.1 SCOPE — section 3 build set, waivers, and worksheet")
     emit("-" * 70)
-    emit("Rows that are neither Deferred nor Excluded by Client agreement.")
-    emit("Each must reach Met, or carry a signed waiver, before 6.4.1 is Met.")
+    emit("BUILD set: rows neither Deferred, Excluded nor Waived. Each must reach Met.")
+    emit("WAIVED: in scope and open at the Phase A freeze, then deliberately not built.")
+    emit("WORKSHEET: BUILD + WAIVED, i.e. every row the Phase A register dispositioned.")
     emit()
     emit(f"  already met      : {s3_counts['Met']} Met")
-    emit(f"  in-scope gaps    : {len(gaps)}   expected {EXPECT_S3_GAP}   "
-         f"{'OK' if len(gaps) == EXPECT_S3_GAP else 'MISMATCH'}")
+    emit(f"  BUILD set        : {len(gaps)}   expected {EXPECT_S3_BUILD}   "
+         f"{'OK' if len(gaps) == EXPECT_S3_BUILD else 'MISMATCH'}")
     emit(f"    Partial        : {sum(1 for r in gaps if r['status'] == 'Partial')}")
     emit(f"    Not Met        : {sum(1 for r in gaps if r['status'] == 'Not Met')}")
+    emit(f"  WAIVED           : {len(waived)}   expected {EXPECT_S3_WAIVED}   "
+         f"{'OK' if len(waived) == EXPECT_S3_WAIVED else 'MISMATCH'}")
+    emit(f"  worksheet        : {len(worksheet)}   expected {EXPECT_S3_WORKSHEET}   "
+         f"{'OK' if len(worksheet) == EXPECT_S3_WORKSHEET else 'MISMATCH'}")
+    emit(f"    check         : {len(gaps)} build + {len(waived)} waived = "
+         f"{len(gaps) + len(waived)}   "
+         f"{'OK' if len(gaps) + len(waived) == EXPECT_S3_WORKSHEET else 'MISMATCH'}")
     emit(f"  already out      : {s3_counts['Deferred']} Deferred + {s3_counts['Excluded']} Excluded"
          f" = {s3_counts['Deferred'] + s3_counts['Excluded']}")
     reconciled = (
-        s3_counts["Met"] + len(gaps) + s3_counts["Deferred"] + s3_counts["Excluded"]
+        s3_counts["Met"] + len(gaps) + len(waived)
+        + s3_counts["Deferred"] + s3_counts["Excluded"]
     )
-    emit(f"  reconciliation   : {s3_counts['Met']} Met + {len(gaps)} gaps"
-         f" + {s3_counts['Deferred']} Def + {s3_counts['Excluded']} Exc"
+    emit(f"  reconciliation   : {s3_counts['Met']} Met + {len(gaps)} build"
+         f" + {len(waived)} waived + {s3_counts['Deferred']} Def"
+         f" + {s3_counts['Excluded']} Exc"
          f" = {reconciled} (must equal {EXPECT_S3_TOTAL})")
-    SI["s3_gap"] = len(gaps)
-    SI["s3_gap_ok"] = len(gaps) == EXPECT_S3_GAP
+    SI["s3_build"] = len(gaps)
+    SI["s3_build_ok"] = len(gaps) == EXPECT_S3_BUILD
+    SI["s3_waived"] = len(waived)
+    SI["s3_waived_ok"] = len(waived) == EXPECT_S3_WAIVED
+    SI["s3_worksheet"] = len(worksheet)
+    SI["s3_worksheet_ok"] = len(worksheet) == EXPECT_S3_WORKSHEET
+    SI["s3_build_plus_waived_ok"] = len(gaps) + len(waived) == EXPECT_S3_WORKSHEET
     SI["s3_reconciliation_ok"] = reconciled == EXPECT_S3_TOTAL
     emit()
     emit(f"  6.4.1 is therefore {'SATISFIABLE' if len(gaps) == 0 else 'NOT MET'} at v1.0.0:")
-    emit(f"  {len(gaps)} of {EXPECT_S3_TOTAL} section 3 clauses remain open.")
+    emit(f"  {len(gaps)} of {EXPECT_S3_TOTAL} section 3 clauses remain to be built,")
+    emit(f"  and {len(waived)} more are waived and will not be built in any phase.")
 
-    # ---------- gap register, raw ----------
+    # ---------- build set, raw ----------
     emit()
     emit("-" * 70)
-    emit("IN-SCOPE GAP REGISTER (clause | status | requirement)")
+    emit("BUILD SET REGISTER (clause | status | requirement)")
     emit("-" * 70)
     for i, r in enumerate(gaps, 1):
         req = r["requirement"]
         if len(req) > 96:
             req = req[:93] + "..."
         emit(f"{i:>3}. {r['clause']:<8} {r['status']:<9} {req}")
+
+    emit()
+    emit("-" * 70)
+    emit("WAIVED REGISTER (clause | requirement)")
+    emit("-" * 70)
+    for i, r in enumerate(waived, 1):
+        req = r["requirement"]
+        if len(req) > 96:
+            req = req[:93] + "..."
+        emit(f"{i:>3}. {r['clause']:<8} {req}")
 
     # ---------- register cross-check ----------
     emit()
@@ -255,22 +297,24 @@ def main():
 
     reg_rows, reg_decisions = parse_register(REGISTER)
     SI["register_rows"] = len(reg_rows)
-    emit(f"worksheet rows        : {len(reg_rows)}   expected {EXPECT_S3_GAP}   "
-         f"{'OK' if len(reg_rows) == EXPECT_S3_GAP else 'MISMATCH'}")
-    SI["register_rows_ok"] = len(reg_rows) == EXPECT_S3_GAP
+    emit(f"worksheet rows        : {len(reg_rows)}   expected {EXPECT_S3_WORKSHEET}   "
+         f"{'OK' if len(reg_rows) == EXPECT_S3_WORKSHEET else 'MISMATCH'}")
+    SI["register_rows_ok"] = len(reg_rows) == EXPECT_S3_WORKSHEET
 
     emit(f"decisions defined     : {len(reg_decisions)}   expected {len(EXPECT_DECISIONS)}   "
          f"{'OK' if len(reg_decisions) == len(EXPECT_DECISIONS) else 'MISMATCH'}")
     emit(f"                       {', '.join(reg_decisions)}")
     SI["register_decisions_ok"] = sorted(reg_decisions) == sorted(EXPECT_DECISIONS)
 
-    # every worksheet row must match the matrix gap row at the same position
+    # every worksheet row must match the matrix worksheet row at the same
+    # position. The register covers BUILD + WAIVED, in matrix document order,
+    # so the comparison set is `worksheet`, not the 67-row build set.
     clause_mismatch = []
     status_mismatch = []
     req_mismatch = []
     phase_bad = []
     decision_bad = []
-    for i, (g, r) in enumerate(zip(gaps, reg_rows)):
+    for i, (g, r) in enumerate(zip(worksheet, reg_rows)):
         if g["clause"] != r["clause"]:
             clause_mismatch.append((i + 1, g["clause"], r["clause"]))
         if g["status"] != r["status"]:
@@ -284,6 +328,32 @@ def main():
             or re.match(r"^deferred D\d+$", r["decision"])
         ):
             decision_bad.append((i + 1, r["decision"]))
+
+    # The matrix and the register each hold a copy of the same disposition.
+    # Comparing them to the frozen counts is what stops a waive being recorded
+    # in one document and forgotten in the other.
+    reg_build = [r for r in reg_rows if r["disposition"].replace("*", "") == "Build"]
+    reg_waive = [r for r in reg_rows if r["disposition"].replace("*", "") == "Waive"]
+    emit()
+    emit("  matrix vs register disposition totals:")
+    emit(f"    matrix BUILD set      : {len(gaps):>3}   register Build : {len(reg_build):>3}   "
+         f"{'OK' if len(gaps) == len(reg_build) else 'MISMATCH'}")
+    emit(f"    matrix WAIVED         : {len(waived):>3}   register Waive : {len(reg_waive):>3}   "
+         f"{'OK' if len(waived) == len(reg_waive) else 'MISMATCH'}")
+    SI["matrix_register_build_ok"] = len(gaps) == len(reg_build)
+    SI["matrix_register_waived_ok"] = len(waived) == len(reg_waive)
+    # A row the matrix calls Waived must be dispositioned Waive, and vice
+    # versa. Status is already compared position-by-position above; this
+    # catches the case where a waive was flipped on one side only.
+    flip = [
+        (r["n"], m["status"], r["disposition"].replace("*", ""))
+        for m, r in zip(worksheet, reg_rows)
+        if (m["status"] == "Waived") != (r["disposition"].replace("*", "") == "Waive")
+    ]
+    SI["waive_direction_ok"] = not flip
+    emit(f"    waive direction       : {'OK' if not flip else str(len(flip)) + ' MISMATCH'}")
+    for n, ms, ds in flip[:10]:
+        emit(f"      row {n}: matrix {ms!r} vs register {ds!r}")
 
     for label, bad in (
         ("clause", clause_mismatch),
@@ -306,9 +376,9 @@ def main():
     emit("  phase distribution (worksheet rows):")
     for p in PHASES:
         emit(f"    {p}: {dist.get(p, 0)}")
-    SI["register_phase_total_ok"] = sum(dist.values()) == EXPECT_S3_GAP
+    SI["register_phase_total_ok"] = sum(dist.values()) == EXPECT_S3_WORKSHEET
     emit(f"    total: {sum(dist.values())}   "
-         f"{'OK' if sum(dist.values()) == EXPECT_S3_GAP else 'MISMATCH'}")
+         f"{'OK' if sum(dist.values()) == EXPECT_S3_WORKSHEET else 'MISMATCH'}")
 
     gated = [r for r in reg_rows if r["decision"] != "-"]
     emit(f"  rows gated on a decision: {len(gated)}   "

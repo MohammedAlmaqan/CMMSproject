@@ -71,9 +71,9 @@ Each decision is posed as a **question** with neutral options, so the reasoning 
 | ID | Clause | Question | Options | Vendor recommendation | Owner | **Answer** (Client) |
 |---|---|---|---|---|---|---|
 | **D-2** | §6.4.6 | §6.4.6 requires "Documentation delivered **and training completed**". Decision X7 already removed training from scope. The criterion cannot be satisfied as written. | (a) Amend §6.4.6 to documentation-only, consistent with X7. (b) Reinstate training, reversing X7. | **(a)**. X7 was an explicit Client decision; leaving the contradictory criterion in place creates a permanent unmeetable acceptance criterion. | Client | Amend SOW 6.4.6 to "Documentation delivered". The training limb is removed entirely, consistent with X7. **Applied**: the matrix row is amended with the original wording struck through. |
-| **D-3** | §3.5.1 | Planned labour cost is implemented as `plannedHours × numberOfTechnicians × craftRate`. The SOW formula reads `planned labour hours × craft rate`. The SOW does not state whether planned hours are per technician or per operation. **Every planned-cost figure and the §3.7.1 cost summary depend on the answer.** | (a) Planned hours are per technician — current implementation stands. (b) Planned hours are per operation — divide out the technician multiplier. (c) Treat as unspecified and agree a plant convention. | **(c)**, then (a) or (b) as the convention. This is a Finance question, not an engineering one, and the two answers produce materially different planned totals. | Client — Maintenance / Finance | Planned hours are the operation's **total** labour hours, so planned labour cost = planned hours x craft rate, exactly as SOW 3.5.1 states. |
-| **D-4** | §4.3 | §4.3 requires **RPO < 1 hour**. The delivered backup is a daily `pg_dump`, giving an RPO of up to 24 hours — three times the objective. | (a) Implement WAL archiving and differential backups to meet 1 h. Requires PostgreSQL configuration and a second backup target. (b) Accept a 24 h RPO in writing as a deviation, with the business impact stated. | **(a)** if the plant cannot absorb a day of lost work; **(b)** is acceptable only if someone with authority signs the risk. A daily schedule cannot be described as meeting §4.3. | Client IT / Operations | Build WAL archiving plus base/differential backup to meet RPO < 1 h. |
-| **D-5** | §5.5, §3.10 | §5.5 requires OAuth2 / OpenID Connect with Azure AD or on-premises AD. §3.10 requires the API to use OAuth2. v1.0.0 ships first-party JWT login, with no OAuth2 flow and no directory integration. | (a) An Azure AD tenant and app registration are available — implement OAuth2/OIDC. (b) No tenant available — accept first-party JWT as a written §5.5 deviation. | Depends entirely on **(a)** being available. If no tenant exists, (b) is the only route, and it should be recorded as a deviation rather than left as a silent `Not Met`. | Client IT | Retain first-party JWT login. OAuth2/OIDC is **waived as a formal, documented SOW 5.5 deviation**. Reopens if a tenant is provided. |
+| **D-3** | §3.5.1 | Planned labour cost is implemented as `plannedHours × numberOfTechnicians × craftRate`. The SOW formula reads `planned labour hours × craft rate`. The SOW does not state whether planned hours are per technician or per operation. **Every planned-cost figure and the §3.7.1 cost summary depend on the answer.** | (a) Planned hours are per technician — current implementation stands. (b) Planned hours are per operation — divide out the technician multiplier. (c) Treat as unspecified and agree a plant convention. | **(c)**, then (a) or (b) as the convention. This is a Finance question, not an engineering one, and the two answers produce materially different planned totals. | Client — Maintenance / Finance | Planned hours are the operation's **total** labour hours, so planned labour cost = planned hours x craft rate, exactly as SOW 3.5.1 states. **Confirmed by the SOW owner 2026-09-26**: remove the `numberOfTechnicians` multiplier from `backend/src/services/costs.ts:19`. The code change lands with row 49 in Phase E. |
+| **D-4** | §4.3 | §4.3 requires **RPO < 1 hour**. The delivered backup is a daily `pg_dump`, giving an RPO of up to 24 hours — three times the objective. | (a) Implement WAL archiving and differential backups to meet 1 h. Requires PostgreSQL configuration and a second backup target. (b) Accept a 24 h RPO in writing as a deviation, with the business impact stated. | **(a)** if the plant cannot absorb a day of lost work; **(b)** is acceptable only if someone with authority signs the risk. A daily schedule cannot be described as meeting §4.3. | Client IT / Operations | Build WAL archiving plus base/differential backup to meet RPO < 1 h. **Confirmed by the SOW owner 2026-09-26**: write the WAL archiving config and update the backup/restore scripts. The proof-of-working is recorded as a **pending rehearsal** against a live PostgreSQL host and a second backup target - a pending verification, NOT a scope reduction. |
+| **D-5** | §5.5, §3.10 | §5.5 requires OAuth2 / OpenID Connect with Azure AD or on-premises AD. §3.10 requires the API to use OAuth2. v1.0.0 ships first-party JWT login, with no OAuth2 flow and no directory integration. | (a) An Azure AD tenant and app registration are available — implement OAuth2/OIDC. (b) No tenant available — accept first-party JWT as a written §5.5 deviation. | Depends entirely on **(a)** being available. If no tenant exists, (b) is the only route, and it should be recorded as a deviation rather than left as a silent `Not Met`. | Client IT | Retain first-party JWT login. OAuth2/OIDC is **waived as a formal, documented SOW 5.5 deviation**. **Confirmed by the SOW owner 2026-09-26**: internal use only, no Azure AD. Does not reopen. |
 | **D-6** | §3.9 | §3.9 requires a *"Responsive web interface that functions on tablets and smartphones"*. X2–X4 removed mobile **camera**, **offline** and **signatures**; they did not remove the responsive shell. This row is `Not Met` and carries no exclusion. | (a) Tablets and phones are in scope — build a responsive layout. (b) Desktop/laptop only — waive the row and record that field devices are out of scope. | Depends on how the plant actually works. If technicians use tablets in the field, (a). The current fixed-width sidebar and multi-column tables are not usable at phone width. | Client — Operations | Build a responsive web layout: Tailwind breakpoints, mobile navigation drawer, table stacking. **No PWA, offline, camera or signature** - X2 to X4 stand. |
 | **D-7** | §4.2 | §4.2 requires row-level data access control *"if multisite/cost-centre separation is required (optional, TBD)"*. The SOW itself marks this optional and undetermined. | (a) Separation is required — implement per-user / per-cost-centre scoping on list routes. (b) Not required — close the row. | **(b)** unless the Client operates multiple sites with separate cost-centre visibility. The SOW wrote "optional, TBD"; leaving it unanswered leaves the row permanently open. | Client | Not required. Row closed as out of scope; no code. |
 | **D-8** | §4.5 | §4.5 states the data model *"should align"* with ISO 14224. No alignment assessment exists. | (a) Documentation-only field mapping is sufficient. (b) A structural alignment is required. | **(a)**. "Should align" is not a functional requirement; a documented mapping table satisfies the intent and is a Phase I deliverable. | Client — Engineering | Documentation-only field mapping is sufficient. Deliver the mapping table; no structural migration. |
@@ -87,7 +87,7 @@ Each decision is posed as a **question** with neutral options, so the reasoning 
 | **D-16** | §3.3.5 vs §3.5.1 | §3.3.5 says actual labour cost = hours × craft rate *"**from work center master**"*. §3.5.1 says the same figure = hours × **craft rate**. The implementation uses `Craft.hourlyRate` and never reads `WorkCenter.costRatePerHour`, which exists in the schema precisely for this. The SOW names two different rate sources. | (a) `Craft.hourlyRate` is authoritative. (b) `WorkCenter.costRatePerHour` is authoritative. (c) `Craft.hourlyRate` by default, falling back to the work-centre rate where no craft rate is set. | **(c)**. It honours both SOW clauses, needs no new master data, and makes the currently-dead `costRatePerHour` column meaningful. | Client — Maintenance / Finance | **Craft.hourlyRate is the single authoritative labour rate.** Amend 3.3.5's "from work center master" to "from craft master". `WorkCenter.costRatePerHour` is a work-centre overhead concept, is not read by cost calculation, and is not a labour rate. |
 | **D-17** | §5.3 / deferred D6 | The SOW's monetary and quantity columns ship as binary floating point. Deferred item D6 parks the `Float` -> `Decimal` migration in v1.1, but Phase F builds cost rollups and cost reports. Should the migration happen before or after that reporting work? | (a) Migrate to `Decimal` in Phase E, before the rollups exist. (b) Leave in v1.1 and build the rollups on `Float`. | **(a)**. Rounding differences baked into new cost reporting are expensive to unpick later, and the totals are otherwise unauditable. | Client - Finance | Build the **Float -> Decimal migration** for monetary columns in Phase E, promoting deferred item D6 out of v1.1. |
 
-**Decisions that gated worksheet rows:** 13 rows were dispositioned on a decision rather than on matrix evidence alone — rows 7, 8, 14, 17, 32, 36, 37, 39, 49, 59, 63, 75, 76. All 13 are now resolved. The remaining 64 were dispositioned directly on the matrix evidence.
+**Decisions that gated worksheet rows:** 13 rows were dispositioned on a decision rather than on matrix evidence alone — rows 7, 8, 14, 17, 32, 36, 37, 39, 49, 59, 63, 75, 76. All 13 are resolved. Row 75 was subsequently waived outright and row 24, which was not in this list, was subsequently built; both changes came from the SOW owner's answers in §6.4. The remaining 64 were dispositioned directly on the matrix evidence.
 
 ---
 
@@ -98,9 +98,9 @@ One line per decision, so the reasoning is auditable without re-reading the opti
 | ID | Why this answer |
 |---|---|
 | **D-2** | X7 already removed training from scope, so the criterion was unmeetable as written; deleting the limb resolves a standing contradiction instead of leaving a permanent failure. |
-| **D-3** | Matches the SOW formula literally and the common CMMS convention in which the operation carries total planned labour, and removes a crew multiplier the SOW never mentions. |
+| **D-3** | Matches the SOW formula literally and the common CMMS convention in which the operation carries total planned labour, and removes a crew multiplier the SOW never mentions. **Confirmed by the SOW owner.** |
 | **D-4** | A daily pg_dump against a 1-hour RPO objective is a 24x miss, and a plant cannot absorb a day of lost work orders. **Cannot be verified until a live PostgreSQL host and a second backup target are provided.** |
-| **D-5** | An Azure AD tenant or on-prem AD is not held, so the integration could be neither completed nor verified; an unverifiable integration is worse than a recorded deviation. |
+| **D-5** | Internal use only, so no identity provider is needed. An integration that could be neither completed nor verified is worse than a recorded deviation. **Confirmed by the SOW owner: does not reopen.** |
 | **D-6** | SOW 1.3 and 3.9 both expect tablet and browser use, and the fixed sidebar plus multi-column tables are unusable at phone width. |
 | **D-7** | The SOW itself marks row-level data access control "optional, TBD" and no multisite cost-centre separation requirement has been stated. |
 | **D-8** | SOW 4.5 says the model "should align", which is not a functional requirement; a documented mapping satisfies the intent. |
@@ -126,11 +126,11 @@ Generated from `docs/SOW_COMPLIANCE.md` by machine; every row's clause text and 
 | **B** | Trust and authorisation - close the 6.4.4 Major defects | 6 | 0 |
 | **C** | Workflow surfaces and master-data write paths | 17 | 1 |
 | **D** | PM engine correctness (3.4) | 10 | 1 |
-| **E** | Data integrity, audit, history and costing basis | 11 | 0 |
+| **E** | Data integrity, audit, history and costing basis | 10 | 1 |
 | **F** | Reporting, BI layer and the UAT pack (6.4.1, 6.4.2) | 14 | 1 |
 | **G** | Non-functional and operational readiness (6.4.3) | 0 | 1 |
-| **H** | Remaining §3 surface, including alerts and responsive layout | 10 | 5 |
-| | **Total** | **68** | **9** |
+| **H** | Remaining §3 surface, including calibration and alerts | 10 | 5 |
+| | **Total** | **67** | **10** |
 
 **Phase G has no §3 build rows and that is not an oversight.** Its only §3 clause was OAuth2
 (row 76), waived under D-5. The non-functional work that §6.4.3 actually demands — the 100-VU
@@ -143,7 +143,7 @@ Evidence for each row — the exact code path, endpoint or absence that justifie
 
 | # | Clause | Requirement | Status | Phase | Decision | Disposition | Decision ID / reason |
 |---|---|---|---|---|---|---|---|
-| 1 | §3.1.1 | Drag-and-drop restructuring of the hierarchy | Not Met | C | - | **Waive** | Re-parenting is delivered; drag-and-drop is an input affordance with no operational value and a fixed tree is cheaper to maintain. |
+| 1 | §3.1.1 | Drag-and-drop restructuring of the hierarchy | Waived | C | - | **Waive** | Re-parenting is delivered; drag-and-drop is an input affordance with no operational value and a fixed tree is cheaper to maintain. |
 | 2 | §3.1.1 | Display open work orders and notification count for each node | Partial | C | - | **Build** | A planner cannot see load per node without it; small read-model change. |
 | 3 | §3.1.2 | Each equipment record assigned to exactly one functional location (lowest level) | Partial | C | - | **Build** | The single-parent invariant is what makes the hierarchy rollups in rows 51-53 correct. |
 | 4 | §3.1.2 | BOM: associate spare parts from the material catalog with an equipment | Partial | C | - | **Build** | Knowing which spares fit an asset is core to maintenance planning. |
@@ -166,32 +166,32 @@ Evidence for each row — the exact code path, endpoint or absence that justifie
 | 21 | §3.2.3 | System shows the relationship and allows navigation between notification and work order | Partial | C | - | **Build** | Notification-to-work-order traceability is the core audit path. |
 | 22 | §3.2.3 | After work order completion, notification status can be set to Completed manually or automatically | Not Met | B | - | **Build** | A converted notification never reaches Completed, so the conversion queue never clears. |
 | 23 | §3.3.1 | Emergency automatically sets highest priority | Not Met | H | - | **Build** | Emergency work must outrank planned work without relying on the operator to remember. |
-| 24 | §3.3.1 | Calibration work orders with pass/fail tracking | Not Met | H | - | **Waive** | PROVISIONAL - calibration pass/fail implies a calibration programme and as-found/as-left records the plant has not stated. Cheap to reverse if a programme exists. See the flagged list. |
+| 24 | §3.3.1 | Calibration work orders with pass/fail tracking | Not Met | H | - | **Build** | SOW owner confirmed 2026-09-26 that the plant DOES run a calibration programme, so the clause applies. SCOPE GATE: the deliverable is larger than a pass/fail label. Do NOT build the label-only version. Depth (pass/fail vs full as-found/as-left plus reference standard plus due-date tracking) must be confirmed with the SOW owner before Phase H work starts. |
 | 25 | §3.3.3 | WO Number auto-generated with a configurable prefix | Partial | C | - | **Build** | Trivial change, and auditors expect a configurable, recognisable work-order prefix. |
 | 26 | §3.3.3 | Header fields: Type, Priority, Status, Equipment/Functional Location (mandatory), Description, Reported By, Responsible Work Center, Assigned Supervisor, planned & actual start/finish, Breakdown flag, Safety critical flag | Partial | E | - | **Build** | Assigned Supervisor and Safety critical are absent from the work-order header. |
 | 27 | §3.3.3 | Each work order must contain at least one operation | Not Met | C | - | **Build** | An operation-less work order has no cost, no labour and no plan lineage. |
 | 28 | §3.3.3 | Per operation: sequence, description, craft, planned hours, number of technicians, actual hours, status (Pending/In Progress/Completed) | Partial | C | - | **Build** | The operation row is the labour record; its fields drive costing and progress. |
 | 29 | §3.3.3 | Rich-text long-text field for job instructions, safety notes, completion remarks | Not Met | H | - | **Build** | Safety notes and job instructions need more than a single-line text field. |
-| 30 | §3.3.4 | Material issue entries must deduct from stock if inventory is managed inside the CMMS | Not Met | E | - | **Build** | Material.currentStock is maintained by the material routes but never decremented on issue, so on-hand stock silently drifts. |
+| 30 | §3.3.4 | Material issue entries must deduct from stock if inventory is managed inside the CMMS | Waived | E | - | **Waive** | SOW owner confirmed 2026-09-26: the warehouse team controls inventory, so the SOW's "if inventory is managed inside the CMMS" condition is NOT met. The CMMS records consumption for cost and traceability but does not own the on-hand count. Material.currentStock stays a manually maintained reference field (Materials page or CSV import), informational only, NOT authoritative, and is not auto-decremented. Consumption on material issue is still recorded - quantity, unit cost, rolled into work order cost and the material consumption report. |
 | 31 | §3.3.4 | Vendor must implement a material reservation concept | Not Met | E | - | **Build** | reservedQuantity exists in the schema and is never written, so a part cannot be held for a scheduled job. |
 | 32 | §3.3.5 | Actual labour cost = hours × craft rate (from work center master) | Partial | E | D-16 | **Build** | [D-16] D-16 fixes the rate source: Craft.hourlyRate is already what the code uses, so the row closes on the wording correction. |
 | 33 | §3.3.5 | Technician identification via login; entries stamped with user and timestamp | Partial | B | - | **Build** | The labour route trusts a client-supplied userId, so labour cost can be attributed to the wrong technician. Named an open 6.4 item. |
 | 34 | §3.3.6 | Additional miscellaneous costs (travel, permits) as line items | Not Met | E | - | **Build** | Travel and permit costs are real and currently have nowhere to be recorded. |
 | 35 | §3.3.7 | WO cannot be set to "In Progress" unless all mandatory safety checklists are acknowledged (sign-off via electronic signature) | Partial | D | - | **Build** | The safety gate enforces checklist status, not item answers; making response nullable and dropping the 'NA' pre-fill closes it. Electronic signature stays excluded per X4. |
 | 36 | §3.3.8 | Any file type may be attached up to 10 MB per file | Partial | H | D-11 | **Build** | [D-11] Widened document allowlist under D-11; the 10 MB cap is already met and executables stay blocked. |
-| 37 | §3.3.8 | Threaded comments visible in the work order detail view, posted by any participant | Not Met | H | D-12 | **Waive** | [D-12] A flat comment list meets the collaboration need; threading adds a parent relation and recursive query for negligible gain. |
+| 37 | §3.3.8 | Threaded comments visible in the work order detail view, posted by any participant | Waived | H | D-12 | **Waive** | [D-12] A flat comment list meets the collaboration need; threading adds a parent relation and recursive query for negligible gain. |
 | 38 | §3.3.8 | Complete audit log recording user, timestamp, action, and old/new value for field modifications | Partial | E | - | **Build** | Old and new values are captured at only a minority of write sites, so the audit log cannot support an investigation. |
 | 39 | §3.4.1 | Plan fields: Plan Code, Description, Equipment/Functional Location (one or a list), Work Center, Task List template, Priority, associated Notifications | Partial | D | D-10 | **Build** | [D-10] A plan cannot target the equipment class, or the list of assets, that the SOW describes. See D-10. |
 | 40 | §3.4.1 | Strategy: time-based, meter-based, or a combination, whichever is due first | Partial | D | - | **Build** | Strategy selection is the switch that makes the PM engine usable at all. |
 | 41 | §3.4.2 | Time-based: interval in days/weeks/months with fixed start date and optional end date | Partial | D | - | **Build** | Time-based scheduling is the base case for most plant assets. |
 | 42 | §3.4.2 | Meter-based: meter associated with the equipment, interval value, support for multiple meters per plan | Partial | D | - | **Build** | Meter-based scheduling is required for usage-driven and rotating equipment. |
 | 43 | §3.4.2 | Call Horizon: user-defined days/units ahead of due date during which generation occurs | Not Met | D | - | **Build** | Without a call horizon every due plan generates at once and floods the backlog. |
-| 44 | §3.4.2 | Seasonal/exclusion blackout dates where generation is suppressed or shifted | Not Met | D | - | **Waive** | No shutdown calendar has been supplied, and PM-suppression logic risks silently dropping planned maintenance. |
+| 44 | §3.4.2 | Seasonal/exclusion blackout dates where generation is suppressed or shifted | Waived | D | - | **Waive** | No shutdown calendar has been supplied, and PM-suppression logic risks silently dropping planned maintenance. |
 | 45 | §3.4.3 | When due date (factoring call horizon) is reached, create a Work Order populated from the plan's task list | Partial | D | - | **Build** | Generating the work order from the plan is the core preventive-maintenance function. |
 | 46 | §3.4.3 | Created work order status Draft or Planned, configurable | Not Met | D | - | **Build** | Draft versus Planned must be the planner's choice; trivial to expose. |
 | 47 | §3.4.3 | If a plan has an associated notification, create it and link them | Not Met | D | - | **Build** | A plan that references a notification must create and link it. |
 | 48 | §3.4.3 | Generation must be idempotent (no duplicate WO if the due date stays inside the horizon) | Partial | D | - | **Build** | Duplicate work orders from a repeated generation window are an operational failure, not a cosmetic one. |
-| 49 | §3.5.1 | Planned Cost = planned labour hours × craft rate + planned materials × standard cost + planned services + other planned | Partial | E | D-3 | **Build** | [D-3] D-3 fixes the formula; today it multiplies by an unstated technician factor the SOW never specifies. |
+| 49 | §3.5.1 | Planned Cost = planned labour hours × craft rate + planned materials × standard cost + planned services + other planned | Partial | E | D-3 | **Build** | [D-3] CONFIRMED by the SOW owner 2026-09-26: planned hours are the operation's TOTAL labour, not per-technician. The `numberOfTechnicians` multiplier in `backend/src/services/costs.ts:19` must be removed so plannedCost = plannedHours x craftRate, matching the 3.5.1 formula exactly. Code change lands in Phase E with this row. |
 | 50 | §3.5.2 | Support cost splitting when a work order covers multiple cost centers (percentage allocation) | Partial | C | - | **Build** | One work order legitimately serves several cost centres and the percentage split is named in the SOW. |
 | 51 | §3.5.3 | Costs summarisable by functional location hierarchy (rollup to any level) | Not Met | F | - | **Build** | Cost rollup by hierarchy is what makes location-level spend visible. |
 | 52 | §3.5.3 | Costs summarisable by equipment | Not Met | F | - | **Build** | Cost by equipment is the asset manager's view and shares the rollup engine. |
@@ -210,16 +210,16 @@ Evidence for each row — the exact code path, endpoint or absence that justifie
 | 65 | §3.7.2 | Backlog Hours by Work Center | Not Met | F | - | **Build** | Backlog hours by work centre is a trivial extension of row 60. |
 | 66 | §3.7.2 | Top 10 Highest-Cost Equipment | Not Met | F | - | **Build** | Top-cost equipment is a trivial extension of the cost rollup. |
 | 67 | §3.7.2 | Notifications Awaiting Conversion | Partial | F | - | **Build** | The conversion queue is how a planner finds notifications nobody has actioned. |
-| 68 | §3.7.2 | Dashboard data is realtime and widgets offer drilldown | Not Met | F | - | **Waive** | Realtime push updates and per-widget drilldown are dashboard-product scope; the underlying reports are delivered in rows 60-67. |
+| 68 | §3.7.2 | Dashboard data is realtime and widgets offer drilldown | Waived | F | - | **Waive** | Realtime push updates and per-widget drilldown are dashboard-product scope; the underlying reports are delivered in rows 60-67. |
 | 69 | §3.8 | In-app alert: work order assignment to technician/supervisor | Not Met | H | - | **Build** | Without an assignment alert a technician has no way to learn a job is theirs. |
 | 70 | §3.8 | In-app alert: overdue work orders (not completed by due date) | Not Met | H | - | **Build** | Overdue work is the single most important exception a maintenance organisation tracks. |
 | 71 | §3.8 | In-app alert: PM generation failure | Partial | H | - | **Build** | A PM generation failure is silent today, so planned maintenance quietly stops without anyone noticing. |
 | 72 | §3.8 | In-app alert: new high-priority notification raised | Not Met | H | - | **Build** | High-priority notifications are the ones that must reach a human immediately. |
-| 73 | §3.8 | Email delivery of alerts | Not Met | H | - | **Waive** | In-app alerts cover the operational need; email delivery needs a client mail server that is not held and adds an unconfigured failure mode. |
-| 74 | §3.8 | Configuration by role/user to opt in or out of specific alert types | Not Met | H | - | **Waive** | The plant wants alerts on, not selectively suppressed; a per-role opt-in matrix adds configuration surface with no stated value. |
-| 75 | §3.9 | Responsive web interface that functions on tablets and smartphones without installing software | Not Met | H | D-6 | **Build** | [D-6] Responsive layout under D-6: the fixed sidebar and multi-column tables are unusable at phone width. |
-| 76 | §3.10 | API must use OAuth2 authentication | Not Met | G | D-5 | **Waive** | [D-5] No Azure AD tenant or on-prem AD is available. Retained JWT login is recorded as a formal SOW 5.5 deviation under D-5. |
-| 77 | §3.10 | API must include bulk endpoints for master data | Partial | H | - | **Waive** | Redundant with the SOW 5.7 CSV importers, which already cover the plant's actual master-data volumes. |
+| 73 | §3.8 | Email delivery of alerts | Waived | H | - | **Waive** | In-app alerts cover the operational need; email delivery needs a client mail server that is not held and adds an unconfigured failure mode. |
+| 74 | §3.8 | Configuration by role/user to opt in or out of specific alert types | Waived | H | - | **Waive** | The plant wants alerts on, not selectively suppressed; a per-role opt-in matrix adds configuration surface with no stated value. |
+| 75 | §3.9 | Responsive web interface that functions on tablets and smartphones without installing software | Waived | H | D-6 | **Waive** | SOW owner confirmed 2026-09-26: no tablet or phone use in the field. The desktop layout stands as is. D-6's buildable subset (responsive layout) is therefore not required, and the related PWA/offline/camera/signature items stay waived. |
+| 76 | §3.10 | API must use OAuth2 authentication | Waived | G | D-5 | **Waive** | [D-5] No Azure AD tenant or on-prem AD is available. Retained JWT login is recorded as a formal SOW 5.5 deviation under D-5. |
+| 77 | §3.10 | API must include bulk endpoints for master data | Waived | H | - | **Waive** | Redundant with the SOW 5.7 CSV importers, which already cover the plant's actual master-data volumes. |
 
 ---
 
@@ -235,7 +235,7 @@ carries an answer, and the machine check agrees. That is the gate as it now stan
 | Every row carries a proposed phase and any gating decision | ✅ §5 |
 | D-2 … D-17 posed with options, an answer and a rationale | ✅ §4, §4.1 |
 | **Every one of the 77 rows dispositioned `Build` or `Waive`** | ✅ **77 of 77** |
-| **Every waive carries a one-line business reason** | ✅ **9 of 9** |
+| **Every waive carries a one-line business reason** | ✅ **10 of 10** |
 | **Every decision answered** | ✅ **16 of 16** |
 | **Rationale recorded for every decision** | ✅ **16 of 16** |
 
@@ -256,7 +256,9 @@ Stated plainly, because a reader deserves to know what this document is:
 - It is **not** an SOW amendment. Amending the SOW is the SOW owner's act. D-2 was applied to
   the compliance matrix as a *record* of the owner's instruction, with the original wording
   struck through so the change is auditable.
-- Every waive is a **proposed** scope reduction. One already needs confirmation (§8).
+- Every waive is a **proposed** scope reduction. All six Phase A flags were answered by the
+  SOW owner on 2026-09-26 (§6.4); three of those answers changed a disposition, and one
+  (row 24) attached a scope gate that must be closed before Phase H.
 - If the SOW owner disagrees with any disposition, the fix is to change that row; the
   machine check re-derives the counts, so the register cannot drift out of step with the matrix.
 
@@ -279,36 +281,78 @@ delegated.
 4. `v1.0.0` is **not** re-tagged. The next tag is `v1.1.0`, cut only when the §6.4 criteria
    are met or waived.
 
-### 6.4 Flagged for the SOW owner
+### 6.4 Flagged items - answered 2026-09-26
 
-**Row 24 — calibration work orders with pass/fail tracking** is marked `Waive` **provisional**.
-The clause implies a calibration programme with as-found/as-left records, and the plant has
-not stated that it runs one. Building it speculatively is the expensive mistake; waiving it is
-cheap to reverse. Confirm whether a calibration programme exists.
+The SOW owner answered all six flags on 2026-09-26. Each answer is recorded against
+its decision and worksheet row. They are listed here so the reasoning behind each
+answer stays auditable, not because any of them is still open.
 
-**D-3 — planned-cost convention** is a Finance convention, not an engineering one. The chosen
-reading (planned hours are the operation's total) makes the implementation match the SOW
-formula exactly. If the plant's convention is per-technician, every planned total shifts and
-one formula changes.
+**Row 24 - calibration work orders - `Build` (was provisional `Waive`).** The plant
+**does** run a calibration programme, so the clause applies and the waive is
+withdrawn. The scope is **larger than the register's pass/fail label**, so the row
+carries a **scope gate**: before Phase H work starts, the SOW owner must be asked
+for the required depth - pass/fail only, or full as-found/as-left plus reference
+standard plus due-date tracking. **The label-only version must not be built.** The
+clause wording itself ("with pass/fail tracking") is narrower than a real
+calibration programme, so this is recorded as a scope clarification the owner must
+close, not a decision the vendor may make.
 
-**Row 75 — responsive layout** is the single largest discretionary item in the register. It is
-built because §1.3 and §3.9 both expect tablet use and the current layout is unusable at phone
-width. If technicians do not in fact use tablets in the field, waiving it is the largest
-single saving available.
+**Row 30 - stock deduction on material issue - `Waive` (was `Build`).** The
+warehouse team controls inventory, so the SOW's own conditional - "if inventory is
+managed inside the CMMS" - is **not** met. `Material.currentStock` remains a
+manually maintained reference field, updated via the Materials page or CSV import,
+**informational only and not authoritative**, and is not auto-decremented.
+Consumption on material issue is still recorded - quantity and unit cost, rolled
+into work order cost and the material consumption report - so costing and
+traceability are unaffected. This reverses the Phase A judgement, which built the
+row because the material routes already maintain `currentStock`; maintaining the
+field is not the same as the CMMS owning the count, and the owner has now drawn
+that line explicitly.
 
-**Row 30 — stock deduction** was nearly waived on the SOW's "if inventory is managed inside
-the CMMS" conditional, and is built instead because `Material.currentStock` is already
-maintained by the material routes. If the plant keeps stock in another system, waive it.
+**Row 75 - responsive layout - `Waive` (was `Build`).** No tablet or phone use in
+the field, so the desktop layout stands. This retires the single largest
+discretionary item identified in Phase A. D-6's buildable subset is therefore not
+required, and the related PWA, offline, camera and signature items stay waived.
 
-**D-4 — backup RPO** is decided as Build, but the restore rehearsal **cannot be verified**
-without a live PostgreSQL host and a second backup target. The code can be written; the proof
-cannot.
+**D-3 - planned cost - confirmed per-operation total.** Planned hours are the
+operation's total labour, not per-technician, so the `numberOfTechnicians`
+multiplier in `backend/src/services/costs.ts:19` is removed and
+`plannedCost = plannedHours x craftRate` matches 3.5.1 exactly. The code change
+lands with row 49 in Phase E.
 
-**D-5 / row 76 — OAuth2** is waived as a recorded §5.5 deviation because no Azure AD tenant or
-on-prem AD is held. If a tenant is provided, the row reopens.
+**D-4 - backup RPO - confirmed `Build`, proof pending.** The WAL archiving config
+and the backup/restore scripts get written. The restore rehearsal **cannot be
+run** without a live PostgreSQL host and a second backup target, so it is recorded
+as a **pending rehearsal** in §7 - a pending verification, explicitly **not** a
+scope reduction and not a waiver.
+
+**D-5 / row 76 - OAuth2 - waive confirmed, does not reopen.** Internal use only;
+no Azure AD and no on-premises AD. The 5.5 deviation stands as documented in
+D-5. Unlike the other flags, this one will not be revisited.
+
+### 6.5 One arithmetic correction
+
+The SOW owner expected a final tally of **66 Build / 11 Waive**. The verified
+tally is **67 Build / 10 Waive**.
+
+Three worksheet rows changed disposition, and each was named explicitly:
+
+| Row | Change | Effect |
+|---|---|---|
+| 24 | `Waive` to `Build` | Build +1, Waive -1 |
+| 30 | `Build` to `Waive` | Build -1, Waive +1 |
+| 75 | `Build` to `Waive` | Build -1, Waive +1 |
+
+Net effect on the 68 / 9 baseline: **Build -1, Waive +1**, giving 67 / 10. D-3,
+D-4 and D-5 changed decision *answers* but no row's disposition, so they do not
+move the totals. Reaching 66 / 11 needs exactly one further row waived, and no
+such row was named, so none has been assumed. The correct fix is either to name
+the eleventh row or to accept 67 / 10; the register records 67 / 10 because that
+is what the named decisions actually produce. The `Waived` status added to the
+compliance matrix makes 67 independently re-derivable: 38 Met + 67 build + 10
+waived + 4 Deferred + 7 Excluded = 126.
 
 ---
-
 
 ## 7. Dependencies the vendor does not hold
 
