@@ -337,6 +337,11 @@ export interface LaborEntry extends Auditable {
 }
 
 // ─── External Service Cost (§3.3.6) ───
+// SOW 3.3.6: "additional miscellaneous costs (travel, permits) as line items".
+// Must stay in step with serviceCostCategories in backend/src/utils/validation.ts.
+export const serviceCostCategories = ['Service', 'Travel', 'Permit', 'Other'] as const;
+export type ServiceCostCategory = (typeof serviceCostCategories)[number];
+
 export interface ExternalServiceCost {
   serviceCostId: string;
   workOrderId: string;
@@ -344,6 +349,8 @@ export interface ExternalServiceCost {
   description: string;
   cost: number;
   invoiceRef: string;
+  /** SOW 3.3.6: Service is a contractor invoice; Travel/Permit/Other are misc. */
+  category?: ServiceCostCategory;
 }
 
 // ─── Safety Checklist (§3.3.7) ───

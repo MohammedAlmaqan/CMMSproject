@@ -542,7 +542,8 @@ Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
-| E.1 | D-3: remove the `numberOfTechnicians` multiplier (row 49) | ✅ | Planned labour is `plannedHours × craft.hourlyRate`. Every planned-cost figure changes **only** by the removed multiplier. | *this commit* |
+| E.1 | D-3: remove the `numberOfTechnicians` multiplier (row 49) | ✅ | Planned labour is `plannedHours × craft.hourlyRate`. Every planned-cost figure changes **only** by the removed multiplier. | `ca9aa63` |
+| E.2 | Miscellaneous costs as line items (row 34), and the `+ other planned` term (row 49) | ✅ | Travel and permits are storable and reportable as their own line items, distinguishable from a contractor service. Every term of the §3.5.1 formula has a distinct source. | *this commit* |
 
 #### E.1, stated as raw output
 
@@ -564,6 +565,26 @@ plannedMaterials, actualMaterials, serviceCost, actualLabor, actualCost  ===  un
 **One assertion was wrong and was corrected rather than accommodated.** I first asserted `roundMoney(1.005) === 1.01`. It returns `1`: `1.005` is stored as `1.00499999999999989…`, so `× 100` is `100.49999…` and rounds down. That is inherent to `Math.round(v * 100) / 100`, which is what the cost code has always done, so changing it would have silently moved stored figures. The test now asserts the real behaviour and names it as part of the reason D-17 exists.
 
 **Row 49 stays `Partial`, and deliberately so.** The residual that matrix row named — the multiplier — is now closed, but the SOW formula also has a `+ other planned` term with no source in the schema. That term *is* the miscellaneous-cost line, and `ExternalServiceCost` currently has no category discriminator, so travel and permits cannot be told apart from contractor services (row 34, `Not Met`). Row 49 and row 34 are therefore one piece of work, and row 49 closes when row 34 lands. Marking it `Met` here would have been a status that the code does not support.
+
+E.1 CI: run **36335261520**, `conclusion: success`, for exact SHA `ca9aa6334ff1aa1f32edb680406b1989ffd4b6bf`.
+
+#### E.2, stated as raw output
+
+SOW §3.3.6 requires "additional miscellaneous costs (travel, permits) as line items". The table already held every non-labour, non-material cost, so travel and permits were storable in principle — but with nothing to tell them apart, a cost report totalled a travel line and a contractor invoice together and called the result "services".
+
+**One column, not a new table.** `ExternalServiceCost.category`, migration `20260927110000_service_cost_category`: `Service` (the contractor case), `Travel`, `Permit`, `Other`. `Service` is the default, and that is also the backfill — every pre-existing line already *was* a service, so a client that never sends a category keeps exactly the meaning it had. `NOT NULL DEFAULT` is deliberate: on Postgres 11+ this is a metadata-only change, so the table is not rewritten and no concurrent read blocks on it.
+
+**Free text plus zod, not a native enum.** This schema has no enums, and v1.1-4 already records the accepted pattern: permitted values are validated in the zod schema at the API boundary. A native `CREATE TYPE` would be stronger enforcement, but it is the one alteration on a live table that cannot be reversed in place, and it would have made this the first enum in a schema that currently has none. Consistency and migration safety won.
+
+The `+ other planned` term of §3.5.1 is the same line item, so `computeWorkOrderCosts` now returns `plannedServices` and `otherCosts` as well as their sum. **The two buckets are a partition of the same lines**, so the split makes the SOW formula explicable without moving a single total — asserted directly, by running the same lines with the categories stripped and comparing. That is what closed row 49 rather than E.1.
+
+The category is exposed end to end: `POST`/`PUT` accept it, the list endpoint returns it, the OpenAPI blocks document it, and `WorkOrderDetailPage.tsx` has a select in both the add and the inline-edit form plus a Category column that renders a misc line differently from a service.
+
+`tsc -b` exits **0** in both packages. The DB-free unit suite is **512 cases across 28 files** (4 new pure cases for the split). `eslint src tests` reports **42** errors against a gate threshold of 50. The frontend suite is 7 cases; locally the vitest forks pool reported worker-start errors and still completed, which is a sandbox resource limit rather than a result, so the CI run below is the claim.
+
+Coverage added: 5 DB-backed cases in `externalServiceCosts.test.ts` — the default applies when the field is omitted, `Travel`/`Permit`/`Other` each persist, an out-of-set category is a zod 400, a line can be reclassified, **an update that does not mention the category does not clear it**, and the list endpoint returns a permitted value on every row.
+
+The row-34 commit moves **two** matrix rows to `Met`: §3.3.6 from `Not Met`, §3.5.1 from `Partial`. Recounted from the Status column of all 214 clause rows rather than transcribed: **76 Met, 68 Partial, 37 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 50 Met, 35 Partial, 20 Not Met, 4 Deferred, 7 Excluded, 10 Waived**, leaving 76 open in §3. The `docs/SOW_COMPLIANCE.md` Summary table and both narrative paragraphs, and the `docs/DECISION_REGISTER.md` row 49 and D-3 row, were corrected in the same commit rather than left contradicting the matrix.
 
 ### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
 

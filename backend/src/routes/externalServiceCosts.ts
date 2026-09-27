@@ -3,7 +3,12 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
-import { validate, externalServiceCreateSchema, externalServiceUpdateSchema } from '../utils/validation.js';
+import {
+  validate,
+  externalServiceCreateSchema,
+  externalServiceUpdateSchema,
+  defaultServiceCostCategory,
+} from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -46,6 +51,7 @@ router.use(authenticate);
  *                   description: { type: string }
  *                   cost: { type: number, format: float, description: "Float-typed in v1.0.0; Decimal migration is v1.1" }
  *                   invoiceRef: { type: string }
+ *                   category: { type: string, enum: [Service, Travel, Permit, Other], description: "SOW 3.3.6: Service is a contractor invoice; Travel/Permit/Other are the additional miscellaneous costs. Defaults to Service." }
  *       '400':
  *         description: workOrderId query parameter is required
  *       '401':
@@ -75,6 +81,7 @@ router.use(authenticate);
  *               description: { type: string }
  *               cost: { type: number, format: float }
  *               invoiceRef: { type: string }
+ *               category: { type: string, enum: [Service, Travel, Permit, Other], description: "Defaults to Service when omitted" }
  *     responses:
  *       '201':
  *         description: Cost line created
@@ -110,7 +117,7 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.post('/', authorizeMinRole('Technician'), validate(externalServiceCreateSchema), async (req: Request, res: Response) => {
   try {
-    const { workOrderId, vendor, description, cost, invoiceRef } = req.body;
+    const { workOrderId, vendor, description, cost, invoiceRef, category } = req.body;
 
     const service = await prisma.externalServiceCost.create({
       data: {
@@ -119,6 +126,7 @@ router.post('/', authorizeMinRole('Technician'), validate(externalServiceCreateS
         description,
         cost,
         invoiceRef: invoiceRef || '',
+        category: category || defaultServiceCostCategory,
       },
     });
 
@@ -167,6 +175,7 @@ router.post('/', authorizeMinRole('Technician'), validate(externalServiceCreateS
  *               description: { type: string }
  *               cost: { type: number, format: float }
  *               invoiceRef: { type: string }
+ *               category: { type: string, enum: [Service, Travel, Permit, Other], description: "Defaults to Service when omitted" }
  *     responses:
  *       '200':
  *         description: Cost line updated
@@ -194,7 +203,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdat
       return res.status(404).json({ error: 'External service not found' });
     }
 
-    const { vendor, description, cost, invoiceRef } = req.body;
+    const { vendor, description, cost, invoiceRef, category } = req.body;
 
     const service = await prisma.externalServiceCost.update({
       where: { serviceCostId: id },
@@ -203,6 +212,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdat
         ...(description !== undefined && { description }),
         ...(cost !== undefined && { cost }),
         ...(invoiceRef !== undefined && { invoiceRef }),
+        ...(category !== undefined && { category }),
       },
     });
 

@@ -429,6 +429,12 @@ model ExternalServiceCost {
   description   String
   cost          Float
   invoiceRef    String
+  // SOW 3.3.6: travel and permits are "additional miscellaneous costs ... as
+  // line items", and without a discriminator they are indistinguishable from a
+  // contractor service. Free text plus a zod enum, consistent with every other
+  // status/type column here (see v1.1-4). 'Service' is the contractor case and
+  // the default, so an existing caller that sends nothing keeps its meaning.
+  category      String @default("Service")
 
   workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId])
 }

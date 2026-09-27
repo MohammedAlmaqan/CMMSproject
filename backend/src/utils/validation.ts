@@ -169,12 +169,23 @@ export const laborUpdateSchema = z.object({
   notes: z.string().nullable().optional(),
 });
 
+/**
+ * SOW 3.3.6: a cost line is either a contracted service, or one of the
+ * "additional miscellaneous costs (travel, permits)" the SOW requires as line
+ * items. Optional on input so a caller that predates the discriminator keeps
+ * working; it is written as 'Service', which is what such a line already meant.
+ */
+export const serviceCostCategories = ['Service', 'Travel', 'Permit', 'Other'] as const;
+export type ServiceCostCategory = (typeof serviceCostCategories)[number];
+export const defaultServiceCostCategory: ServiceCostCategory = 'Service';
+
 export const externalServiceCreateSchema = z.object({
   workOrderId: z.string().min(1),
   vendor: z.string().min(1),
   description: z.string().min(1),
   cost: z.number().nonnegative(),
   invoiceRef: z.string().optional(),
+  category: z.enum(serviceCostCategories).optional(),
 });
 
 export const externalServiceUpdateSchema = externalServiceCreateSchema.partial();

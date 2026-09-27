@@ -36,6 +36,13 @@ export interface CostMaterial {
 
 export interface CostService {
   cost: number | null;
+  /**
+   * SOW 3.3.6 discriminator: 'Service' is a contractor invoice, 'Travel',
+   * 'Permit' and 'Other' are the "additional miscellaneous costs" the SOW
+   * requires as line items. Null/absent is treated as 'Service' so a row that
+   * predates the column still lands in the right bucket.
+   */
+  category?: string | null;
 }
 
 export interface CostLaborEntry {
@@ -55,12 +62,21 @@ export interface WorkOrderCostBreakdown {
   actualLabor: number;
   plannedMaterials: number;
   actualMaterials: number;
+  /** SOW 3.5.1 "planned services": contracted work only. */
+  plannedServices: number;
+  /** SOW 3.5.1 "other planned": travel, permits, and anything else misc. */
+  otherCosts: number;
+  /** plannedServices + otherCosts. Every cost line, for callers that just want the total. */
   serviceCost: number;
   plannedCost: number;
   actualCost: number;
 }
 
 const num = (v: number | null | undefined): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+
+/** The SOW's misc-cost categories. Everything else is a contracted service. */
+const isMiscCategory = (category: string | null | undefined): boolean =>
+  category === 'Travel' || category === 'Permit' || category === 'Other';
 
 export function computeWorkOrderCosts(input: WorkOrderCostInput): WorkOrderCostBreakdown {
   // D-3: no technician multiplier. plannedHours is the operation's total labour.
@@ -84,13 +100,26 @@ export function computeWorkOrderCosts(input: WorkOrderCostInput): WorkOrderCostB
     (sum, m) => sum + num(m.actualQuantity) * num(m.unitCost),
     0
   );
-  const serviceCost = input.externalServices.reduce((sum, s) => sum + num(s.cost), 0);
+  // SOW 3.3.6: the two buckets are a partition of the same lines, so splitting
+  // them gives every term of the SOW 3.5.1 formula a distinct source without
+  // moving a single total.
+  const plannedServices = input.externalServices.reduce(
+    (sum, s) => (isMiscCategory(s.category) ? sum : sum + num(s.cost)),
+    0
+  );
+  const otherCosts = input.externalServices.reduce(
+    (sum, s) => (isMiscCategory(s.category) ? sum + num(s.cost) : sum),
+    0
+  );
+  const serviceCost = plannedServices + otherCosts;
 
   return {
     plannedLabor,
     actualLabor,
     plannedMaterials,
     actualMaterials,
+    plannedServices,
+    otherCosts,
     serviceCost,
     plannedCost: plannedLabor + plannedMaterials + serviceCost,
     actualCost: actualLabor + actualMaterials + serviceCost,

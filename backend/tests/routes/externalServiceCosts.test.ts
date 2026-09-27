@@ -4,6 +4,10 @@ import { prisma } from '../../src/utils/prisma.js';
 
 let woId = '';
 let svcId = '';
+const extraIds: string[] = [];
+
+const createService = (body: Record<string, unknown>, token = ctx.adminToken) =>
+  api().post('/api/external-services').set(authHeaders(token)).send(body);
 
 describe('external service costs routes', () => {
   beforeAll(async () => {
@@ -30,6 +34,10 @@ describe('external service costs routes', () => {
     if (svcId) {
       await prisma.externalServiceCost.deleteMany({ where: { serviceCostId: svcId } }).catch(() => {});
       await prisma.auditLogEntry.deleteMany({ where: { recordId: svcId } }).catch(() => {});
+    }
+    if (extraIds.length) {
+      await prisma.externalServiceCost.deleteMany({ where: { serviceCostId: { in: extraIds } } }).catch(() => {});
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: extraIds } } }).catch(() => {});
     }
     await prisma.auditLogEntry.deleteMany({ where: { recordId: woId } }).catch(() => {});
     await prisma.workOrder.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
@@ -75,5 +83,69 @@ describe('external service costs routes', () => {
     expect(
       await prisma.auditLogEntry.count({ where: { tableName: 'ExternalServiceCost', recordId: svcId, action: 'Delete' } })
     ).toBeGreaterThanOrEqual(1);
+  });
+
+  // SOW 3.3.6: "Additional miscellaneous costs (travel, permits) as line items".
+  describe('cost category', () => {
+    it('defaults to Service when the caller sends no category, so an older client keeps its meaning', async () => {
+      const res = await createService({ workOrderId: woId, vendor: 'V', description: 'no category', cost: 10 });
+      expect(res.status).toBe(201);
+      extraIds.push(res.body.serviceCostId);
+      const row = await prisma.externalServiceCost.findUniqueOrThrow({ where: { serviceCostId: res.body.serviceCostId } });
+      expect(row.category).toBe('Service');
+    });
+
+    it('accepts and persists Travel, Permit and Other as distinct line items', async () => {
+      for (const category of ['Travel', 'Permit', 'Other']) {
+        const res = await createService({ workOrderId: woId, vendor: 'V', description: category, cost: 5, category });
+        expect(res.status).toBe(201);
+        extraIds.push(res.body.serviceCostId);
+        const row = await prisma.externalServiceCost.findUniqueOrThrow({ where: { serviceCostId: res.body.serviceCostId } });
+        expect(row.category).toBe(category);
+      }
+    });
+
+    it('rejects a category outside the permitted set with a zod-derived 400', async () => {
+      const res = await createService({
+        workOrderId: woId,
+        vendor: 'V',
+        description: 'bad category',
+        cost: 5,
+        category: 'Freight',
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('lets a line be reclassified by update', async () => {
+      const created = await createService({ workOrderId: woId, vendor: 'V', description: 'reclass', cost: 7 });
+      const id = created.body.serviceCostId;
+      extraIds.push(id);
+
+      const res = await api()
+        .put(`/api/external-services/${id}`)
+        .set(authHeaders(ctx.adminToken))
+        .send({ category: 'Permit' });
+      expect(res.status).toBe(200);
+
+      const row = await prisma.externalServiceCost.findUniqueOrThrow({ where: { serviceCostId: id } });
+      expect(row.category).toBe('Permit');
+      // An update that does not mention the category must not clear it.
+      const res2 = await api()
+        .put(`/api/external-services/${id}`)
+        .set(authHeaders(ctx.adminToken))
+        .send({ cost: 8 });
+      expect(res2.status).toBe(200);
+      const row2 = await prisma.externalServiceCost.findUniqueOrThrow({ where: { serviceCostId: id } });
+      expect(row2.category).toBe('Permit');
+    });
+
+    it('returns the category on the list endpoint', async () => {
+      const res = await api().get(`/api/external-services?workOrderId=${woId}`).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      expect(res.body.length).toBeGreaterThan(0);
+      for (const row of res.body) {
+        expect(['Service', 'Travel', 'Permit', 'Other']).toContain(row.category);
+      }
+    });
   });
 });

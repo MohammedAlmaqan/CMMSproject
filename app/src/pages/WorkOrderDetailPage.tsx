@@ -60,7 +60,9 @@ import type {
   Material,
   SafetyChecklistTemplate,
   Attachment,
+  ServiceCostCategory,
 } from '@/types';
+import { serviceCostCategories } from '@/types';
 
 type DetailTab = 'operations' | 'materials' | 'labor' | 'services' | 'checklists' | 'notifications' | 'comments' | 'attachments' | 'history';
 
@@ -102,6 +104,7 @@ interface ExternalServiceDetail {
   description: string;
   cost: number;
   invoiceRef: string;
+  category?: ServiceCostCategory;
 }
 
 interface ChecklistItemRef { itemId: string; checklistTemplateId: string; sequenceNumber: number; description: string }
@@ -206,8 +209,10 @@ interface SvcFormState {
   description: string;
   cost: string;
   invoiceRef: string;
+  /** SOW 3.3.6: Service is a contractor invoice; Travel/Permit/Other are misc. */
+  category: ServiceCostCategory;
 }
-const emptySvcForm: SvcFormState = { vendor: '', description: '', cost: '', invoiceRef: '' };
+const emptySvcForm: SvcFormState = { vendor: '', description: '', cost: '', invoiceRef: '', category: 'Service' };
 
 export default function WorkOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -640,6 +645,7 @@ export default function WorkOrderDetailPage() {
           description: svcForm.description.trim(),
           cost: parseFloat(svcForm.cost) || 0,
           invoiceRef: svcForm.invoiceRef.trim(),
+          category: svcForm.category,
         });
         setSvcAdding(false);
         setSvcForm(emptySvcForm);
@@ -657,6 +663,7 @@ export default function WorkOrderDetailPage() {
         description: s.description,
         cost: String(s.cost),
         invoiceRef: s.invoiceRef || '',
+        category: s.category || 'Service',
       });
     },
     []
@@ -670,6 +677,7 @@ export default function WorkOrderDetailPage() {
           description: editSvcForm.description.trim(),
           cost: parseFloat(editSvcForm.cost) || 0,
           invoiceRef: editSvcForm.invoiceRef.trim(),
+          category: editSvcForm.category,
         });
         setEditingSvcId(null);
         await afterMutation();
@@ -1455,6 +1463,14 @@ export default function WorkOrderDetailPage() {
                     <input className={inputCls} value={svcForm.description} onChange={(e) => setSvcForm({ ...svcForm, description: e.target.value })} placeholder="Service description" aria-label="Service description" />
                   </div>
                   <div className="col-span-2">
+                    <FieldLabel>Category</FieldLabel>
+                    <select className={inputCls} value={svcForm.category} onChange={(e) => setSvcForm({ ...svcForm, category: e.target.value as ServiceCostCategory })} aria-label="Cost category">
+                      {serviceCostCategories.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
                     <FieldLabel>Cost $</FieldLabel>
                     <input className={inputCls} type="number" min={0} step="0.01" value={svcForm.cost} onChange={(e) => setSvcForm({ ...svcForm, cost: e.target.value })} aria-label="Service cost" />
                   </div>
@@ -1483,7 +1499,7 @@ export default function WorkOrderDetailPage() {
                 <table className="w-full">
                   <thead>
                     <tr style={{ backgroundColor: '#27272A' }}>
-                      {['Vendor', 'Description', 'Cost', 'Invoice Ref', ''].map((h) => (
+                      {['Vendor', 'Description', 'Category', 'Cost', 'Invoice Ref', ''].map((h) => (
                         <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
@@ -1498,6 +1514,13 @@ export default function WorkOrderDetailPage() {
                             </td>
                             <td className={tdCls}>
                               <input className={inputCls} value={editSvcForm.description} onChange={(e) => setEditSvcForm({ ...editSvcForm, description: e.target.value })} aria-label="Edit service description" />
+                            </td>
+                            <td className={tdCls}>
+                              <select className={inputCls} value={editSvcForm.category} onChange={(e) => setEditSvcForm({ ...editSvcForm, category: e.target.value as ServiceCostCategory })} aria-label="Edit cost category">
+                                {serviceCostCategories.map((c) => (
+                                  <option key={c} value={c}>{c}</option>
+                                ))}
+                              </select>
                             </td>
                             <td className={tdCls}>
                               <input className={inputCls} type="number" min={0} step="0.01" value={editSvcForm.cost} onChange={(e) => setEditSvcForm({ ...editSvcForm, cost: e.target.value })} aria-label="Edit service cost" />
@@ -1525,6 +1548,9 @@ export default function WorkOrderDetailPage() {
                           <>
                             <td className={`${tdCls} text-xs text-primary`}>{s.vendor}</td>
                             <td className={`${tdCls} text-xs text-secondary`}>{s.description}</td>
+                            <td className={`${tdCls} text-xs ${(s.category || 'Service') === 'Service' ? 'text-secondary' : 'text-primary'}`}>
+                              {s.category || 'Service'}
+                            </td>
                             <td className={`${tdCls} font-mono text-xs text-primary`}>${s.cost.toLocaleString()}</td>
                             <td className={`${tdCls} font-mono text-xs text-secondary`}>{s.invoiceRef}</td>
                             <td className={tdCls}>

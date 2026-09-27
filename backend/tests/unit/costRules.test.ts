@@ -191,6 +191,54 @@ describe('SOW 3.5.1 formula', () => {
   });
 });
 
+describe('SOW 3.3.6 cost categories and the SOW 3.5.1 "other planned" term', () => {
+  const lines = [
+    { cost: 1000, category: 'Service' },
+    { cost: 200, category: 'Travel' },
+    { cost: 50, category: 'Permit' },
+    { cost: 25, category: 'Other' },
+  ];
+  const withLines = (externalServices: typeof lines) => ({
+    operations: [],
+    woMaterials: [],
+    externalServices,
+    laborEntries: [],
+  });
+
+  it('separates contracted services from the miscellaneous costs', () => {
+    const c = computeWorkOrderCosts(withLines(lines));
+    expect(c.plannedServices).toBe(1000);
+    expect(c.otherCosts).toBe(275);
+  });
+
+  it('does not move a single total when the lines are split into two buckets', () => {
+    // The two buckets are a partition of the same lines, so the SOW formula is
+    // unchanged in value and only becomes explicable. If this ever fails, a
+    // category has leaked out of both buckets or into both.
+    const withCategories = computeWorkOrderCosts(withLines(lines));
+    const withoutCategories = computeWorkOrderCosts(
+      withLines(lines.map((l) => ({ cost: l.cost })))
+    );
+    expect(withCategories.serviceCost).toBe(withoutCategories.serviceCost);
+    expect(withCategories.plannedCost).toBe(withoutCategories.plannedCost);
+    expect(withCategories.actualCost).toBe(withoutCategories.actualCost);
+  });
+
+  it('gives the SOW "other planned" term a real source', () => {
+    const c = computeWorkOrderCosts(withLines(lines));
+    // planned labour 0 + planned materials 0 + planned services + other planned
+    expect(c.plannedCost).toBe(c.plannedLabor + c.plannedMaterials + c.plannedServices + c.otherCosts);
+    expect(c.plannedCost).toBe(1275);
+  });
+
+  it('treats a line with no category as a service, and an unknown one as a service', () => {
+    // A row written before the column existed, or by a caller that omits it.
+    expect(computeWorkOrderCosts(withLines([{ cost: 40 }])).plannedServices).toBe(40);
+    expect(computeWorkOrderCosts(withLines([{ cost: 40, category: null }])).plannedServices).toBe(40);
+    expect(computeWorkOrderCosts(withLines([{ cost: 40, category: 'Freight' }])).plannedServices).toBe(40);
+  });
+});
+
 describe('roundMoney', () => {
   it('rounds to two decimal places at the persist boundary', () => {
     expect(roundMoney(992.5)).toBe(992.5);
