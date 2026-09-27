@@ -233,6 +233,9 @@ async function generateOne(
         description: plan.description,
         workCenterId: plan.workCenterId,
         supervisorUserId: input.supervisorUserId ?? plan.createdBy,
+        // A PM work order is raised by the plan, not reported by a person, so the
+        // reporter is whoever raised it. The SOW 3.3.3 field is non-null for that reason.
+        reportedByUserId: input.actorUserId,
         sourcePlanId: plan.planId,
         sourcePlanCycle: cycleKey,
         breakdownFlag: false,

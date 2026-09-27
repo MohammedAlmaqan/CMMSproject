@@ -20,6 +20,7 @@ describe('work order materials routes', () => {
         functionalLocationId: fl.functionalLocationId,
         workCenterId: wc.workCenterId,
         supervisorUserId: ctx.adminId,
+        reportedByUserId: ctx.adminId,
         createdBy: ctx.adminId,
         modifiedBy: ctx.adminId,
       },

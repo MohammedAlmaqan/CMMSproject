@@ -27,6 +27,7 @@ model User {
 
   workCenter        WorkCenter?       @relation(fields: [workCenterId], references: [workCenterId])
   assignedWOs       WorkOrder[]       @relation("Supervisor")
+  reportedWOs       WorkOrder[]       @relation("ReportedBy")
   reportedNotifs    Notification[]    @relation("ReportedBy")
   laborEntries      LaborEntry[]
   auditLogs         AuditLogEntry[]
@@ -322,6 +323,13 @@ model WorkOrder {
   description         String
   workCenterId        String
   supervisorUserId    String
+  // SOW 3.3.3 lists "Reported By" as a header field in its own right, separate
+  // from "Assigned Supervisor". createdBy records who raised the work-order
+  // record; for a corrective job converted from a notification that is the
+  // planner, not the person who saw the broken machine, so the two cannot share
+  // a column. Backfilled from createdBy so every existing work order names
+  // somebody.
+  reportedByUserId    String
   plannedStart        DateTime?
   plannedFinish       DateTime?
   actualStart         DateTime?
@@ -345,7 +353,8 @@ model WorkOrder {
   functionalLocation FunctionalLocation @relation(fields: [functionalLocationId], references: [functionalLocationId])
   equipment          Equipment?         @relation(fields: [equipmentId], references: [equipmentId])
   workCenter         WorkCenter         @relation(fields: [workCenterId], references: [workCenterId])
-  supervisor         User               @relation("Supervisor", fields: [supervisorUserId], references: [userId])
+  supervisor         User     @relation("Supervisor", fields: [supervisorUserId], references: [userId])
+  reportedBy         User     @relation("ReportedBy", fields: [reportedByUserId], references: [userId])
   operations         WorkOrderOperation[]
   woMaterials        WorkOrderMaterial[]
   externalServices   ExternalServiceCost[]

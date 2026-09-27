@@ -352,4 +352,66 @@ describe('work orders routes', () => {
       await prisma.auditLogEntry.count({ where: { tableName: 'WorkOrder', recordId: createdId, action: 'Delete' } })
     ).toBeGreaterThanOrEqual(1);
   });
+
+  /**
+   * SOW 3.3.3 names "Reported By" as a header field in its own right, separate
+   * from "Assigned Supervisor". The register once recorded this row's residual
+   * as "Assigned Supervisor and Safety critical are absent", which was wrong:
+   * supervisorUserId and safetyCriticalFlag both exist. The real gap was
+   * Reported By, and the whole point of the field is that it is not createdBy.
+   */
+  describe('reported by', () => {
+    const base = () => ({
+      type: 'CM',
+      priority: 'Medium',
+      description: 'reporter case',
+      functionalLocationId: flat,
+      workCenterId: wc,
+      supervisorUserId: sup,
+    });
+
+    it('defaults the reporter to the authenticated caller', async () => {
+      const res = await api().post('/api/work-orders').set(authHeaders(ctx.adminToken)).send(base());
+      expect(res.status).toBe(201);
+      extraIds.push(res.body.workOrderId);
+
+      const row = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: res.body.workOrderId } });
+      expect(row.reportedByUserId).toBe(ctx.adminId);
+    });
+
+    it('accepts an explicitly nominated reporter, without disturbing the supervisor', async () => {
+      const res = await api()
+        .post('/api/work-orders')
+        .set(authHeaders(ctx.adminToken))
+        .send({ ...base(), reportedByUserId: ctx.operatorId });
+      expect(res.status).toBe(201);
+      extraIds.push(res.body.workOrderId);
+
+      const row = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: res.body.workOrderId } });
+      expect(row.reportedByUserId).toBe(ctx.operatorId);
+      // Reporter and assignee are different facts about the same job.
+      expect(row.supervisorUserId).toBe(sup);
+    });
+
+    it('exposes the reporter on the detail read, separately from the supervisor', async () => {
+      const created = await api()
+        .post('/api/work-orders')
+        .set(authHeaders(ctx.adminToken))
+        .send({ ...base(), reportedByUserId: ctx.operatorId });
+      extraIds.push(created.body.workOrderId);
+
+      const res = await api().get(`/api/work-orders/${created.body.workOrderId}`).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      expect(res.body.reportedBy?.userId).toBe(ctx.operatorId);
+      expect(res.body.supervisor?.userId).toBe(sup);
+    });
+
+    it('refuses an empty reporter with a zod-derived 400', async () => {
+      const res = await api()
+        .post('/api/work-orders')
+        .set(authHeaders(ctx.adminToken))
+        .send({ ...base(), reportedByUserId: '' });
+      expect(res.status).toBe(400);
+    });
+  });
 });

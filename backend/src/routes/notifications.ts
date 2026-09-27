@@ -609,6 +609,10 @@ router.post('/:id/convert-to-wo', authorizeMinRole('Maintenance Planner'), valid
           description: notification.description,
           workCenter: { connect: { workCenterId: req.body.workCenterId || defaultWorkCenter.workCenterId } },
           supervisor: { connect: { userId: req.body.supervisorUserId || notification.reportedByUserId || req.user!.userId } },
+          // The person who reported the fault carries over from the notification.
+          // This is the field that makes the corrective job answerable back to
+          // its origin, and it is why Reported By is not just createdBy.
+          reportedBy: { connect: { userId: notification.reportedByUserId } },
           breakdownFlag: notification.breakdownFlag,
           createdBy: req.user!.userId,
           modifiedBy: req.user!.userId,

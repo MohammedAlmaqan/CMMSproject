@@ -273,6 +273,9 @@ export interface WorkOrder extends Auditable {
   description: string;
   workCenterId: string;
   supervisorUserId: string;
+  /** SOW 3.3.3 "Reported By": who reported the fault, not who raised the record. */
+  reportedByUserId?: string;
+  reportedBy?: Pick<User, 'userId' | 'fullName' | 'username'>;
   plannedStart: string | null;
   plannedFinish: string | null;
   actualStart: string | null;

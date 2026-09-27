@@ -73,4 +73,37 @@ describe('notifications routes', () => {
       await prisma.auditLogEntry.count({ where: { tableName: 'Notification', recordId: createdId, action: 'Delete' } })
     ).toBeGreaterThanOrEqual(1);
   });
+
+  /**
+   * SOW 3.3.3 "Reported By", and the reason it is not the same column as
+   * createdBy. This notification is reported by the operator, and the admin is
+   * the one who converts it. The corrective work order must remember the person
+   * who saw the fault, not the person who typed the conversion -- otherwise the
+   * job cannot be traced back to whoever reported it.
+   */
+  it('carries the notification reporter onto the converted work order', async () => {
+    const notif = await api()
+      .post('/api/notifications')
+      .set(authHeaders(ctx.adminToken))
+      .send({ ...body(), description: 'reporter carry-over' });
+    expect(notif.status).toBe(201);
+    const notificationId = notif.body.notificationId;
+
+    const res = await api()
+      .post(`/api/notifications/${notificationId}/convert-to-wo`)
+      .set(authHeaders(ctx.adminToken))
+      .send({});
+    expect(res.status).toBe(201);
+    const workOrderId = res.body.workOrderId;
+
+    const wo = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId } });
+    expect(wo.reportedByUserId).toBe(ctx.operatorId);
+    // The converter is a different person, and is recorded as such.
+    expect(wo.createdBy).toBe(ctx.adminId);
+
+    await prisma.auditLogEntry.deleteMany({ where: { recordId: workOrderId } }).catch(() => {});
+    await prisma.workOrderNotifLink.deleteMany({ where: { notificationId } }).catch(() => {});
+    await prisma.auditLogEntry.deleteMany({ where: { recordId: notificationId } }).catch(() => {});
+    await prisma.notification.deleteMany({ where: { notificationId } }).catch(() => {});
+  });
 });

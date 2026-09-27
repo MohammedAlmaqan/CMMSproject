@@ -23,6 +23,7 @@ describe('external service costs routes', () => {
         functionalLocationId: fl.functionalLocationId,
         workCenterId: wc.workCenterId,
         supervisorUserId: ctx.adminId,
+        reportedByUserId: ctx.adminId,
         createdBy: ctx.adminId,
         modifiedBy: ctx.adminId,
       },

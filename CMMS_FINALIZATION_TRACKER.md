@@ -543,7 +543,8 @@ Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
 | E.1 | D-3: remove the `numberOfTechnicians` multiplier (row 49) | ✅ | Planned labour is `plannedHours × craft.hourlyRate`. Every planned-cost figure changes **only** by the removed multiplier. | `ca9aa63` |
-| E.2 | Miscellaneous costs as line items (row 34), and the `+ other planned` term (row 49) | ✅ | Travel and permits are storable and reportable as their own line items, distinguishable from a contractor service. Every term of the §3.5.1 formula has a distinct source. | *this commit* |
+| E.2 | Miscellaneous costs as line items (row 34), and the `+ other planned` term (row 49) | ✅ | Travel and permits are storable and reportable as their own line items, distinguishable from a contractor service. Every term of the §3.5.1 formula has a distinct source. | `722e1a3` |
+| E.3 | Work Order "Reported By" header field (row 26) | ✅ | The work order names who reported the fault, separately from who raised the record and from who is assigned. Carries across a notification conversion. | *this commit* |
 
 #### E.1, stated as raw output
 
@@ -585,6 +586,26 @@ The category is exposed end to end: `POST`/`PUT` accept it, the list endpoint re
 Coverage added: 5 DB-backed cases in `externalServiceCosts.test.ts` — the default applies when the field is omitted, `Travel`/`Permit`/`Other` each persist, an out-of-set category is a zod 400, a line can be reclassified, **an update that does not mention the category does not clear it**, and the list endpoint returns a permitted value on every row.
 
 The row-34 commit moves **two** matrix rows to `Met`: §3.3.6 from `Not Met`, §3.5.1 from `Partial`. Recounted from the Status column of all 214 clause rows rather than transcribed: **76 Met, 68 Partial, 37 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 50 Met, 35 Partial, 20 Not Met, 4 Deferred, 7 Excluded, 10 Waived**, leaving 76 open in §3. The `docs/SOW_COMPLIANCE.md` Summary table and both narrative paragraphs, and the `docs/DECISION_REGISTER.md` row 49 and D-3 row, were corrected in the same commit rather than left contradicting the matrix.
+
+E.2 CI: run **36336673989** for exact SHA `722e1a37aa9914a25b9d6c3065f69b71d0a281bd`.
+
+#### E.3, and the residual that was wrong about which field was missing
+
+Row 26 is the §3.3.3 header-field clause. **The register's residual for it was factually wrong, and it was checked against the schema before anything was built.** The register said "Assigned Supervisor and Safety critical are absent from the work-order header". Both are present: `WorkOrder.supervisorUserId` and `WorkOrder.safetyCriticalFlag`.
+
+The `docs/SOW_COMPLIANCE.md` row had it right — the missing field was `reportedByUserId`. Had the register been trusted, E.3 would have "added" two columns that already existed and left the actual gap open. Both documents now record the correction rather than only the fix.
+
+`WorkOrder.reportedByUserId`, migration `20260927120000_work_order_reported_by`: added nullable, backfilled from `createdBy`, then from `supervisorUserId` for any legacy row whose `createdBy` is itself null, and only then set `NOT NULL`. `ON DELETE RESTRICT`, because a work order's reporter is a statement about the past and must not be erased by removing a user account.
+
+**The field is deliberately not `createdBy`, and that is the entire reason it exists.** For a corrective job converted from a notification, `createdBy` is the planner who typed the conversion and the reporter is the technician who saw the broken machine. `convert-to-wo` now carries `notification.reportedByUserId` across, so the job is answerable back to its origin.
+
+Wired through all three `workOrder.create` sites: the manual route (defaults to the authenticated caller, accepts an explicit nomination), `generatePmWorkOrder` (a PM job is raised by the plan rather than reported by a person, so the reporter is the actor — which is why the column is non-nullable rather than optional), and `convert-to-wo`. `reportedBy` is included on the detail read next to `supervisor`, and the two are asserted to be different facts in the tests.
+
+Five DB-backed cases: the reporter defaults to the caller; an explicit nomination is accepted and does **not** disturb `supervisorUserId`; the detail read exposes `reportedBy` separately; an empty string is a zod 400; and the conversion case, which raises a notification reported by the operator, converts it as the admin, and asserts the work order names the operator while `createdBy` is the admin.
+
+`tsc -b` exits **0** in both packages. The DB-free unit suite is **512 cases across 28 files**; `eslint src tests` reports **42** against a gate threshold of 50.
+
+Counted from the Status column, not transcribed: **77 Met, 67 Partial, 37 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 51 Met, 34 Partial, 20 Not Met, 4 Deferred, 7 Excluded, 10 Waived**.
 
 ### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
 

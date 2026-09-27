@@ -168,6 +168,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         equipment: true,
         workCenter: true,
         supervisor: { select: { userId: true, fullName: true, username: true } },
+    reportedBy: { select: { userId: true, fullName: true, username: true } },
         operations: { include: { craft: true }, orderBy: { sequenceNumber: 'asc' } },
         // operation included so the screen can group a material line under the
         // step that needs it, which is the point of SOW 3.1.5.
@@ -272,7 +273,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
   try {
     const {
       type, priority, functionalLocationId, equipmentId, description,
-      workCenterId, supervisorUserId, plannedStart, plannedFinish,
+      workCenterId, supervisorUserId, reportedByUserId, plannedStart, plannedFinish,
       costCenterCode, internalOrder, breakdownFlag, safetyCriticalFlag,
       taskListId,
     } = req.body;
@@ -341,6 +342,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
           description,
           workCenterId,
           supervisorUserId,
+          reportedByUserId: reportedByUserId || req.user!.userId,
           plannedStart: plannedStart ? new Date(plannedStart) : null,
           plannedFinish: plannedFinish ? new Date(plannedFinish) : null,
           costCenterCode: costCenterCode || '',
@@ -466,7 +468,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
 
     const {
       type, priority, functionalLocationId, equipmentId, description,
-      workCenterId, supervisorUserId, plannedStart, plannedFinish,
+      workCenterId, supervisorUserId, reportedByUserId, plannedStart, plannedFinish,
       actualStart, actualFinish, costCenterCode, internalOrder,
       breakdownFlag, safetyCriticalFlag, status,
     } = req.body;
@@ -481,6 +483,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
         ...(description !== undefined && { description }),
         ...(workCenterId !== undefined && { workCenterId }),
         ...(supervisorUserId !== undefined && { supervisorUserId }),
+      ...(reportedByUserId !== undefined && { reportedByUserId }),
         ...(plannedStart !== undefined && { plannedStart: plannedStart ? new Date(plannedStart) : null }),
         ...(plannedFinish !== undefined && { plannedFinish: plannedFinish ? new Date(plannedFinish) : null }),
         ...(actualStart !== undefined && { actualStart: actualStart ? new Date(actualStart) : null }),

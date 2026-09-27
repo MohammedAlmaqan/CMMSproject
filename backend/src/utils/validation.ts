@@ -31,6 +31,11 @@ export const workOrderCreateSchema = z.object({
   equipmentId: z.string().min(1).nullable().optional(),
   workCenterId: z.string().min(1),
   supervisorUserId: z.string().min(1),
+  // SOW 3.3.3 "Reported By". Optional on input because the common case is
+  // that the planner raising the work order is also the person reporting it; the
+  // route falls back to the authenticated caller, exactly as it already does for
+  // supervisorUserId on the notification-conversion path.
+  reportedByUserId: z.string().min(1).optional(),
   plannedStart: z.string().min(1).nullable().optional(),
   plannedFinish: z.string().min(1).nullable().optional(),
   costCenterCode: z.string().optional(),
