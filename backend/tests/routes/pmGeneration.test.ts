@@ -256,10 +256,11 @@ describe('PM generation: SOW 3.4.3 idempotency', () => {
     const second = await runSchedulerOnce();
     const after2 = await wosFor(planId);
     expect(after2).toHaveLength(1);
-    expect(second.wosSkipped).toBeGreaterThanOrEqual(1);
     expect(first.wosCreated).toBeGreaterThanOrEqual(1);
-    // Counts are global across plans, so the per-plan assertion above is the
-    // real one; this only checks the run itself was clean.
+    // A repeat run reports the plan as not due rather than as a skip: the
+    // generated cycle becomes the baseline, so the next cycle is outside the
+    // horizon. The skip counter is for a unique-index race, covered by the
+    // double-press case above and by the service unit tests.
     expect(second.errors).toEqual([]);
   });
 

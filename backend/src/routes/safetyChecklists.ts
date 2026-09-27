@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
+import { countUnansweredItems } from '../utils/checklistRules.js';
 import { logger } from '../utils/logger.js';
 import {
   validate,
@@ -463,6 +464,36 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
         ...(comment !== undefined && { comment: comment || null }),
       },
     });
+
+    // Clearing an answer has to re-arm the gate. Without this a checklist stays
+    // 'Completed' after one of its items is put back to unanswered, so a
+    // mistaken answer could never be corrected and the work order would stay
+    // unblocked for the rest of its life.
+    //
+    // The status is only ever downgraded here. Sign-off is a deliberate act with
+    // its own endpoint, and silently promoting a checklist to 'Completed' because
+    // somebody filled in the last box would remove it.
+    const checklist = await prisma.workOrderChecklist.findUnique({
+      where: { woChecklistId: item.woChecklistId },
+      select: { status: true },
+    });
+    if (checklist?.status === 'Completed') {
+      const siblings = await prisma.workOrderChecklistItem.findMany({
+        where: { woChecklistId: item.woChecklistId },
+        select: { response: true },
+      });
+      if (countUnansweredItems(siblings.map((s) => s.response)) > 0) {
+        await prisma.workOrderChecklist.update({
+          where: { woChecklistId: item.woChecklistId },
+          data: { status: 'In Progress' },
+        });
+        await logAudit(
+          { tableName: 'WorkOrderChecklist', recordId: item.woChecklistId, action: 'Update' },
+          req.user!.userId,
+          req.ip
+        );
+      }
+    }
 
     await logAudit(
       { tableName: 'WorkOrderChecklistItem', recordId: id, action: 'Update' },

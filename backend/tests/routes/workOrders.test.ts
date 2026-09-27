@@ -179,6 +179,48 @@ describe('work orders routes', () => {
     expect(blocked.status).toBe(409);
     expect(blocked.body.error).toContain('must be completed');
 
+    // SOW 3.4.1: the checklist is itemised, and an itemised checklist is only
+    // acknowledged when every item carries an answer. Signing the checklist off
+    // while its items are blank is no longer enough, so answer them first.
+    const gateItems = await prisma.workOrderChecklistItem.findMany({
+      where: { woChecklistId: attached.body.woChecklistId },
+      orderBy: { itemId: 'asc' },
+    });
+    expect(gateItems.length).toBeGreaterThan(0);
+    for (const gateItem of gateItems) {
+      const answered = await api()
+        .put(`/api/safety-checklists/work-order-checklist-item/${gateItem.woChecklistItemId}`)
+        .set(authHeaders(ctx.technicianToken))
+        .send({ response: 'Isolated and locked off' });
+      expect(answered.status).toBe(200);
+    }
+
+    // A completed checklist whose items are blank must still block.
+    const signedOffEarly = await api()
+      .put(`/api/safety-checklists/work-order-checklist/${attached.body.woChecklistId}`)
+      .set(authHeaders(ctx.technicianToken))
+      .send({ status: 'Completed' });
+    expect(signedOffEarly.status).toBe(200);
+    for (const gateItem of gateItems) {
+      await api()
+        .put(`/api/safety-checklists/work-order-checklist-item/${gateItem.woChecklistItemId}`)
+        .set(authHeaders(ctx.technicianToken))
+        .send({ response: null });
+    }
+    const stillBlocked = await api()
+      .put(`/api/work-orders/${gated.body.workOrderId}/status`)
+      .set(authHeaders(ctx.technicianToken))
+      .send({ status: 'In Progress' });
+    expect(stillBlocked.status).toBe(409);
+
+    for (const gateItem of gateItems) {
+      const reanswered = await api()
+        .put(`/api/safety-checklists/work-order-checklist-item/${gateItem.woChecklistItemId}`)
+        .set(authHeaders(ctx.technicianToken))
+        .send({ response: 'Isolated and locked off' });
+      expect(reanswered.status).toBe(200);
+    }
+
     await api()
       .put(`/api/safety-checklists/work-order-checklist/${attached.body.woChecklistId}`)
       .set(authHeaders(ctx.technicianToken))
