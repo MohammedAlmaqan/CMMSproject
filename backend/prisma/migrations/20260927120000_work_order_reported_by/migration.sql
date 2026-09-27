@@ -21,11 +21,28 @@
 ALTER TABLE "WorkOrder" ADD COLUMN "reportedByUserId" TEXT;
 
 -- Backfill before the NOT NULL constraint, from the closest thing that exists.
-UPDATE "WorkOrder" SET "reportedByUserId" = "createdBy" WHERE "reportedByUserId" IS NULL;
-
--- Belt and braces: a work order whose createdBy is itself null (legacy rows
--- created before the audit columns were enforced) still needs a reporter.
-UPDATE "WorkOrder" SET "reportedByUserId" = "supervisorUserId" WHERE "reportedByUserId" IS NULL;
+--
+-- The lookup against "User" is the whole point of this statement, and the first
+-- attempt at it did not have one. WorkOrder.createdBy is
+-- `String @default("system")`, so every work order raised without an explicit
+-- author carries the literal string "system" -- and there is no User row with
+-- that id, because user ids are uuids from the seed. Copying createdBy straight
+-- across therefore wrote "system" into reportedByUserId, and the foreign key
+-- added below rejected it, which failed the migration and with it every test
+-- that follows. The backfill has to ask whether the value names a real user
+-- before using it.
+--
+-- Preference order, first match that is an actual user wins:
+--   1. createdBy        - who raised the record, the closest true answer
+--   2. supervisorUserId - who owns the job
+--   3. the earliest user - a real, attributable name rather than a dangling one
+UPDATE "WorkOrder" w
+SET "reportedByUserId" = COALESCE(
+  (SELECT u."userId" FROM "User" u WHERE u."userId" = w."createdBy"),
+  (SELECT u."userId" FROM "User" u WHERE u."userId" = w."supervisorUserId"),
+  (SELECT u."userId" FROM "User" u ORDER BY u."createdDate" ASC, u."userId" ASC LIMIT 1)
+)
+WHERE w."reportedByUserId" IS NULL;
 
 -- AlterTable
 ALTER TABLE "WorkOrder" ALTER COLUMN "reportedByUserId" SET NOT NULL;

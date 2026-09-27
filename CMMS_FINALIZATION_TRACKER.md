@@ -546,7 +546,8 @@ Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3
 | E.2 | Miscellaneous costs as line items (row 34), and the `+ other planned` term (row 49) | ✅ | Travel and permits are storable and reportable as their own line items, distinguishable from a contractor service. Every term of the §3.5.1 formula has a distinct source. | `722e1a3` |
 | E.3 | Work Order "Reported By" header field (row 26) | ✅ | The work order names who reported the fault, separately from who raised the record and from who is assigned. Carries across a notification conversion. | `e256ad1` |
 | E.4 | Notification "Damages/observations" field (row 19) | ✅ | What was found at the asset is recorded in its own field, and cannot overwrite the original report. | `96645ee` |
-| E.5 | Material reservation concept (row 31) | ✅ | A part can actually be held for a scheduled job: over-reservation is refused, availability is reported, and a closed or cancelled job lets go. | *this commit* |
+| E.5 | Material reservation concept (row 31) | ✅ | A part can actually be held for a scheduled job: over-reservation is refused, availability is reported, and a closed or cancelled job lets go. | `abb580f` |
+| E.6 | Fix the E.3 migration backfill and the E.4 update schema | ✅ | Both E.3 and E.4 were red on CI. Neither was a test-logic problem; both were ways of writing a value that the database would not accept. | *this commit* |
 
 #### E.1, stated as raw output
 
@@ -645,6 +646,21 @@ Six DB-backed cases in `workOrderMaterials.test.ts`, on an isolated material so 
 `tsc -b` exits **0**. DB-free unit suite **512 across 28 files**. `eslint src tests` **42** against threshold 50 — the one error this task introduced (an unused destructured parameter) was found and removed rather than left for the next person.
 
 Counted from the Status column, not transcribed: **79 Met, 67 Partial, 35 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 53 Met, 34 Partial, 18 Not Met, 4 Deferred, 7 Excluded, 10 Waived**.
+
+#### E.6 — E.3 and E.4 were both red, and neither was what it looked like
+
+E.3 (run **36338619584**) and E.4 (run **36339202953**) both failed at the same step, `Test`, on the Backend job, with Frontend green. Two separate faults, one in each commit, and neither of them was bad test logic.
+
+**E.3: the migration could not run.** The backfill was
+`UPDATE "WorkOrder" SET "reportedByUserId" = "createdBy"`. The theory was that `createdBy` is the closest available answer to "who reported this". But `WorkOrder.createdBy` is `String @default("system")`, so every work order raised without an explicit author carries the literal string `"system"`, and **no `User` row has that id — user ids are uuids from the seed**. So the backfill wrote `"system"` into a column that the very next statement puts a foreign key on, the FK rejected it, the migration failed, and every test after it failed. A test failure was reported for what was actually a schema fault, and the fix belonged in the migration, not in a test.
+
+The corrected backfill asks whether the value names a real user before using it: `createdBy` if it resolves, else `supervisorUserId` if it resolves, else the earliest-created user, so the column is populated with an attributable name rather than a dangling one.
+
+**E.4: the update silently dropped the field.** `damagesObservations` was added to `notificationCreateSchema` but not to `notificationUpdateSchema`. A zod `object` **strips** keys it does not declare, so `PUT /api/notifications/:id` received the field, removed it, wrote nothing, and answered **200**. The route code was correct and the destructure was correct; the value never survived validation. This is the worst shape a bug can take — a success response for a write that did not happen — and the test that caught it ("records an observation added later") is exactly the case that existed to catch it.
+
+The lesson worth keeping: both faults were invisible to `tsc -b`, to the 512-case unit suite, and to `eslint`. Neither surfaces without a real database applying the migrations, which is the argument for gating DB-backed tests on every migration-bearing commit rather than only at the end of a phase.
+
+`tsc -b` exits **0**. DB-free unit suite **512 across 28 files**. `eslint src tests` **42** against threshold 50.
 
 ### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
 

@@ -291,6 +291,11 @@ export const notificationUpdateSchema = z
     functionalLocationId: z.string().min(1).nullable().optional(),
     equipmentId: z.string().min(1).nullable().optional(),
     reportedByUserId: z.string().min(1).optional(),
+    // Must be declared here as well as on create. Zod strips keys the object
+    // schema does not name, so an update that omits this silently discards the
+    // observation instead of recording it -- and the route would still answer
+    // 200, which is the worst version of the bug.
+    damagesObservations: z.string().min(1).nullable().optional(),
     breakdownFlag: z.boolean().optional(),
     status: notificationStatusSchema.optional(),
   });
