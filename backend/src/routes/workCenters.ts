@@ -185,9 +185,15 @@ router.get('/capacity', async (req: Request, res: Response) => {
       where: {
         isDeleted: false,
         status: { in: [...CAPACITY_CONSUMING_STATUSES] },
+        // The third branch is load-bearing. Both date comparisons below are
+        // false for a work order with no plannedStart, because Prisma emits
+        // `plannedFinish >= $1` / `plannedStart <= $2` and neither operand is
+        // NULL. Undated work was therefore never fetched, so `unscheduledHours`
+        // and `unscheduledWorkOrders` reported zero however much of it existed.
         OR: [
           { plannedFinish: { gte: rangeStart } },
           { plannedStart: { lte: rangeEnd } },
+          { plannedStart: null },
         ],
       },
       select: {

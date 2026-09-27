@@ -88,6 +88,39 @@ describe('the endpoint is reachable and safe', () => {
   it('documents the unscheduled hours rather than hiding them', () => {
     expect(wcRoute).toMatch(/unscheduledHours/);
   });
+
+  it('fetches work orders that have no plannedStart at all', () => {
+    // This is the branch that made the unscheduled figure a lie. Prisma turns
+    // `{ plannedFinish: { gte } }` and `{ plannedStart: { lte } }` into
+    // `plannedFinish >= $1` / `plannedStart <= $2`, and SQL three-valued logic
+    // makes both comparisons UNKNOWN -- not true -- when the column is NULL.
+    // Undated work orders were therefore filtered out before
+    // buildCapacityBoard ever saw them, so it reported
+    // `unscheduledWorkOrders: []` however much undated work existed. The route
+    // comment claimed the opposite. Without an explicit `plannedStart: null`
+    // branch there is no query that fetches them.
+    const start = wcRoute.indexOf("router.get('/capacity'");
+    const block = wcRoute.slice(start, wcRoute.indexOf("router.get('/:id'"));
+    expect(block).toMatch(/plannedStart: null/);
+  });
+
+  it('reaches buildCapacityBoard with the work orders it fetched', () => {
+    // Guards the join between the fetch and the spread: an unscheduled counter
+    // is only as good as the rows handed to it.
+    const start = wcRoute.indexOf("router.get('/capacity'");
+    const block = wcRoute.slice(start, wcRoute.indexOf("router.get('/:id'"));
+    expect(block).toMatch(/buildCapacityBoard\(/);
+    expect(block).toMatch(/workOrders\.map\(/);
+  });
+
+  it('selects the two dates the spread needs, and the crafts it splits by', () => {
+    const start = wcRoute.indexOf("router.get('/capacity'");
+    const block = wcRoute.slice(start, wcRoute.indexOf("router.get('/:id'"));
+    expect(block).toMatch(/plannedStart: true/);
+    expect(block).toMatch(/plannedFinish: true/);
+    expect(block).toMatch(/craftId: true/);
+    expect(block).toMatch(/plannedHours: true/);
+  });
 });
 
 describe('the board is on the work centres page', () => {
