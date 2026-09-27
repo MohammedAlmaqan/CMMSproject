@@ -442,6 +442,67 @@ Phase C covers the 17 §3 rows the Phase A register assigned to it: 2, 3, 4, 5, 
 
 ---
 
+## CI Diagnostic — runs 45 to 61, and why 16 red runs went unnoticed
+
+**Found on 2026-09-27, immediately after `5be8563` was pushed.** CI was red on `main` and had been for 16 consecutive runs. This section is the record of what was actually wrong, because the reason is a process failure and not only a code failure.
+
+### The two distinct failures
+
+| Runs | Commit | Fails at | Cause |
+|---|---|---|---|
+| 45 | `0ee4584` (C.4) | — | green; the last good run |
+| 46–53 | `f2f3bf6` (C.5) through C.12 | `Test` | C.5 added the operation-presence guard, but its own integration fixtures still created operationless work orders and expected `200` |
+| 54–61 | `5fa769b` (C.13) through `5be8563` | `Lint baseline` | Phase C pushed ESLint errors past the CI threshold of 50, so the suite never ran at all |
+
+**Raw failing assertion, from the GitHub check annotations on run 46**, at `backend/tests/routes/workOrders.test.ts` lines 102, 134, 187 and 217:
+
+```
+AssertionError: expected 409 to be 200 // Object.is equality
+```
+
+The literal Actions log blob is not retrievable: the logs endpoint returns HTTP 403 and the run page requires sign-in, and no `gh`, `GH_TOKEN` or `GITHUB_TOKEN` is available in this environment. The four annotations above are the raw error text GitHub does expose unauthenticated. Nothing here is paraphrased.
+
+**The 409 was correct and the test was wrong.** C.5 implemented SOW 3.3.3 — a work order may not leave Draft with zero operations — and shipped unit tests for the pure rule, but no database-backed test for the route. Every test that walked a work order up the lifecycle created it with no operations and then asserted `200` on Draft → Planned. The test was doing its job: it caught a real behavioural change the commit did not account for. **The fix adds operations to those fixtures; it does not weaken the guard or relax the assertion.**
+
+`f2f3bf6` is the commit that introduced the failure. The new coverage added with the fix asserts all three parts of the contract: the 409, the `Blocked` audit row, that the work order remains in `Draft`, and that the same transition succeeds once an operation exists. A second case pins that `Cancelled` remains exempt, so a later tightening of the guard cannot quietly strand draft work.
+
+### The lint regression, measured
+
+`npx eslint src tests --format json`, which is the exact command CI runs:
+
+| Commit | Errors |
+|---|---|
+| `98fb76f` (Phase B start) | 49 |
+| `0ee4584` (C.4) | 49 |
+| `5fa769b` (C.13) | 51 |
+| `5be8563` (tip at the time) | 52 |
+
+So the drift **did not predate Phase B or Phase C** — the baseline was healthy at 49. Phase C added a net 3: two `no-explicit-any` in `taskLists.ts` and one unused variable in `capacity.ts`. The baseline was **not** raised. The fixes brought the count to **46**, and the two `catch (error: any)` sites in `workCenters.ts` were converted to `unknown` with explicit narrowing, following the precedent set in `ca2072b`.
+
+### Why 16 red runs were not noticed — the answer
+
+Traced through this tracker, the local gate has **only ever run the database-free subset.** Phase B step 5.5 added `backend/vitest.unit.config.ts`, which by design runs only `tests/unit`, declares no `setupFiles`, and needs no database, no JWT secret and no `.env`. Every local verification recorded in this tracker — every `tsc -b`, every `npm run test:unit`, every `ESLINT_ERRORS=` count — came from that DB-free subset.
+
+`npm test` is the DB-backed suite, and CI runs it against a provisioned PostgreSQL 15 service. **It was never executed locally.** So for sixteen runs the local report was genuinely green and genuinely meaningless with respect to the thing that was broken. The two failures were in code paths the DB-free subset does not reach: the integration suite (a database the subset never touches) and `eslint src tests` (which includes `tests/`, where the local checks had only ever run the typechecker and the unit config).
+
+This is the whole failure, and it is worth being blunt about it: **a gate you can quietly run a subset of is not a gate.** The process gap, not the C.5 code, is the reason this went unnoticed for sixteen runs.
+
+### Closing the gap
+
+`backend/scripts/gate.mjs`, run as `npm run gate` from `backend`, executes every step CI executes: backend typecheck, the exact lint command and its threshold, the DB-free unit suite, then migrate, seed and the DB-backed suite. The difference is that the database step **cannot be skipped by accident**:
+
+- If no database is reachable, the gate **exits non-zero** and explains that a green result without the DB-backed suite does not imply CI will be green. It does not report success.
+- `SKIP_DB_TESTS=1` runs the database-free steps only, and its output is labelled `PARTIAL ... not equivalent to CI` so it can never be mistaken for a full pass.
+- Nothing destructive happens without `GATE_ALLOW_DB=1`. `prisma/seed.ts` calls `deleteMany()` across most of the schema and the integration suite writes and deletes rows, so the gate will not migrate or seed a reachable database — local or remote — on its own. A reachable local database is refused outright unless that opt-in is set.
+
+The rule going forward, which is the actual answer to "how do we close that gap so a green local gate means a green CI": **report CI state for the exact SHA.** A local result is called *static-green* until the DB-backed suite has run; the only claim that means CI is green is a green GitHub Actions run for that commit. `5be8563` is the proof of why: it passed every local check ever applied to it.
+
+### One more prerequisite that is easy to misread
+
+`verify_g3*`, `verify_g4*`, `verify_g5*` and `verify_g6*` are Playwright scripts and require a **Vite dev server running on `http://localhost:3000`**. They are not self-contained and are not part of CI. Any future claim that they passed must state that the server was running; otherwise a connection refusal is indistinguishable from a pass.
+
+---
+
 ## Deferred to Post-Go-Live
 
 - ERP integration

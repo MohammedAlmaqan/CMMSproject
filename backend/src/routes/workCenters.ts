@@ -4,6 +4,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { workCenterCreateSchema, workCenterUpdateSchema, capacityQuerySchema, validate } from '../utils/validation.js';
 import { buildCapacityBoard, CAPACITY_CONSUMING_STATUSES } from '../utils/capacity.js';
+import { isPrismaError } from '../utils/prismaErrors.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -314,8 +315,8 @@ router.post('/', authorizeMinRole('Requester'), validate(workCenterCreateSchema)
     );
 
     res.status(201).json(workCenter);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Work center code already exists' });
     }
     logger.error({ err: error }, 'Error creating work center');
@@ -404,8 +405,8 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workCenterUpdateSchem
     );
 
     res.json(workCenter);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Work center code already exists' });
     }
     logger.error({ err: error }, 'Error updating work center');

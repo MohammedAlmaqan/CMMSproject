@@ -14,7 +14,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "lint": "eslint src/",
     "test": "vitest run",
-    "test:unit": "vitest run --config vitest.unit.config.ts"
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "gate": "node scripts/gate.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",

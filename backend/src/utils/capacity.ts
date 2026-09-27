@@ -159,7 +159,6 @@ export function buildCapacityBoard(
   to: string,
 ): CapacityBoard {
   const days = enumerateDays(from, to);
-  const daySet = new Set(days);
 
   const byCenter = new Map<string, CapacityBoardEntry>();
   for (const wc of workCenters) {

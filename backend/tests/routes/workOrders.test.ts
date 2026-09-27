@@ -6,20 +6,47 @@ let createdId = '';
 let flat = '';
 let wc = '';
 let sup = '';
+let craftId = '';
 let gateTemplateId = '';
 const extraIds: string[] = [];
 const checklistIds: string[] = [];
 
 describe('work orders routes', () => {
   beforeAll(async () => {
-    const [fls, wcs] = await Promise.all([
+    const [fls, wcs, crafts] = await Promise.all([
       api().get('/api/functional-locations').set(authHeaders(ctx.adminToken)),
       api().get('/api/work-centers').set(authHeaders(ctx.adminToken)),
+      api().get('/api/crafts').set(authHeaders(ctx.adminToken)),
     ]);
     flat = fls.body[0].functionalLocationId;
     wc = wcs.body[0].workCenterId;
     sup = ctx.adminId;
+    // An operation needs a craft, and the work order's own work centre is the
+    // one the craft is expected to sit in, so prefer a match and fall back to
+    // the first seeded craft rather than depending on seed ordering.
+    const all: Array<{ craftId: string; workCenterId: string }> = crafts.body;
+    craftId = (all.find((c) => c.workCenterId === wc) ?? all[0]).craftId;
   });
+
+  /**
+   * SOW 3.3.3: a work order may not leave Draft with zero operations, so every
+   * test that walks a work order up the lifecycle has to give it one first.
+   * The 409 is the intended behaviour, not an obstacle to route around -- see
+   * the dedicated case below.
+   */
+  const addOperation = async (workOrderId: string) => {
+    const res = await api()
+      .post('/api/work-order-operations')
+      .set(authHeaders(ctx.technicianToken))
+      .send({
+        workOrderId,
+        sequenceNumber: 10,
+        description: 'test operation',
+        craftId,
+        plannedHours: 1,
+      });
+    expect(res.status).toBe(201);
+  };
 
   afterAll(async () => {
     for (const id of [createdId, ...extraIds]) {
@@ -95,6 +122,8 @@ describe('work orders routes', () => {
       .send({ status: 'Planned' });
     expect(op.status).toBe(403);
 
+    await addOperation(createdId);
+
     const good = await api()
       .put(`/api/work-orders/${createdId}/status`)
       .set(authHeaders(ctx.adminToken))
@@ -126,6 +155,7 @@ describe('work orders routes', () => {
     extraIds.push(gated.body.workOrderId, plain.body.workOrderId);
 
     for (const id of [gated.body.workOrderId, plain.body.workOrderId]) {
+      await addOperation(id);
       for (const step of ['Planned', 'Scheduled']) {
         const r = await api()
           .put(`/api/work-orders/${id}/status`)
@@ -178,6 +208,7 @@ describe('work orders routes', () => {
     const made = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body());
     extraIds.push(made.body.workOrderId);
     const id = made.body.workOrderId;
+    await addOperation(id);
 
     for (const step of ['Planned', 'Scheduled', 'In Progress', 'Completed']) {
       const r = await api()
@@ -208,6 +239,7 @@ describe('work orders routes', () => {
     const made = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body());
     extraIds.push(made.body.workOrderId);
     const id = made.body.workOrderId;
+    await addOperation(id);
 
     for (const step of ['Planned', 'Scheduled', 'In Progress', 'Completed']) {
       const r = await api()
@@ -223,6 +255,57 @@ describe('work orders routes', () => {
       .send({ status: 'Closed' });
     expect(adm.status).toBe(200);
     expect(adm.body.status).toBe('Closed');
+  });
+
+  it('refuses to plan a work order that has no operations, and allows it once one is added', async () => {
+    // SOW 3.3.3, and the reason the lifecycle cases above all attach an
+    // operation first. This is the database-backed half of the guard: the pure
+    // rule is covered in tests/unit/workOrderOperationRule.test.ts, but until
+    // this case existed nothing proved the route honoured it.
+    const made = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body());
+    extraIds.push(made.body.workOrderId);
+    const id = made.body.workOrderId;
+
+    const blocked = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Planned' });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error).toMatch(/operation/i);
+
+    // The refusal is auditable, so a planner can see why the hop was refused.
+    expect(
+      await prisma.auditLogEntry.count({
+        where: { tableName: 'WorkOrder', recordId: id, action: 'Blocked', fieldName: 'status' },
+      })
+    ).toBe(1);
+
+    // And the work order really did stay in Draft rather than half-moving.
+    expect((await prisma.workOrder.findUnique({ where: { workOrderId: id } }))!.status).toBe('Draft');
+
+    await addOperation(id);
+
+    const allowed = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Planned' });
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.status).toBe('Planned');
+  });
+
+  it('lets a work order with no operations be cancelled from Draft', async () => {
+    // Cancelled is deliberately exempt: requiring an operation in order to
+    // abandon an unplanned draft would be absurd. Pinning the exemption stops
+    // a later tightening of the guard from quietly stranding draft work.
+    const made = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body());
+    extraIds.push(made.body.workOrderId);
+
+    const cancelled = await api()
+      .put(`/api/work-orders/${made.body.workOrderId}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Cancelled' });
+    expect(cancelled.status).toBe(200);
+    expect(cancelled.body.status).toBe('Cancelled');
   });
 
   it('updates a work order (Requester+) and writes an audit row', async () => {

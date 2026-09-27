@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { taskListCreateSchema, taskListUpdateSchema, validate } from '../utils/validation.js';
+import { isPrismaError, prismaErrorTarget } from '../utils/prismaErrors.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -293,19 +294,19 @@ router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), 
     );
 
     res.status(201).json(taskList);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       // Either the task list code collided, or one operation listed the same
       // material twice. The index is on (taskOperationId, materialId), so a
       // duplicate requirement is a data-entry slip; the generic code message
       // would blame the wrong field and send the caller looking at the header.
-      const target = String(error.meta?.target ?? '');
+      const target = prismaErrorTarget(error);
       if (target.includes('TaskListMaterial')) {
         return res.status(400).json({ error: 'An operation lists the same material more than once' });
       }
       return res.status(409).json({ error: 'Task list code already exists' });
     }
-    if (error.code === 'P2003') {
+    if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced work center, equipment, or craft not found' });
     }
     logger.error({ err: error }, 'Error creating task list');
@@ -386,7 +387,10 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
 
     const { code, description, equipmentClass: ec, equipmentId: ei, workCenterId, operations } = req.body;
 
-    const taskList = await prisma.taskList.update({
+    // The result is deliberately not bound: when `operations` is supplied the
+    // rows are replaced in the transaction below, so the value this returns is
+    // already stale. The response is built from the re-read further down.
+    await prisma.taskList.update({
       where: { taskListId: String(req.params.id) },
       data: {
         ...(code !== undefined && { code }),
@@ -486,19 +490,19 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
     );
 
     res.json(updated);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       // Either the task list code collided, or one operation listed the same
       // material twice. The index is on (taskOperationId, materialId), so a
       // duplicate requirement is a data-entry slip; the generic code message
       // would blame the wrong field and send the caller looking at the header.
-      const target = String(error.meta?.target ?? '');
+      const target = prismaErrorTarget(error);
       if (target.includes('TaskListMaterial')) {
         return res.status(400).json({ error: 'An operation lists the same material more than once' });
       }
       return res.status(409).json({ error: 'Task list code already exists' });
     }
-    if (error.code === 'P2003') {
+    if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced work center, equipment, or craft not found' });
     }
     logger.error({ err: error }, 'Error updating task list');
