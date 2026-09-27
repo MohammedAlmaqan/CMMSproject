@@ -528,6 +528,10 @@ https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36326909767
 
 `main` was red for 16 runs and is now green at `da02540`. Phase D remains not started.
 
+**Docker attempt, abandoned.** A throwaway `postgres:15` container was attempted on 2026-09-27 to enable local DB-backed verification; Docker Desktop started, but `docker pull` never completed and the attempt was abandoned rather than retried. The integration fix is verified by CI, not locally. Docker is present on this machine but unreliable for this purpose — do not re-attempt without investigating the pull failure first.
+
+**Rule, going forward.** A local result is static-green until the DB-backed suite has run. The only claim that means CI is green is a green GitHub Actions run for the exact SHA. `npm run gate` reports PARTIAL when the DB step is skipped — a partial result is not equivalent to CI, and the CI run for that SHA is the answer.
+
 ---
 
 ## Deferred to Post-Go-Live
