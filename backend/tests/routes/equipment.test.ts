@@ -9,7 +9,19 @@ let flat = '';
 
 describe('equipment routes', () => {
   beforeAll(async () => {
-    flat = (await prisma.functionalLocation.findFirst({ where: { isDeleted: false } }))?.functionalLocationId || '';
+    // SOW 3.1.2 / equipment.ts:515: equipment may only be placed at a
+    // lowest-level functional location, which locationRules.ts defines
+    // structurally as one with no non-deleted children. Picking an arbitrary
+    // first row therefore only worked by accident: it was green for as long as
+    // the seed happened to put a leaf at the front, and broke as soon as
+    // Phase C added locations ahead of it. Select a real leaf, deterministically.
+    const leaf = await prisma.functionalLocation.findFirst({
+      where: { isDeleted: false, children: { none: { isDeleted: false } } },
+      select: { functionalLocationId: true },
+      orderBy: { functionalLocationId: 'asc' },
+    });
+    if (!leaf) throw new Error('no lowest-level functional location in the seed; equipment tests cannot run');
+    flat = leaf.functionalLocationId;
   });
 
   afterAll(async () => {
