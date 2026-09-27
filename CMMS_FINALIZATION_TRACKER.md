@@ -501,6 +501,33 @@ The rule going forward, which is the actual answer to "how do we close that gap 
 
 `verify_g3*`, `verify_g4*`, `verify_g5*` and `verify_g6*` are Playwright scripts and require a **Vite dev server running on `http://localhost:3000`**. They are not self-contained and are not part of CI. Any future claim that they passed must state that the server was running; otherwise a connection refusal is indistinguishable from a pass.
 
+### A third failure the first fix exposed, and why it was invisible
+
+The first fix (`9668db5`) cleared the lint gate — step 8 `Lint baseline` went green for the first time since C.4 — and cleared all four `workOrders.test.ts` assertions. With the suite running again it immediately failed somewhere else, in `backend/tests/routes/equipment.test.ts`:
+
+```
+[backend/tests/routes/equipment.test.ts:46] AssertionError: expected 400 to be 201
+[backend/tests/routes/equipment.test.ts:65] AssertionError: expected 404 to be 403
+[backend/tests/routes/equipment.test.ts:70] AssertionError: expected 404 to be 200
+```
+
+All three are one bug. `equipment.ts:515` refuses a create whose `functionalLocationId` is not a lowest-level location, which `locationRules.ts` defines structurally as one with no non-deleted children. The test picked its location with an unordered `findFirst`, so it passed only for as long as the seed happened to place a leaf at the front — and Phase C adding functional locations broke that coincidence. The 400 at line 46 means `createdId` was never assigned, and lines 65 and 70 are cascade from that. Fixed in `da02540` by selecting a genuine leaf deterministically.
+
+Worth recording plainly: **this failure had been present since Phase C too, and nothing in the local gate could ever have found it.** It is the same lesson as the other two, in a third place. Fixing the first failure is what made it visible.
+
+### Verified end state
+
+`da02540` is green on CI. Run 36326909767, both jobs, every step including `Test`:
+
+| Job | Result |
+|---|---|
+| Backend (`ubuntu-latest`) | **success** — Typecheck, Lint baseline, Apply migrations, Seed test data, Test all success |
+| Frontend (`ubuntu-latest`) | **success** — Typecheck, Build, Test all success |
+
+https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36326909767
+
+`main` was red for 16 runs and is now green at `da02540`. Phase D remains not started.
+
 ---
 
 ## Deferred to Post-Go-Live
