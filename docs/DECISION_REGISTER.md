@@ -17,7 +17,9 @@ The SOW states its own definition of done in one place: **§6.4 Acceptance Crite
 
 §6.4.1 reads: *"All functional requirements listed in §3 are implemented and pass UAT scripts."*
 
-Of the 126 §3 clause rows, **38 are Met**, 11 are already out of scope by Client agreement (4 Deferred, 7 Excluded), and **77 are neither Deferred nor Excluded** — they are `Partial` or `Not Met`. Those 77 are the entire engineering question. Each one must either be built, or be waived in writing by the Client, before §6.4.1 can honestly be called `Met`.
+Of the 126 §3 clause rows, **47 are Met**, 11 are already out of scope by Client agreement (4 Deferred, 7 Excluded), and 10 more are `Waived` by decision recorded in this register. That leaves **58 that are neither Deferred, Excluded nor Waived** — they are `Partial` or `Not Met`. Those 58 are the entire engineering question. Each one must either be built, or be waived in writing by the Client, before §6.4.1 can honestly be called `Met`.
+
+*Corrected 2026-09-27:* this previously read "38 are Met ... 77 are Partial or Not Met". Phase D promoted nine §3.4 rows (six from `Partial`, three from `Not Met`) to `Met`, which moves both figures: `Met` 38 → 47, and the open set 77 → 58. The previous wording also described the 10 `Waived` rows as part of the open set, which they are not — a waiver is a decision, not a gap.
 
 This document is the instrument for that. Each row carries a disposition and a one-line business reason, and each decision carries an answer and its rationale. The authority under which those were recorded is stated in §6 — it is delegated engineering judgement, **not** a client signature, and this document does not claim to be one.
 

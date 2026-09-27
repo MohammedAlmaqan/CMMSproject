@@ -534,6 +534,63 @@ https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36326909767
 
 ---
 
+### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
+
+Phase D closed the §3.4 Preventive Maintenance subsection and, as a side effect, **broke the deadlock that held 23 Phase B/C rows at `IMPLEMENTED, NOT VERIFIED`**. Those rows were never promoted because `backend/tests/routes/*.test.ts` had never executed against a live PostgreSQL. CI does exactly that — `Apply migrations`, `Seed test data`, `Test` — so from `479a7f7` onward every DB-backed case in this phase has genuinely run. That is the only reason a matrix row is marked `Met` in this phase.
+
+| # | Task | Status | Acceptance Criteria | Commit |
+|---|---|---|---|---|
+| D.0 | Gate parity: `npm run gate` matching CI, DB step refusing to self-skip | ✅ | One command runs typecheck, lint, unit, and — only with an explicit opt-out — the DB-backed suite. A missing database is reported, not silently skipped. | `9668db5`, `da02540`, `98822b5` |
+| D.1 | Item-level safety-checklist gate (row 35) | ✅ | A work order cannot start while a mandatory checklist item is unanswered. Items are nullable and start blank; `'NA'` is a deliberate answer, never a default. Clearing an answer re-arms the gate. | `9b2e9bd`, `369ff13`, `7b3a17a` |
+| D.2 | PM plan fields, target list, meter thresholds (rows 39, 46, 47) | ✅ | `priority`, `generatedWorkOrderStatus`, `notificationId` and a `MaintenancePlanTarget` list, with migration `20260927100000_pm_plan_targets_and_fields`. Boundary validation on create **and** on partial update. | `638dbd6`, `c0496b0` |
+| D.3 | Due-date engine (rows 40, 41, 42, 43) | ✅ | `backend/src/utils/pmDueRules.ts`, pure and fully unit-tested: calendar-correct month arithmetic, `endDate`, both horizon units, meter evaluation, `Combined` earliest-due. | `2fc199f` |
+| D.4 | Generation service shared by scheduler and manual route (rows 45, 48) | ✅ | One `generatePmWorkOrder` used by both entry points, so the manual button and the nightly run can no longer produce different work orders. Idempotent on both. | `60f016b`, `479a7f7` |
+| D.5 | DB-backed coverage for the whole PM path | ✅ | 15 route cases in `backend/tests/routes/pmGeneration.test.ts` plus 28 service unit cases, executed against PostgreSQL by CI. | `60f016b`, `479a7f7` |
+| D.6 | Matrix and tracker reconciliation | ✅ | `docs/SOW_COMPLIANCE.md` §3.4 rows re-derived from code; §3 totals recounted from the Status column, not transcribed. | `pending` — recorded by the follow-up hash commit, as this repo does elsewhere |
+| D.7 | Phase D gate | ✅ | Green CI run for the exact final SHA, both jobs, every step. | `7b3a17a`, `c0496b0` |
+
+#### The gate, stated as raw output
+
+Final SHA **`c0496b021b92d9d1fd45555800a5ba39846f897e`**, run **36333270532**, both jobs, every step `success`:
+
+| Job | Result |
+|---|---|
+| Backend (`ubuntu-latest`) | **success** — Typecheck, Lint baseline, Apply migrations, Seed test data, Test |
+| Frontend (`ubuntu-latest`) | **success** — Typecheck, Build, Test |
+
+https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36333270532
+
+`7b3a17a` is green on run 36332065608 and is the first Phase D SHA where every job and step passed. Locally, against that tree: `tsc -b` exits 0; the DB-free unit suite is **497 cases across 27 files**; `eslint src tests` reports **42** errors against a gate threshold of 50. `npm run gate` is `PARTIAL` locally because the DB step is skipped without authorisation — the CI run above is the claim, not the local one.
+
+#### Five defects found in this phase, and what each one actually was
+
+**1. A 500 on every PM generation, in the code that was meant to unify it.** `60f016b` passed `tsc` and every DB-free test, then returned HTTP 500 for every generation path in CI. The shared service called `db.$transaction` on a value that is sometimes a transaction client and sometimes the root Prisma client; only the root has that method. Fixed in `479a7f7` with a client check, plus 28 DB-free service tests around the call. **This is the argument for the D.0 gate: a green local unit suite did not mean the feature worked.**
+
+**2. The re-arm I added was too eager, and CI caught it in the next run.** `369ff13` re-armed a `Completed` checklist whenever any item was blank. That also downgraded a checklist a planner had deliberately signed off *before* filling in the answers, so the work order then failed with the generic "must be completed" instead of naming the unanswered item. `7b3a17a` restricts the downgrade to an update that itself removes an answer. The rule is now "correcting an answer re-arms the gate", not "a blank anywhere re-arms the gate".
+
+**3. A fixture that asserted the wrong thing about the scheduler.** `pmGeneration.test.ts` expected a repeat scheduler run to report a *skip*. It reports *not due*: the generated cycle becomes the baseline, so the next cycle is outside the horizon. The skip counter is for a unique-index race, which is covered by the double-press case and the service unit tests. The assertion was wrong, not the scheduler.
+
+**4. A fixture that sent a value the API correctly refuses.** `checklistItemUpdateSchema` is an enum of `Yes`/`No`/`NA`; the rewritten fixture answered an item with free text and was rejected with 400. The schema was right.
+
+**5. Partial updates could create a plan that can never generate.** `maintenancePlanUpdateSchema` is `.partial()`, so the create-time cross-field rules could not run on a patch: `PUT {strategyType:'Meter'}` with no thresholds passed every field check and produced a plan that is active, schedulable, and permanently not due — indistinguishable, from the outside, from a plan that simply is not due yet. The same held for moving `startDate` past an existing `endDate` and for stripping the last target. `c0496b0` adds `planPatchIssues`, which applies those rules to the merged record, runs only the rules whose fields the patch touches, and is called before anything is written. The unit tests caught that my first version of that helper accepted both a patch *and* a hand-merged record — two places for one value to come from — so the helper now does the merging itself.
+
+The fifth defect is the one worth carrying forward: **every one of these was invisible from the outside.** None threw, none logged an error, none failed a build. A plan that never generates and a checklist that stays unblocked look exactly like working software.
+
+#### Matrix effect, stated exactly
+
+Phase D moved **nine** rows from open to `Met`, all in §3.4: six from `Partial` (plan fields, strategy choice, time-based intervals, meter-based intervals, task-list copy, idempotency) and three from `Not Met` (call horizon, configurable work-order status, plan notification). §3.4.2's seasonal/exclusion row stays `Waived` — a recorded decision, not a gap.
+
+Recounted from the Status column rather than transcribed: **all 214 clauses are now 73 Met, 70 Partial, 38 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 47 Met, 37 Partial, 21 Not Met, 4 Deferred, 7 Excluded, 10 Waived**. §3.4 is the only §3 subsection with no `Partial` and no `Not Met` row. `docs/DECISION_REGISTER.md` §1 carried the same arithmetic and was corrected in the same commit rather than left contradicting the matrix.
+
+#### Not done, and deliberately out of Phase D
+
+- **D-3, the technician-multiplier removal (row 49), is not done.** It stays in Phase E with row 49, and `backend/src/utils/costs.ts` was not touched.
+- **D-4, the backup and restore drill, is not done.** It is Phase G and needs a live host, as recorded above.
+- **D.5, the capacity board, was not revisited** beyond the C.17 fix; the PM-generated work orders now flow into it, which is the first time the board has had scheduler output to display.
+- The Playwright `verify_g3*`–`verify_g6*` scripts still need a Vite server on port 3000 and were not re-run in this phase. They are frontend flows and Phase D changed no frontend.
+
+---
+
 ## Deferred to Post-Go-Live
 
 - ERP integration
