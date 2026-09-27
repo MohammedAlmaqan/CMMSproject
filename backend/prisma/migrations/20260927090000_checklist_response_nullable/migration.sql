@@ -1,0 +1,22 @@
+-- SOW 3.3.7: a work order cannot go In Progress unless all mandatory safety
+-- checklists are acknowledged, and acknowledgement is an item-level property.
+--
+-- The column was NOT NULL and the attach route pre-filled every item with the
+-- literal string 'NA'. The two together meant an unanswered question was
+-- indistinguishable from a question the technician had deliberately marked "not
+-- applicable", so a mandatory checklist could be signed off without anyone
+-- reading it. The gate in workOrders.ts compensated with a test for blank
+-- responses, but no row could ever be blank, so that test was dead code.
+--
+-- Making the column nullable and stopping the pre-fill gives the state we
+-- actually need to represent: null = not yet answered. 'NA' keeps its meaning
+-- as a deliberate answer, because some checklist questions genuinely do not
+-- apply to a given job and a technician must be able to say so.
+--
+-- Existing rows all hold 'NA' and are therefore treated as answered. That is
+-- the correct reading of the old data: it records that the checklist was
+-- attached, and no technician has been asked to re-answer work already done.
+-- Only newly attached items start unanswered.
+
+-- AlterTable
+ALTER TABLE "WorkOrderChecklistItem" ALTER COLUMN "response" DROP NOT NULL;

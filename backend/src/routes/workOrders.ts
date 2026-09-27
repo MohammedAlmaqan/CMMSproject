@@ -6,6 +6,7 @@ import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber, generateNotifNumber } from '../utils/sequence.js';
 import { canTransition } from '../utils/transitions.js';
 import { requiresAtLeastOneOperation, missingOperationMessage } from '../utils/workOrderRules.js';
+import { findBlockingChecklist, describeBlockedChecklist } from '../utils/checklistRules.js';
 import { logger } from '../utils/logger.js';
 import {
   validate,
@@ -695,22 +696,28 @@ router.put(
     }
 
     if (newStatus === 'In Progress') {
-      const blockingChecklist = await prisma.workOrderChecklist.findFirst({
-        where: {
-          workOrderId: id,
-          template: { isMandatory: true },
-          OR: [
-            { status: { not: 'Completed' } },
-            { items: { some: { response: { in: ['', ' '] } } } },
-          ],
-        },
+      // SOW 3.3.7. Every mandatory checklist must be signed off AND have every
+      // item answered. The item test used to look for a blank response, which
+      // could never match because attach pre-filled 'NA'; the rule now keys off
+      // an unanswered (null) item instead. See utils/checklistRules.ts.
+      const mandatoryChecklists = await prisma.workOrderChecklist.findMany({
+        where: { workOrderId: id, template: { isMandatory: true } },
         select: {
-          woChecklistId: true,
           status: true,
           template: { select: { name: true } },
+          items: { select: { response: true } },
         },
       });
+
+      const blockingChecklist = findBlockingChecklist(
+        mandatoryChecklists.map((c) => ({
+          templateName: c.template.name,
+          status: c.status,
+          items: c.items.map((i) => i.response),
+        }))
+      );
       if (blockingChecklist) {
+        const blocked = describeBlockedChecklist(blockingChecklist);
         await logAudit(
           {
             tableName: 'WorkOrder',
@@ -724,8 +731,8 @@ router.put(
           req.ip
         );
         return res.status(409).json({
-          error: `Mandatory safety checklist '${blockingChecklist.template.name}' must be completed before starting work`,
-          checklist: blockingChecklist.template.name,
+          error: blocked.ok ? '' : blocked.error,
+          checklist: blockingChecklist.templateName,
           checklistStatus: blockingChecklist.status,
         });
       }

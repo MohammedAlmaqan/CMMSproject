@@ -477,7 +477,11 @@ model WorkOrderChecklistItem {
   woChecklistItemId String @id @default(uuid())
   woChecklistId     String
   itemId            String
-  response          String // Yes, No, NA
+  // Nullable, and no longer pre-filled with 'NA' at attach time. `null` means
+  // the item has not been answered yet, which is what lets the SOW 3.3.7 gate
+  // distinguish an unacknowledged mandatory checklist from a completed one.
+  // 'NA' stays a valid deliberate answer for questions that do not apply.
+  response          String?  // Yes, No, NA, or null when unanswered
   comment           String?
 
   woChecklist WorkOrderChecklist @relation(fields: [woChecklistId], references: [woChecklistId])

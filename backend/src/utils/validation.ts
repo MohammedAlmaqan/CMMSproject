@@ -203,7 +203,10 @@ export const checklistUpdateSchema = z.object({
 });
 
 export const checklistItemUpdateSchema = z.object({
-  response: z.enum(['Yes', 'No', 'NA']).optional(),
+  // null clears an answer back to unanswered, which is what re-arms the SOW 3.3.7
+  // gate. Without it a mistaken answer could never be corrected, and the gate
+  // would stay open.
+  response: z.enum(['Yes', 'No', 'NA']).nullable().optional(),
   comment: z.string().nullable().optional(),
 });
 

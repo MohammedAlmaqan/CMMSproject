@@ -278,9 +278,12 @@ router.post('/work-order/:woId/attach', authorizeMinRole('Technician'), validate
         createdBy: req.user!.userId,
         modifiedBy: req.user!.userId,
         items: {
+          // No pre-fill. An item starts unanswered (null) so that SOW 3.3.7 can
+          // tell a mandatory checklist nobody has answered from one a
+          // technician worked through. See utils/checklistRules.ts.
           create: template.items.map((item) => ({
             itemId: item.itemId,
-            response: 'NA',
+            response: null,
           })),
         },
       },
