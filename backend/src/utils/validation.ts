@@ -267,6 +267,9 @@ export const notificationCreateSchema = z
     functionalLocationId: z.string().min(1).nullable().optional(),
     equipmentId: z.string().min(1).nullable().optional(),
     reportedByUserId: z.string().min(1),
+    // SOW 3.2.2 key field. Optional, because a notification is raised before
+    // anyone has inspected the asset; required once the observation exists.
+    damagesObservations: z.string().min(1).nullable().optional(),
     breakdownFlag: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {

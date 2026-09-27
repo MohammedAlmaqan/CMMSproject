@@ -103,7 +103,90 @@ describe('notifications routes', () => {
 
     await prisma.auditLogEntry.deleteMany({ where: { recordId: workOrderId } }).catch(() => {});
     await prisma.workOrderNotifLink.deleteMany({ where: { notificationId } }).catch(() => {});
+    await prisma.workOrder.deleteMany({ where: { workOrderId } }).catch(() => {});
     await prisma.auditLogEntry.deleteMany({ where: { recordId: notificationId } }).catch(() => {});
     await prisma.notification.deleteMany({ where: { notificationId } }).catch(() => {});
+  });
+
+  /**
+   * SOW 3.2.2 "Damages/observations" was the one key field on the clause with
+   * nowhere to go. It is nullable because a notification is raised before anyone
+   * has inspected the asset, and it is separate from `description` so a later
+   * observation cannot overwrite the original report.
+   */
+  describe('damages and observations', () => {
+    let observationId = '';
+
+    afterAll(async () => {
+      if (observationId) {
+        await prisma.auditLogEntry.deleteMany({ where: { recordId: observationId } }).catch(() => {});
+        await prisma.notification.deleteMany({ where: { notificationId: observationId } }).catch(() => {});
+      }
+    });
+
+    it('stays null when the reporter supplies nothing, rather than defaulting to a string', async () => {
+      const res = await api()
+        .post('/api/notifications')
+        .set(authHeaders(ctx.adminToken))
+        .send({ ...body(), description: 'no observation' });
+      expect(res.status).toBe(201);
+      observationId = res.body.notificationId;
+
+      const row = await prisma.notification.findUniqueOrThrow({ where: { notificationId: observationId } });
+      expect(row.damagesObservations).toBeNull();
+    });
+
+    it('captures an observation on create, separately from the description', async () => {
+      const res = await api()
+        .post('/api/notifications')
+        .set(authHeaders(ctx.adminToken))
+        .send({ ...body(), description: 'pump noisy', damagesObservations: 'mechanical seal weeping' });
+      expect(res.status).toBe(201);
+      const id = res.body.notificationId;
+
+      const row = await prisma.notification.findUniqueOrThrow({ where: { notificationId: id } });
+      // The report and the finding are two facts, not one overwritten field.
+      expect(row.description).toBe('pump noisy');
+      expect(row.damagesObservations).toBe('mechanical seal weeping');
+
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
+      await prisma.notification.deleteMany({ where: { notificationId: id } }).catch(() => {});
+    });
+
+    it('records an observation added later, once somebody has inspected', async () => {
+      const created = await api()
+        .post('/api/notifications')
+        .set(authHeaders(ctx.adminToken))
+        .send({ ...body(), description: 'bearing hot' });
+      const id = created.body.notificationId;
+
+      const res = await api()
+        .put(`/api/notifications/${id}`)
+        .set(authHeaders(ctx.adminToken))
+        .send({ damagesObservations: 'housing cracked, oil in base' });
+      expect(res.status).toBe(200);
+
+      const row = await prisma.notification.findUniqueOrThrow({ where: { notificationId: id } });
+      expect(row.damagesObservations).toBe('housing cracked, oil in base');
+      expect(row.description).toBe('bearing hot');
+
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
+      await prisma.notification.deleteMany({ where: { notificationId: id } }).catch(() => {});
+    });
+
+    it('returns the observation on the detail read', async () => {
+      const created = await api()
+        .post('/api/notifications')
+        .set(authHeaders(ctx.adminToken))
+        .send({ ...body(), description: 'odd noise', damagesObservations: 'play in bearing' });
+      const id = created.body.notificationId;
+
+      const res = await api().get(`/api/notifications/${id}`).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      expect(res.body.damagesObservations).toBe('play in bearing');
+
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
+      await prisma.notification.deleteMany({ where: { notificationId: id } }).catch(() => {});
+    });
   });
 });

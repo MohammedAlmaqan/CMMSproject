@@ -297,6 +297,13 @@ model Notification {
   equipmentId         String?
   reportedByUserId    String
   description         String
+  // SOW 3.2.2 names "Damages/observations" as a key field in its own right,
+  // separate from the description. What was actually found at the asset is the
+  // evidence a failure analyst needs, and folding it into `description` loses
+  // it: the description is the caller's summary at raise time, the observation
+  // is what somebody saw. Nullable, because a notification is raised before
+  // anyone has inspected anything.
+  damagesObservations String?
   breakdownFlag       Boolean  @default(false)
   status              String   @default("Open") // Open, In Process, Completed, Converted
   createdBy           String   @default("system")

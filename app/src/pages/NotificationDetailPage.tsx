@@ -170,6 +170,17 @@ export default function NotificationDetailPage() {
             <h3 className="text-primary text-sm font-semibold mb-3">Description</h3>
             <p className="text-secondary text-sm leading-relaxed">{notif.description}</p>
           </div>
+
+          {/* SOW 3.2.2: kept separate from the description on purpose. The
+              description is the caller's report written at raise time; this is
+              what somebody actually found at the asset. Shown only once it
+              exists, because a notification is raised before anyone inspects. */}
+          {notif.damagesObservations && (
+            <div className="industrial-card rounded p-4 mt-3">
+              <h3 className="text-primary text-sm font-semibold mb-3">Damages / Observations</h3>
+              <p className="text-secondary text-sm leading-relaxed whitespace-pre-wrap">{notif.damagesObservations}</p>
+            </div>
+          )}
         </div>
 
         {/* Right: Linked Work Orders */}

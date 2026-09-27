@@ -73,6 +73,7 @@ router.use(authenticate);
  *                   functionalLocationId: { type: string }
  *                   equipmentId: { type: string, nullable: true }
  *                   reportedByUserId: { type: string }
+ *                   damagesObservations: { type: string, nullable: true, description: "SOW 3.2.2 key field: what was actually found at the asset. Separate from description, which is the report written at raise time." }
  *                   breakdownFlag: { type: boolean }
  *       '401':
  *         description: Missing or invalid bearer token
@@ -103,6 +104,7 @@ router.use(authenticate);
  *               functionalLocationId: { type: string }
  *               equipmentId: { type: string, nullable: true }
  *               reportedByUserId: { type: string }
+ *               damagesObservations: { type: string, nullable: true, description: "SOW 3.2.2 key field; optional, since nothing is observed before inspection" }
  *               breakdownFlag: { type: boolean }
  *     responses:
  *       '201':
@@ -228,7 +230,7 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
   try {
     const {
       type, priority, functionalLocationId, equipmentId,
-      reportedByUserId, description, breakdownFlag,
+      reportedByUserId, description, damagesObservations, breakdownFlag,
     } = req.body;
 
     // SOW 3.2.2 makes the location/equipment selection mandatory but does not
@@ -272,6 +274,7 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
         equipmentId: resolvedEquipmentId,
         reportedByUserId,
         description,
+        damagesObservations: damagesObservations ?? null,
         breakdownFlag: breakdownFlag || false,
         status: 'Open',
         createdBy: req.user!.userId,
@@ -333,6 +336,7 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
  *               functionalLocationId: { type: string }
  *               equipmentId: { type: string, nullable: true }
  *               reportedByUserId: { type: string }
+ *               damagesObservations: { type: string, nullable: true, description: "SOW 3.2.2 key field; optional, since nothing is observed before inspection" }
  *               breakdownFlag: { type: boolean }
  *               status: { type: string, enum: [Open, "In Process", Completed, Converted] }
  *     responses:
@@ -364,7 +368,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(notificationUpdateSch
 
     const {
       type, priority, functionalLocationId, equipmentId,
-      reportedByUserId, description, breakdownFlag, status,
+      reportedByUserId, description, damagesObservations, breakdownFlag, status,
     } = req.body;
 
     // SOW 3.2.1: transition validity is enforced and illegal transitions are
@@ -423,6 +427,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(notificationUpdateSch
         ...(functionalLocationId !== undefined && { functionalLocationId }),
         ...(equipmentId !== undefined && { equipmentId: equipmentId || null }),
         ...(reportedByUserId !== undefined && { reportedByUserId }),
+      ...(damagesObservations !== undefined && { damagesObservations }),
         ...(description !== undefined && { description }),
         ...(breakdownFlag !== undefined && { breakdownFlag }),
         ...(status !== undefined && { status }),

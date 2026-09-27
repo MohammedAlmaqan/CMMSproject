@@ -544,7 +544,8 @@ Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3
 |---|---|---|---|---|
 | E.1 | D-3: remove the `numberOfTechnicians` multiplier (row 49) | ✅ | Planned labour is `plannedHours × craft.hourlyRate`. Every planned-cost figure changes **only** by the removed multiplier. | `ca9aa63` |
 | E.2 | Miscellaneous costs as line items (row 34), and the `+ other planned` term (row 49) | ✅ | Travel and permits are storable and reportable as their own line items, distinguishable from a contractor service. Every term of the §3.5.1 formula has a distinct source. | `722e1a3` |
-| E.3 | Work Order "Reported By" header field (row 26) | ✅ | The work order names who reported the fault, separately from who raised the record and from who is assigned. Carries across a notification conversion. | *this commit* |
+| E.3 | Work Order "Reported By" header field (row 26) | ✅ | The work order names who reported the fault, separately from who raised the record and from who is assigned. Carries across a notification conversion. | `e256ad1` |
+| E.4 | Notification "Damages/observations" field (row 19) | ✅ | What was found at the asset is recorded in its own field, and cannot overwrite the original report. | *this commit* |
 
 #### E.1, stated as raw output
 
@@ -606,6 +607,22 @@ Five DB-backed cases: the reporter defaults to the caller; an explicit nominatio
 `tsc -b` exits **0** in both packages. The DB-free unit suite is **512 cases across 28 files**; `eslint src tests` reports **42** against a gate threshold of 50.
 
 Counted from the Status column, not transcribed: **77 Met, 67 Partial, 37 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 51 Met, 34 Partial, 20 Not Met, 4 Deferred, 7 Excluded, 10 Waived**.
+
+E.3 CI: run **36338619584** for exact SHA `e256ad150af5ba120f6c5818fd038c7654bdd5fe`.
+
+#### E.4 — the field that had nowhere to go
+
+Row 19 was the shortest clause in §3.2.2, "Damages/observations", and it was `Not Met` for a reason that took a second look to get right. The only free text on a notification was `description`. The obvious fix — start storing observations in `description` — is wrong, and not just untidy: `description` is the caller's summary written at raise time, and the observation is what somebody found afterwards. They are two facts, and overwriting one with the other destroys the record of what was originally reported, which is the thing a failure analyst needs.
+
+`Notification.damagesObservations`, migration `20260927130000_notification_damages_observations`: nullable, and **that is the load-bearing decision**. A notification is raised *before* anyone inspects the asset, so making the column required would force an observation to be invented at raise time. It is filled in on the follow-up `PUT` once a technician has actually been there. Metadata-only on Postgres: no default, no rewrite, no backfill.
+
+Wired through `notificationCreateSchema`, `POST /api/notifications` and `PUT /api/notifications/:id`, and documented in both OpenAPI bodies. There is no notification create form in the UI (notifications are raised through the API), so the frontend change is the type plus a detail card that only renders when the observation exists.
+
+Four DB-backed cases in `notifications.test.ts`: null stays null rather than defaulting to a string; create with an observation leaves `description` alone; an observation added later does not disturb the original report; and the detail read returns it. While writing these the reporter test was also found to be leaking its `WorkOrder` into the shared test database and was fixed.
+
+`tsc -b` exits **0** in both packages. DB-free unit suite **512 cases across 28 files**; `eslint src tests` **42** against a gate threshold of 50.
+
+Counted from the Status column, not transcribed: **78 Met, 67 Partial, 36 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 52 Met, 34 Partial, 19 Not Met, 4 Deferred, 7 Excluded, 10 Waived**.
 
 ### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
 

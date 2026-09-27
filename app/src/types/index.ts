@@ -240,6 +240,8 @@ export interface Notification extends Auditable {
   equipmentId: string | null;
   reportedByUserId: string;
   description: string;
+  /** SOW 3.2.2 key field: what was found at the asset, as distinct from the report. */
+  damagesObservations?: string | null;
   breakdownFlag: boolean;
   status: NotificationStatus;
   functionalLocation?: { functionalLocationId: string; locationCode: string; description: string };
