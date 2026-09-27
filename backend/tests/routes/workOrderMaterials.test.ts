@@ -37,6 +37,131 @@ describe('work order materials routes', () => {
     await prisma.workOrder.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
   });
 
+  /**
+   * SOW 3.3.4 "Vendor must implement a material reservation concept".
+   *
+   * `reservationQuantity` was already stored on every write. The gap was that
+   * nothing acted on it, so these cases pin down the behaviour that makes it a
+   * reservation: a second job cannot take stock the first job is holding, a
+   * line can be raised against its own reservation, and a finished job lets go.
+   */
+  describe('material reservation', () => {
+    let stockMaterialId = '';
+    let otherWoId = '';
+    const createdLineIds: string[] = [];
+
+    beforeAll(async () => {
+      const fl = (await prisma.functionalLocation.findFirst({ where: { isDeleted: false } }))!;
+      const wc = (await prisma.workCenter.findFirst({ where: { isDeleted: false } }))!;
+
+      // An isolated material, so the shared material master's own reservations
+      // cannot influence the expected totals.
+      const m = await prisma.material.create({
+        data: {
+          materialCode: `RSV-${Date.now()}`,
+          description: 'reservation test stock',
+          unitOfMeasure: 'EA',
+          standardCost: 10,
+          currentStock: 100,
+        },
+      });
+      stockMaterialId = m.materialId;
+
+      const other = await prisma.workOrder.create({
+        data: {
+          woNumber: `WO-T${Date.now()}-R`,
+          type: 'CM',
+          priority: 'Medium',
+          status: 'Draft',
+          description: 'second job competing for the same stock',
+          functionalLocationId: fl.functionalLocationId,
+          workCenterId: wc.workCenterId,
+          supervisorUserId: ctx.adminId,
+          reportedByUserId: ctx.adminId,
+          createdBy: ctx.adminId,
+          modifiedBy: ctx.adminId,
+        },
+      });
+      otherWoId = other.workOrderId;
+    });
+
+    afterAll(async () => {
+      for (const id of createdLineIds) {
+        await prisma.workOrderMaterial.deleteMany({ where: { woMaterialId: id } }).catch(() => {});
+      }
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: createdLineIds } } }).catch(() => {});
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: otherWoId } }).catch(() => {});
+      await prisma.workOrder.deleteMany({ where: { workOrderId: otherWoId } }).catch(() => {});
+      await prisma.material.deleteMany({ where: { materialId: stockMaterialId } }).catch(() => {});
+    });
+
+    async function reserve(workOrder: string, quantity: number) {
+      const res = await api()
+        .post('/api/work-order-materials')
+        .set(authHeaders(ctx.adminToken))
+        .send({ workOrderId: workOrder, materialId: stockMaterialId, plannedQuantity: quantity, reservationQuantity: quantity });
+      if (res.status === 201) createdLineIds.push(res.body.woMaterialId);
+      return res;
+    }
+
+    it('reports availability on the material detail read', async () => {
+      const res = await api().get(`/api/materials/${stockMaterialId}`).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      expect(res.body.availability.currentStock).toBe(100);
+      expect(res.body.availability.reservedQuantity).toBe(0);
+      expect(res.body.availability.availableQuantity).toBe(100);
+    });
+
+    it('reserves against the live job and reduces what is available', async () => {
+      const res = await reserve(woId, 30);
+      expect(res.status).toBe(201);
+      expect(res.body.availability.reservedQuantity).toBe(30);
+      expect(res.body.availability.availableQuantity).toBe(70);
+    });
+
+    it('refuses a second job reserving stock the first job already holds', async () => {
+      const res = await reserve(otherWoId, 80);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain('already reserved');
+      // The refusal must actually have prevented the line, not merely complained.
+      const count = await prisma.workOrderMaterial.count({
+        where: { workOrderId: otherWoId, materialId: stockMaterialId },
+      });
+      expect(count).toBe(0);
+    });
+
+    it('allows the second job to take only what is genuinely free', async () => {
+      const res = await reserve(otherWoId, 70);
+      expect(res.status).toBe(201);
+      expect(res.body.availability.reservedQuantity).toBe(100);
+      expect(res.body.availability.availableQuantity).toBe(0);
+    });
+
+    it('raises an existing line against its own reservation without counting the old value twice', async () => {
+      const line = await prisma.workOrderMaterial.findFirstOrThrow({
+        where: { workOrderId: woId, materialId: stockMaterialId },
+      });
+      // Everything is already reserved, so this only succeeds if the line's own
+      // 30 is excluded from the check before the 30 is added back.
+      const res = await api()
+        .put(`/api/work-order-materials/${line.woMaterialId}`)
+        .set(authHeaders(ctx.adminToken))
+        .send({ reservationQuantity: 30 });
+      expect(res.status).toBe(200);
+      expect(res.body.availability.reservedQuantity).toBe(100);
+    });
+
+    it('releases the reservation when the holding work order is cancelled', async () => {
+      await prisma.workOrder.update({ where: { workOrderId: woId }, data: { status: 'Cancelled' } });
+
+      const res = await api().get(`/api/materials/${stockMaterialId}`).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      // The cancelled job's 30 is no longer holding anything; the live job's 70 is.
+      expect(res.body.availability.reservedQuantity).toBe(70);
+      expect(res.body.availability.availableQuantity).toBe(30);
+    });
+  });
+
   it('returns the materials for a work order', async () => {
     const res = await api().get(`/api/work-order-materials?workOrderId=${woId}`).set(authHeaders(ctx.adminToken));
     expect(res.status).toBe(200);

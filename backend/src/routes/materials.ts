@@ -5,6 +5,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { materialImportRowSchema, materialCreateSchema, materialUpdateSchema, validate } from '../utils/validation.js';
 import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
+import { getMaterialAvailability } from '../services/materialAvailability.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -302,7 +303,12 @@ router.get('/', async (req: Request, res: Response) => {
  * /api/materials/{id}:
  *   get:
  *     summary: Get one material
- *     description: Returns a single non-deleted material row.
+ *     description: >
+ *       Returns a single non-deleted material row, plus an `availability` object
+ *       carrying `currentStock`, `reservedQuantity` and `availableQuantity`
+ *       (SOW 3.3.4). `reservedQuantity` is derived live from the work-order
+ *       material lines whose work order can still consume the material, so it
+ *       excludes work orders that are Completed, Closed or Cancelled.
  *     tags: [Materials]
  *     security:
  *       - bearerAuth: []
@@ -335,7 +341,10 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Material not found' });
     }
 
-    res.json(material);
+    // SOW 3.3.4. A planner picking material needs to know what is already
+    // promised to other jobs, not just what is on the shelf, so the detail read
+    // carries the reservation picture alongside the stock figure.
+    res.json({ ...material, availability: await getMaterialAvailability(material.materialId) });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching material');
     res.status(500).json({ error: 'Internal server error' });

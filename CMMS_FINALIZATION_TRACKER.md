@@ -545,7 +545,8 @@ Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3
 | E.1 | D-3: remove the `numberOfTechnicians` multiplier (row 49) | ✅ | Planned labour is `plannedHours × craft.hourlyRate`. Every planned-cost figure changes **only** by the removed multiplier. | `ca9aa63` |
 | E.2 | Miscellaneous costs as line items (row 34), and the `+ other planned` term (row 49) | ✅ | Travel and permits are storable and reportable as their own line items, distinguishable from a contractor service. Every term of the §3.5.1 formula has a distinct source. | `722e1a3` |
 | E.3 | Work Order "Reported By" header field (row 26) | ✅ | The work order names who reported the fault, separately from who raised the record and from who is assigned. Carries across a notification conversion. | `e256ad1` |
-| E.4 | Notification "Damages/observations" field (row 19) | ✅ | What was found at the asset is recorded in its own field, and cannot overwrite the original report. | *this commit* |
+| E.4 | Notification "Damages/observations" field (row 19) | ✅ | What was found at the asset is recorded in its own field, and cannot overwrite the original report. | `96645ee` |
+| E.5 | Material reservation concept (row 31) | ✅ | A part can actually be held for a scheduled job: over-reservation is refused, availability is reported, and a closed or cancelled job lets go. | *this commit* |
 
 #### E.1, stated as raw output
 
@@ -623,6 +624,27 @@ Four DB-backed cases in `notifications.test.ts`: null stays null rather than def
 `tsc -b` exits **0** in both packages. DB-free unit suite **512 cases across 28 files**; `eslint src tests` **42** against a gate threshold of 50.
 
 Counted from the Status column, not transcribed: **78 Met, 67 Partial, 36 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 52 Met, 34 Partial, 19 Not Met, 4 Deferred, 7 Excluded, 10 Waived**.
+
+E.4 CI: run **36339202953** for exact SHA `96645ee799ffd3ef60c3d9a34747b8e4173a9910`.
+
+#### E.5 — a number that was stored but meant nothing
+
+Row 31 is one clause long: "Vendor must implement a material reservation concept". Both the matrix and the register claimed `reservationQuantity` "is never written". **That was wrong, and checking it first mattered.** It was already written on create and update; what was missing was any behaviour attached to it. Nothing read it, nothing stopped two jobs promising the same bearing, and no planner could see what was already committed.
+
+So E.5 does not add a column. It gives the existing column meaning:
+
+- `getMaterialAvailability` reports `currentStock`, `reservedQuantity` and a clamped `availableQuantity`.
+- `assertReservable` refuses an over-reservation with **409 before the write**, so a line can never land in an over-reserved state for someone to discover at issue time. Both `workOrderMaterials` routes now honour that status instead of flattening every failure to a 500 — a stock conflict reported as a server error hides the one sentence the planner needs.
+- The update path excludes the line's own reservation from the check. Without that, raising a line's reservation counts its old value against its new one and rejects the very change being made — the kind of bug that looks correct in review and makes reservations impossible to edit.
+- Completed, Closed and Cancelled work orders stop holding their reservation automatically.
+
+**Reservations are derived on every read rather than kept in a counter.** A `Material.reservedStock` column would be cheaper per read and would drift the first time a job was cancelled, a line deleted, or a route updated a line without remembering to decrement it. A wrong availability figure is worse than an absent one, because a planner trusts it and issues against stock that was not there.
+
+Six DB-backed cases in `workOrderMaterials.test.ts`, on an isolated material so the shared master's own reservations cannot perturb the totals. The 409 case asserts the line is **absent from the database**, not merely that the response said no.
+
+`tsc -b` exits **0**. DB-free unit suite **512 across 28 files**. `eslint src tests` **42** against threshold 50 — the one error this task introduced (an unused destructured parameter) was found and removed rather than left for the next person.
+
+Counted from the Status column, not transcribed: **79 Met, 67 Partial, 35 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 53 Met, 34 Partial, 18 Not Met, 4 Deferred, 7 Excluded, 10 Waived**.
 
 ### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
 

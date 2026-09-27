@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
+import { assertReservable, getMaterialAvailability } from '../services/materialAvailability.js';
 import { validate, woMaterialCreateSchema, woMaterialUpdateSchema } from '../utils/validation.js';
 import {
   materialOperationMessage,
@@ -145,6 +146,12 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
       }
     }
 
+    // SOW 3.3.4. A stored reservation has to mean something, so a reservation
+    // that exceeds what is on hand is refused before the line is written, rather
+    // than being recorded and discovered later by whoever tries to issue it.
+    const nextReservation = reservationQuantity || 0;
+    await assertReservable({ materialId, nextReservationQuantity: nextReservation });
+
     const material = await prisma.workOrderMaterial.create({
       data: {
         workOrderId,
@@ -153,7 +160,7 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
         plannedQuantity,
         actualQuantity: actualQuantity || 0,
         unitCost: unitCost || 0,
-        reservationQuantity: reservationQuantity || 0,
+        reservationQuantity: nextReservation,
       },
     });
 
@@ -165,10 +172,19 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
       req.ip
     );
 
-    res.status(201).json(material);
+    res.status(201).json({
+      ...material,
+      availability: await getMaterialAvailability(materialId),
+    });
   } catch (error) {
     logger.error({ err: error }, 'Error creating work order material');
-    res.status(500).json({ error: 'Internal server error' });
+    // A rejected reservation is a 409, not an internal fault. Swallowing the
+    // status here would report a stock conflict as a server error and hide the
+    // reason the planner needs in order to fix it.
+    const status = (error as { status?: number })?.status;
+    res
+      .status(status ?? 500)
+      .json({ error: status ? (error as Error).message : 'Internal server error' });
   }
 });
 
@@ -249,6 +265,17 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
       }
     }
 
+    // SOW 3.3.4. The line's own current reservation is excluded from the check,
+    // otherwise raising this line's reservation would count its old value against
+    // its new one and reject the very change being made.
+    if (reservationQuantity !== undefined) {
+      await assertReservable({
+        materialId: existing.materialId,
+        nextReservationQuantity: reservationQuantity,
+        excludeWoMaterialId: id,
+      });
+    }
+
     const material = await prisma.workOrderMaterial.update({
       where: { woMaterialId: id },
       data: {
@@ -268,10 +295,16 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
       req.ip
     );
 
-    res.json(material);
+    res.json({
+      ...material,
+      availability: await getMaterialAvailability(existing.materialId),
+    });
   } catch (error) {
     logger.error({ err: error }, 'Error updating work order material');
-    res.status(500).json({ error: 'Internal server error' });
+    const status = (error as { status?: number })?.status;
+    res
+      .status(status ?? 500)
+      .json({ error: status ? (error as Error).message : 'Internal server error' });
   }
 });
 
