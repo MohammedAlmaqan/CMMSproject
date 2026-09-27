@@ -547,7 +547,8 @@ Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3
 | E.3 | Work Order "Reported By" header field (row 26) | ✅ | The work order names who reported the fault, separately from who raised the record and from who is assigned. Carries across a notification conversion. | `e256ad1` |
 | E.4 | Notification "Damages/observations" field (row 19) | ✅ | What was found at the asset is recorded in its own field, and cannot overwrite the original report. | `96645ee` |
 | E.5 | Material reservation concept (row 31) | ✅ | A part can actually be held for a scheduled job: over-reservation is refused, availability is reported, and a closed or cancelled job lets go. | `abb580f` |
-| E.6 | Fix the E.3 migration backfill and the E.4 update schema | ✅ | Both E.3 and E.4 were red on CI. Neither was a test-logic problem; both were ways of writing a value that the database would not accept. | *this commit* |
+| E.6 | Fix the E.3 migration backfill and the E.4 update schema | ✅ | Both E.3 and E.4 were red on CI. Neither was a test-logic problem; both were ways of writing a value that the database would not accept. | `fa79ef0` |
+| E.7 | Stop the row-31 reservation tests mutating the shared work order (row 32 wording, D-16) | ✅ | The release test cancelled a work order the rest of the file depends on; it now owns its own. Row 32 closed on D-16, with no code change. | *this commit* |
 
 #### E.1, stated as raw output
 
@@ -661,6 +662,16 @@ The corrected backfill asks whether the value names a real user before using it:
 The lesson worth keeping: both faults were invisible to `tsc -b`, to the 512-case unit suite, and to `eslint`. Neither surfaces without a real database applying the migrations, which is the argument for gating DB-backed tests on every migration-bearing commit rather than only at the end of a phase.
 
 `tsc -b` exits **0**. DB-free unit suite **512 across 28 files**. `eslint src tests` **42** against threshold 50.
+
+#### E.7 — a shared-fixture bug found by reading, and row 32 closed for free
+
+**The row-31 test bug.** E.5's reservation cases ran *before* the pre-existing cases in `workOrderMaterials.test.ts`, and the release case cancelled `woId` — the work order the outer suite creates in its own `beforeAll` and then uses for the list, create, malformed-body and hard-delete cases. It would probably have passed, since nothing in those cases asserts a work-order status, but it is the same class of fault as E.6: a test that mutates shared state and happens to get away with it. The block now creates its own work order and its own material, so cancelling one cannot reach anything else. This was found by reading the file, not by CI — which is the point of reading it.
+
+**Row 32 closes with no code at all.** §3.3.5 says actual labour cost is "hours x craft rate **(from work center master)**", while §3.5.1 says the same figure is "hours x craft rate" with no parenthetical. The SOW names two different rate sources. D-16 already records the position supplied by the SOW owner that `Craft.hourlyRate` is authoritative, which makes the parenthetical superseded, and the code has always used it.
+
+Verified rather than assumed before closing: actual labour is `hoursWorked x craft.hourlyRate` over booked entries (`backend/src/utils/costRules.ts:90-92`), and `WorkCenter.costRatePerHour` — the column the old residual said "is never used" — is read in `workCenters.ts` CRUD and once in `validation.ts` but by **no cost path**. The row is now `Met` for the wording, and the column is documented as master data that is deliberately not a second source of truth, rather than left looking like an oversight. No behaviour changed; the arithmetic is the pure function D-3 already exercised in CI.
+
+Counted from the Status column, not transcribed: **80 Met, 66 Partial, 35 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 54 Met, 33 Partial, 18 Not Met, 4 Deferred, 7 Excluded, 10 Waived**.
 
 ### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
 

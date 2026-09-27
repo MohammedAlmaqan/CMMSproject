@@ -47,6 +47,7 @@ describe('work order materials routes', () => {
    */
   describe('material reservation', () => {
     let stockMaterialId = '';
+    let reservationWoId = '';
     let otherWoId = '';
     const createdLineIds: string[] = [];
 
@@ -66,6 +67,26 @@ describe('work order materials routes', () => {
         },
       });
       stockMaterialId = m.materialId;
+
+      // A work order of this block's own. The release case cancels a work
+      // order, and the outer suite shares one -- cancelling that one would leave
+      // later tests running against a job nobody asked to cancel.
+      const reservation = await prisma.workOrder.create({
+        data: {
+          woNumber: `WO-T${Date.now()}-RES`,
+          type: 'CM',
+          priority: 'Medium',
+          status: 'Draft',
+          description: 'job holding the reservation',
+          functionalLocationId: fl.functionalLocationId,
+          workCenterId: wc.workCenterId,
+          supervisorUserId: ctx.adminId,
+          reportedByUserId: ctx.adminId,
+          createdBy: ctx.adminId,
+          modifiedBy: ctx.adminId,
+        },
+      });
+      reservationWoId = reservation.workOrderId;
 
       const other = await prisma.workOrder.create({
         data: {
@@ -90,8 +111,8 @@ describe('work order materials routes', () => {
         await prisma.workOrderMaterial.deleteMany({ where: { woMaterialId: id } }).catch(() => {});
       }
       await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: createdLineIds } } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: otherWoId } }).catch(() => {});
-      await prisma.workOrder.deleteMany({ where: { workOrderId: otherWoId } }).catch(() => {});
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: [reservationWoId, otherWoId] } } }).catch(() => {});
+      await prisma.workOrder.deleteMany({ where: { workOrderId: { in: [reservationWoId, otherWoId] } } }).catch(() => {});
       await prisma.material.deleteMany({ where: { materialId: stockMaterialId } }).catch(() => {});
     });
 
@@ -113,7 +134,7 @@ describe('work order materials routes', () => {
     });
 
     it('reserves against the live job and reduces what is available', async () => {
-      const res = await reserve(woId, 30);
+      const res = await reserve(reservationWoId, 30);
       expect(res.status).toBe(201);
       expect(res.body.availability.reservedQuantity).toBe(30);
       expect(res.body.availability.availableQuantity).toBe(70);
@@ -139,7 +160,7 @@ describe('work order materials routes', () => {
 
     it('raises an existing line against its own reservation without counting the old value twice', async () => {
       const line = await prisma.workOrderMaterial.findFirstOrThrow({
-        where: { workOrderId: woId, materialId: stockMaterialId },
+        where: { workOrderId: reservationWoId, materialId: stockMaterialId },
       });
       // Everything is already reserved, so this only succeeds if the line's own
       // 30 is excluded from the check before the 30 is added back.
@@ -152,7 +173,7 @@ describe('work order materials routes', () => {
     });
 
     it('releases the reservation when the holding work order is cancelled', async () => {
-      await prisma.workOrder.update({ where: { workOrderId: woId }, data: { status: 'Cancelled' } });
+      await prisma.workOrder.update({ where: { workOrderId: reservationWoId }, data: { status: 'Cancelled' } });
 
       const res = await api().get(`/api/materials/${stockMaterialId}`).set(authHeaders(ctx.adminToken));
       expect(res.status).toBe(200);
