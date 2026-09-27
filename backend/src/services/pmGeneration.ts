@@ -95,6 +95,10 @@ export async function generatePmWorkOrder(
   const plan = await db.maintenancePlan.findFirst({
     where: { planId: input.planId, isDeleted: false },
     include: {
+      // Selected up front so the pre-D-10 fallback below resolves the asset's
+      // functional location from the same query rather than a second one that
+      // can come back empty and leave the plan looking untargetable.
+      equipment: true,
       targets: { include: { equipment: true, functionalLocation: true } },
       taskList: { include: { operations: { where: { isDeleted: false }, orderBy: { sequenceNumber: 'asc' } } } },
       notification: true,
@@ -132,12 +136,7 @@ export async function generatePmWorkOrder(
           planTargetId: null as string | null,
           equipmentId: plan.equipmentId,
           functionalLocationId: plan.functionalLocationId,
-          equipment: plan.equipmentId
-            ? ((await db.equipment.findUnique({
-                where: { equipmentId: plan.equipmentId },
-                include: { functionalLocation: true },
-              })) ?? null)
-            : null,
+          equipment: plan.equipmentId ? plan.equipment : null,
           functionalLocation: null as null,
         },
       ];
@@ -167,6 +166,7 @@ export async function generatePmWorkOrder(
 
 type PlanWithRelations = Prisma.MaintenancePlanGetPayload<{
   include: {
+    equipment: true;
     targets: { include: { equipment: true; functionalLocation: true } };
     taskList: { include: { operations: true } };
     notification: true;
@@ -177,7 +177,7 @@ type PlanTargetWithAssets = {
   planTargetId: string | null;
   equipmentId: string | null;
   functionalLocationId: string | null;
-  equipment: PlanWithRelations['targets'][number]['equipment'];
+  equipment: PlanWithRelations['equipment'];
   functionalLocation: PlanWithRelations['targets'][number]['functionalLocation'];
 };
 
@@ -298,10 +298,10 @@ async function generateOne(
   };
 
   try {
-    // The caller owns the transaction boundary. When handed a transaction client
-    // the work must join that transaction rather than opening a nested one, which
-    // Prisma does not support.
-    if (hasTransaction(db)) {
+    // The caller owns the transaction boundary. A transaction client has no
+    // `$transaction` of its own, so the work must join the transaction it was
+    // handed rather than opening a nested one, which Prisma does not support.
+    if (!canStartTransaction(db)) {
       return await run(db as Prisma.TransactionClient);
     }
     return await (db as typeof prisma).$transaction(run);
@@ -326,7 +326,7 @@ async function generateOne(
   }
 }
 
-function hasTransaction(db: unknown): boolean {
+function canStartTransaction(db: unknown): boolean {
   return typeof (db as { $transaction?: unknown } | null)?.$transaction === 'function';
 }
 
