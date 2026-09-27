@@ -549,7 +549,8 @@ Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3
 | E.5 | Material reservation concept (row 31) | ✅ | A part can actually be held for a scheduled job: over-reservation is refused, availability is reported, and a closed or cancelled job lets go. | `abb580f` |
 | E.6 | Fix the E.3 migration backfill and the E.4 update schema | ✅ | Both E.3 and E.4 were red on CI. Neither was a test-logic problem; both were ways of writing a value that the database would not accept. | `fa79ef0` |
 | E.7 | Stop the row-31 reservation tests mutating the shared work order (row 32 wording, D-16) | ✅ | The release test cancelled a work order the rest of the file depends on; it now owns its own. Row 32 closed on D-16, with no code change. | `98c356e` |
-| E.8 | Stop PM generation writing `'scheduler'` into a user foreign key | ✅ | Every scheduled work order generation was failing on `WorkOrder_reportedByUserId_fkey`. Found by reproducing CI locally, not by guessing. | *this commit* |
+| E.8 | Stop PM generation writing `'scheduler'` into a user foreign key | ✅ | Every scheduled work order generation was failing on `WorkOrder_reportedByUserId_fkey`. Found by reproducing CI locally, not by guessing. | `96988dd` |
+| E.9 | One-shot DB-backed diagnostic: re-test every row held on "never run against a live database" | ✅ | All 20 held rows examined clause by clause against the real suite. One promoted on genuine coverage; 19 re-stated as the specific untested clause. | *this commit* |
 
 #### E.1, stated as raw output
 
@@ -710,6 +711,44 @@ Earlier phases of this tracker recorded "no authorised local PostgreSQL" and tre
 - Reproduce CI with: `prisma migrate deploy`, `npx tsx prisma/seed.ts`, then `vitest run`, with `JWT_SECRET`, `NODE_ENV=test` and `SEED_DEMO=1` set as in `.github/workflows/ci.yml`.
 
 The full DB-backed suite — **721 tests across 53 files** — runs in about two minutes this way. That is a two-minute feedback loop instead of a nine-minute CI round trip with unreadable logs, and it is the only way to see a foreign-key or constraint fault at all. Prefer it over pushing a speculative fix.
+
+#### E.9 — the green suite, and what it did not prove
+
+The local run gave something no earlier phase had: a real answer to the question every one of the 20 held rows was waiting on. All 20 carried the same residual — *"never run against a live database"* — and the obvious move was to promote them together on the strength of 721/721.
+
+That would have been wrong, and checking cost about ten minutes.
+
+Each row's residual was re-read and then **grepped for against the actual test files**. The result is blunt: **19 of the 20 have no test that touches the clause at all.** Not a failing test — an absent one. The suite is green because it never asks the question.
+
+| Held on | Why it is still held |
+|---|---|
+| §3.1.1 tree counts | Nothing in `backend/tests/` references an aggregated count or a descendant rollup. `functionalLocations.test.ts` asserts the list and the tree shape only. |
+| §3.1.2 location rules | `equipment.test.ts` *selects* a leaf as a fixture (lines 13-24) so its own create case has somewhere valid to go. It never asserts a refusal. |
+| §3.1.2 / §3.1.5 BOM | No `equipmentBom` test file. The string `/bom` appears in no route test. |
+| §3.1.2 attachments | Upload/list/download/delete covered against a valid parent; the missing-parent 400 this row names is not. |
+| §3.1.3 crafts | `crafts.test.ts` has two cases: the list and a 401. No `POST`, no `PUT`, none of the 409 retirement refusals. |
+| §3.1.3 capacity | No capacity test file; `buildCapacityBoard` has never executed. |
+| §3.1.4 task lists | Eight cases covering list/401/403/create/400/update/delete — none of per-step materials, the duplicate refusal, or zero-quantity. |
+| §3.1.4 template copy | `taskListId` never appears in `workOrders.test.ts`. The copy path has never been called with a template. |
+| §3.1.5 WO-operation materials | `workOrderMaterials.test.ts` covers reservations and plain CRUD, but never sets `operationId`. |
+| §3.2.1 M3 on completion | No route test contains the string `M3` or `Completion Confirmation`. |
+| §3.2.1 transition validity | `workOrders.test.ts:111` covers *work order* transitions — a different map in a different file. `notifications.test.ts` never drives the notification lifecycle map. |
+| §3.2.2 mandatory pair | One fixture location, and no assertion of the at-least-one rule, the contradictory pair, or the derived location. |
+| §3.2.3 link navigation | The only test reading `WorkOrderNotifLink` is `pmGeneration.test.ts:185`, which belongs to row 47. |
+| §3.2.3 close on completion | No test completes a work order that has converted notifications behind it. |
+| §3.3.3 prefix config | No **route** test exists. `tests/unit/systemConfig.test.ts` is static source-reading — 6 `readFileSync`, no `prisma`, no `api()`. |
+| §3.3.3 operation update | `workOrderOperations.test.ts` has no `PUT /:id` case at all. The fix's entire subject is a value surviving a Zod parse. |
+| §3.3.5 labour attribution | Every case sends an explicit `userId` (lines 65, 73, 85), so nothing proves the login is authoritative. |
+| §3.5.2 cost splits | No `workOrderCostSplits` route test. `tests/unit/costSplits.test.ts` is static source-reading — 3 `readFileSync`, no `prisma`, no `api()`. Its "is mounted in the api" case greps the source rather than calling it. |
+
+**One row was promoted: §3.3.3, the at-least-one-operation guard (row 129).** It was the single held row whose residual was genuinely a database question, and the answer was already in the suite. `workOrders.test.ts:278` *"refuses to plan a work order that has no operations, and allows it once one is added"* asserts against live PostgreSQL that the transition returns **409**, the message matches `/operation/i`, exactly one `AuditLogEntry` with `action: 'Blocked'` and `fieldName: 'status'` is written, the row is still `Draft` rather than half-moved — and then, after an operation is added, the same hop returns **200** with `status: 'Planned'`. `:314` separately pins the deliberate `Cancelled` exemption so a later tightening cannot strand draft work.
+
+The general finding, and the reason the other 19 stay held: **a green suite is evidence about the tests that exist, not about clauses no test touches.** Nineteen rows were held on a reason that is now false — the database exists and the code has run against it — and replacing that with a precise, actionable statement of which clause is untested is worth more than a promotion would have been. Each of the 19 now names the test it needs.
+
+Two more, for the record. The OpenAPI parser emits a non-fatal `YAMLSemanticError: Map keys must be unique; "400" is repeated at line 34, column 7` from `backend/src/routes/functionalLocations.ts` during unit runs; it fails no assertion and was already present, but it does mean that spec is not strictly valid YAML. And no row was found whose tests *fail* — there was nothing to record on that front, because the suite is green. "Untested" and "failing" are different findings and the matrix now says which is which.
+
+Counts: **81 Met / 65 Partial / 35 Not Met / 8 Deferred / 15 Excluded / 10 Waived** across 214; §3 is **55 / 32 / 18 / 4 / 7 / 10** across 126. Both verified by re-deriving them from the Status column rather than transcribing.
+
 
 ### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
 
