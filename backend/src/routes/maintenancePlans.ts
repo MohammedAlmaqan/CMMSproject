@@ -4,7 +4,8 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
 import { validate, schedulerRunSchema, maintenancePlanCreateSchema, maintenancePlanUpdateSchema } from '../utils/validation.js';
 import { runSchedulerOnce } from '../services/scheduler.js';
-import { generateWoNumber } from '../utils/sequence.js';
+import { generatePmWorkOrder, PmGenerationError } from '../services/pmGeneration.js';
+import { isoDay } from '../utils/pmDueRules.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -620,85 +621,69 @@ router.post('/:id/generate-wo', authorizeMinRole('Maintenance Planner'), async (
     const id = req.params.id as string;
     const plan = await prisma.maintenancePlan.findFirst({
       where: { planId: id, isDeleted: false },
-      include: {
-        taskList: { include: { operations: { where: { isDeleted: false } } } },
-      },
+      select: { planId: true, planCode: true },
     });
     if (!plan) {
       return res.status(404).json({ error: 'Maintenance plan not found' });
     }
 
-    const woNumber = await generateWoNumber();
+    // A manual generation is not subject to the call horizon, which is a
+    // scheduling window rather than a permission, so the cycle is today's.
+    // Everything else is identical to a scheduled generation: the same service
+    // builds the work order, copies the task list, raises the associated
+    // notification and records sourcePlanId/sourcePlanCycle.
+    const cycleKey = isoDay(new Date());
+    const outcome = await prisma.$transaction((tx) =>
+      generatePmWorkOrder(tx, {
+        planId: plan.planId,
+        cycleKey,
+        basis: 'Time',
+        dueDate: new Date(),
+        actorUserId: req.user!.userId,
+        supervisorUserId: req.body.supervisorUserId || null,
+      })
+    );
 
-    const taskListOps = (plan as any).taskList?.operations || [];
-
-    let functionalLocationId = plan.functionalLocationId;
-    if (!functionalLocationId && plan.equipmentId) {
-      const equipment = await prisma.equipment.findUnique({
-        where: { equipmentId: plan.equipmentId },
-        select: { functionalLocationId: true },
-      });
-      functionalLocationId = equipment?.functionalLocationId || null;
+    if (!outcome.workOrderId) {
+      return res.status(400).json({ error: `Maintenance plan ${plan.planCode} has no usable target` });
     }
-    if (!functionalLocationId) {
-      return res.status(400).json({ error: 'Maintenance plan requires a functional location (set on the plan or its equipment)' });
-    }
 
-    const workOrder = await prisma.$transaction(async (tx) => {
-      const wo = await tx.workOrder.create({
-        data: {
-          woNumber,
-          type: 'PM',
-          priority: 'Medium',
-          status: 'Draft',
-          functionalLocationId,
-          equipmentId: plan.equipmentId,
-          description: plan.description,
-          workCenterId: plan.workCenterId,
-          supervisorUserId: req.body.supervisorUserId || req.user!.userId,
-          breakdownFlag: false,
-          createdBy: req.user!.userId,
-          modifiedBy: req.user!.userId,
-        },
+    // SOW 3.4.3 idempotency: a second press in the same cycle is a no-op, not a
+    // duplicate work order. The route previously created a new work order every
+    // time it was called, because it recorded no plan cycle at all.
+    if (!outcome.created) {
+      const existing = await prisma.workOrder.findUnique({
+        where: { workOrderId: outcome.workOrderId },
       });
-
-      for (const op of taskListOps) {
-        await tx.workOrderOperation.create({
-          data: {
-            workOrderId: wo.workOrderId,
-            sequenceNumber: op.sequenceNumber,
-            description: op.description,
-            craftId: op.craftId,
-            plannedHours: op.plannedHours,
-            numberOfTechnicians: op.numberOfTechnicians,
-            createdBy: req.user!.userId,
-            modifiedBy: req.user!.userId,
-          },
-        });
-      }
-
-      return wo;
-    });
+      return res.status(200).json({ ...existing, alreadyExisted: true, skipReason: outcome.skipReason });
+    }
 
     await prisma.systemAlert.create({
       data: {
         alertType: 'PM_Generation',
         userId: req.user!.userId,
         title: 'PM Work Order Generated',
-        message: `Work order ${workOrder.woNumber} generated from plan ${plan.planCode}`,
-        relatedEntityId: workOrder.workOrderId,
+        message: `Work order ${outcome.woNumber} generated from plan ${plan.planCode}`,
+        relatedEntityId: outcome.workOrderId,
         relatedEntityType: 'WorkOrder',
       },
     });
 
     await logAudit(
-      { tableName: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create' },
+      { tableName: 'WorkOrder', recordId: outcome.workOrderId, action: 'Create' },
       req.user!.userId,
       req.ip
     );
 
-    res.status(201).json(workOrder);
+    const workOrder = await prisma.workOrder.findUnique({
+      where: { workOrderId: outcome.workOrderId },
+    });
+    res.status(201).json({ ...workOrder, notificationId: outcome.notificationId });
   } catch (error) {
+    if (error instanceof PmGenerationError) {
+      const status = error.code === 'PLAN_NOT_FOUND' ? 404 : 400;
+      return res.status(status).json({ error: error.message, code: error.code });
+    }
     logger.error({ err: error }, 'Error generating work order from plan');
     res.status(500).json({ error: 'Internal server error' });
   }

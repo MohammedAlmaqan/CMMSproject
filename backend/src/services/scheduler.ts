@@ -1,8 +1,9 @@
 import cron from 'node-cron';
 import os from 'os';
 import { prisma } from '../utils/prisma.js';
-import { generateWoNumber } from '../utils/sequence.js';
 import { logger } from '../utils/logger.js';
+import { evaluatePlan, type IntervalUnit, type MeterThreshold, type PlanStrategy } from '../utils/pmDueRules.js';
+import { baseCycleKey, generatePmWorkOrder, PmGenerationError } from './pmGeneration.js';
 
 export interface SchedulerRunResult {
   ranAt: string;
@@ -72,22 +73,6 @@ async function completeRunRecord(result: SchedulerRunResult, status: 'success' |
 
 const BATCH_SIZE = 50;
 
-function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function addDaysUtc(base: Date, days: number): Date {
-  const d = new Date(base);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d;
-}
-
-function intervalDays(value: number, unit: string): number {
-  if (unit === 'Weeks') return value * 7;
-  if (unit === 'Months') return value * 30;
-  return value;
-}
-
 export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
   const result: SchedulerRunResult = {
     ranAt: new Date().toISOString(),
@@ -97,24 +82,18 @@ export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
     errors: [],
   };
 
-  const todayIso = isoDay(new Date());
+  const now = new Date();
 
-  const deferred = await prisma.maintenancePlan.count({
-    where: {
-      isDeleted: false,
-      activeFlag: true,
-      strategyType: { in: ['Meter', 'Combined'] },
-    },
-  });
-  if (deferred > 0) {
-    logger.info(`[scheduler] ${deferred} meter-strategy plans deferred (meter strategy not yet implemented)`);
-  }
-
+  // SOW 3.4.1: Time, Meter and Combined are all schedulable. This previously
+  // filtered to Time only and logged the rest as "not yet implemented", so a
+  // meter-driven plan never generated a work order at all.
   const plans = await prisma.maintenancePlan.findMany({
-    where: { isDeleted: false, activeFlag: true, strategyType: 'Time' },
+    where: { isDeleted: false, activeFlag: true, strategyType: { in: ['Time', 'Meter', 'Combined'] } },
     include: {
       equipment: { select: { functionalLocationId: true } },
       taskList: { include: { operations: true } },
+      targets: { include: { equipment: true, functionalLocation: true } },
+      planMeters: true,
     },
   });
 
@@ -130,74 +109,74 @@ export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
     for (const plan of batch) {
     try {
       result.plansEvaluated += 1;
-      const start = new Date(plan.startDate);
-      const startIso = isoDay(start);
-      if (startIso > todayIso) continue;
 
-      const gapDays = enumDaysBetweenUtc(start, new Date());
-      const stepDays = intervalDays(plan.intervalValue, plan.intervalUnit);
-      const n = Math.max(0, Math.floor(gapDays / stepDays));
-      const cycleKey = isoDay(addDaysUtc(start, n * stepDays));
-      if (cycleKey > todayIso) continue;
+      // SOW 3.4.3: the last cycle already generated is the baseline for the next
+      // one. Read across the plan's own work orders rather than trusting a plan
+      // column, so a manually generated cycle also advances the schedule.
+      const lastGenerated = await prisma.workOrder.findFirst({
+        where: { sourcePlanId: plan.planId, isDeleted: false, sourcePlanCycle: { not: null } },
+        orderBy: { createdDate: 'desc' },
+        select: { sourcePlanCycle: true },
+      });
+      const afterCycleKey = baseCycleKey(lastGenerated?.sourcePlanCycle);
 
-      let functionalLocationId = plan.functionalLocationId;
-      if (!functionalLocationId && plan.equipmentId) {
-        functionalLocationId = plan.equipment?.functionalLocationId ?? null;
-      }
-      if (!functionalLocationId) {
-        result.errors.push(`${plan.planCode}: no functional location`);
+      const meters = await loadMeterThresholds(plan);
+
+      const evaluation = evaluatePlan({
+        strategy: plan.strategyType as PlanStrategy,
+        time: {
+          schedule: {
+            startDate: plan.startDate,
+            endDate: plan.endDate,
+            intervalValue: plan.intervalValue,
+            intervalUnit: plan.intervalUnit as IntervalUnit,
+          },
+          // SOW 3.4.2: generation happens inside the plan's call horizon.
+          horizon: { value: plan.callHorizonValue, unit: plan.callHorizonUnit as 'Days' | 'Units' },
+          afterCycleKey,
+        },
+        meters,
+        now,
+      });
+
+      if (!evaluation.due) {
+        logger.info(`[scheduler] ${plan.planCode}: not due (${evaluation.explanation})`);
         continue;
       }
 
-      const woNumber = await generateWoNumber();
-      try {
-        await prisma.$transaction(async (tx) => {
-          const wo = await tx.workOrder.create({
-            data: {
-              woNumber,
-              type: 'PM',
-              priority: 'Medium',
-              status: 'Draft',
-              functionalLocationId,
-              equipmentId: plan.equipmentId,
-              description: plan.description,
-              workCenterId: plan.workCenterId,
-              supervisorUserId: plan.createdBy,
-              sourcePlanId: plan.planId,
-              sourcePlanCycle: cycleKey,
-              breakdownFlag: false,
-              createdBy: 'scheduler',
-              modifiedBy: 'scheduler',
-            },
-          });
-          for (const op of (plan as any).taskList?.operations ?? []) {
-            await tx.workOrderOperation.create({
-              data: {
-                workOrderId: wo.workOrderId,
-                sequenceNumber: op.sequenceNumber,
-                description: op.description,
-                craftId: op.craftId,
-                plannedHours: op.plannedHours,
-                numberOfTechnicians: op.numberOfTechnicians,
-                createdBy: 'scheduler',
-                modifiedBy: 'scheduler',
-              },
-            });
+      for (const cycle of evaluation.cycles) {
+        // D-10: one work order per covered asset. A plan targeting five assets
+        // raises five work orders for the cycle, each separately idempotent.
+        const targetIds = plan.targets.length > 0 ? plan.targets.map((t) => t.planTargetId) : [null];
+        for (const targetId of targetIds) {
+          const outcome = await prisma.$transaction((tx) =>
+            generatePmWorkOrder(tx, {
+              planId: plan.planId,
+              cycleKey: cycle.cycleKey,
+              targetId,
+              basis: cycle.basis,
+              dueDate: cycle.dueDate,
+              actorUserId: 'scheduler',
+            })
+          );
+          if (outcome.created) {
+            result.wosCreated += 1;
+            logger.info(
+              `[scheduler] ${plan.planCode} cycle ${cycle.cycleKey} -> ${outcome.woNumber}${outcome.notificationId ? ' + notification' : ''}`
+            );
+          } else {
+            result.wosSkipped += 1;
+            logger.info(`[scheduler] ${plan.planCode} cycle ${cycle.cycleKey} skipped: ${outcome.skipReason}`);
           }
-        });
-        result.wosCreated += 1;
-      } catch (err: any) {
-        if (err && err.code === 'P2002') {
-          logger.info(`[scheduler] ${plan.planCode} cycle ${cycleKey} skipped (idempotent)`);
-          result.wosSkipped += 1;
-        } else {
-          result.errors.push(`${plan.planCode}: ${err?.message ?? String(err)}`);
-          logger.error({ err }, `[scheduler] plan ${plan.planCode} failed`);
         }
       }
-    } catch (err: any) {
-      result.errors.push(`${plan.planCode}: ${err?.message ?? String(err)}`);
-      logger.error({ err }, `[scheduler] plan ${plan.planCode} threw`);
+    } catch (err: unknown) {
+      if (err instanceof PmGenerationError) {
+        result.errors.push(`${plan.planCode}: ${err.message}`);
+      } else {
+        result.errors.push(`${plan.planCode}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      logger.error({ err }, `[scheduler] plan ${plan.planCode} failed`);
     }
     }
     await new Promise((r) => setImmediate(r));
@@ -213,11 +192,80 @@ export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
   return result;
 }
 
-function enumDaysBetweenUtc(a: Date, b: Date): number {
-  const msPerDay = 86400000;
-  const aMs = Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate());
-  const bMs = Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate());
-  return Math.floor((bMs - aMs) / msPerDay);
+/**
+ * Build the plan's meter thresholds from recorded readings (SOW 3.4.2).
+ *
+ * A plan covers meters on any of its target assets. Each threshold's baseline is
+ * the reading at the last generation for that plan, so a plan tracks its own
+ * progress rather than restarting from the meter's first ever reading.
+ */
+async function loadMeterThresholds(plan: {
+  planId: string;
+  planMeters: { meterId: string; meterInterval: number }[];
+  targets: { equipmentId: string | null }[];
+  equipmentId: string | null;
+}): Promise<MeterThreshold[]> {
+  if (plan.planMeters.length === 0) return [];
+
+  const equipmentIds = [
+    ...new Set(
+      plan.targets.map((t) => t.equipmentId).filter((id): id is string => Boolean(id))
+    ),
+  ];
+  if (plan.equipmentId && !equipmentIds.includes(plan.equipmentId)) equipmentIds.push(plan.equipmentId);
+  if (equipmentIds.length === 0) return [];
+
+  const meters = await prisma.equipmentMeter.findMany({
+    where: { equipmentId: { in: equipmentIds }, isDeleted: false },
+    include: { readings: { orderBy: { readingDate: 'asc' }, take: 1 } },
+  });
+  const meterById = new Map(meters.map((m) => [m.meterId, m]));
+
+  const thresholds: MeterThreshold[] = [];
+  for (const pm of plan.planMeters) {
+    const meter = meterById.get(pm.meterId);
+    if (!meter) continue;
+    const baseline = await lastReadingAtGeneration(plan.planId, meter.meterId, pm.meterId);
+    thresholds.push({
+      meterId: pm.meterId,
+      threshold: pm.meterInterval,
+      lastReading: meter.lastReading,
+      lastReadingDate: meter.lastReadingDate,
+      baselineReading: baseline ?? meter.readings[0]?.readingValue ?? null,
+      firstReading: meter.readings[0]?.readingValue ?? null,
+      firstReadingDate: meter.readings[0]?.readingDate ?? null,
+    });
+  }
+  return thresholds;
+}
+
+/**
+ * The meter reading recorded when this plan last generated against this meter.
+ *
+ * Meter cycles are keyed `M:<meterId>:<readingValue>`, so the work order for the
+ * last cycle names the reading it was raised at. That reading becomes the new
+ * baseline, which is what lets a 500-hour plan stay on a 500-hour cadence
+ * instead of re-triggering on every subsequent reading.
+ */
+async function lastReadingAtGeneration(
+  planId: string,
+  _equipmentId: string,
+  meterId: string
+): Promise<number | null> {
+  const previous = await prisma.workOrder.findFirst({
+    where: {
+      sourcePlanId: planId,
+      isDeleted: false,
+      sourcePlanCycle: { startsWith: `M:${meterId}:` },
+    },
+    orderBy: { createdDate: 'desc' },
+    select: { sourcePlanCycle: true },
+  });
+  const key = previous?.sourcePlanCycle;
+  if (!key) return null;
+  const parts = key.split('#')[0]?.split(':') ?? [];
+  const value = Number(parts[2]);
+  return Number.isFinite(value) ? value : null;
 }
 
 let scheduledTask: ReturnType<typeof cron.schedule> | undefined;
