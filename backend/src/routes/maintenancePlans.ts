@@ -11,6 +11,40 @@ const router = Router();
 
 router.use(authenticate);
 
+/**
+ * D-10 / SOW 3.4.1: reconcile the two ways a target can arrive.
+ *
+ * The target list is the source of truth, but the legacy single `equipmentId` /
+ * `functionalLocationId` columns are still part of the API and are mirrored into
+ * the list so a caller that sets either one still produces a real target. Both
+ * forms are accepted and merged, with duplicates collapsed: naming the same
+ * asset twice would otherwise trip the (planId, equipmentId) unique index and
+ * surface as a 500.
+ */
+function normaliseTargets(
+  targets: Array<{ equipmentId?: string | null; functionalLocationId?: string | null }> | undefined,
+  equipmentId?: string | null,
+  functionalLocationId?: string | null
+): Array<{ equipmentId: string | null; functionalLocationId: string | null }> {
+  const supplied = [
+    ...(targets ?? []),
+    ...(equipmentId ? [{ equipmentId }] : []),
+    ...(functionalLocationId ? [{ functionalLocationId }] : []),
+  ];
+  const seen = new Set<string>();
+  const out: Array<{ equipmentId: string | null; functionalLocationId: string | null }> = [];
+  for (const t of supplied) {
+    const key = t.equipmentId ? `E:${t.equipmentId}` : `L:${t.functionalLocationId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      equipmentId: t.equipmentId ?? null,
+      functionalLocationId: t.equipmentId ? null : (t.functionalLocationId ?? null),
+    });
+  }
+  return out;
+}
+
 
 /**
  * @openapi
@@ -57,7 +91,10 @@ router.use(authenticate);
  *                   startDate: { type: string, format: date-time }
  *                   endDate: { type: string, format: date-time, nullable: true }
  *                   activeFlag: { type: boolean }
- *                   lastGeneratedDate: { type: string, format: date-time, nullable: true }
+ *                   priority: { type: string, enum: [High, Medium, Low], description: "SOW 3.4.1; applied to generated work orders" }
+ *                   generatedWorkOrderStatus: { type: string, enum: [Draft, Planned], description: "SOW 3.4.3" }
+ *                   notificationId: { type: string, nullable: true, description: "SOW 3.4.1/3.4.3; created and linked on generation" }
+ *                   targets: { type: array, description: "D-10; the assets this plan covers" }
  *       '401':
  *         description: Missing or invalid bearer token
  *       '500':
@@ -123,6 +160,15 @@ router.get('/', async (req: Request, res: Response) => {
         equipment: { select: { equipmentId: true, equipmentCode: true, name: true } },
         workCenter: { select: { workCenterId: true, code: true, name: true } },
         taskList: { select: { taskListId: true, code: true, description: true } },
+        // D-10: the target list is what the plan actually covers, so it belongs
+        // in the list response rather than only on the detail route.
+        targets: {
+          include: {
+            equipment: { select: { equipmentId: true, equipmentCode: true, name: true } },
+            functionalLocation: { select: { functionalLocationId: true, locationCode: true, description: true } },
+          },
+        },
+        planMeters: true,
       },
       orderBy: { createdDate: 'desc' },
     });
@@ -249,6 +295,7 @@ router.post('/', authorizeMinRole('Requester'), validate(maintenancePlanCreateSc
       planCode, description, equipmentId, functionalLocationId,
       workCenterId, taskListId, strategyType, intervalValue,
       intervalUnit, callHorizonValue, callHorizonUnit, startDate, endDate,
+      priority, generatedWorkOrderStatus, notificationId, targets, planMeters,
     } = req.body;
 
     const plan = await prisma.maintenancePlan.create({
@@ -266,9 +313,33 @@ router.post('/', authorizeMinRole('Requester'), validate(maintenancePlanCreateSc
         callHorizonUnit: callHorizonUnit || 'Days',
         startDate: new Date(startDate),
         endDate: endDate ? new Date(endDate) : null,
+        priority: priority ?? 'Medium',
+        generatedWorkOrderStatus: generatedWorkOrderStatus ?? 'Draft',
+        notificationId: notificationId || null,
+        // D-10: the target list is the source of truth. The legacy single
+        // columns above stay as a compatibility mirror of the first target, so
+        // existing readers of the plan API keep working unchanged.
+        targets: {
+          create: normaliseTargets(targets, equipmentId, functionalLocationId).map((t) => ({
+            equipmentId: t.equipmentId ?? null,
+            functionalLocationId: t.functionalLocationId ?? null,
+          })),
+        },
+        // SOW 3.4.2: multiple meters per plan, each with its own threshold.
+        ...(planMeters?.length
+          ? {
+              planMeters: {
+                create: planMeters.map((m: { meterId: string; meterInterval: number }) => ({
+                  meterId: m.meterId,
+                  meterInterval: m.meterInterval,
+                })),
+              },
+            }
+          : {}),
         createdBy: req.user!.userId,
         modifiedBy: req.user!.userId,
       },
+      include: { targets: true, planMeters: true },
     });
 
     await logAudit(
@@ -361,6 +432,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdate
       description, equipmentId, functionalLocationId,
       workCenterId, taskListId, strategyType, intervalValue,
       intervalUnit, callHorizonValue, callHorizonUnit, startDate, endDate, activeFlag,
+      priority, generatedWorkOrderStatus, notificationId, targets, planMeters,
     } = req.body;
 
     const plan = await prisma.maintenancePlan.update({
@@ -379,9 +451,40 @@ router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdate
         ...(startDate !== undefined && { startDate: new Date(startDate) }),
         ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
         ...(activeFlag !== undefined && { activeFlag }),
+        ...(priority !== undefined && { priority }),
+        ...(generatedWorkOrderStatus !== undefined && { generatedWorkOrderStatus }),
+        ...(notificationId !== undefined && { notificationId: notificationId || null }),
         modifiedBy: req.user!.userId,
       },
     });
+
+    // Targets and meters are replaced wholesale rather than patched field by
+    // field: the caller is stating the plan's current coverage, and a partial
+    // diff over a set with no natural ordering is where duplicates creep in.
+    if (targets !== undefined) {
+      await prisma.$transaction([
+        prisma.maintenancePlanTarget.deleteMany({ where: { planId: id } }),
+        prisma.maintenancePlanTarget.createMany({
+          data: normaliseTargets(targets, null, null).map((t) => ({
+            planId: id,
+            equipmentId: t.equipmentId,
+            functionalLocationId: t.functionalLocationId,
+          })),
+        }),
+      ]);
+    }
+    if (planMeters !== undefined) {
+      await prisma.$transaction([
+        prisma.maintenancePlanMeter.deleteMany({ where: { planId: id } }),
+        prisma.maintenancePlanMeter.createMany({
+          data: planMeters.map((m: { meterId: string; meterInterval: number }) => ({
+            planId: id,
+            meterId: m.meterId,
+            meterInterval: m.meterInterval,
+          })),
+        }),
+      ]);
+    }
 
     await logAudit(
       { tableName: 'MaintenancePlan', recordId: plan.planId, action: 'Update' },
@@ -470,9 +573,14 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
  *   post:
  *     summary: Generate a work order from a maintenance plan
  *     description: >
- *       Creates a single PM work order from the plan and its task list operations, bumping
- *       lastGeneratedDate. supervisorUserId defaults to the authenticated user; workCenterId
- *       is taken from the plan. Requires the Maintenance Planner role.
+ *       Creates a single PM work order from the plan and its task list operations.
+ *       supervisorUserId defaults to the authenticated user; workCenterId is taken from the
+ *       plan. Requires the Maintenance Planner role.
+ *
+ *       NOTE: this route and the scheduler both delegate to
+ *       services/pmGeneration.ts, so a manually generated work order and a
+ *       scheduled one are built identically. This route generates on demand and
+ *       is therefore not subject to the call horizon; the scheduler is.
  *     tags: [Maintenance Plans]
  *     security:
  *       - bearerAuth: []

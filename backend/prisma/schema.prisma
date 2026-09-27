@@ -68,6 +68,7 @@ model FunctionalLocation {
   equipment    Equipment[]
   notifications Notification[]
   workOrders   WorkOrder[]
+  planTargets  MaintenancePlanTarget[]
 }
 
 model Equipment {
@@ -97,6 +98,7 @@ model Equipment {
   notifications      Notification[]
   workOrders         WorkOrder[]
   maintenancePlans   MaintenancePlan[]
+  planTargets        MaintenancePlanTarget[]
   taskLists          TaskList[]
 }
 
@@ -306,6 +308,7 @@ model Notification {
   equipment          Equipment?         @relation(fields: [equipmentId], references: [equipmentId])
   reportedBy         User               @relation("ReportedBy", fields: [reportedByUserId], references: [userId])
   workOrders         WorkOrderNotifLink[]
+  maintenancePlans   MaintenancePlan[]
 }
 
 model WorkOrder {
@@ -507,6 +510,17 @@ model MaintenancePlan {
   callHorizonUnit     String   @default("Days") // Days, Units
   startDate           DateTime
   endDate             DateTime?
+  // SOW 3.4.1 names Priority as a plan field. The generated work order used to
+  // be hard-coded to 'Medium', so a plan could not express that inspecting a
+  // safety-critical asset outranks routine lubrication.
+  priority            String   @default("Medium") // High, Medium, Low
+  // SOW 3.4.3: the status a generated work order starts in is the planner's
+  // choice. Draft keeps it in the queue for triage; Planned means the plan is
+  // trusted enough to schedule without a second look.
+  generatedWorkOrderStatus String @default("Draft") // Draft, Planned
+  // SOW 3.4.1 and 3.4.3: a plan may carry an associated notification, which is
+  // created and linked to the work order each time the plan generates one.
+  notificationId      String?
   activeFlag          Boolean  @default(true)
   createdBy           String   @default("system")
   createdDate         DateTime @default(now())
@@ -517,7 +531,36 @@ model MaintenancePlan {
   equipment  Equipment?           @relation(fields: [equipmentId], references: [equipmentId])
   workCenter WorkCenter           @relation(fields: [workCenterId], references: [workCenterId])
   taskList   TaskList             @relation(fields: [taskListId], references: [taskListId])
+  notification Notification?      @relation(fields: [notificationId], references: [notificationId])
   planMeters MaintenancePlanMeter[]
+  // D-10 / SOW 3.4.1: a plan targets Equipment or Functional Location "or a
+  // list". This join table is the source of truth for what a plan covers, so
+  // one fleet-wide plan can drive many assets. The single `equipmentId` and
+  // `functionalLocationId` columns above are retained as a compatibility mirror
+  // of the first target and are backfilled from existing plans.
+  targets    MaintenancePlanTarget[]
+}
+
+model MaintenancePlanTarget {
+  planTargetId         String @id @default(uuid())
+  planId               String
+  equipmentId          String?
+  functionalLocationId String?
+
+  // CASCADE: a target row is only meaningful as part of its plan's definition.
+  // Deleting the plan must take its targeting with it, or the rows are orphans
+  // describing assets nobody scheduled.
+  plan               MaintenancePlan     @relation(fields: [planId], references: [planId], onDelete: Cascade)
+  equipment          Equipment?          @relation(fields: [equipmentId], references: [equipmentId])
+  functionalLocation FunctionalLocation? @relation(fields: [functionalLocationId], references: [functionalLocationId])
+
+  // Postgres treats NULLs as distinct in a unique index, so these stop a
+  // repeated non-null target but cannot stop two all-NULL rows. The CHECK
+  // constraint in the migration is what makes "exactly one target" real.
+  @@unique([planId, equipmentId])
+  @@unique([planId, functionalLocationId])
+  @@index([equipmentId])
+  @@index([functionalLocationId])
 }
 
 model MaintenancePlanMeter {

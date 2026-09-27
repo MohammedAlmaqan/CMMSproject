@@ -388,7 +388,27 @@ export const failureCodeCreateSchema = z.object({
 
 export const failureCodeUpdateSchema = failureCodeCreateSchema.partial();
 
-export const maintenancePlanCreateSchema = z.object({
+/**
+ * A plan target names exactly one asset (D-10 / SOW 3.4.1). The database CHECK
+ * constraint enforces this too, but validating it at the boundary means the
+ * caller gets a 400 naming the problem rather than a constraint violation.
+ */
+export const planTargetSchema = z
+  .object({
+    equipmentId: z.string().min(1).nullable().optional(),
+    functionalLocationId: z.string().min(1).nullable().optional(),
+  })
+  .refine((t) => (t.equipmentId ? 1 : 0) + (t.functionalLocationId ? 1 : 0) === 1, {
+    message: 'A plan target must name exactly one of equipmentId or functionalLocationId',
+  });
+
+/** SOW 3.4.2: a meter threshold on a plan, in the meter's own unit of measure. */
+export const planMeterSchema = z.object({
+  meterId: z.string().min(1),
+  meterInterval: z.number().positive(),
+});
+
+const planShape = {
   planCode: z.string().trim().min(1),
   description: z.string().trim().min(1),
   equipmentId: z.string().min(1).nullable().optional(),
@@ -396,16 +416,70 @@ export const maintenancePlanCreateSchema = z.object({
   workCenterId: z.string().min(1),
   taskListId: z.string().min(1),
   strategyType: z.enum(['Time', 'Meter', 'Combined']),
-  intervalValue: z.number().int().nonnegative(),
+  // Positive, not merely non-negative. The scheduler computes cycles as
+  // floor(gapDays / stepDays); a zero interval divided into it yields
+  // Infinity, which silently stopped generating instead of being rejected.
+  intervalValue: z.number().int().positive(),
   intervalUnit: z.enum(['Days', 'Weeks', 'Months']),
   callHorizonValue: z.number().int().nonnegative().optional(),
   callHorizonUnit: z.enum(['Days', 'Units']).optional(),
   startDate: z.string().min(1),
   endDate: z.string().min(1).nullable().optional(),
   activeFlag: z.boolean().optional(),
-});
+  // SOW 3.4.1 and 3.4.3.
+  priority: z.enum(['High', 'Medium', 'Low']).optional(),
+  generatedWorkOrderStatus: z.enum(['Draft', 'Planned']).optional(),
+  notificationId: z.string().min(1).nullable().optional(),
+  // D-10: one plan may cover many assets.
+  targets: z.array(planTargetSchema).optional(),
+  // SOW 3.4.2: multiple meters per plan.
+  planMeters: z.array(planMeterSchema).optional(),
+};
 
-export const maintenancePlanUpdateSchema = maintenancePlanCreateSchema.partial();
+export const maintenancePlanCreateSchema = z
+  .object(planShape)
+  .superRefine((d, ctx) => {
+    // SOW 3.4.1: the plan must say what it covers. Accept either the legacy
+    // single columns or the new target list, but not neither.
+    const legacyTargets = (d.equipmentId ? 1 : 0) + (d.functionalLocationId ? 1 : 0);
+    const listTargets = d.targets?.length ?? 0;
+    if (legacyTargets + listTargets === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['equipmentId'],
+        message: 'A maintenance plan must target at least one equipment or functional location',
+      });
+    }
+    // SOW 3.4.2: a meter strategy with no threshold can never come due, which
+    // looks identical to a plan that simply has not run yet.
+    if (d.strategyType === 'Meter' || d.strategyType === 'Combined') {
+      if (!d.planMeters || d.planMeters.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['planMeters'],
+          message: `strategyType '${d.strategyType}' requires at least one meter threshold`,
+        });
+      }
+    }
+    if (d.endDate) {
+      const start = Date.parse(d.startDate);
+      const end = Date.parse(d.endDate);
+      if (Number.isNaN(start) || Number.isNaN(end)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'startDate and endDate must be parseable dates' });
+      } else if (end < start) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['endDate'],
+          message: 'endDate cannot be before startDate',
+        });
+      }
+    }
+  });
+
+export const maintenancePlanUpdateSchema = z
+  .object(planShape)
+  .partial()
+  .refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required' });
 
 export const userUpdateSchema = z
   .object({
