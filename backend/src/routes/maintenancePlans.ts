@@ -162,8 +162,7 @@ router.get('/', async (req: Request, res: Response) => {
         taskList: { select: { taskListId: true, code: true, description: true } },
         // D-10: the target list is what the plan actually covers, so it belongs
         // in the list response rather than only on the detail route.
-        targets: {
-          include: {
+        targets: {          include: {
             equipment: { select: { equipmentId: true, equipmentCode: true, name: true } },
             functionalLocation: { select: { functionalLocationId: true, locationCode: true, description: true } },
           },
