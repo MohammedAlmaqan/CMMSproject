@@ -78,13 +78,33 @@ EXPECT_DECISIONS = [f"D-{n}" for n in range(2, 18)]
 # derived from the freeze by applying this list. So an unlisted status change is
 # still a FAIL, exactly as before, while a reviewed one is not noise.
 #
-# Empty at the Phase B boundary: Phase B implemented rows 14/15/16/17/22/33 but
-# their runtime behaviour was never exercised against a live database, so the
-# owner directed that the statuses be held rather than promoted. That decision
-# is recorded in CMMS_FINALIZATION_TRACKER.md.
+# Phase B (rows 14/15/16/17/22/33) is deliberately absent: the code landed but
+# its runtime behaviour was never exercised against a live database, so the owner
+# directed that the statuses be held rather than promoted. That decision is
+# recorded in CMMS_FINALIZATION_TRACKER.md.
+#
+# Phase C contributes two entries, both Not Met -> Partial rather than -> Met,
+# because in both cases the *defect* is gone but the row still cannot be called
+# satisfied. expected_counts() applies any from/to pair, not just promotions to
+# Met, so these are modelled by the same mechanism; they are listed separately
+# below only so the distinction is visible to a reader.
+#
+#   reg 9  (§3.1.4) task lists were modellable but had no screen at all, so the
+#           row read Not Met. C.14 built the CRUD surface; it is now Partial.
+#   reg 27 (§3.3.3) a work order could reach a field-work status with zero
+#           operations. C.5 added the guard; it is now Partial.
+#
+# Both are section 3 rows, so both apply to EXPECT_ALL and EXPECT_S3 alike. The
+# register's own Status column is the freeze-time value and is deliberately not
+# compared against the matrix (see B.7); reg row 9 is recorded there as Partial
+# even though the matrix row was Not Met at the freeze, so the `from` below is
+# the *matrix* status, which is what expected_counts() is reconciling against.
 #
 # Format: (register row number, from status, to status, commit)
-APPROVED_PROMOTIONS: list = []
+APPROVED_PROMOTIONS: list = [
+    (9, "Not Met", "Partial", "5f4a7e0"),
+    (27, "Not Met", "Partial", "f2f3bf6"),
+]
 
 
 def expected_counts(baseline, promotions):
