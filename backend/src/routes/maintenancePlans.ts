@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
-import { validate, schedulerRunSchema, maintenancePlanCreateSchema, maintenancePlanUpdateSchema } from '../utils/validation.js';
+import { validate, schedulerRunSchema, maintenancePlanCreateSchema, maintenancePlanUpdateSchema, planPatchIssues } from '../utils/validation.js';
 import { runSchedulerOnce } from '../services/scheduler.js';
 import { generatePmWorkOrder, PmGenerationError } from '../services/pmGeneration.js';
 import { isoDay } from '../utils/pmDueRules.js';
@@ -309,8 +309,11 @@ router.post('/', authorizeMinRole('Requester'), validate(maintenancePlanCreateSc
         strategyType,
         intervalValue,
         intervalUnit,
-        callHorizonValue: callHorizonValue || 7,
-        callHorizonUnit: callHorizonUnit || 'Days',
+        // Nullish, not `||`: zero is a documented legal horizon ("generate on
+        // the due date only") and `||` silently overwrote it with the 7-day
+        // default, so a caller asking for no lead time got a week of it.
+        callHorizonValue: callHorizonValue ?? 7,
+        callHorizonUnit: callHorizonUnit ?? 'Days',
         startDate: new Date(startDate),
         endDate: endDate ? new Date(endDate) : null,
         priority: priority ?? 'Medium',
@@ -434,6 +437,33 @@ router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdate
       intervalUnit, callHorizonValue, callHorizonUnit, startDate, endDate, activeFlag,
       priority, generatedWorkOrderStatus, notificationId, targets, planMeters,
     } = req.body;
+
+    // The create-time cross-field rules cannot see a patch, so the merged
+    // record is checked here before anything is written. Doing it first means a
+    // plan is never left straddling two states - strategy switched to Meter,
+    // thresholds not yet attached.
+    const existingTargets = await prisma.maintenancePlanTarget.findMany({
+      where: { planId: id },
+      select: { equipmentId: true, functionalLocationId: true },
+    });
+    const existingMeterCount = await prisma.maintenancePlanMeter.count({
+      where: { planId: id },
+    });
+    const issues = planPatchIssues(
+      req.body,
+      existing,
+      {
+        targetCount: normaliseTargets(
+          targets !== undefined ? targets : existingTargets,
+          equipmentId !== undefined ? equipmentId : existing.equipmentId,
+          functionalLocationId !== undefined ? functionalLocationId : existing.functionalLocationId
+        ).length,
+        storedMeterCount: existingMeterCount,
+      }
+    );
+    if (issues.length > 0) {
+      return res.status(400).json({ error: issues.join('; ') });
+    }
 
     const plan = await prisma.maintenancePlan.update({
       where: { planId: id },

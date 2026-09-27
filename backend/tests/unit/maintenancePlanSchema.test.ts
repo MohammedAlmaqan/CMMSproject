@@ -3,6 +3,7 @@ import {
   maintenancePlanCreateSchema,
   maintenancePlanUpdateSchema,
   planTargetSchema,
+  planPatchIssues,
 } from '../../src/utils/validation.js';
 
 /**
@@ -200,5 +201,124 @@ describe('maintenancePlanUpdateSchema', () => {
   it('still rejects invalid values on a partial update', () => {
     expect(maintenancePlanUpdateSchema.safeParse({ priority: 'Nope' }).success).toBe(false);
     expect(maintenancePlanUpdateSchema.safeParse({ generatedWorkOrderStatus: 'Completed' }).success).toBe(false);
+  });
+});
+
+/**
+ * The same boundary rules, reached through a patch instead of a whole plan.
+ *
+ * `maintenancePlanUpdateSchema` cannot enforce them: it is `.partial()`, so it
+ * has no way to know what the rest of the plan currently says. `planPatchIssues`
+ * is the other half - it is handed the merged record and decides which rules
+ * the patch has made relevant.
+ */
+describe('planPatchIssues - meter strategy', () => {
+  const existing = { strategyType: 'Time' };
+  const sets = { targetCount: 1, storedMeterCount: 0 };
+
+  it('rejects switching a Time plan to Meter with no threshold attached', () => {
+    const issues = planPatchIssues({ strategyType: 'Meter' }, existing, sets);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatch(/strategyType 'Meter' requires at least one meter threshold/);
+  });
+
+  it('rejects switching to Combined with no threshold attached', () => {
+    expect(planPatchIssues({ strategyType: 'Combined' }, existing, sets)).toHaveLength(1);
+  });
+
+  it('accepts the switch when the patch carries the thresholds', () => {
+    expect(
+      planPatchIssues(
+        { strategyType: 'Meter', planMeters: [{ meterId: 'M-1', meterInterval: 500 }] },
+        existing,
+        sets
+      )
+    ).toEqual([]);
+  });
+
+  it('accepts the switch when the plan already has thresholds stored', () => {
+    expect(
+      planPatchIssues({ strategyType: 'Meter' }, existing, { targetCount: 1, storedMeterCount: 2 })
+    ).toEqual([]);
+  });
+
+  it('rejects clearing the last threshold on a Meter plan', () => {
+    expect(planPatchIssues({ planMeters: [] }, { strategyType: 'Meter' }, sets)).toHaveLength(1);
+  });
+
+  it('leaves a legacy plan alone when the patch touches neither strategy nor meters', () => {
+    // A plan that already violates the rule must still be editable, otherwise a
+    // broken plan could never be deactivated or repaired.
+    const broken = { strategyType: 'Combined' };
+    expect(planPatchIssues({ activeFlag: false }, broken, sets)).toEqual([]);
+    expect(planPatchIssues({ priority: 'Low' }, broken, sets)).toEqual([]);
+  });
+});
+
+describe('planPatchIssues - dates', () => {
+  const existing = { strategyType: 'Time', startDate: '2026-01-01T00:00:00.000Z', endDate: null };
+  const sets = { targetCount: 1, storedMeterCount: 0 };
+
+  it('rejects an endDate earlier than the existing startDate', () => {
+    const issues = planPatchIssues({ endDate: '2025-12-31T00:00:00.000Z' }, existing, sets);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatch(/endDate cannot be before startDate/);
+  });
+
+  it('rejects a startDate moved past the existing endDate', () => {
+    const issues = planPatchIssues({ startDate: '2027-01-01T00:00:00.000Z' }, {
+      ...existing,
+      endDate: '2026-06-01T00:00:00.000Z',
+    }, sets);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatch(/endDate cannot be before startDate/);
+  });
+
+  it('accepts clearing endDate back to open-ended', () => {
+    expect(planPatchIssues({ endDate: null }, existing, sets)).toEqual([]);
+  });
+
+  it('accepts an endDate on or after the startDate', () => {
+    expect(planPatchIssues({ endDate: '2026-01-01T00:00:00.000Z' }, existing, sets)).toEqual([]);
+    expect(planPatchIssues({ endDate: '2026-12-01T00:00:00.000Z' }, existing, sets)).toEqual([]);
+  });
+
+  it('does not re-check dates the patch never mentions', () => {
+    expect(
+      planPatchIssues({ description: 'renamed' }, { ...existing, endDate: '2020-01-01T00:00:00.000Z' }, sets)
+    ).toEqual([]);
+  });
+
+  it('reads a startDate held as a Date, as Prisma returns it', () => {
+    const issues = planPatchIssues(
+      { endDate: '2025-01-01T00:00:00.000Z' },
+      { ...existing, startDate: new Date('2026-01-01T00:00:00.000Z') },
+      sets
+    );
+    expect(issues).toHaveLength(1);
+  });
+});
+
+describe('planPatchIssues - targeting', () => {
+  const existing = { strategyType: 'Time' };
+
+  it('rejects a patch that would leave the plan targeting nothing', () => {
+    const issues = planPatchIssues(
+      { equipmentId: null, functionalLocationId: null, targets: [] },
+      existing,
+      { targetCount: 0, storedMeterCount: 0 }
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatch(/must target at least one/);
+  });
+
+  it('accepts replacing the target list with a non-empty one', () => {
+    expect(
+      planPatchIssues({ targets: [{ equipmentId: 'EQ-9' }] }, existing, { targetCount: 2, storedMeterCount: 0 })
+    ).toEqual([]);
+  });
+
+  it('does not re-check targeting when the patch never mentions an asset', () => {
+    expect(planPatchIssues({ priority: 'High' }, existing, { targetCount: 0, storedMeterCount: 0 })).toEqual([]);
   });
 });

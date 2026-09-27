@@ -481,6 +481,83 @@ export const maintenancePlanUpdateSchema = z
   .partial()
   .refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required' });
 
+/**
+ * The create-time cross-field rules, applied to a partial update.
+ *
+ * `maintenancePlanUpdateSchema` is `.partial()`, so a patch can never satisfy
+ * the rules in `maintenancePlanCreateSchema` on its own: switching a Time plan
+ * to `Meter` without sending thresholds passes every field check and leaves a
+ * plan that can never come due. That failure is invisible from the outside -
+ * the plan is active, the scheduler runs clean, and no work order ever appears.
+ *
+ * Scalar fields are merged from `patch` over `existing` here rather than by the
+ * caller, so the value a rule inspects and the set of fields it fires for can
+ * never come from two different places.
+ *
+ * The caller supplies the two set sizes it alone can know: `targetCount` is the
+ * plan's coverage *after* the patch, which needs the same de-duplicating helper
+ * the write path uses because a patch may name an asset in both the legacy
+ * columns and the target list. `storedMeterCount` is the pre-patch threshold
+ * count, read from the database; the patch's own list overrides it.
+ *
+ * Each rule runs only when the patch touches a field that rule depends on. That
+ * second part matters: plans that predate this phase can already violate a rule,
+ * and re-checking every rule on every edit would make such a plan impossible to
+ * deactivate or correct one field at a time.
+ */
+export function planPatchIssues(
+  patch: Record<string, unknown>,
+  existing: {
+    strategyType?: string | null;
+    startDate?: Date | string | null;
+    endDate?: Date | string | null;
+  },
+  sets: { targetCount: number; storedMeterCount: number }
+): string[] {
+  const issues: string[] = [];
+  const touches = (...keys: string[]) => keys.some((k) => k in patch);
+  const pick = <T>(key: string): T | null =>
+    (key in patch ? (patch[key] as T | null) : (existing[key as keyof typeof existing] as T | null) ?? null);
+  const asMs = (v: Date | string | null): number => {
+    if (v instanceof Date) return v.getTime();
+    if (typeof v === 'string') return Date.parse(v);
+    return Number.NaN;
+  };
+
+  if (touches('strategyType', 'planMeters')) {
+    const strategy = pick<string>('strategyType');
+    const meters = 'planMeters' in patch
+      ? ((patch.planMeters as unknown[] | null | undefined) ?? []).length
+      : sets.storedMeterCount;
+    if ((strategy === 'Meter' || strategy === 'Combined') && meters === 0) {
+      issues.push(
+        `planMeters: strategyType '${strategy}' requires at least one meter threshold`
+      );
+    }
+  }
+
+  // A null endDate clears the rule: an open-ended plan is always legal.
+  if (touches('startDate', 'endDate')) {
+    const start = asMs(pick<Date | string>('startDate'));
+    const end = asMs(pick<Date | string>('endDate'));
+    if (!Number.isNaN(end)) {
+      if (Number.isNaN(start)) {
+        issues.push('endDate: startDate and endDate must be parseable dates');
+      } else if (end < start) {
+        issues.push('endDate: endDate cannot be before startDate');
+      }
+    }
+  }
+
+  if (touches('equipmentId', 'functionalLocationId', 'targets') && sets.targetCount === 0) {
+    issues.push(
+      'equipmentId: A maintenance plan must target at least one equipment or functional location'
+    );
+  }
+
+  return issues;
+}
+
 export const userUpdateSchema = z
   .object({
     fullName: z.string().trim().min(1).optional(),
