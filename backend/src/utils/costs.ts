@@ -1,4 +1,6 @@
 import { prisma } from './prisma.js';
+import { computeWorkOrderCosts, roundMoney } from './costRules.js';
+import type { WorkOrderCostInput } from './costRules.js';
 
 export async function recomputeWorkOrderCosts(workOrderId: string) {
   const [operations, woMaterials, externalServices, laborEntries] = await Promise.all([
@@ -14,35 +16,26 @@ export async function recomputeWorkOrderCosts(workOrderId: string) {
     }),
   ]);
 
-  // Pre-computed only to keep object shape symmetric; actual labor comes from entries
-  const plannedLabor = operations.reduce(
-    (sum, op) => sum + (op.plannedHours || 0) * Math.max(1, op.numberOfTechnicians || 1) * (op.craft.hourlyRate || 0),
-    0
-  );
-  const actualLabor = laborEntries.reduce(
-    (sum, entry) => sum + (entry.hoursWorked || 0) * (entry.operation.craft.hourlyRate || 0),
-    0
-  );
-  const plannedMaterials = woMaterials.reduce(
-    (sum, m) => sum + (m.plannedQuantity || 0) * (m.unitCost || 0),
-    0
-  );
-  const actualMaterials = woMaterials.reduce(
-    (sum, m) => sum + (m.actualQuantity || 0) * (m.unitCost || 0),
-    0
-  );
-  const serviceCost = externalServices.reduce((sum, s) => sum + (s.cost || 0), 0);
+  // The arithmetic is in utils/costRules.ts so it can be tested as arithmetic.
+  // Prisma rows satisfy the input shape structurally: an absent relation or a
+  // null numeric column arrives here as null, which the pure function treats
+  // as zero rather than propagating NaN into a stored cost.
+  const input = {
+    operations,
+    woMaterials,
+    externalServices,
+    laborEntries,
+  } as unknown as WorkOrderCostInput;
 
-  const plannedCost = plannedLabor + plannedMaterials + serviceCost;
-  const actualCost = actualLabor + actualMaterials + serviceCost;
+  const costs = computeWorkOrderCosts(input);
 
   await prisma.workOrder.update({
     where: { workOrderId },
     data: {
-      plannedCost: Math.round(plannedCost * 100) / 100,
-      actualCost: Math.round(actualCost * 100) / 100,
+      plannedCost: roundMoney(costs.plannedCost),
+      actualCost: roundMoney(costs.actualCost),
     },
   });
 
-  return { plannedCost, actualCost };
+  return { plannedCost: costs.plannedCost, actualCost: costs.actualCost };
 }

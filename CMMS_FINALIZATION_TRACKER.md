@@ -536,6 +536,35 @@ https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36326909767
 
 ---
 
+### Phase E - Costs, audit trail, and the data layer
+
+Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3 (the technician multiplier), D-17 (`Float` → `Decimal` for monetary columns), and the 17-model soft-delete sweep. This is the highest-risk phase of Phase 8 — two of the three cross-cutting items change the schema, and the third changes what every read in the system returns.
+
+| # | Task | Status | Acceptance Criteria | Commit |
+|---|---|---|---|---|
+| E.1 | D-3: remove the `numberOfTechnicians` multiplier (row 49) | ✅ | Planned labour is `plannedHours × craft.hourlyRate`. Every planned-cost figure changes **only** by the removed multiplier. | *this commit* |
+
+#### E.1, stated as raw output
+
+The multiplier lived in exactly one place, `backend/src/utils/costs.ts:19`. `recomputeWorkOrderCosts` is the single cost entry point, called from `labor.ts`, `workOrderOperations.ts`, `workOrderMaterials.ts`, `externalServiceCosts.ts` and `workOrders.ts`, so removing it there corrects all five call sites at once. A sweep of `numberOfTechnicians` across `backend/src` confirmed the other eleven references only read or write the field; none of them touch money.
+
+The arithmetic moved to `backend/src/utils/costRules.ts`, free of Prisma, matching the existing `pmDueRules.ts` / `checklistRules.ts` convention, so it can be tested as arithmetic. `costs.ts` now fetches, calls it, and rounds once at the persist boundary via `roundMoney`.
+
+The test the change was judged on is differential, not a golden number. `costRules.test.ts` carries its own reference implementation of the **old** formula and asserts the new one differs in exactly one term:
+
+```
+plannedCost(before) - plannedCost(after)  ===  the labour term alone
+plannedMaterials, actualMaterials, serviceCost, actualLabor, actualCost  ===  unchanged
+```
+
+`tsc -b` exits **0**. The DB-free unit suite is **508 cases across 28 files**. `eslint src tests` reports **42** errors against a gate threshold of 50. `npm run gate` is `PARTIAL` locally because the DB step is skipped without authorisation; the CI run is the claim, not the local one.
+
+**The test was negative-tested, because a test that only ever passes proves nothing.** Restoring the multiplier on a scratch copy of `costRules.ts` and re-running the file gave **5 failed, 6 passed**; restoring the fix gave **11 passed**. The cases detect the defect they were written for.
+
+**One assertion was wrong and was corrected rather than accommodated.** I first asserted `roundMoney(1.005) === 1.01`. It returns `1`: `1.005` is stored as `1.00499999999999989…`, so `× 100` is `100.49999…` and rounds down. That is inherent to `Math.round(v * 100) / 100`, which is what the cost code has always done, so changing it would have silently moved stored figures. The test now asserts the real behaviour and names it as part of the reason D-17 exists.
+
+**Row 49 stays `Partial`, and deliberately so.** The residual that matrix row named — the multiplier — is now closed, but the SOW formula also has a `+ other planned` term with no source in the schema. That term *is* the miscellaneous-cost line, and `ExternalServiceCost` currently has no category discriminator, so travel and permits cannot be told apart from contractor services (row 34, `Not Met`). Row 49 and row 34 are therefore one piece of work, and row 49 closes when row 34 lands. Marking it `Met` here would have been a status that the code does not support.
+
 ### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
 
 Phase D closed the §3.4 Preventive Maintenance subsection and, as a side effect, **broke the deadlock that held 23 Phase B/C rows at `IMPLEMENTED, NOT VERIFIED`**. Those rows were never promoted because `backend/tests/routes/*.test.ts` had never executed against a live PostgreSQL. CI does exactly that — `Apply migrations`, `Seed test data`, `Test` — so from `479a7f7` onward every DB-backed case in this phase has genuinely run. That is the only reason a matrix row is marked `Met` in this phase.
