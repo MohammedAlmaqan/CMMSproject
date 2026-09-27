@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { assertReservable, getMaterialAvailability } from '../services/materialAvailability.js';
 import { validate, woMaterialCreateSchema, woMaterialUpdateSchema } from '../utils/validation.js';
@@ -164,13 +164,9 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
       },
     });
 
-    await recomputeWorkOrderCosts(workOrderId);
+    await recomputeWorkOrderCosts(workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAudit(
-      { tableName: 'WorkOrderMaterial', recordId: material.woMaterialId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrderMaterial', recordId: material.woMaterialId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json({
       ...material,
@@ -287,13 +283,9 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
       },
     });
 
-    await recomputeWorkOrderCosts(existing.workOrderId);
+    await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAudit(
-      { tableName: 'WorkOrderMaterial', recordId: id, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrderMaterial', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({
       ...material,
@@ -362,13 +354,9 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
       where: { woMaterialId: id },
     });
 
-    await recomputeWorkOrderCosts(existing.workOrderId);
+    await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAudit(
-      { tableName: 'WorkOrderMaterial', recordId: id, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrderMaterial', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Work order material deleted successfully' });
   } catch (error) {

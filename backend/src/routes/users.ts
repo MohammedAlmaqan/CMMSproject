@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorize, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction } from '../middleware/audit.js';
 import { userUpdateSchema, validate } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
@@ -257,11 +257,11 @@ router.put('/:id', authorize('Administrator'), validate(userUpdateSchema), async
       },
     });
 
-    await logAudit(
-      { tableName: 'User', recordId: id, action: 'Update', fieldName: 'profile' },
-      req.user!.userId,
-      req.ip
-    );
+    // A profile edit touches several columns at once. Recording one label with
+    // no values behind it used to look like a field diff in the trail without
+    // being one, so it is filed as an action. Per-field diffs for profile edits
+    // are the open part of row 38.
+    await logAuditAction({ table: 'User', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json(user);
   } catch (error) {
@@ -367,11 +367,10 @@ router.put('/:id/password', async (req: Request, res: Response) => {
       },
     });
 
-    await logAudit(
-      { tableName: 'User', recordId: id, action: 'Update', fieldName: 'password' },
-      req.user!.userId,
-      req.ip
-    );
+    // Deliberately action-only. A password change must never put the old or new
+    // secret in an audit row; the fact that it happened, by whom and from where,
+    // is the whole of what an auditor is entitled to here.
+    await logAuditAction({ table: 'User', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Password updated successfully' });
   } catch (error) {

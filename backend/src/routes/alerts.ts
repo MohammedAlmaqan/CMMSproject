@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction } from '../middleware/audit.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -174,11 +174,10 @@ router.put('/read-all', authorizeMinRole('Requester'), async (req: Request, res:
       data: { isRead: true },
     });
 
-    await logAudit(
-      { tableName: 'SystemAlert', recordId: req.user!.userId, action: 'Update', fieldName: 'read-all' },
-      req.user!.userId,
-      req.ip
-    );
+    // Action-only, no field: "every alert marked read" is an event, not a
+    // change to one column. The old `fieldName: 'read-all'` was a label with
+    // no values behind it, which reads as a diff in the trail without being one.
+    await logAuditAction({ table: 'SystemAlert', recordId: req.user!.userId, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'All alerts marked as read' });
   } catch (error) {
@@ -202,11 +201,7 @@ router.put('/:id/read', authorizeMinRole('Requester'), async (req: Request, res:
       data: { isRead: true },
     });
 
-    await logAudit(
-      { tableName: 'SystemAlert', recordId: id, action: 'Update', fieldName: 'read' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'SystemAlert', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json(alert);
   } catch (error) {

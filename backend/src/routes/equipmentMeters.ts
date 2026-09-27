@@ -1,8 +1,9 @@
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, equipmentMeterCreateSchema, equipmentMeterUpdateSchema, meterReadingCreateSchema } from '../utils/validation.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -370,11 +371,7 @@ router.post('/', authorizeMinRole('Technician'), validate(equipmentMeterCreateSc
       },
     });
 
-    await logAudit(
-      { tableName: 'EquipmentMeter', recordId: meter.meterId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'EquipmentMeter', recordId: meter.meterId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(meter);
   } catch (error: any) {
@@ -409,11 +406,18 @@ router.put('/:id', authorizeMinRole('Technician'), validate(equipmentMeterUpdate
       },
     });
 
-    await logAudit(
-      { tableName: 'EquipmentMeter', recordId: existing.meterId, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    // Field diffs rather than one generic "Update" row: the trail should
+    // say which column moved and from what to what. A PUT that changes
+    // nothing records nothing, which is the honest outcome.
+    await logFieldChanges({
+      table: 'EquipmentMeter',
+      recordId: existing.meterId,
+      before: existing,
+      after: meter,
+      fields: AUDITED_FIELDS.EquipmentMeter,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(meter);
   } catch (error: any) {
@@ -456,11 +460,7 @@ router.post('/:id/readings', authorizeMinRole('Technician'), validate(meterReadi
       },
     });
 
-    await logAudit(
-      { tableName: 'MeterReading', recordId: reading.readingId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'MeterReading', recordId: reading.readingId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(reading);
   } catch (error) {
@@ -486,11 +486,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       },
     });
 
-    await logAudit(
-      { tableName: 'EquipmentMeter', recordId: existing.meterId, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'EquipmentMeter', recordId: existing.meterId, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Meter deleted successfully' });
   } catch (error) {

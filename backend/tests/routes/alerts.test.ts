@@ -35,14 +35,18 @@ describe('alerts routes', () => {
   });
 
   it('marks all alerts read and writes an audit row', async () => {
+    // Matched on table, record and action only. "Mark every alert read" is a
+    // bulk event, not a change to one column, so the row carries no fieldName:
+    // a field name with no old and new value behind it reads as a diff in the
+    // trail without being one.
     const before = await prisma.auditLogEntry.count({
-      where: { tableName: 'SystemAlert', recordId: ctx.operatorId, action: 'Update', fieldName: 'read-all' },
+      where: { tableName: 'SystemAlert', recordId: ctx.operatorId, action: 'Update', fieldName: null },
     });
     const res = await api().put('/api/alerts/read-all').set(authHeaders(ctx.operatorToken));
     expect(res.status).toBe(200);
     expect(
       await prisma.auditLogEntry.count({
-        where: { tableName: 'SystemAlert', recordId: ctx.operatorId, action: 'Update', fieldName: 'read-all' },
+        where: { tableName: 'SystemAlert', recordId: ctx.operatorId, action: 'Update', fieldName: null },
       })
     ).toBe(before + 1);
   });

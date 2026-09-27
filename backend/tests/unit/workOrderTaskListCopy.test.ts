@@ -78,8 +78,9 @@ describe('copying a task list onto a work order', () => {
 
   it('recomputes planned cost when operations were copied', () => {
     // Planned cost derives from the operations, so without this the new work
-    // order reports zero until something else touches it.
-    expect(workOrderRoute).toMatch(/if \(templateOperations\.length > 0\) \{\s*\n\s*\/\/[\s\S]*?await recomputeWorkOrderCosts\(workOrder\.workOrderId\);/);
+    // order reports zero until something else touches it. The recompute names
+    // who asked for it, so a cost change can never land with nobody attached.
+    expect(workOrderRoute).toMatch(/if \(templateOperations\.length > 0\) \{\s*\n\s*\/\/[\s\S]*?await recomputeWorkOrderCosts\(workOrder\.workOrderId, \{ userId: req\.user!\.userId, ipAddress: req\.ip \}\);/);
   });
 
   it('allocates the work order number before opening the transaction', () => {

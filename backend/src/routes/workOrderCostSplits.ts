@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction } from '../middleware/audit.js';
 import { validate, costSplitReplaceSchema } from '../utils/validation.js';
 import { checkAllocation, describeProblem, allocate } from '../utils/costSplits.js';
 import { logger } from '../utils/logger.js';
@@ -186,11 +186,7 @@ router.put('/', authorizeMinRole('Maintenance Planner'), validate(costSplitRepla
       return created;
     });
 
-    await logAudit(
-      { tableName: 'CostSplit', recordId: workOrderId, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'CostSplit', recordId: workOrderId, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({
       workOrderId,
@@ -256,11 +252,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     await prisma.costSplit.delete({ where: { splitId } });
 
-    await logAudit(
-      { tableName: 'CostSplit', recordId: splitId, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'CostSplit', recordId: splitId, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Cost split deleted successfully' });
   } catch (error) {

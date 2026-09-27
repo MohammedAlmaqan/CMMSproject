@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditFieldChange } from '../middleware/audit.js';
 import { validate, systemConfigUpdateSchema } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
@@ -146,18 +146,17 @@ router.put('/', authorizeMinRole('Administrator'), validate(systemConfigUpdateSc
       create: { key, value },
     });
 
-    await logAudit(
-      {
-        tableName: 'SystemConfig',
+    await logAuditFieldChange({
+
+        table: 'SystemConfig',
         recordId: key,
         action: 'Update',
-        fieldName: key,
+        field: key,
         oldValue: previous?.value ?? setting.fallback,
         newValue: value,
-      },
-      req.user!.userId,
-      req.ip
-    );
+        userId: req.user!.userId,
+        ipAddress: req.ip,
+      });
 
     res.json({ key: saved.key, value: saved.value });
   } catch (error) {

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction } from '../middleware/audit.js';
 import { logger } from '../utils/logger.js';
 import {
   validate,
@@ -141,11 +141,7 @@ router.post('/templates', authorizeMinRole('Maintenance Planner'), validate(chec
       include: { items: { orderBy: { sequenceNumber: 'asc' } } },
     });
 
-    await logAudit(
-      { tableName: 'SafetyChecklistTemplate', recordId: template.checklistTemplateId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'SafetyChecklistTemplate', recordId: template.checklistTemplateId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(template);
   } catch (error) {
@@ -293,11 +289,7 @@ router.post('/work-order/:woId/attach', authorizeMinRole('Technician'), validate
       },
     });
 
-    await logAudit(
-      { tableName: 'WorkOrderChecklist', recordId: checklist.woChecklistId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrderChecklist', recordId: checklist.woChecklistId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(checklist);
   } catch (error) {
@@ -385,11 +377,7 @@ router.put('/work-order-checklist/:id', authorizeMinRole('Technician'), validate
       },
     });
 
-    await logAudit(
-      { tableName: 'WorkOrderChecklist', recordId: id, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrderChecklist', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json(checklist);
   } catch (error) {
@@ -487,19 +475,11 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
           where: { woChecklistId: item.woChecklistId },
           data: { status: 'In Progress' },
         });
-        await logAudit(
-          { tableName: 'WorkOrderChecklist', recordId: item.woChecklistId, action: 'Update' },
-          req.user!.userId,
-          req.ip
-        );
+        await logAuditAction({ table: 'WorkOrderChecklist', recordId: item.woChecklistId, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
       }
     }
 
-    await logAudit(
-      { tableName: 'WorkOrderChecklistItem', recordId: id, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrderChecklistItem', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json(item);
   } catch (error) {
@@ -565,11 +545,7 @@ router.delete('/work-order-checklist/:id', authorizeMinRole('Technician'), async
       where: { woChecklistId: id },
     });
 
-    await logAudit(
-      { tableName: 'WorkOrderChecklist', recordId: id, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrderChecklist', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Work order checklist deleted successfully' });
   } catch (error) {

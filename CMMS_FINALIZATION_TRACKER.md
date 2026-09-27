@@ -3,8 +3,8 @@
 **Project:** CommandPulse CMMS
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
-**Critical path:** Phase 2 (E2E integration) -> Phase 3.1 (PM scheduler) -> Phase 5 (backend route tests) -> Phase 6 (hardening)
-**Status:** Phase 0 - Complete | Phase 1 (1.0–1.10) - Complete | Phase 2 - In Progress (Milestone A: WO domain E2E - complete; Milestone B Group 1: WO sub-domain CRUD + costs + board - complete; Group 2: Notifications complete; **Group 3: Asset Master complete; Group 4a: Preventive Maintenance frontend + API complete (F1/F2 recorded); Group 4b: PM scheduler complete (3.1a–3.1g ✅); Group 5: Dashboard + Reports complete (2.4/2.5/2.6 ✅); **Group 6a: mockData deletion + fallback removal complete (2.3 ✅, trust property); Group 6b: sidebar + Swagger + refresh decision complete (2.7/2.11/2.12 ✅); Group 7 dropped — Administration remaining needs folded into Phase 4/G8 | **Phase 4 - DB & Build Hygiene: complete (4.1–4.5 ✅)**; **Phase 3 - Missing SOW Features: complete (3.1–3.7 ✅, incl. 3.3 CSV, 3.5 WCAG, 3.5a 404)**; **Phase 5 - Testing: complete (5.1–5.4 ✅ — all 11 verify scripts green; see Phase 5 rows + commit log)**)
+**Critical path:** Phase 8 - Production Readiness. Sections A through E; E is the last, and D-17 (`Float` -> `Decimal`) is its final item.
+**Status:** Phases 0-7 complete. **Phase 8 - Production Readiness: A complete (gate passed) | B code complete | C code complete | D complete and verified | E in progress, through E.10.** Matrix: **81 of 214 clauses `Met`**, 65 Partial, 35 Not Met. The audit workstream is done and Phase E stops here for review; what remains is rows 55/56, the 16-model soft-delete sweep, then D-17. **A row is verified at the SHA where its test was green** — a commit cannot contain its own hash, so the evidence cell cites the tested SHA and that run's CI ID rather than the tip.
 
 ## Status Legend
 
@@ -538,7 +538,9 @@ https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36326909767
 
 ### Phase E - Costs, audit trail, and the data layer
 
-Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3 (the technician multiplier), D-17 (`Float` → `Decimal` for monetary columns), and the 17-model soft-delete sweep. This is the highest-risk phase of Phase 8 — two of the three cross-cutting items change the schema, and the third changes what every read in the system returns.
+Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3 (the technician multiplier), D-17 (`Float` → `Decimal` for monetary columns), and the 16-model soft-delete sweep. This is the highest-risk phase of Phase 8 — two of the three cross-cutting items change the schema, and the third changes what every read in the system returns.
+
+Rows 19, 26, 31, 32, 34, 38, 49 and 57 are done, along with D-3. What remains is **rows 55 and 56, the 16-model soft-delete sweep, then D-17 last** — in that order, and Phase E stops at each boundary for review.
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
@@ -551,6 +553,31 @@ Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3
 | E.7 | Stop the row-31 reservation tests mutating the shared work order (row 32 wording, D-16) | ✅ | The release test cancelled a work order the rest of the file depends on; it now owns its own. Row 32 closed on D-16, with no code change. | `98c356e` |
 | E.8 | Stop PM generation writing `'scheduler'` into a user foreign key | ✅ | Every scheduled work order generation was failing on `WorkOrder_reportedByUserId_fkey`. Found by reproducing CI locally, not by guessing. | `96988dd` |
 | E.9 | One-shot DB-backed diagnostic: re-test every row held on "never run against a live database" | ✅ | All 20 held rows examined clause by clause against the real suite. One promoted on genuine coverage; 19 re-stated as the specific untested clause. | *this commit* |
+| E.10 | Audit workstream: enforce field diffs and actor metadata in the type system (rows 38, 57) | ✅ | Measured before touching anything: **10 of 84** real route call sites carried both old and new values (the earlier "86" was a raw grep that counted the definition and the import). The row-57 premise turned out to be wrong — all **323/323** audit rows already in the database carried an IP address — so the real gap was field diffs and write-site coverage, not missing IPs. Both matrix rows restated from the measurement. `logAudit` no longer exists: `logAuditFieldChange` requires field, old and new; `logAuditAction` cannot accept value fields at all; both require user and IP. 84 call sites across 22 route files migrated. Turning enforcement on immediately surfaced **six** call sites that passed a `fieldName` with no values behind it, which the trail had been presenting as diffs. Master-data edits on nine registries and work-order cost recomputes now record per-column old/new via a shared differ. | *this commit* |
+
+**E.10 decisions worth recording**
+
+- **Why `userId`/`ipAddress` are required object properties rather than positional arguments.** They were positional, optional and nullable, which is three independent ways for a call site to drop them without noticing, and the nullable column accepted the result. As required properties they cannot be omitted, so SOW 3.6's "including IP address and user" is enforced by the compiler rather than by whoever remembers. The alternative considered was capturing `req.ip` in middleware, but the 84 call sites span bulk and transaction-scoped writes that never pass through the response hook, so it would have left the same sites unaudited.
+- **`ipAddress` is required but nullable.** Express types `req.ip` as `string | undefined`, so requiring a `string` would have forced a fabricated value at 84 sites. Required forces the call site to decide; nullable keeps the record honest when the socket is genuinely gone.
+- **A no-op edit records nothing.** Master-data updates emit one row per column that actually moved rather than a generic "Update" row, so a `PUT` that changes nothing leaves no trail entry. That is the honest outcome, but it is a deliberate change from the previous always-one-row behaviour, and the two tests that asserted on the old fake `fieldName` labels were rewritten rather than the labels restored.
+- **Four label-without-diff sites were demoted to actions, not given invented values.** `alerts` read-all and read, `users` profile and password. A password change must never carry the old or new secret, so that one is permanently action-only; a per-field diff for profile edits remains open work under row 38.
+- **`auth.ts` deliberately bypasses the helpers.** It writes audit rows through its own transaction client so an audit failure aborts the login, which is the opposite of the helpers' swallow-and-log policy and is right for authentication. The cost is that those rows sit outside the type enforcement, so their values are spelled out by hand: the `lastLogin` row gained an explicit `oldValue: null`, and the `LoginFailure` row keeps its `fieldName` because the account-lockout counter queries on it. Giving failure events a discriminator column is the clean fix and needs a migration; open against 3.5.1.
+- **Auditable columns are declared once.** `backend/src/middleware/auditFields.ts` lists the business columns per registry, checked against the generated Prisma model types so a typo is a compile error rather than a field that silently never matches. System columns are excluded on purpose: they change on nearly every write and would bury the edits that matter.
+- **The first draft of that registry was wrong.** The column names were written from memory and 9 of the 10 models listed fields that do not exist, which would have made the differ match nothing and silently audit nothing at all. It was rewritten from `schema.prisma` and given the compile-time check that would have caught it in the first place.
+- **A verified fix was briefly lost and caught by re-running the validator.** Reverting the first, broken codemod with `git checkout -- backend/src/routes/` also reverted the duplicate `'400'` response key already fixed and verified in `functionalLocations.ts`, because the fix was uncommitted and lived in the same file. Nothing else was lost — the only other pending change was in the tracker. It was re-applied and re-verified at 111 blocks and 0 strict-YAML failures. The reason it is in this commit rather than the earlier one is that the earlier commit was already pushed, and amending or force-pushing it to fold in an unrelated fix would be worse than carrying the fix forward with its own verification. Worth remembering: a bulk `git checkout` on a directory discards every uncommitted change in it, not just the one being undone.
+
+**E.10 verification**
+
+| Gate | Result |
+|---|---|
+| `tsc -b` (backend) | exit 0 |
+| `eslint src/` | 42 errors, identical set to the `HEAD` baseline — **no new violations** (gate: no new vs baseline) |
+| Unit suite (no DB) | **524 cases across 29 files**, all passing (512 before; 12 new for the differ) |
+| Full DB-backed suite on `cmms_gate` | **733 tests across 54 files**, all passing (721 before; 12 new) |
+| `@openapi` strict YAML | **111 blocks, 0 failures** |
+| Database inspection | 0 action rows leaking field values; 0 rows missing `userId` or `ipAddress`; cost and master-data diffs present with both old and new |
+
+The 12 new cases cover the differ's decision logic, and were checked by mutation rather than trusted: making it skip any field that exists fails 5 of them, and removing the stable JSON key ordering fails 1. The silent no-op — a registry that matches nothing and audits nothing while looking correct — is the failure mode this code is most able to produce, so it is the one the tests were written against.
 
 #### E.1, stated as raw output
 

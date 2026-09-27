@@ -1,8 +1,24 @@
 import { prisma } from './prisma.js';
 import { computeWorkOrderCosts, roundMoney } from './costRules.js';
 import type { WorkOrderCostInput } from './costRules.js';
+import { logAuditFieldChange } from '../middleware/audit.js';
 
-export async function recomputeWorkOrderCosts(workOrderId: string) {
+/** Who caused a recompute. Required, so a cost change can never land in the
+ *  database without someone attached to it. */
+export interface CostActor {
+  userId: string;
+  ipAddress: string | undefined;
+}
+
+export async function recomputeWorkOrderCosts(workOrderId: string, actor: CostActor) {
+  // Read the stored figures first: a recompute that lands on the same numbers
+  // is not a change, and writing an audit row for it would pad the trail with
+  // events an auditor has to read past to find the real ones.
+  const prior = await prisma.workOrder.findUnique({
+    where: { workOrderId },
+    select: { plannedCost: true, actualCost: true },
+  });
+
   const [operations, woMaterials, externalServices, laborEntries] = await Promise.all([
     prisma.workOrderOperation.findMany({
       where: { workOrderId },
@@ -29,13 +45,41 @@ export async function recomputeWorkOrderCosts(workOrderId: string) {
 
   const costs = computeWorkOrderCosts(input);
 
+  const plannedCost = roundMoney(costs.plannedCost);
+  const actualCost = roundMoney(costs.actualCost);
+
   await prisma.workOrder.update({
     where: { workOrderId },
-    data: {
-      plannedCost: roundMoney(costs.plannedCost),
-      actualCost: roundMoney(costs.actualCost),
-    },
+    data: { plannedCost, actualCost },
   });
+
+  // One row per figure that actually moved, naming the field so the trail
+  // says which number changed rather than only that "costs" changed.
+  // String() keeps this correct if D-17 later moves the columns to Decimal.
+  if (prior && prior.plannedCost !== plannedCost) {
+    await logAuditFieldChange({
+      table: 'WorkOrder',
+      recordId: workOrderId,
+      action: 'Update',
+      field: 'plannedCost',
+      oldValue: String(prior.plannedCost),
+      newValue: String(plannedCost),
+      userId: actor.userId,
+      ipAddress: actor.ipAddress,
+    });
+  }
+  if (prior && prior.actualCost !== actualCost) {
+    await logAuditFieldChange({
+      table: 'WorkOrder',
+      recordId: workOrderId,
+      action: 'Update',
+      field: 'actualCost',
+      oldValue: String(prior.actualCost),
+      newValue: String(actualCost),
+      userId: actor.userId,
+      ipAddress: actor.ipAddress,
+    });
+  }
 
   return { plannedCost: costs.plannedCost, actualCost: costs.actualCost };
 }

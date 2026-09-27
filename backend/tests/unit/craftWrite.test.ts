@@ -111,14 +111,16 @@ describe('craft write path, SOW 3.1.3', () => {
   });
 
   it('audits each of the three writes, and leaves the read unaudited', () => {
-    const create = craftsRoute.match(/tableName: 'Craft', recordId: craft\.craftId, action: 'Create'/g) ?? [];
-    const update = craftsRoute.match(/tableName: 'Craft', recordId: craftId, action: 'Update'/g) ?? [];
-    const remove = craftsRoute.match(/tableName: 'Craft', recordId: craftId, action: 'Delete'/g) ?? [];
+    const create = craftsRoute.match(/table: 'Craft', recordId: craft\.craftId, action: 'Create'/g) ?? [];
+    // The update path is a field diff, so it names the table and the record but
+    // carries no action: logFieldChanges is only ever an update.
+    const update = craftsRoute.match(/logFieldChanges\(\{\s*\n\s*table: 'Craft',\s*\n\s*recordId: craftId,/g) ?? [];
+    const remove = craftsRoute.match(/table: 'Craft', recordId: craftId, action: 'Delete'/g) ?? [];
     expect(create).toHaveLength(1);
     expect(update).toHaveLength(1);
     expect(remove).toHaveLength(1);
     // Three writes, three audit entries: a silent unaudited mutation is the
     // failure this guards, so the count is pinned exactly rather than loosely.
-    expect((craftsRoute.match(/tableName: 'Craft'/g) ?? [])).toHaveLength(3);
+    expect((craftsRoute.match(/table: 'Craft'/g) ?? [])).toHaveLength(3);
   });
 });

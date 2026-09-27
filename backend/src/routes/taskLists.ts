@@ -1,7 +1,8 @@
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { taskListCreateSchema, taskListUpdateSchema, validate } from '../utils/validation.js';
 import { isPrismaError, prismaErrorTarget } from '../utils/prismaErrors.js';
 import { logger } from '../utils/logger.js';
@@ -287,11 +288,7 @@ router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), 
       },
     });
 
-    await logAudit(
-      { tableName: 'TaskList', recordId: taskList.taskListId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'TaskList', recordId: taskList.taskListId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(taskList);
   } catch (error) {
@@ -387,10 +384,11 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
 
     const { code, description, equipmentClass: ec, equipmentId: ei, workCenterId, operations } = req.body;
 
-    // The result is deliberately not bound: when `operations` is supplied the
-    // rows are replaced in the transaction below, so the value this returns is
-    // already stale. The response is built from the re-read further down.
-    await prisma.taskList.update({
+    // Bound for the audit diff below. The value is stale with respect to
+    // `operations`, which get replaced in the transaction further down and are
+    // read again for the response, but TaskList's audited columns are all
+    // scalars, and those are exactly what this call returns.
+    const updatedForAudit = await prisma.taskList.update({
       where: { taskListId: String(req.params.id) },
       data: {
         ...(code !== undefined && { code }),
@@ -483,11 +481,18 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
       },
     });
 
-    await logAudit(
-      { tableName: 'TaskList', recordId: String(req.params.id), action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    // Field diffs rather than one generic "Update" row: the trail should
+    // say which column moved and from what to what. A PUT that changes
+    // nothing records nothing, which is the honest outcome.
+    await logFieldChanges({
+      table: 'TaskList',
+      recordId: String(req.params.id),
+      before: existing,
+      after: updatedForAudit,
+      fields: AUDITED_FIELDS.TaskList,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(updated);
   } catch (error) {
@@ -585,11 +590,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       });
     });
 
-    await logAudit(
-      { tableName: 'TaskList', recordId: String(req.params.id), action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'TaskList', recordId: String(req.params.id), action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Task list deleted successfully' });
   } catch (error) {

@@ -153,12 +153,24 @@ router.post('/login', async (req: Request, res: Response) => {
             lockedUntil: null,
           },
         });
+        // Written through the transaction client rather than the logAudit
+        // helpers, deliberately: here an audit failure must abort the login,
+        // because the alternative is a session that exists with no record of how
+        // it started. The helpers swallow their errors, which is the right
+        // default elsewhere but wrong for authentication. The cost of bypassing
+        // them is that this row is not covered by the typed field-change
+        // enforcement, so the values are spelled out here instead.
         await tx.auditLogEntry.create({
           data: {
             tableName: 'User',
             recordId: currentUser.userId,
             action: 'Update',
             fieldName: 'lastLogin',
+            // The previous value is genuinely unknown to this transaction: it
+            // read the user row for locking, not for the old timestamp. null
+            // says "no prior value recorded" rather than leaving the field
+            // absent, so the row is a complete diff rather than a half of one.
+            oldValue: null,
             newValue: loginTime.toISOString(),
             userId: currentUser.userId,
             ipAddress: req.ip,
@@ -200,6 +212,13 @@ router.post('/login', async (req: Request, res: Response) => {
           lockedUntil: shouldLock ? new Date(now.getTime() + ACCOUNT_LOCK_MS) : null,
         },
       });
+      // `fieldName` here is a discriminator, not a diff: the failed-login
+      // counter below queries on it to count attempts inside the window, so it
+      // cannot be dropped or the account lockout stops working. That leaves a
+      // Run row carrying a fieldName with no old or new value, which is the one
+      // remaining shape the typed field-change API does not allow. Giving
+      // failure events their own discriminator column is the clean fix and needs
+      // a migration; recorded as an open item against SOW 3.5.1.
       await tx.auditLogEntry.create({
         data: {
           tableName: 'User',

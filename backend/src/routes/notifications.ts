@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditFieldChange, logAuditAction } from '../middleware/audit.js';
 import { generateNotifNumber, generateWoNumber } from '../utils/sequence.js';
 import {
   canTransition,
@@ -282,11 +282,7 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
       },
     });
 
-    await logAudit(
-      { tableName: 'Notification', recordId: notification.notificationId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Notification', recordId: notification.notificationId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(notification);
   } catch (error: any) {
@@ -376,18 +372,17 @@ router.put('/:id', authorizeMinRole('Requester'), validate(notificationUpdateSch
     // so any status could be reached from any other.
     if (status !== undefined && status !== existing.status) {
       if (!canTransition(existing.status, status)) {
-        await logAudit(
-          {
-            tableName: 'Notification',
+        await logAuditFieldChange({
+
+            table: 'Notification',
             recordId: id,
             action: 'Blocked',
-            fieldName: 'status',
+            field: 'status',
             oldValue: existing.status,
             newValue: status,
-          },
-          req.user!.userId,
-          req.ip
-        );
+            userId: req.user!.userId,
+            ipAddress: req.ip,
+          });
         return res.status(400).json({
           error: invalidTransitionMessage(existing.status, status),
           currentStatus: existing.status,
@@ -435,11 +430,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(notificationUpdateSch
       },
     });
 
-    await logAudit(
-      { tableName: 'Notification', recordId: notification.notificationId, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Notification', recordId: notification.notificationId, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json(notification);
   } catch (error) {
@@ -500,11 +491,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
-    await logAudit(
-      { tableName: 'Notification', recordId: id, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Notification', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Notification deleted successfully' });
   } catch (error) {
@@ -639,16 +626,8 @@ router.post('/:id/convert-to-wo', authorizeMinRole('Maintenance Planner'), valid
       return wo;
     });
 
-    await logAudit(
-      { tableName: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
-    await logAudit(
-      { tableName: 'Notification', recordId: notification.notificationId, action: 'Update', fieldName: 'status', oldValue: notification.status, newValue: 'Converted' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
+    await logAuditFieldChange({ table: 'Notification', recordId: notification.notificationId, action: 'Update', field: 'status', oldValue: notification.status, newValue: 'Converted', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(workOrder);
   } catch (error) {

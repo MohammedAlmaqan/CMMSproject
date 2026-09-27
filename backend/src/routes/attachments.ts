@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction } from '../middleware/audit.js';
 import { validate, attachmentCreateSchema } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
@@ -301,11 +301,7 @@ router.post('/', authorizeMinRole('Requester'), uploadFile, validate(attachmentC
       },
     });
 
-    await logAudit(
-      { tableName: 'Attachment', recordId: attachment.attachmentId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Attachment', recordId: attachment.attachmentId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(attachment);
   } catch (error) {
@@ -351,11 +347,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       data: { isDeleted: true, modifiedBy: req.user!.username },
     });
 
-    await logAudit(
-      { tableName: 'Attachment', recordId: id, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Attachment', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Attachment deleted successfully' });
   } catch (error) {

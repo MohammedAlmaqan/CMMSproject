@@ -1,8 +1,9 @@
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { materialImportRowSchema, materialCreateSchema, materialUpdateSchema, validate } from '../utils/validation.js';
 import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
 import { getMaterialAvailability } from '../services/materialAvailability.js';
@@ -190,12 +191,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
               modifiedBy: req.user!.userId,
             },
           });
-          await logAudit(
-            { tableName: 'Material', recordId: existing.materialId, action: 'Update' },
-            req.user!.userId,
-            req.ip,
-            tx
-          );
+          await logAuditAction({ table: 'Material', recordId: existing.materialId, action: 'Update', userId: req.user!.userId, ipAddress: req.ip, db: tx });
           updated++;
         } else {
           const createdRow = await tx.material.create({
@@ -209,12 +205,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
               modifiedBy: req.user!.userId,
             },
           });
-          await logAudit(
-            { tableName: 'Material', recordId: createdRow.materialId, action: 'Create' },
-            req.user!.userId,
-            req.ip,
-            tx
-          );
+          await logAuditAction({ table: 'Material', recordId: createdRow.materialId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip, db: tx });
           created++;
         }
       }
@@ -410,11 +401,7 @@ router.post('/', authorizeMinRole('Requester'), validate(materialCreateSchema), 
       },
     });
 
-    await logAudit(
-      { tableName: 'Material', recordId: material.materialId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Material', recordId: material.materialId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(material);
   } catch (error: any) {
@@ -498,11 +485,18 @@ router.put('/:id', authorizeMinRole('Requester'), validate(materialUpdateSchema)
       },
     });
 
-    await logAudit(
-      { tableName: 'Material', recordId: material.materialId, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    // Field diffs rather than one generic "Update" row: the trail should
+    // say which column moved and from what to what. A PUT that changes
+    // nothing records nothing, which is the honest outcome.
+    await logFieldChanges({
+      table: 'Material',
+      recordId: material.materialId,
+      before: existing,
+      after: material,
+      fields: AUDITED_FIELDS.Material,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(material);
   } catch (error: any) {
@@ -568,11 +562,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       },
     });
 
-    await logAudit(
-      { tableName: 'Material', recordId: String(req.params.id), action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Material', recordId: String(req.params.id), action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Material deleted successfully' });
   } catch (error) {

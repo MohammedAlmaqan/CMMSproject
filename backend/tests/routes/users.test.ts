@@ -103,8 +103,11 @@ describe('users routes', () => {
   });
 
   it('changes a users password as Administrator and writes an audit row', async () => {
+    // Deliberately no fieldName, and none could be: a password change must
+    // never put the old or new secret in an audit row, so the fact that it
+    // happened, by whom and from where, is the whole of the record.
     const before = await prisma.auditLogEntry.count({
-      where: { tableName: 'User', recordId: tempUserId, action: 'Update', fieldName: 'password' },
+      where: { tableName: 'User', recordId: tempUserId, action: 'Update', fieldName: null },
     });
     const res = await api()
       .put(`/api/users/${tempUserId}/password`)
@@ -114,7 +117,7 @@ describe('users routes', () => {
     expect(res.body.message).toBe('Password updated successfully');
     expect(
       await prisma.auditLogEntry.count({
-        where: { tableName: 'User', recordId: tempUserId, action: 'Update', fieldName: 'password' },
+        where: { tableName: 'User', recordId: tempUserId, action: 'Update', fieldName: null },
       })
     ).toBe(before + 1);
   });

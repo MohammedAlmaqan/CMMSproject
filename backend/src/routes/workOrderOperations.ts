@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { validate, operationCreateSchema, operationUpdateSchema } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
@@ -139,13 +139,9 @@ router.post('/', authorizeMinRole('Technician'), validate(operationCreateSchema)
       },
     });
 
-    await recomputeWorkOrderCosts(workOrderId);
+    await recomputeWorkOrderCosts(workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAudit(
-      { tableName: 'WorkOrderOperation', recordId: operation.operationId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrderOperation', recordId: operation.operationId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(operation);
   } catch (error) {
@@ -231,13 +227,9 @@ router.put('/:id', authorizeMinRole('Technician'), validate(operationUpdateSchem
       },
     });
 
-    await recomputeWorkOrderCosts(existing.workOrderId);
+    await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAudit(
-      { tableName: 'WorkOrderOperation', recordId: id, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrderOperation', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json(operation);
   } catch (error) {
@@ -306,13 +298,9 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
       where: { operationId: id },
     });
 
-    await recomputeWorkOrderCosts(existing.workOrderId);
+    await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAudit(
-      { tableName: 'WorkOrderOperation', recordId: id, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrderOperation', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Operation deleted successfully' });
   } catch (error) {

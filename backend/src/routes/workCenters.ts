@@ -1,7 +1,8 @@
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { workCenterCreateSchema, workCenterUpdateSchema, capacityQuerySchema, validate } from '../utils/validation.js';
 import { buildCapacityBoard, CAPACITY_CONSUMING_STATUSES } from '../utils/capacity.js';
 import { isPrismaError } from '../utils/prismaErrors.js';
@@ -308,11 +309,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workCenterCreateSchema)
       },
     });
 
-    await logAudit(
-      { tableName: 'WorkCenter', recordId: workCenter.workCenterId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkCenter', recordId: workCenter.workCenterId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(workCenter);
   } catch (error) {
@@ -398,11 +395,18 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workCenterUpdateSchem
       },
     });
 
-    await logAudit(
-      { tableName: 'WorkCenter', recordId: workCenter.workCenterId, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    // Field diffs rather than one generic "Update" row: the trail should
+    // say which column moved and from what to what. A PUT that changes
+    // nothing records nothing, which is the honest outcome.
+    await logFieldChanges({
+      table: 'WorkCenter',
+      recordId: workCenter.workCenterId,
+      before: existing,
+      after: workCenter,
+      fields: AUDITED_FIELDS.WorkCenter,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(workCenter);
   } catch (error) {
@@ -468,11 +472,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       },
     });
 
-    await logAudit(
-      { tableName: 'WorkCenter', recordId: String(req.params.id), action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkCenter', recordId: String(req.params.id), action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Work center deleted successfully' });
   } catch (error) {

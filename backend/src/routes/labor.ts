@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditFieldChange, logAuditAction } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { resolveAttributedUser } from '../utils/attribution.js';
 import { validate, laborCreateSchema, laborUpdateSchema } from '../utils/validation.js';
@@ -145,18 +145,17 @@ router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), as
     const attributed = resolveAttributedUser(req.user!, userId);
 
     if (attributed.rejected) {
-      await logAudit(
-        {
-          tableName: 'LaborEntry',
+      await logAuditFieldChange({
+
+          table: 'LaborEntry',
           recordId: 'uncreated',
           action: 'Blocked',
-          fieldName: 'userId',
+          field: 'userId',
           oldValue: req.user!.userId,
           newValue: userId,
-        },
-        req.user!.userId,
-        req.ip
-      );
+          userId: req.user!.userId,
+          ipAddress: req.ip,
+        });
       return res.status(403).json({
         error:
           'Labour is attributed to the authenticated user; booking hours for another user requires the Maintenance Supervisor role',
@@ -189,27 +188,22 @@ router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), as
     });
 
     const op = await prisma.workOrderOperation.findUnique({ where: { operationId } });
-    if (op) await recomputeWorkOrderCosts(op.workOrderId);
+    if (op) await recomputeWorkOrderCosts(op.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAudit(
-      { tableName: 'LaborEntry', recordId: entry.laborEntryId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'LaborEntry', recordId: entry.laborEntryId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     if (attributed.outcome === 'override') {
-      await logAudit(
-        {
-          tableName: 'LaborEntry',
+      await logAuditFieldChange({
+
+          table: 'LaborEntry',
           recordId: entry.laborEntryId,
           action: 'Update',
-          fieldName: 'userId',
+          field: 'userId',
           oldValue: req.user!.userId,
           newValue: attributed.userId,
-        },
-        req.user!.userId,
-        req.ip
-      );
+          userId: req.user!.userId,
+          ipAddress: req.ip,
+        });
     }
 
     res.status(201).json(entry);
@@ -284,18 +278,17 @@ router.put('/:id', authorizeMinRole('Technician'), validate(laborUpdateSchema), 
       userId !== undefined ? resolveAttributedUser(req.user!, userId) : null;
 
     if (attributed?.rejected) {
-      await logAudit(
-        {
-          tableName: 'LaborEntry',
+      await logAuditFieldChange({
+
+          table: 'LaborEntry',
           recordId: id,
           action: 'Blocked',
-          fieldName: 'userId',
+          field: 'userId',
           oldValue: existing.userId,
           newValue: userId,
-        },
-        req.user!.userId,
-        req.ip
-      );
+          userId: req.user!.userId,
+          ipAddress: req.ip,
+        });
       return res.status(403).json({
         error:
           'Labour is attributed to the authenticated user; reassigning an entry to another user requires the Maintenance Supervisor role',
@@ -324,27 +317,22 @@ router.put('/:id', authorizeMinRole('Technician'), validate(laborUpdateSchema), 
     });
 
     const op = await prisma.workOrderOperation.findUnique({ where: { operationId: operationId || existing.operationId } });
-    if (op) await recomputeWorkOrderCosts(op.workOrderId);
+    if (op) await recomputeWorkOrderCosts(op.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAudit(
-      { tableName: 'LaborEntry', recordId: id, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'LaborEntry', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     if (attributed && attributed.outcome === 'override') {
-      await logAudit(
-        {
-          tableName: 'LaborEntry',
+      await logAuditFieldChange({
+
+          table: 'LaborEntry',
           recordId: id,
           action: 'Update',
-          fieldName: 'userId',
+          field: 'userId',
           oldValue: existing.userId,
           newValue: attributed.userId,
-        },
-        req.user!.userId,
-        req.ip
-      );
+          userId: req.user!.userId,
+          ipAddress: req.ip,
+        });
     }
 
     res.json(entry);
@@ -407,13 +395,9 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
     });
 
     const op = await prisma.workOrderOperation.findUnique({ where: { operationId: existing.operationId } });
-    if (op) await recomputeWorkOrderCosts(op.workOrderId);
+    if (op) await recomputeWorkOrderCosts(op.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAudit(
-      { tableName: 'LaborEntry', recordId: id, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'LaborEntry', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Labor entry deleted successfully' });
   } catch (error) {

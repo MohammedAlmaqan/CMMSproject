@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditFieldChange, logAuditAction } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber, generateNotifNumber } from '../utils/sequence.js';
 import { canTransition } from '../utils/transitions.js';
@@ -404,14 +404,10 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
     if (templateOperations.length > 0) {
       // Planned cost is derived from the operations, so the new work order's
       // totals are otherwise left at zero until something else touches them.
-      await recomputeWorkOrderCosts(workOrder.workOrderId);
+      await recomputeWorkOrderCosts(workOrder.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
     }
 
-    await logAudit(
-      { tableName: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(workOrder);
   } catch (error: any) {
@@ -497,13 +493,9 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
       },
     });
 
-    await recomputeWorkOrderCosts(id);
+    await recomputeWorkOrderCosts(id, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAudit(
-      { tableName: 'WorkOrder', recordId: id, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrder', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json(await prisma.workOrder.findUnique({ where: { workOrderId: id } }));
   } catch (error) {
@@ -557,11 +549,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
-    await logAudit(
-      { tableName: 'WorkOrder', recordId: id, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrder', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Work order deleted successfully' });
   } catch (error) {
@@ -682,18 +670,17 @@ router.put(
     if (requiresAtLeastOneOperation(workOrder.status, newStatus)) {
       const operationCount = await prisma.workOrderOperation.count({ where: { workOrderId: id } });
       if (operationCount === 0) {
-        await logAudit(
-          {
-            tableName: 'WorkOrder',
+        await logAuditFieldChange({
+
+            table: 'WorkOrder',
             recordId: id,
             action: 'Blocked',
-            fieldName: 'status',
+            field: 'status',
             oldValue: workOrder.status,
             newValue: newStatus,
-          },
-          req.user!.userId,
-          req.ip
-        );
+            userId: req.user!.userId,
+            ipAddress: req.ip,
+          });
         return res.status(409).json({ error: missingOperationMessage() });
       }
     }
@@ -721,18 +708,17 @@ router.put(
       );
       if (blockingChecklist) {
         const blocked = describeBlockedChecklist(blockingChecklist);
-        await logAudit(
-          {
-            tableName: 'WorkOrder',
+        await logAuditFieldChange({
+
+            table: 'WorkOrder',
             recordId: id,
             action: 'Blocked',
-            fieldName: 'status',
+            field: 'status',
             oldValue: workOrder.status,
             newValue: newStatus,
-          },
-          req.user!.userId,
-          req.ip
-        );
+            userId: req.user!.userId,
+            ipAddress: req.ip,
+          });
         return res.status(409).json({
           error: blocked.ok ? '' : blocked.error,
           checklist: blockingChecklist.templateName,
@@ -784,7 +770,9 @@ router.put(
     // Only notifications this call actually moved are audited. A link whose
     // status the lifecycle refused to change was not modified, and recording a
     // status change for it would be a false entry in the trail.
-    const completedLinkIds: string[] = [];
+    // The status each notification was moved FROM, so the audit row records a
+    // real diff rather than only the value it ended on.
+    const completedLinks: { notificationId: string; from: string }[] = [];
 
     const updated = await prisma.$transaction(async (tx) => {
       const wo = await tx.workOrder.update({
@@ -805,7 +793,7 @@ router.put(
               where: { notificationId: link.notificationId },
               data: { status: 'Completed', modifiedBy: req.user!.userId },
             });
-            completedLinkIds.push(link.notificationId);
+            completedLinks.push({ notificationId: link.notificationId, from: notif.status });
           }
         }
 
@@ -831,25 +819,15 @@ router.put(
       return wo;
     });
 
-    await logAudit(
-      { tableName: 'WorkOrder', recordId: id, action: 'Update', fieldName: 'status', oldValue: workOrder.status, newValue: newStatus },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditFieldChange({ table: 'WorkOrder', recordId: id, action: 'Update', field: 'status', oldValue: workOrder.status, newValue: newStatus, userId: req.user!.userId, ipAddress: req.ip });
 
     if (newStatus === 'Completed') {
-      for (const notificationId of completedLinkIds) {
-        await logAudit(
-          { tableName: 'Notification', recordId: notificationId, action: 'Update', fieldName: 'status', newValue: 'Completed' },
-          req.user!.userId,
-          req.ip
-        );
+      for (const link of completedLinks) {
+        await logAuditFieldChange({ table: 'Notification', recordId: link.notificationId, action: 'Update', field: 'status', oldValue: link.from, newValue: 'Completed', userId: req.user!.userId, ipAddress: req.ip });
       }
-      await logAudit(
-        { tableName: 'Notification', recordId: createdM3Id!, action: 'Create', fieldName: 'type', newValue: 'M3' },
-        req.user!.userId,
-        req.ip
-      );
+      // The M3 was created here, so there is no prior value to record; the
+      // field is what makes the row meaningful, and null says so honestly.
+      await logAuditFieldChange({ table: 'Notification', recordId: createdM3Id!, action: 'Create', field: 'type', oldValue: null, newValue: 'M3', userId: req.user!.userId, ipAddress: req.ip });
     }
 
     res.json(updated);

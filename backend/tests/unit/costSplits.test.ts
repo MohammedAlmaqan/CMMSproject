@@ -194,8 +194,8 @@ describe('cost split write path, SOW 3.5.2', () => {
   });
 
   it('audits the replacement and the clear', () => {
-    expect(route).toMatch(/tableName: 'CostSplit', recordId: workOrderId, action: 'Update'/);
-    expect(route).toMatch(/tableName: 'CostSplit', recordId: splitId, action: 'Delete'/);
+    expect(route).toMatch(/table: 'CostSplit', recordId: workOrderId, action: 'Update'/);
+    expect(route).toMatch(/table: 'CostSplit', recordId: splitId, action: 'Delete'/);
   });
 
   it('is mounted in the api', () => {

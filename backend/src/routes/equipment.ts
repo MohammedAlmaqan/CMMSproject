@@ -1,9 +1,10 @@
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, equipmentCreateSchema, equipmentUpdateSchema, equipmentImportRowSchema, equipmentBomCreateSchema, equipmentBomUpdateSchema } from '../utils/validation.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
 import { checkEquipmentPlacement } from '../utils/locationRules.js';
 import { logger } from '../utils/logger.js';
@@ -235,12 +236,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
               modifiedBy: req.user!.userId,
             },
           });
-          await logAudit(
-            { tableName: 'Equipment', recordId: existing.equipmentId, action: 'Update' },
-            req.user!.userId,
-            req.ip,
-            tx
-          );
+          await logAuditAction({ table: 'Equipment', recordId: existing.equipmentId, action: 'Update', userId: req.user!.userId, ipAddress: req.ip, db: tx });
           updated++;
         } else {
           const createdRow = await tx.equipment.create({
@@ -260,12 +256,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
               modifiedBy: req.user!.userId,
             },
           });
-          await logAudit(
-            { tableName: 'Equipment', recordId: createdRow.equipmentId, action: 'Create' },
-            req.user!.userId,
-            req.ip,
-            tx
-          );
+          await logAuditAction({ table: 'Equipment', recordId: createdRow.equipmentId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip, db: tx });
           created++;
         }
       }
@@ -537,11 +528,7 @@ router.post('/', authorizeMinRole('Technician'), validate(equipmentCreateSchema)
       },
     });
 
-    await logAudit(
-      { tableName: 'Equipment', recordId: equipment.equipmentId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Equipment', recordId: equipment.equipmentId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(equipment);
   } catch (error: any) {
@@ -662,11 +649,18 @@ router.put('/:id', authorizeMinRole('Technician'), validate(equipmentUpdateSchem
       },
     });
 
-    await logAudit(
-      { tableName: 'Equipment', recordId: existing.equipmentId, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    // Field diffs rather than one generic "Update" row: the trail should
+    // say which column moved and from what to what. A PUT that changes
+    // nothing records nothing, which is the honest outcome.
+    await logFieldChanges({
+      table: 'Equipment',
+      recordId: existing.equipmentId,
+      before: existing,
+      after: equipment,
+      fields: AUDITED_FIELDS.Equipment,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(equipment);
   } catch (error: any) {
@@ -735,11 +729,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       },
     });
 
-    await logAudit(
-      { tableName: 'Equipment', recordId: existing.equipmentId, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Equipment', recordId: existing.equipmentId, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Equipment deleted successfully' });
   } catch (error) {
@@ -863,11 +853,7 @@ router.post('/:id/bom', authorizeMinRole('Technician'), validate(equipmentBomCre
       data: { equipmentId, materialId, quantity },
     });
 
-    await logAudit(
-      { tableName: 'EquipmentBOMMaterial', recordId: bomItem.bomId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'EquipmentBOMMaterial', recordId: bomItem.bomId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(bomItem);
   } catch (error) {
@@ -938,11 +924,7 @@ router.put('/:id/bom/:bomId', authorizeMinRole('Technician'), validate(equipment
       data: { quantity: req.body.quantity },
     });
 
-    await logAudit(
-      { tableName: 'EquipmentBOMMaterial', recordId: String(bomId), action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'EquipmentBOMMaterial', recordId: String(bomId), action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json(bomItem);
   } catch (error) {
@@ -1004,11 +986,7 @@ router.delete('/:id/bom/:bomId', authorizeMinRole('Maintenance Supervisor'), asy
 
     await prisma.equipmentBOMMaterial.delete({ where: { bomId } });
 
-    await logAudit(
-      { tableName: 'EquipmentBOMMaterial', recordId: String(bomId), action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'EquipmentBOMMaterial', recordId: String(bomId), action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'BOM line deleted successfully' });
   } catch (error) {

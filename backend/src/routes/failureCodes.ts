@@ -1,7 +1,8 @@
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { failureCodeCreateSchema, failureCodeUpdateSchema, validate } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
@@ -243,11 +244,7 @@ router.post('/', authorizeMinRole('Requester'), validate(failureCodeCreateSchema
       },
     });
 
-    await logAudit(
-      { tableName: 'FailureCode', recordId: failureCode.failureCodeId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'FailureCode', recordId: failureCode.failureCodeId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(failureCode);
   } catch (error: any) {
@@ -326,11 +323,18 @@ router.put('/:id', authorizeMinRole('Requester'), validate(failureCodeUpdateSche
       },
     });
 
-    await logAudit(
-      { tableName: 'FailureCode', recordId: failureCode.failureCodeId, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    // Field diffs rather than one generic "Update" row: the trail should
+    // say which column moved and from what to what. A PUT that changes
+    // nothing records nothing, which is the honest outcome.
+    await logFieldChanges({
+      table: 'FailureCode',
+      recordId: failureCode.failureCodeId,
+      before: existing,
+      after: failureCode,
+      fields: AUDITED_FIELDS.FailureCode,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(failureCode);
   } catch (error: any) {
@@ -394,11 +398,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       },
     });
 
-    await logAudit(
-      { tableName: 'FailureCode', recordId: String(req.params.id), action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'FailureCode', recordId: String(req.params.id), action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Failure code deleted successfully' });
   } catch (error) {

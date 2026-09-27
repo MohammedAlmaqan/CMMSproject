@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction } from '../middleware/audit.js';
 import { validate, commentCreateSchema } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
@@ -188,11 +188,7 @@ router.post('/', authorizeMinRole('Requester'), validate(commentCreateSchema), a
       include: { user: { select: { userId: true, fullName: true, username: true } } },
     });
 
-    await logAudit(
-      { tableName: 'Comment', recordId: comment.commentId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Comment', recordId: comment.commentId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(comment);
   } catch (error) {
@@ -220,11 +216,7 @@ router.delete('/:id', authorizeMinRole('Requester'), async (req: Request, res: R
       where: { commentId: id },
     });
 
-    await logAudit(
-      { tableName: 'Comment', recordId: id, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'Comment', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Comment deleted successfully' });
   } catch (error) {

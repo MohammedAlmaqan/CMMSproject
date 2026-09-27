@@ -1,7 +1,8 @@
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { validate, schedulerRunSchema, maintenancePlanCreateSchema, maintenancePlanUpdateSchema, planPatchIssues } from '../utils/validation.js';
 import { runSchedulerOnce } from '../services/scheduler.js';
 import { generatePmWorkOrder, PmGenerationError } from '../services/pmGeneration.js';
@@ -222,11 +223,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/run-scheduler', authorizeMinRole('Administrator'), validate(schedulerRunSchema), async (req: Request, res: Response) => {
   try {
     const result = await runSchedulerOnce();
-    await logAudit(
-      { tableName: 'MaintenancePlan', recordId: req.user!.userId, action: 'Run' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'MaintenancePlan', recordId: req.user!.userId, action: 'Run', userId: req.user!.userId, ipAddress: req.ip });
     res.json(result);
   } catch (error) {
     logger.error({ err: error }, 'Error running scheduler');
@@ -345,11 +342,7 @@ router.post('/', authorizeMinRole('Requester'), validate(maintenancePlanCreateSc
       include: { targets: true, planMeters: true },
     });
 
-    await logAudit(
-      { tableName: 'MaintenancePlan', recordId: plan.planId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'MaintenancePlan', recordId: plan.planId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(plan);
   } catch (error: any) {
@@ -516,11 +509,18 @@ router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdate
       ]);
     }
 
-    await logAudit(
-      { tableName: 'MaintenancePlan', recordId: plan.planId, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    // Field diffs rather than one generic "Update" row: the trail should
+    // say which column moved and from what to what. A PUT that changes
+    // nothing records nothing, which is the honest outcome.
+    await logFieldChanges({
+      table: 'MaintenancePlan',
+      recordId: plan.planId,
+      before: existing,
+      after: plan,
+      fields: AUDITED_FIELDS.MaintenancePlan,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(plan);
   } catch (error) {
@@ -583,11 +583,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
-    await logAudit(
-      { tableName: 'MaintenancePlan', recordId: id, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'MaintenancePlan', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Maintenance plan deleted successfully' });
   } catch (error) {
@@ -699,11 +695,7 @@ router.post('/:id/generate-wo', authorizeMinRole('Maintenance Planner'), async (
       },
     });
 
-    await logAudit(
-      { tableName: 'WorkOrder', recordId: outcome.workOrderId, action: 'Create' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'WorkOrder', recordId: outcome.workOrderId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     const workOrder = await prisma.workOrder.findUnique({
       where: { workOrderId: outcome.workOrderId },

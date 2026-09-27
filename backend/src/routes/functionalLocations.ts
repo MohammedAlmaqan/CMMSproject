@@ -1,8 +1,9 @@
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, functionalLocationCreateSchema, functionalLocationUpdateSchema } from '../utils/validation.js';
-import { logAudit } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { checkChildAddition, checkLocationMove } from '../utils/locationRules.js';
 import {
   OPEN_WORK_ORDER_STATUSES,
@@ -324,11 +325,7 @@ router.post('/', authorizeMinRole('Technician'), validate(functionalLocationCrea
       },
     });
 
-    await logAudit(
-      { tableName: 'FunctionalLocation', recordId: location.functionalLocationId, action: 'Create' },
-      userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'FunctionalLocation', recordId: location.functionalLocationId, action: 'Create', userId: userId, ipAddress: req.ip });
 
     res.status(201).json(location);
   } catch (error: any) {
@@ -382,17 +379,15 @@ router.post('/', authorizeMinRole('Technician'), validate(functionalLocationCrea
  *           application/json:
  *             schema: { type: object, additionalProperties: true }
  *       '400':
- *         description: zod validation failed
+ *         description: zod validation failed; the named parent location does not exist; the move would place the location beneath a parent that holds equipment, make a location its own parent, or create a cycle
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
  *         description: Caller role is below Technician
  *       '404':
- *         description: Location not found, or the named parent location does not exist
+ *         description: Location not found
  *       '409':
- *         description: locationCode already in use, or the move would place the location beneath a parent that holds equipment
- *       '400':
- *         description: The move would make a location its own parent or create a cycle
+ *         description: locationCode already in use
  *       '500':
  *         description: Internal server error
  */
@@ -473,11 +468,18 @@ router.put('/:id', authorizeMinRole('Technician'), validate(functionalLocationUp
       },
     });
 
-    await logAudit(
-      { tableName: 'FunctionalLocation', recordId: existing.functionalLocationId, action: 'Update' },
-      req.user!.userId,
-      req.ip
-    );
+    // Field diffs rather than one generic "Update" row: the trail should
+    // say which column moved and from what to what. A PUT that changes
+    // nothing records nothing, which is the honest outcome.
+    await logFieldChanges({
+      table: 'FunctionalLocation',
+      recordId: existing.functionalLocationId,
+      before: existing,
+      after: location,
+      fields: AUDITED_FIELDS.FunctionalLocation,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(location);
   } catch (error: any) {
@@ -542,11 +544,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       },
     });
 
-    await logAudit(
-      { tableName: 'FunctionalLocation', recordId: existing.functionalLocationId, action: 'Delete' },
-      req.user!.userId,
-      req.ip
-    );
+    await logAuditAction({ table: 'FunctionalLocation', recordId: existing.functionalLocationId, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Functional location deleted successfully' });
   } catch (error) {
