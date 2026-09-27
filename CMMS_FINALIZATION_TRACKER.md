@@ -698,6 +698,19 @@ Second local run: **721 tests across 53 files, all passing**, including the five
 
 The wider lesson, recorded because it cost three red runs: **the 512-case unit suite, `tsc -b` and `eslint` were all green while a foreign key was being violated on every scheduled work order in the system.** Nothing short of a real database executing the code finds that class of fault, and a local instance was available the whole time.
 
+E.8 CI: run **36341077785**, exact SHA `96988dd0daacde47933bbee1389a431224fcfdd6`, **Backend and Frontend both `success`**. This is the first green backend run since E.2, and it is cumulative — it carries rows 26, 19 and 31 and every fix between them, so E.3 through E.8 are all verified on this one SHA.
+
+#### Working practice, corrected: there is a local database
+
+Earlier phases of this tracker recorded "no authorised local PostgreSQL" and treated the Docker daemon as the only route to a database. **A local PostgreSQL 18 service is running on 5432** and has been all along. Use it, with these constraints:
+
+- **Never point this at the developer's `cmms` database.** It is a real, populated database and is not a test fixture. Create a throwaway one (`cmms_gate` was used) and drop it when finished.
+- Credentials come from `backend/.env` (`DATABASE_URL`); the value is **quoted**, so strip the quotes before passing it to a child process or Prisma will reject the URL as malformed.
+- Override per command with `$env:DATABASE_URL`; do not edit `.env` to repoint the project.
+- Reproduce CI with: `prisma migrate deploy`, `npx tsx prisma/seed.ts`, then `vitest run`, with `JWT_SECRET`, `NODE_ENV=test` and `SEED_DEMO=1` set as in `.github/workflows/ci.yml`.
+
+The full DB-backed suite — **721 tests across 53 files** — runs in about two minutes this way. That is a two-minute feedback loop instead of a nine-minute CI round trip with unreadable logs, and it is the only way to see a foreign-key or constraint fault at all. Prefer it over pushing a speculative fix.
+
 ### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
 
 Phase D closed the §3.4 Preventive Maintenance subsection and, as a side effect, **broke the deadlock that held 23 Phase B/C rows at `IMPLEMENTED, NOT VERIFIED`**. Those rows were never promoted because `backend/tests/routes/*.test.ts` had never executed against a live PostgreSQL. CI does exactly that — `Apply migrations`, `Seed test data`, `Test` — so from `479a7f7` onward every DB-backed case in this phase has genuinely run. That is the only reason a matrix row is marked `Met` in this phase.
