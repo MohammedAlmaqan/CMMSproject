@@ -548,7 +548,8 @@ Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3
 | E.4 | Notification "Damages/observations" field (row 19) | ✅ | What was found at the asset is recorded in its own field, and cannot overwrite the original report. | `96645ee` |
 | E.5 | Material reservation concept (row 31) | ✅ | A part can actually be held for a scheduled job: over-reservation is refused, availability is reported, and a closed or cancelled job lets go. | `abb580f` |
 | E.6 | Fix the E.3 migration backfill and the E.4 update schema | ✅ | Both E.3 and E.4 were red on CI. Neither was a test-logic problem; both were ways of writing a value that the database would not accept. | `fa79ef0` |
-| E.7 | Stop the row-31 reservation tests mutating the shared work order (row 32 wording, D-16) | ✅ | The release test cancelled a work order the rest of the file depends on; it now owns its own. Row 32 closed on D-16, with no code change. | *this commit* |
+| E.7 | Stop the row-31 reservation tests mutating the shared work order (row 32 wording, D-16) | ✅ | The release test cancelled a work order the rest of the file depends on; it now owns its own. Row 32 closed on D-16, with no code change. | `98c356e` |
+| E.8 | Stop PM generation writing `'scheduler'` into a user foreign key | ✅ | Every scheduled work order generation was failing on `WorkOrder_reportedByUserId_fkey`. Found by reproducing CI locally, not by guessing. | *this commit* |
 
 #### E.1, stated as raw output
 
@@ -652,14 +653,11 @@ Counted from the Status column, not transcribed: **79 Met, 67 Partial, 35 Not Me
 
 E.3 (run **36338619584**) and E.4 (run **36339202953**) both failed at the same step, `Test`, on the Backend job, with Frontend green. Two separate faults, one in each commit, and neither of them was bad test logic.
 
-**E.3: the migration could not run.** The backfill was
-`UPDATE "WorkOrder" SET "reportedByUserId" = "createdBy"`. The theory was that `createdBy` is the closest available answer to "who reported this". But `WorkOrder.createdBy` is `String @default("system")`, so every work order raised without an explicit author carries the literal string `"system"`, and **no `User` row has that id — user ids are uuids from the seed**. So the backfill wrote `"system"` into a column that the very next statement puts a foreign key on, the FK rejected it, the migration failed, and every test after it failed. A test failure was reported for what was actually a schema fault, and the fix belonged in the migration, not in a test.
+**E.3: a foreign key violated on every scheduled PM generation.** `generatePmWorkOrder` wrote `reportedByUserId: input.actorUserId`, and the unattended scheduler calls it with the literal sentinel `actorUserId: 'scheduler'`. `reportedByUserId` carries a foreign key to `User`, and no user has the id `scheduler`, so **every** PM generation died with `WorkOrder_reportedByUserId_fkey` — 7 tests in `pmGeneration.test.ts`. The mistake was assuming `actorUserId` is always a person. It is the identity of *whoever ran the job*, which for the scheduler is a sentinel, and conflating "who ran this" with "who reported this" was the whole error. Fixed in E.8.
 
-The corrected backfill asks whether the value names a real user before using it: `createdBy` if it resolves, else `supervisorUserId` if it resolves, else the earliest-created user, so the column is populated with an attributable name rather than a dangling one.
+**The migration was not the CI cause, and the first guess at it was wrong.** The first theory was that the `createdBy` backfill wrote `"system"` into the new column and the foreign key rejected it. That is a real latent fault — `WorkOrder.createdBy` is `@default("system")`, so on any database that already holds work orders the backfill *would* write a dangling value — and the corrected backfill that checks each candidate against `User` before using it is the right thing to have in the file. But it was not why CI was red, and the reason is worth recording: **CI applies migrations to an empty database and seeds afterwards, so the backfill `UPDATE` matches zero rows and the foreign key is never exercised.** A migration fault of this shape is invisible to CI by construction. The E.6 migration change is therefore a genuine robustness fix for real data, not a CI repair, and the tracker previously claimed otherwise.
 
-**E.4: the update silently dropped the field.** `damagesObservations` was added to `notificationCreateSchema` but not to `notificationUpdateSchema`. A zod `object` **strips** keys it does not declare, so `PUT /api/notifications/:id` received the field, removed it, wrote nothing, and answered **200**. The route code was correct and the destructure was correct; the value never survived validation. This is the worst shape a bug can take — a success response for a write that did not happen — and the test that caught it ("records an observation added later") is exactly the case that existed to catch it.
-
-The lesson worth keeping: both faults were invisible to `tsc -b`, to the 512-case unit suite, and to `eslint`. Neither surfaces without a real database applying the migrations, which is the argument for gating DB-backed tests on every migration-bearing commit rather than only at the end of a phase.
+**E.4: the update silently dropped the field.** `damagesObservations` was added to `notificationCreateSchema` but not to `notificationUpdateSchema`. A zod `object` **strips** keys it does not declare, so `PUT /api/notifications/:id` received the field, removed it, wrote nothing, and answered **200**. The route code was correct and the destructure was correct; the value never survived validation. This is the worst shape a bug can take — a success response for a write that did not happen — and the test that caught it ("records an observation added later") is exactly the case that existed to catch it. This one was real, and it is the fault that E.4's red run actually turned on once the PM-generation failures were accounted for.
 
 `tsc -b` exits **0**. DB-free unit suite **512 across 28 files**. `eslint src tests` **42** against threshold 50.
 
@@ -672,6 +670,33 @@ The lesson worth keeping: both faults were invisible to `tsc -b`, to the 512-cas
 Verified rather than assumed before closing: actual labour is `hoursWorked x craft.hourlyRate` over booked entries (`backend/src/utils/costRules.ts:90-92`), and `WorkCenter.costRatePerHour` — the column the old residual said "is never used" — is read in `workCenters.ts` CRUD and once in `validation.ts` but by **no cost path**. The row is now `Met` for the wording, and the column is documented as master data that is deliberately not a second source of truth, rather than left looking like an oversight. No behaviour changed; the arithmetic is the pure function D-3 already exercised in CI.
 
 Counted from the Status column, not transcribed: **80 Met, 66 Partial, 35 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 54 Met, 33 Partial, 18 Not Met, 4 Deferred, 7 Excluded, 10 Waived**.
+
+#### E.8 — the CI log was unreadable, so the failure was reproduced instead
+
+Three consecutive red runs on the same step, and the cause was still unknown: the Actions API reports which step failed but the literal logs return `403` without authentication, and no `GH_TOKEN` or `gh` CLI is available here. Guessing at a fix and pushing it is how a red run becomes a red run with extra commits on top.
+
+**A local PostgreSQL 18 is running on 5432** — it had been recorded as unavailable, which was wrong. So the failing job was reproduced exactly: a **throwaway** database `cmms_gate` on the local instance, `prisma migrate deploy`, `npx tsx prisma/seed.ts`, then `vitest run` with the same env CI uses. The developer's own `cmms` database was not read, written, or migrated at any point.
+
+The first local run failed in one second with the exact message CI could not show:
+
+```
+Foreign key constraint violated on the constraint: `WorkOrder_reportedByUserId_fkey`
+  at src/services/pmGeneration.ts:225
+```
+
+`generatePmWorkOrder` set `reportedByUserId: input.actorUserId`, and `src/services/scheduler.ts:159` calls it with the literal `actorUserId: 'scheduler'`. Seven tests in `pmGeneration.test.ts` died on it. **The scheduled PM path — the one that runs unattended with nobody watching — was entirely broken by E.3**, and it was broken by the specific thing E.3 added: a foreign key on a column fed a value that was never a user id.
+
+The fix does not invent a user. A PM work order is raised by the *plan*, not reported by a person, so the reporter is the plan's own supervisor — the same value already used for `supervisorUserId`. One resolution rule now feeds both columns, so they cannot disagree:
+
+```ts
+const raisedByUserId = input.supervisorUserId ?? plan.createdBy;
+```
+
+`actorUserId` is the right answer to "who ran this" and was the wrong answer to "who reported this". Keeping it in `createdBy` and `modifiedBy`, where a sentinel is legitimate, and taking the attributable person for the reporter, is the distinction the SOW is actually asking for.
+
+Second local run: **721 tests across 53 files, all passing**, including the five DB-backed cases for row 26, the five for row 19, the six for row 31, and the whole pre-existing suite.
+
+The wider lesson, recorded because it cost three red runs: **the 512-case unit suite, `tsc -b` and `eslint` were all green while a foreign key was being violated on every scheduled work order in the system.** Nothing short of a real database executing the code finds that class of fault, and a local instance was available the whole time.
 
 ### Phase D - Preventive maintenance, and the first rows promoted to `Met` (COMPLETE, VERIFIED)
 

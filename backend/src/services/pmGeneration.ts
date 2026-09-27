@@ -221,6 +221,17 @@ async function generateOne(
 
   const woNumber = await generateWoNumber();
 
+  // Who the generated work order belongs to, as opposed to who ran the job that
+  // created it. `input.actorUserId` is deliberately NOT usable here: the
+  // unattended scheduler passes the literal sentinel 'scheduler', and
+  // `reportedByUserId` carries a foreign key to User. Using the actor wrote the
+  // string 'scheduler' into that column and every scheduled generation failed
+  // with WorkOrder_reportedByUserId_fkey. A PM work order is raised by the plan
+  // rather than reported by a person, so the plan's own supervisor is both the
+  // assigned supervisor and the attributable reporter -- one resolution rule for
+  // one column pair, rather than two sources of truth for the same question.
+  const raisedByUserId = input.supervisorUserId ?? plan.createdBy;
+
   const run = async (tx: Prisma.TransactionClient): Promise<GeneratePmWorkOrderResult> => {
     const wo = await tx.workOrder.create({
       data: {
@@ -232,10 +243,9 @@ async function generateOne(
         equipmentId,
         description: plan.description,
         workCenterId: plan.workCenterId,
-        supervisorUserId: input.supervisorUserId ?? plan.createdBy,
-        // A PM work order is raised by the plan, not reported by a person, so the
-        // reporter is whoever raised it. The SOW 3.3.3 field is non-null for that reason.
-        reportedByUserId: input.actorUserId,
+        supervisorUserId: raisedByUserId,
+        // SOW 3.3.3 requires a reporter, and a PM job is raised by the plan.
+        reportedByUserId: raisedByUserId,
         sourcePlanId: plan.planId,
         sourcePlanCycle: cycleKey,
         breakdownFlag: false,
