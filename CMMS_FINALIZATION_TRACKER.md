@@ -546,7 +546,7 @@ Phase D closed the §3.4 Preventive Maintenance subsection and, as a side effect
 | D.3 | Due-date engine (rows 40, 41, 42, 43) | ✅ | `backend/src/utils/pmDueRules.ts`, pure and fully unit-tested: calendar-correct month arithmetic, `endDate`, both horizon units, meter evaluation, `Combined` earliest-due. | `2fc199f` |
 | D.4 | Generation service shared by scheduler and manual route (rows 45, 48) | ✅ | One `generatePmWorkOrder` used by both entry points, so the manual button and the nightly run can no longer produce different work orders. Idempotent on both. | `60f016b`, `479a7f7` |
 | D.5 | DB-backed coverage for the whole PM path | ✅ | 15 route cases in `backend/tests/routes/pmGeneration.test.ts` plus 28 service unit cases, executed against PostgreSQL by CI. | `60f016b`, `479a7f7` |
-| D.6 | Matrix and tracker reconciliation | ✅ | `docs/SOW_COMPLIANCE.md` §3.4 rows re-derived from code; §3 totals recounted from the Status column, not transcribed. | `pending` — recorded by the follow-up hash commit, as this repo does elsewhere |
+| D.6 | Matrix and tracker reconciliation | ✅ | `docs/SOW_COMPLIANCE.md` §3.4 rows re-derived from code; §3 totals recounted from the Status column, not transcribed. | `1c14c25` |
 | D.7 | Phase D gate | ✅ | Green CI run for the exact final SHA, both jobs, every step. | `7b3a17a`, `c0496b0` |
 
 #### The gate, stated as raw output
@@ -560,7 +560,7 @@ Final SHA **`c0496b021b92d9d1fd45555800a5ba39846f897e`**, run **36333270532**, b
 
 https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36333270532
 
-`7b3a17a` is green on run 36332065608 and is the first Phase D SHA where every job and step passed. Locally, against that tree: `tsc -b` exits 0; the DB-free unit suite is **497 cases across 27 files**; `eslint src tests` reports **42** errors against a gate threshold of 50. `npm run gate` is `PARTIAL` locally because the DB step is skipped without authorisation — the CI run above is the claim, not the local one.
+`7b3a17a` is green on run 36332065608 and is the first Phase D SHA where every job and step passed. The documentation commit `1c14c259fa81fd4405e0bdddd8c584c4efb24dda` is green on run **36333857715**, both jobs, and changes no code. Locally, against that tree: `tsc -b` exits 0; the DB-free unit suite is **497 cases across 27 files**; `eslint src tests` reports **42** errors against a gate threshold of 50. `npm run gate` is `PARTIAL` locally because the DB step is skipped without authorisation — the CI runs above are the claim, not the local one.
 
 #### Five defects found in this phase, and what each one actually was
 
