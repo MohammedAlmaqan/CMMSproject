@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAudit } from '../middleware/audit.js';
-import { countUnansweredItems } from '../utils/checklistRules.js';
 import { logger } from '../utils/logger.js';
 import {
   validate,
@@ -470,19 +469,20 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
     // mistaken answer could never be corrected and the work order would stay
     // unblocked for the rest of its life.
     //
-    // The status is only ever downgraded here. Sign-off is a deliberate act with
-    // its own endpoint, and silently promoting a checklist to 'Completed' because
-    // somebody filled in the last box would remove it.
-    const checklist = await prisma.workOrderChecklist.findUnique({
-      where: { woChecklistId: item.woChecklistId },
-      select: { status: true },
-    });
-    if (checklist?.status === 'Completed') {
-      const siblings = await prisma.workOrderChecklistItem.findMany({
+    // This fires only when *this* update removed an answer. Answering a blank
+    // item is not a reason to downgrade: a planner may legitimately sign a
+    // checklist off and then fill in the answers, and downgrading on every
+    // partial answer would silently undo that sign-off. Nor is the status ever
+    // promoted here - sign-off is a deliberate act with its own endpoint.
+    const removedAnswer =
+      existing.response !== null && existing.response.trim() !== '' &&
+      (item.response === null || item.response.trim() === '');
+    if (removedAnswer) {
+      const checklist = await prisma.workOrderChecklist.findUnique({
         where: { woChecklistId: item.woChecklistId },
-        select: { response: true },
+        select: { status: true },
       });
-      if (countUnansweredItems(siblings.map((s) => s.response)) > 0) {
+      if (checklist?.status === 'Completed') {
         await prisma.workOrderChecklist.update({
           where: { woChecklistId: item.woChecklistId },
           data: { status: 'In Progress' },
