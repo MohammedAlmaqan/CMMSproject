@@ -148,7 +148,7 @@ describe('requirements are stored and returned', () => {
   });
 
   it('blames the duplicate requirement rather than the task list code', () => {
-    expect(taskLists).toMatch(/target\.includes\('TaskListMaterial'\)/);
+    expect(taskLists).toMatch(/target\.includes\('code'\)/);
     expect(taskLists).toMatch(/same material more than once/);
   });
 });

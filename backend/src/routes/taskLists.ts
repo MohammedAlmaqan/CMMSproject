@@ -299,10 +299,10 @@ router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), 
       // duplicate requirement is a data-entry slip; the generic code message
       // would blame the wrong field and send the caller looking at the header.
       const target = prismaErrorTarget(error);
-      if (target.includes('TaskListMaterial')) {
-        return res.status(400).json({ error: 'An operation lists the same material more than once' });
+      if (target.includes('code')) {
+        return res.status(409).json({ error: 'Task list code already exists' });
       }
-      return res.status(409).json({ error: 'Task list code already exists' });
+      return res.status(400).json({ error: 'An operation lists the same material more than once' });
     }
     if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced work center, equipment, or craft not found' });
@@ -501,10 +501,10 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
       // duplicate requirement is a data-entry slip; the generic code message
       // would blame the wrong field and send the caller looking at the header.
       const target = prismaErrorTarget(error);
-      if (target.includes('TaskListMaterial')) {
-        return res.status(400).json({ error: 'An operation lists the same material more than once' });
+      if (target.includes('code')) {
+        return res.status(409).json({ error: 'Task list code already exists' });
       }
-      return res.status(409).json({ error: 'Task list code already exists' });
+      return res.status(400).json({ error: 'An operation lists the same material more than once' });
     }
     if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced work center, equipment, or craft not found' });

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { api, authHeaders, ctx } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
@@ -78,5 +78,156 @@ describe('task lists routes', () => {
     const res = await api().delete(`/api/task-lists/${createdId}`).set(authHeaders(ctx.adminToken));
     expect(res.status).toBe(200);
     expect(await auditCount(createdId, 'Delete')).toBe(before + 1);
+  });
+
+  describe('per-step required materials (SOW 3.1.4)', () => {
+    let craftId = '';
+    let materialA = '';
+    let materialB = '';
+    let matTemplateId = '';
+    const tmpIds: string[] = [];
+
+    beforeAll(async () => {
+      const crafts = await api().get('/api/crafts').set(authHeaders(ctx.adminToken));
+      craftId = crafts.body[0].craftId;
+      const mats = await prisma.material.findMany({
+        where: { isDeleted: false },
+        orderBy: { materialCode: 'asc' },
+        take: 2,
+      });
+      materialA = mats[0].materialId;
+      materialB = mats[1].materialId;
+    });
+
+    afterAll(async () => {
+      for (const id of tmpIds) {
+        await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
+        await prisma.taskListMaterial.deleteMany({ where: { taskOperation: { taskListId: id } } }).catch(() => {});
+        await prisma.taskListOperation.deleteMany({ where: { taskListId: id } }).catch(() => {});
+        await prisma.taskList.deleteMany({ where: { taskListId: id } }).catch(() => {});
+      }
+    });
+
+    it('persists and returns the materials each step requires', async () => {
+      const res = await api()
+        .post('/api/task-lists')
+        .set(authHeaders(ctx.operatorToken))
+        .send({
+          code: `TLM-${Date.now()}`,
+          description: 'per-step materials',
+          workCenterId,
+          operations: [
+            {
+              sequenceNumber: 10,
+              description: 'needs one part',
+              craftId,
+              plannedHours: 1,
+              materials: [{ materialId: materialA, quantity: 3 }],
+            },
+            {
+              sequenceNumber: 20,
+              description: 'needs another',
+              craftId,
+              plannedHours: 1,
+              materials: [{ materialId: materialB, quantity: 1 }],
+            },
+          ],
+        });
+      expect(res.status).toBe(201);
+      matTemplateId = res.body.taskListId;
+      tmpIds.push(matTemplateId);
+      expect(res.body.operations.length).toBe(2);
+
+      // Each step answers with its own requirement, not a merged list-level one.
+      const op10 = res.body.operations.find((o: any) => o.sequenceNumber === 10);
+      const op20 = res.body.operations.find((o: any) => o.sequenceNumber === 20);
+      expect(op10.materials).toEqual([expect.objectContaining({ materialId: materialA, quantity: 3 })]);
+      expect(op20.materials).toEqual([expect.objectContaining({ materialId: materialB, quantity: 1 })]);
+
+      const rows = await prisma.taskListMaterial.findMany({
+        where: { taskOperation: { taskListId: matTemplateId } },
+      });
+      expect(rows.length).toBe(2);
+      expect(rows.map((r) => r.materialId).sort()).toEqual([materialA, materialB].sort());
+
+      // The detail read carries the same requirements.
+      const detail = await api().get(`/api/task-lists/${matTemplateId}`).set(authHeaders(ctx.adminToken));
+      expect(detail.status).toBe(200);
+      expect(detail.body.operations.length).toBe(2);
+    });
+
+    it('refuses the same material twice on one step (400)', async () => {
+      const res = await api()
+        .post('/api/task-lists')
+        .set(authHeaders(ctx.operatorToken))
+        .send({
+          code: `TLD-${Date.now()}`,
+          description: 'duplicate requirement fixture',
+          workCenterId,
+          operations: [
+            {
+              sequenceNumber: 10,
+              description: 'lists the same part twice',
+              craftId,
+              plannedHours: 1,
+              materials: [
+                { materialId: materialA, quantity: 1 },
+                { materialId: materialA, quantity: 2 },
+              ],
+            },
+          ],
+        });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/more than once/);
+    });
+
+    it('accepts a zero quantity as "required, not yet quantified"', async () => {
+      const res = await api()
+        .post('/api/task-lists')
+        .set(authHeaders(ctx.operatorToken))
+        .send({
+          code: `TLZ-${Date.now()}`,
+          description: 'zero quantity means required but unquantified',
+          workCenterId,
+          operations: [
+            {
+              sequenceNumber: 10,
+              description: 'unquantified step',
+              craftId,
+              plannedHours: 1,
+              materials: [{ materialId: materialA, quantity: 0 }],
+            },
+          ],
+        });
+      expect(res.status).toBe(201);
+      tmpIds.push(res.body.taskListId);
+      expect(
+        (await prisma.taskListMaterial.findFirstOrThrow({
+          where: { taskOperation: { taskListId: res.body.taskListId } },
+        })).quantity
+      ).toBe(0);
+    });
+
+    it('rejects a negative quantity, which would reduce stock when issued', async () => {
+      const res = await api()
+        .post('/api/task-lists')
+        .set(authHeaders(ctx.operatorToken))
+        .send({
+          code: `TLN-${Date.now()}`,
+          description: 'negative quantity fixture',
+          workCenterId,
+          operations: [
+            {
+              sequenceNumber: 10,
+              description: 'negative step',
+              craftId,
+              plannedHours: 1,
+              materials: [{ materialId: materialA, quantity: -1 }],
+            },
+          ],
+        });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('quantity');
+    });
   });
 });

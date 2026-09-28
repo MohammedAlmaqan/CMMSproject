@@ -36,11 +36,23 @@ export function isPrismaError(error: unknown): error is PrismaLikeError {
  * The constraint name Prisma reports, when it reports one. Returns `undefined`
  * for anything that is not a usable string, so callers can safely do
  * `String(target ?? '')` and get `''` rather than `'[object Object]'`.
+ *
+ * Prisma reports P2002 `meta.target` as a string (usually the constraint name)
+ * in some versions and as an array of the offending column names in others.
+ * Both forms are normalised: a column array is joined so a handler can check
+ * `target.includes('code')` against the header column the same way whatever
+ * shape the driving version of Prisma throws.
  */
 export function prismaErrorTarget(error: unknown): string {
   if (!isPrismaError(error)) {
     return '';
   }
   const target = error.meta?.target;
-  return typeof target === 'string' ? target : '';
+  if (typeof target === 'string') {
+    return target;
+  }
+  if (Array.isArray(target)) {
+    return target.map((part) => String(part)).join(' ');
+  }
+  return '';
 }

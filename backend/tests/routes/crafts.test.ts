@@ -1,7 +1,49 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { api, authHeaders, ctx } from '../helpers.js';
+import { prisma } from '../../src/utils/prisma.js';
+
+// SOW 3.1.3: crafts are assigned to a work centre, each with its own hourly
+// rate, and the assignment is a real write path. The matrix held the row
+// because crafts.test.ts only covered the list and a 401 — none of POST/PUT,
+// and none of the 409 retirement refusals this row is built on.
+
+const stamp = Date.now();
+let createdIds: string[] = [];
+let workCenterId = '';
+let refCraftId = '';
+let taskCraftId = '';
+let blockedWoId = '';
+let blockedTaskListId = '';
+
+async function createCraft(craftCode: string, overrides: Record<string, unknown> = {}, token = ctx.adminToken) {
+  return api()
+    .post('/api/crafts')
+    .set(authHeaders(token))
+    .send({ workCenterId, craftCode, description: 'craft fixture', hourlyRate: 42.5, ...overrides });
+}
 
 describe('crafts routes', () => {
+  beforeAll(async () => {
+    const wcs = await api().get('/api/work-centers').set(authHeaders(ctx.adminToken));
+    workCenterId = wcs.body[0].workCenterId;
+  });
+
+  afterAll(async () => {
+    for (const id of createdIds) {
+      await prisma.craft.deleteMany({ where: { craftId: id } }).catch(() => {});
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
+    }
+    if (blockedWoId) {
+      await prisma.workOrderOperation.deleteMany({ where: { workOrderId: blockedWoId } }).catch(() => {});
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: blockedWoId } }).catch(() => {});
+      await prisma.workOrder.deleteMany({ where: { workOrderId: blockedWoId } }).catch(() => {});
+    }
+    if (blockedTaskListId) {
+      await prisma.taskListOperation.deleteMany({ where: { taskListId: blockedTaskListId } }).catch(() => {});
+      await prisma.taskList.deleteMany({ where: { taskListId: blockedTaskListId } }).catch(() => {});
+    }
+  });
+
   it('returns the craft list', async () => {
     const res = await api().get('/api/crafts').set(authHeaders(ctx.adminToken));
     expect(res.status).toBe(200);
@@ -12,4 +54,137 @@ describe('crafts routes', () => {
     const res = await api().get('/api/crafts');
     expect(res.status).toBe(401);
   });
-})
+
+  describe('craft write path (SOW 3.1.3)', () => {
+    it('creates a craft with its own hourly rate and persists it', async () => {
+      const res = await createCraft(`CRF-W-${stamp}`);
+      expect(res.status).toBe(201);
+      const id = res.body.craftId;
+      createdIds.push(id);
+      const row = await prisma.craft.findUniqueOrThrow({ where: { craftId: id } });
+      expect(Number(row.hourlyRate)).toBe(42.5);
+      expect(row.workCenterId).toBe(workCenterId);
+    });
+
+    it('refuses a duplicate craft code within the same work centre with 409', async () => {
+      const res = await createCraft(`CRF-W-${stamp}`);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/already exists/);
+    });
+
+    it('rejects a craft without an hourly rate as malformed (400)', async () => {
+      const res = await api()
+        .post('/api/crafts')
+        .set(authHeaders(ctx.adminToken))
+        .send({ workCenterId, craftCode: `CRF-NR-${stamp}`, description: 'no rate' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('hourlyRate');
+    });
+
+    it('rejects create by a below-Planner role with 403', async () => {
+      const res = await createCraft(`CRF-ROLE-${stamp}`, {}, ctx.operatorToken);
+      expect(res.status).toBe(403);
+    });
+
+    it('updates a craft rate and persists the new value', async () => {
+      const made = await createCraft(`CRF-U-${stamp}`);
+      expect(made.status).toBe(201);
+      createdIds.push(made.body.craftId);
+
+      const res = await api()
+        .put(`/api/crafts/${made.body.craftId}`)
+        .set(authHeaders(ctx.adminToken))
+        .send({ hourlyRate: 55 });
+      expect(res.status).toBe(200);
+      expect(Number(res.body.hourlyRate)).toBe(55);
+      expect(Number((await prisma.craft.findUniqueOrThrow({ where: { craftId: made.body.craftId } })).hourlyRate)).toBe(55);
+    });
+
+    it('refuses retirement while a work order operation references the craft (409)', async () => {
+      const made = await createCraft(`CRF-BWO-${stamp}`);
+      expect(made.status).toBe(201);
+      refCraftId = made.body.craftId;
+      createdIds.push(refCraftId);
+
+      const fl = (await prisma.functionalLocation.findFirst({ where: { isDeleted: false } }))!;
+      const wo = await prisma.workOrder.create({
+        data: {
+          woNumber: `WO-CRF-${stamp}`,
+          type: 'CM',
+          priority: 'Medium',
+          status: 'Draft',
+          description: 'craft retirement block fixture',
+          functionalLocationId: fl.functionalLocationId,
+          workCenterId,
+          supervisorUserId: ctx.adminId,
+          reportedByUserId: ctx.adminId,
+          createdBy: ctx.adminId,
+          modifiedBy: ctx.adminId,
+        },
+      });
+      blockedWoId = wo.workOrderId;
+      await prisma.workOrderOperation.create({
+        data: {
+          workOrderId: wo.workOrderId,
+          sequenceNumber: 10,
+          description: 'operation using the craft',
+          craftId: refCraftId,
+          plannedHours: 1,
+          createdBy: ctx.adminId,
+          modifiedBy: ctx.adminId,
+        },
+      });
+
+      const res = await api().delete(`/api/crafts/${refCraftId}`).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/work order operation/);
+      expect((await prisma.craft.findUniqueOrThrow({ where: { craftId: refCraftId } })).isDeleted).toBe(false);
+    });
+
+    it('refuses retirement while a live task list step references the craft (409)', async () => {
+      const made = await createCraft(`CRF-BTL-${stamp}`);
+      expect(made.status).toBe(201);
+      taskCraftId = made.body.craftId;
+      createdIds.push(taskCraftId);
+
+      const tpl = await prisma.taskList.create({
+        data: {
+          code: `TL-CRF-${stamp}`,
+          description: 'craft retirement block template',
+          workCenterId,
+          createdBy: ctx.adminId,
+          modifiedBy: ctx.adminId,
+        },
+      });
+      blockedTaskListId = tpl.taskListId;
+      await prisma.taskListOperation.create({
+        data: {
+          taskListId: tpl.taskListId,
+          sequenceNumber: 10,
+          description: 'step using the craft',
+          craftId: taskCraftId,
+          plannedHours: 1,
+          numberOfTechnicians: 1,
+          createdBy: ctx.adminId,
+          modifiedBy: ctx.adminId,
+        },
+      });
+
+      const res = await api().delete(`/api/crafts/${taskCraftId}`).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/task list step/);
+      expect((await prisma.craft.findUniqueOrThrow({ where: { craftId: taskCraftId } })).isDeleted).toBe(false);
+    });
+
+    it('retires a craft once nothing references it', async () => {
+      const made = await createCraft(`CRF-FREE-${stamp}`);
+      expect(made.status).toBe(201);
+      const id = made.body.craftId;
+      createdIds.push(id);
+
+      const res = await api().delete(`/api/crafts/${id}`).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      expect((await prisma.craft.findUniqueOrThrow({ where: { craftId: id } })).isDeleted).toBe(true);
+    });
+  });
+});

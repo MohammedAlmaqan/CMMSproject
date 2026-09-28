@@ -54,10 +54,13 @@ describe('prismaErrorTarget', () => {
     expect(prismaErrorTarget({ code: 'P2002' })).toBe('');
   });
 
-  it('returns an empty string when target is not a string', () => {
-    // Prisma has been known to hand back an array of column names. Stringifying
-    // that would produce "[object Object]" and read as a code collision.
-    expect(prismaErrorTarget({ code: 'P2002', meta: { target: ['a', 'b'] } })).toBe('');
+  it('joins a column-array target so the route can .includes() the header column', () => {
+    // Prisma hands back an array of column names in some versions, which used to
+    // fall out empty and made the duplicate-material discriminator mis-read a
+    // P2002 as a header-code collision. The columns are joined so the check
+    // works the same no matter which shape the driving version reports.
+    expect(prismaErrorTarget({ code: 'P2002', meta: { target: ['a', 'b'] } })).toBe('a b');
+    expect(prismaErrorTarget({ code: 'P2002', meta: { target: ['code'] } })).toBe('code');
   });
 
   it('returns an empty string for anything that is not a Prisma error', () => {
