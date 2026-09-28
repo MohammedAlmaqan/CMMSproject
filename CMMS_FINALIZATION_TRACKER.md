@@ -971,7 +971,7 @@ The E.11 boundary note deferred **19 §3 rows** that E.9 restated as *clauses wh
 | F.4 | Capacity-board suite (F0g) | ✅ | `buildCapacityBoard` runs against live data; board shape asserted. | *this commit* |
 | F.5 | Notification lifecycle suites: M3, transition validity, mandatory pair, link navigation, close on completion (F0k–F0o) | ✅ | M3 auto-created on completion; notification transition map driven both ways; at-least-one rule asserted; navigation split decided (F0n); auto-close asserted. | *this commit* |
 | F.6 | Work-order rules suites: prefix config, operation update (F0p, F0q) | ✅ | A route test proves the configured WO-number prefix; a `PUT` operation update survives the Zod parse. | *this commit* |
-| F.7 | Labour attribution suite (F0r) | ⬜ | Session-derived technician is authoritative; client-supplied `userId` cannot override. | — |
+| F.7 | Labour attribution suite (F0r) | ✅ | Session-derived technician is authoritative; client-supplied `userId` cannot override. | *this commit* |
 | F.8 | Cost-split suite (F0s) | ⬜ | 100% validation and read-back over the route; the static source-reading unit test is superseded. | — |
 | F.9 | Phase F gate: matrix recount, docs delta, green CI for the exact SHA | ⬜ | Status column re-derived from the suites' outcomes; §3 counts recounted; every promotion cites its suite; green CI both jobs; report carries the Docs delta. | — |
 
