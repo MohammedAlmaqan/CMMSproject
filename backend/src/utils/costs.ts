@@ -21,13 +21,13 @@ export async function recomputeWorkOrderCosts(workOrderId: string, actor: CostAc
 
   const [operations, woMaterials, externalServices, laborEntries] = await Promise.all([
     prisma.workOrderOperation.findMany({
-      where: { workOrderId },
+      where: { workOrderId, isDeleted: false },
       include: { craft: true },
     }),
-    prisma.workOrderMaterial.findMany({ where: { workOrderId } }),
-    prisma.externalServiceCost.findMany({ where: { workOrderId } }),
+    prisma.workOrderMaterial.findMany({ where: { workOrderId, isDeleted: false } }),
+    prisma.externalServiceCost.findMany({ where: { workOrderId, isDeleted: false } }),
     prisma.laborEntry.findMany({
-      where: { isDeleted: false, operation: { workOrderId } },
+      where: { isDeleted: false, operation: { workOrderId, isDeleted: false } },
       include: { operation: { include: { craft: true } } },
     }),
   ]);

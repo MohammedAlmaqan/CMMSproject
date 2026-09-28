@@ -197,6 +197,11 @@ model EquipmentBOMMaterial {
   equipmentId String
   materialId  String
   quantity    Float
+  createdBy   String   @default("system")
+  createdDate DateTime @default(now())
+  modifiedBy  String   @default("system")
+  modifiedDate DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
 
   equipment Equipment @relation(fields: [equipmentId], references: [equipmentId])
   material  Material  @relation(fields: [materialId], references: [materialId])
@@ -281,11 +286,13 @@ model TaskListMaterial {
   createdDate  DateTime @default(now())
   modifiedBy   String   @default("system")
   modifiedDate DateTime @updatedAt
+  isDeleted    Boolean  @default(false)
 
   taskOperation TaskListOperation @relation(fields: [taskOperationId], references: [taskOperationId])
   material      Material          @relation(fields: [materialId], references: [materialId])
 
-  @@unique([taskOperationId, materialId], name: "TaskListMaterial_op_material_key")
+  // F3: @@unique([taskOperationId, materialId]) replaced by partial unique
+  // index (isDeleted=false) so a soft-deleted requirement frees its pair.
   @@index([materialId], map: "TaskListMaterial_materialId_idx")
 }
 
@@ -398,6 +405,11 @@ model WorkOrderSnapshot {
 model WorkOrderNotifLink {
   workOrderId    String
   notificationId String
+  createdBy      String   @default("system")
+  createdDate    DateTime @default(now())
+  modifiedBy     String   @default("system")
+  modifiedDate   DateTime @updatedAt
+  isDeleted      Boolean  @default(false)
 
   workOrder     WorkOrder    @relation(fields: [workOrderId], references: [workOrderId])
   notification  Notification @relation(fields: [notificationId], references: [notificationId])
@@ -419,6 +431,7 @@ model WorkOrderOperation {
   createdDate        DateTime @default(now())
   modifiedBy         String   @default("system")
   modifiedDate       DateTime @updatedAt
+  isDeleted          Boolean  @default(false)
 
   workOrder  WorkOrder    @relation(fields: [workOrderId], references: [workOrderId])
   craft      Craft        @relation(fields: [craftId], references: [craftId])
@@ -440,6 +453,11 @@ model WorkOrderMaterial {
   actualQuantity     Float  @default(0)
   unitCost           Float  @default(0)
   reservationQuantity Float @default(0)
+  createdBy           String   @default("system")
+  createdDate         DateTime @default(now())
+  modifiedBy          String   @default("system")
+  modifiedDate        DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
 
   workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId])
   material  Material  @relation(fields: [materialId], references: [materialId])
@@ -476,6 +494,11 @@ model ExternalServiceCost {
   // status/type column here (see v1.1-4). 'Service' is the contractor case and
   // the default, so an existing caller that sends nothing keeps its meaning.
   category      String @default("Service")
+  createdBy     String   @default("system")
+  createdDate   DateTime @default(now())
+  modifiedBy    String   @default("system")
+  modifiedDate  DateTime @updatedAt
+  isDeleted     Boolean  @default(false)
 
   workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId])
 }
@@ -500,6 +523,11 @@ model ChecklistItem {
   checklistTemplateId String
   sequenceNumber      Int
   description         String
+  createdBy           String   @default("system")
+  createdDate         DateTime @default(now())
+  modifiedBy          String   @default("system")
+  modifiedDate        DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
 
   template SafetyChecklistTemplate @relation(fields: [checklistTemplateId], references: [checklistTemplateId])
   responses WorkOrderChecklistItem[]
@@ -516,6 +544,7 @@ model WorkOrderChecklist {
   createdDate         DateTime @default(now())
   modifiedBy          String   @default("system")
   modifiedDate        DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
 
   workOrder  WorkOrder              @relation(fields: [workOrderId], references: [workOrderId])
   template   SafetyChecklistTemplate @relation(fields: [checklistTemplateId], references: [checklistTemplateId])
@@ -533,6 +562,11 @@ model WorkOrderChecklistItem {
   // 'NA' stays a valid deliberate answer for questions that do not apply.
   response          String?  // Yes, No, NA, or null when unanswered
   comment           String?
+  createdBy         String   @default("system")
+  createdDate       DateTime @default(now())
+  modifiedBy        String   @default("system")
+  modifiedDate      DateTime @updatedAt
+  isDeleted         Boolean  @default(false)
 
   woChecklist WorkOrderChecklist @relation(fields: [woChecklistId], references: [woChecklistId])
   item        ChecklistItem      @relation(fields: [itemId], references: [itemId])
@@ -593,6 +627,11 @@ model MaintenancePlanTarget {
   planId               String
   equipmentId          String?
   functionalLocationId String?
+  createdBy            String   @default("system")
+  createdDate          DateTime @default(now())
+  modifiedBy           String   @default("system")
+  modifiedDate         DateTime @updatedAt
+  isDeleted            Boolean  @default(false)
 
   // CASCADE: a target row is only meaningful as part of its plan's definition.
   // Deleting the plan must take its targeting with it, or the rows are orphans
@@ -604,8 +643,9 @@ model MaintenancePlanTarget {
   // Postgres treats NULLs as distinct in a unique index, so these stop a
   // repeated non-null target but cannot stop two all-NULL rows. The CHECK
   // constraint in the migration is what makes "exactly one target" real.
-  @@unique([planId, equipmentId])
-  @@unique([planId, functionalLocationId])
+  // F3: @@unique([planId, equipmentId]) replaced by a partial unique index
+  // (isDeleted=false) so a soft-deleted target frees its pair for re-add.
+  // F3: @@unique([planId, functionalLocationId]) likewise.
   @@index([equipmentId])
   @@index([functionalLocationId])
 }
@@ -615,6 +655,11 @@ model MaintenancePlanMeter {
   planId       String
   meterId      String
   meterInterval Float
+  createdBy     String   @default("system")
+  createdDate   DateTime @default(now())
+  modifiedBy    String   @default("system")
+  modifiedDate  DateTime @updatedAt
+  isDeleted     Boolean  @default(false)
 
   plan  MaintenancePlan @relation(fields: [planId], references: [planId])
   meter EquipmentMeter  @relation(fields: [meterId], references: [meterId])
@@ -625,6 +670,11 @@ model CostSplit {
   workOrderId     String
   costCenterCode  String
   percentage      Float
+  createdBy       String   @default("system")
+  createdDate     DateTime @default(now())
+  modifiedBy      String   @default("system")
+  modifiedDate    DateTime @updatedAt
+  isDeleted       Boolean  @default(false)
 
   workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId])
 }
@@ -654,6 +704,10 @@ model SystemAlert {
   createdDate       DateTime @default(now())
   relatedEntityId   String?
   relatedEntityType String?
+  createdBy         String   @default("system")
+  modifiedBy        String   @default("system")
+  modifiedDate      DateTime @updatedAt
+  isDeleted         Boolean  @default(false)
 
   user User @relation(fields: [userId], references: [userId])
 }
@@ -665,6 +719,10 @@ model Comment {
   userId      String
   content     String
   createdDate DateTime @default(now())
+  createdBy   String   @default("system")
+  modifiedBy  String   @default("system")
+  modifiedDate DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
 
   user User @relation(fields: [userId], references: [userId])
 }
@@ -689,8 +747,17 @@ model Attachment {
 
 model SystemConfig {
   configId String @id @default(uuid())
-  key      String @unique
-  value    String
+  // F3: `key` is NOT `@unique` here; uniqueness is enforced for active rows only
+  // by a partial unique index (see migration for the sweep):
+  //   CREATE UNIQUE INDEX "SystemConfig_key_active_key"
+  //     ON "SystemConfig" ("key") WHERE "isDeleted" = false;
+  key        String
+  value      String
+  createdBy  String   @default("system")
+  createdDate DateTime @default(now())
+  modifiedBy String   @default("system")
+  modifiedDate DateTime @updatedAt
+  isDeleted  Boolean  @default(false)
 }
 
 model SchedulerRun {
@@ -705,6 +772,11 @@ model SchedulerRun {
   wosCreated     Int      @default(0)
   wosSkipped     Int      @default(0)
   errorMessage   String?
+  createdBy      String   @default("system")
+  createdDate    DateTime @default(now())
+  modifiedBy     String   @default("system")
+  modifiedDate   DateTime @updatedAt
+  isDeleted      Boolean  @default(false)
 
   @@index([status, heartbeatAt])
   @@index([completedAt])

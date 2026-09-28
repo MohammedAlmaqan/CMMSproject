@@ -202,6 +202,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         equipment: true,
         reportedBy: { select: { userId: true, fullName: true, username: true } },
         workOrders: {
+          where: { isDeleted: false, workOrder: { isDeleted: false } },
           include: {
             workOrder: { select: { workOrderId: true, woNumber: true, status: true, type: true } },
           },
@@ -214,7 +215,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     }
 
     const comments = await prisma.comment.findMany({
-      where: { entityType: 'Notification', entityId: notification.notificationId },
+      where: { entityType: 'Notification', entityId: notification.notificationId, isDeleted: false },
       include: { user: { select: { userId: true, fullName: true } } },
       orderBy: { createdDate: 'desc' },
     });
@@ -615,6 +616,8 @@ router.post('/:id/convert-to-wo', authorizeMinRole('Maintenance Planner'), valid
         data: {
           workOrderId: wo.workOrderId,
           notificationId: notification.notificationId,
+          createdBy: req.user!.userId,
+          modifiedBy: req.user!.userId,
         },
       });
 

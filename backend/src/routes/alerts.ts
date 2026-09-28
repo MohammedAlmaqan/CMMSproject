@@ -143,7 +143,7 @@ router.use(authenticate);
 router.get('/', async (req: Request, res: Response) => {
   try {
     const alerts = await prisma.systemAlert.findMany({
-      where: { userId: req.user!.userId },
+      where: { userId: req.user!.userId, isDeleted: false },
       orderBy: { createdDate: 'desc' },
     });
 
@@ -157,7 +157,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/unread-count', async (req: Request, res: Response) => {
   try {
     const count = await prisma.systemAlert.count({
-      where: { userId: req.user!.userId, isRead: false },
+      where: { userId: req.user!.userId, isRead: false, isDeleted: false },
     });
 
     res.json({ count });
@@ -170,7 +170,7 @@ router.get('/unread-count', async (req: Request, res: Response) => {
 router.put('/read-all', authorizeMinRole('Requester'), async (req: Request, res: Response) => {
   try {
     await prisma.systemAlert.updateMany({
-      where: { userId: req.user!.userId, isRead: false },
+      where: { userId: req.user!.userId, isRead: false, isDeleted: false },
       data: { isRead: true },
     });
 
@@ -190,7 +190,7 @@ router.put('/:id/read', authorizeMinRole('Requester'), async (req: Request, res:
   try {
     const id = req.params.id as string;
     const existing = await prisma.systemAlert.findFirst({
-      where: { alertId: id, userId: req.user!.userId },
+      where: { alertId: id, userId: req.user!.userId, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Alert not found' });

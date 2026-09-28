@@ -127,8 +127,9 @@ describe('requirements are stored and returned', () => {
 
   it('clears the superseded requirements instead of leaking them', () => {
     // Operations are soft-deleted, so without this the requirements would
-    // outlive every step they describe and grow on each edit.
-    expect(taskLists).toMatch(/taskListMaterial\.deleteMany\(/);
+    // outlive every step they describe and grow on each edit. The step's own
+    // rows now retire the same way (updateMany), matching the operation.
+    expect(taskLists).toMatch(/taskListMaterial\.updateMany\(/);
   });
 
   it('does all of that in one transaction, so a failure leaves no half list', () => {
@@ -136,8 +137,14 @@ describe('requirements are stored and returned', () => {
   });
 
   it('returns them on every task list read', () => {
-    const includes = taskLists.match(/materials: \{ include: \{ material: true \} \}/g) ?? [];
-    expect(includes.length).toBe(5);
+    // Five include sites total: the two read paths (list + detail) use the bare
+    // include, the three write-path returns (create, update-audit, update) carry
+    // the sweep's isDeleted filter in front of it. Both forms count to prove
+    // the filter rigged into the write-path returns without dropping a read.
+    const bare = taskLists.match(/materials: \{ ?include: \{ material: true \}/g) ?? [];
+    const filtered = taskLists.match(/materials: \{ where: \{ isDeleted: false \}, include: \{ material: true \}/g) ?? [];
+    expect(bare.length).toBe(2);
+    expect(filtered.length).toBe(3);
   });
 
   it('blames the duplicate requirement rather than the task list code', () => {

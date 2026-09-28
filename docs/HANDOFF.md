@@ -49,7 +49,7 @@ Recorded in `CMMS_FINALIZATION_TRACKER.md` under **Post-Go-Live Backlog (v1.1)**
 
 ### Verified good — not a defect
 
-Work orders are soft-deleted and **children are retained**, per rule 3.4. Verified empirically against the live DB on 2026-09-25 for every populated child table: `WorkOrderOperation` (122 rows), `ExternalServiceCost` (1) and `WorkOrderNotifLink` (4) all kept their rows across `UPDATE "WorkOrder" SET "isDeleted"=true`, with the parent row still present. `WorkOrderMaterial`, `CostSplit` and `WorkOrderChecklist` are empty, so they hold by the same mechanism but were not exercised. All rows restored afterwards.
+Work orders are soft-deleted and **children are retained** under the parent row, per rule 3.4. Verified empirically against the live DB on 2026-09-25 for every populated child table: `WorkOrderOperation` (122 rows), `ExternalServiceCost` (1) and `WorkOrderNotifLink` (4) all kept their rows across `UPDATE "WorkOrder" SET "isDeleted"=true`, with the parent row still present. `WorkOrderMaterial`, `CostSplit` and `WorkOrderChecklist` are empty, so they hold by the same mechanism but were not exercised. All rows restored afterwards. **Superseded by E.12:** the children now carry their own `isDeleted` (the 16-model sweep), and deletes on operations, materials, checklists, splits and plans soft-retire the related rows instead of removing them.
 
 ### Open residuals (2)
 

@@ -99,7 +99,7 @@ export async function generatePmWorkOrder(
       // functional location from the same query rather than a second one that
       // can come back empty and leave the plan looking untargetable.
       equipment: true,
-      targets: { include: { equipment: true, functionalLocation: true } },
+      targets: { where: { isDeleted: false }, include: { equipment: true, functionalLocation: true } },
       taskList: { include: { operations: { where: { isDeleted: false }, orderBy: { sequenceNumber: 'asc' } } } },
       notification: true,
     },
@@ -167,8 +167,8 @@ export async function generatePmWorkOrder(
 type PlanWithRelations = Prisma.MaintenancePlanGetPayload<{
   include: {
     equipment: true;
-    targets: { include: { equipment: true; functionalLocation: true } };
-    taskList: { include: { operations: true } };
+    targets: { where: { isDeleted: false }; include: { equipment: true; functionalLocation: true } };
+    taskList: { include: { operations: { where: { isDeleted: false } } } };
     notification: true;
   };
 }>;
@@ -296,7 +296,12 @@ async function generateOne(
         },
       });
       await tx.workOrderNotifLink.create({
-        data: { workOrderId: wo.workOrderId, notificationId: notification.notificationId },
+        data: {
+          workOrderId: wo.workOrderId,
+          notificationId: notification.notificationId,
+          createdBy: input.actorUserId,
+          modifiedBy: input.actorUserId,
+        },
       });
       notificationId = notification.notificationId;
     }

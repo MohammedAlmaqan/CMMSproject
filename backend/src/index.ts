@@ -150,8 +150,8 @@ app.get('/api/health', (_req, res) => {
 const STALE_WINDOW_MS = 25 * 60 * 60 * 1000;
 
 async function createSchedulerStaleAlert(): Promise<void> {
-  const existing = await prisma.systemAlert.findFirst({
-    where: { alertType: 'Scheduler_Stale', createdDate: { gt: new Date(Date.now() - STALE_WINDOW_MS) } },
+const existing = await prisma.systemAlert.findFirst({
+    where: { alertType: 'Scheduler_Stale', isDeleted: false, createdDate: { gt: new Date(Date.now() - STALE_WINDOW_MS) } },
   });
   if (existing) return;
   const admin = await prisma.user.findFirst({ where: { role: 'Administrator', isActive: true } });
@@ -169,8 +169,8 @@ async function createSchedulerStaleAlert(): Promise<void> {
 
 app.get('/api/health/scheduler', async (_req, res) => {
   try {
-    const last = await prisma.schedulerRun.findFirst({
-      where: { status: 'success' },
+const last = await prisma.schedulerRun.findFirst({
+      where: { status: 'success', isDeleted: false },
       orderBy: { completedAt: 'desc' },
     });
     const nowMs = Date.now();

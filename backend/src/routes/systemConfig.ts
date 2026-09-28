@@ -69,7 +69,7 @@ const SETTINGS: SettingDefinition[] = [
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const stored = await prisma.systemConfig.findMany({
-      where: { key: { in: SETTINGS.map((s) => s.key) } },
+      where: { key: { in: SETTINGS.map((s) => s.key) }, isDeleted: false },
     });
     const byKey = new Map(stored.map((row) => [row.key, row.value]));
 
@@ -139,12 +139,18 @@ router.put('/', authorizeMinRole('Administrator'), validate(systemConfigUpdateSc
       return res.status(400).json({ error: 'That setting is not configurable' });
     }
 
-    const previous = await prisma.systemConfig.findUnique({ where: { key } });
-    const saved = await prisma.systemConfig.upsert({
-      where: { key },
-      update: { value },
-      create: { key, value },
-    });
+    // key is no longer a plain @unique (see the F3 note in schema.prisma), so the
+    // previous value is read with findFirst over active rows, and upsert is
+    // replaced by an explicit update-or-create on the row's own configId.
+    const previous = await prisma.systemConfig.findFirst({ where: { key, isDeleted: false } });
+    const saved = previous
+      ? await prisma.systemConfig.update({
+          where: { configId: previous.configId },
+          data: { value, modifiedBy: req.user!.userId },
+        })
+      : await prisma.systemConfig.create({
+          data: { key, value, createdBy: req.user!.userId, modifiedBy: req.user!.userId },
+        });
 
     await logAuditFieldChange({
 

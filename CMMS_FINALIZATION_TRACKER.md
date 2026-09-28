@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 8 - Production Readiness. Sections A through E; E is the last, and D-17 (`Float` -> `Decimal`) is its final item.
-**Status:** Phases 0-7 complete. **Phase 8 - Production Readiness: A complete (gate passed) | B code complete | C code complete | D complete and verified | E in progress, through E.11.** Matrix: **83 of 214 clauses `Met`**, 64 Partial, 34 Not Met. The §3.6 history workstream is done (Work Order History and Equipment Maintenance History are both `Met`, residual L25 closed) and Phase E stops here for review; what remains is the 16-model soft-delete sweep, then D-17. **A row is verified at the SHA where its test was green** — a commit cannot contain its own hash, so the evidence cell cites the tested SHA and that run's CI ID rather than the tip.
+**Status:** Phases 0-7 complete. **Phase 8 - Production Readiness: A complete (gate passed) | B code complete | C code complete | D complete and verified | E in progress, through E.12.** Matrix: **83 of 214 clauses `Met`**, 64 Partial, 34 Not Met. The §3.6 history workstream is done (rows 55/56 `Met`, residual L25 closed); the 16-model soft-delete sweep (E.12) is done — §4.3 and §5.3 stay `Partial` only because the audit-purge job and the four deliberately non-soft-deleted tables (`RefreshToken`, `AuditLogEntry`, `SequenceCounter`, `WorkOrderSnapshot`) remain; what remains is **D-17** (`Float` → `Decimal`), and Phase E stops at this boundary for review. **A row is verified at the SHA where its test was green** — a commit cannot contain its own hash, so the evidence cell cites the tested SHA and that run's CI ID rather than the tip.
 
 ## Status Legend
 
@@ -540,7 +540,7 @@ https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36326909767
 
 Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3 (the technician multiplier), D-17 (`Float` → `Decimal` for monetary columns), and the 16-model soft-delete sweep. This is the highest-risk phase of Phase 8 — two of the three cross-cutting items change the schema, and the third changes what every read in the system returns.
 
-Rows 19, 26, 31, 32, 34, 38, 49, 55 and 56 are done, along with D-3. Row 57 closed on the E.10 restatement, not on a code change. What remains is **the 16-model soft-delete sweep, then D-17 last** — in that order, and Phase E stops at each boundary for review.
+Rows 19, 26, 31, 32, 34, 38, 49, 55 and 56 are done, along with D-3. Row 57 closed on the E.10 restatement, not on a code change. The 16-model soft-delete sweep (E.12) is done too. What remains is **D-17 last**, and Phase E stops at this boundary for review.
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
@@ -555,6 +555,7 @@ Rows 19, 26, 31, 32, 34, 38, 49, 55 and 56 are done, along with D-3. Row 57 clos
 | E.9 | One-shot DB-backed diagnostic: re-test every row held on "never run against a live database" | ✅ | All 20 held rows examined clause by clause against the real suite. One promoted on genuine coverage; 19 re-stated as the specific untested clause. | `6c5b926` |
 | E.10 | Audit workstream: enforce field diffs and actor metadata in the type system (rows 38, 57) | ✅ | Measured before touching anything: **10 of 84** real route call sites carried both old and new values (the earlier "86" was a raw grep that counted the definition and the import). The row-57 premise turned out to be wrong — all **323/323** audit rows already in the database carried an IP address — so the real gap was field diffs and write-site coverage, not missing IPs. Both matrix rows restated from the measurement. `logAudit` no longer exists: `logAuditFieldChange` requires field, old and new; `logAuditAction` cannot accept value fields at all; both require user and IP. 84 call sites across 22 route files migrated. Turning enforcement on immediately surfaced **six** call sites that passed a `fieldName` with no values behind it, which the trail had been presenting as diffs. Master-data edits on nine registries and work-order cost recomputes now record per-column old/new via a shared differ. | `8a155bf` |
 | E.11 | Work Order History + Equipment Maintenance History (rows 55, 56) | ✅ | Each successful work-order status change stores a complete immutable snapshot of the work order (`WorkOrderSnapshot`, migration `20260928151746_work_order_snapshot`), written inside the status-transition transaction so a change can never occur without its history row; `GET /api/work-orders/:id/history` serves them oldest-first. `GET /api/equipment/:id/history` serves the full chronological maintenance history per equipment — date, type, cost, planned cost, and downtime hours derived from the actual start/finish exactly as the downtime report does — paginated and excluding soft-deleted work orders. Residual **L25 closed**. | *this commit* |
+| E.12 | 16-model soft-delete sweep (closes the hard-deleted-children contradiction in §4.3/§5.3) | ✅ | Every remaining transactional table gains `isDeleted` (13 of them also gain the full audit-column set); every read on a soft-deletable entity filters `isDeleted: false`; DELETEs become soft; task-list-material replacement, work-order-operation DELETE (cascading to its labour), maintenance-plan PUT/DELETE (targets and meters) and cost-split PUT replacement soft-retire prior rows instead of deleting them; the dropped `SystemConfig.key` `@unique` is replaced by a partial unique index scoped to active rows plus `findFirst`/update-or-create in `sequence.ts` and `systemConfig.ts`. Migration `20260928160000_soft_delete_sweep` applies cleanly on `cmms_gate` and on a fresh-DB replay. | *this commit* |
 
 **E.10 decisions worth recording**
 
@@ -613,6 +614,34 @@ Row 55 (§3.6 Work Order History) and row 56 (§3.6 Equipment Maintenance Histor
 | Database inspection | one immutable snapshot row per status transition; none on plain edits; equipment history rows carry correct cost and downtime; sortedness covered by the unit suite |
 
 **Phase F 19-hold deferral, recorded now.** E.9 restated 19 §3 rows held on `IMPLEMENTED, NOT VERIFIED` as clauses whose behaviour **no test exercises**. E.11 does not reopen any of them, and its 744-case green run is evidence only about the tests that exist. The DB-backed suites that must exist before any of those 19 rows can move are **Phase F's work**, and the E.11 verification table above deliberately claims nothing about them. Recording the constraint at each phase boundary is what stops a later reader treating a green run as coverage it does not have.
+
+#### E.12 — the 16-model soft-delete sweep (§4.3/§5.3)
+
+The phase-3.4 doctrine that work-order children are hard-deleted "with the parent work order as the soft-delete boundary" is retired. The sixteen remaining tables without `isDeleted` — every child, join and configuration table — now carry it, and 13 of them also gained the `createdBy`/`modifiedBy`/`modifiedDate` audit columns in the same migration. Thirty-four of the 38 tables are soft-deletable; the four that are not are deliberate and unmatched: `RefreshToken` (revoked, never deleted), `SequenceCounter` (a numeric semaphore), and the immutable append-only `AuditLogEntry` and `WorkOrderSnapshot`. `WorkOrderOperation`, `WorkOrderChecklist` and `TaskListMaterial` already had the audit set and gained `isDeleted` only.
+
+**E.12 decisions worth recording**
+
+- **The scope was the tables that lacked `isDeleted`.** Reads on every soft-deletable entity already filtered `isDeleted: false` after earlier sweeps; the missing half was the sixteen tables that had no column to filter on. The sweep therefore touched delete/write paths (soft-retire instead of `delete`), the replace operations (task-list materials, cost splits, plan targets/meters PUT), the operation DELETE cascade to labour, and the system tables `SystemAlert`, `SystemConfig` and `SchedulerRun` whose state was previously destroyed by hard deletes.
+- **Prisma refuses `where` on required to-one relations in `include`.** Filtering the linked template, item or work order inside an include for a **required** to-one relation is a TS2353 compile error — `where` is only allowed on optional relations. The filter moves up to the parent list's `where` (`where: { isDeleted: false, template: { isDeleted: false } }` over `include: { template: true }`). This is a constraint, not a choice, and the checklist-gate doctrine test documents it.
+- **`SystemConfig.key` lost its `@unique`.** A unique index scoped to active rows cannot be declared as a Prisma `@unique`, so `findUnique({ where: { key } })` stopped compiling. `sequence.ts` and `systemConfig.ts` now resolve by `findFirst({ where: { key, isDeleted: false } })` and write explicitly (update-or-create on `configId` rather than an upsert). Three other partial unique indexes joined it: `TaskListMaterial` and `MaintenancePlanTarget` (×2) get an `..._active_key` only over active rows, so a soft-deleted row always releases its slot.
+- **Four tables stay without `isDeleted`, deliberately.** `RefreshToken` rows are revoked, never deleted; `SequenceCounter` is a numeric semaphore where a soft delete would corrupt allocation; `AuditLogEntry` and `WorkOrderSnapshot` are immutable append-only records — a soft delete would be an edit. The §4.3/§5.3 rows now name them as the reason those clauses stay `Partial`, rather than counting them as gaps of the kind E.12 just closed.
+- **`crafts.ts:360` is deliberately unfiltered.** The craft-retirement guard counts work orders **including** soft-deleted ones, so a retired craft that holds only deleted orders still refuses retirement. The retirement test is locked to that behaviour.
+- **Tests moved to concrete patterns the code actually contains.** Doctrine tests that pinned fragile single-line source strings were widened to the real forms — `taskListMaterial.updateMany(... isDeleted: true)` for the replace, and separate counts for the two bare-read and three filtered returns on the task-list materials include. One new scenario (re-adding a soft-retired BOM line) was added rather than trusting the sweep.
+
+**E.12 verification**
+
+| Gate | Result |
+|---|---|
+| Backend `tsc -b` | exit 0 |
+| `eslint src tests` (backend) | 42 errors, identical set to the `HEAD` baseline — **no new violations** (delta script: 0 positive) |
+| Frontend `npm run build` | exit 0 |
+| Unit suite (no DB) | **530 cases across 30 files**, all passing (529 before; 1 new re-add/retire scenario) |
+| Full DB-backed suite on `cmms_gate` | **745 tests across 55 files**, all passing (744 before; 1 new) |
+| `@openapi` strict YAML | **113 blocks, 0 failures** |
+| Migration | `20260928160000_soft_delete_sweep` applied to `cmms_gate`; fresh-DB `prisma migrate deploy` replays the full chain cleanly (`cmms_gate_fresh`) |
+| Database inspection | 34 of 38 tables carry `isDeleted`; the four exceptions are `RefreshToken`, `AuditLogEntry`, `SequenceCounter`, `WorkOrderSnapshot`; `SystemConfig.key` has no `@unique`; the four partial unique indexes exist, and a soft-deleted row frees its unique slot |
+
+The first sweep run of the DB-backed suite failed 77 tests, all `P2021`/`P2022` "column/table does not exist" — the suite had been pointed at the stale local `cmms` database (eight migrations behind `prisma/migrations`) instead of the migrated `cmms_gate`. That is why the E.12 DB row cites `cmms_gate`: a gate is only evidence about the database it actually ran against.
 
 #### E.1, stated as raw output
 

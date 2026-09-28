@@ -898,9 +898,9 @@ async function checkEquipmentIsAtLeaf(
   return checkEquipmentPlacement({ hasChildren: location._count.children > 0 });
 }
 
-// SOW 3.1.2 / 3.1.5: the spare-parts BOM is a maintenance-managed write path, not// a read-only projection. EquipmentBOMMaterial is a composition child with no
-// isDeleted column, so BOM lines are hard-deleted — the same treatment 3.4 gives
-// the other child tables in this file.
+// SOW 3.1.2 / 3.1.5: the spare-parts BOM is a maintenance-managed write path, not
+// a read-only projection. BOM lines are soft-deleted (isDeleted=true) and retire
+// out of every live read; the audit entry and the row itself are both retained.
 //
 // The duplicate-material guard below is an application-level check only:
 // EquipmentBOMMaterial has no unique index on (equipmentId, materialId), so two
@@ -982,14 +982,14 @@ router.post('/:id/bom', authorizeMinRole('Technician'), validate(equipmentBomCre
     }
 
     const existingLine = await prisma.equipmentBOMMaterial.findFirst({
-      where: { equipmentId, materialId },
+      where: { equipmentId, materialId, isDeleted: false },
     });
     if (existingLine) {
       return res.status(409).json({ error: 'Material is already on this equipment BOM' });
     }
 
     const bomItem = await prisma.equipmentBOMMaterial.create({
-      data: { equipmentId, materialId, quantity },
+      data: { equipmentId, materialId, quantity, createdBy: req.user!.userId, modifiedBy: req.user!.userId },
     });
 
     await logAuditAction({ table: 'EquipmentBOMMaterial', recordId: bomItem.bomId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
@@ -1052,7 +1052,7 @@ router.put('/:id/bom/:bomId', authorizeMinRole('Technician'), validate(equipment
     const bomId = String(req.params.bomId);
 
     const existing = await prisma.equipmentBOMMaterial.findFirst({
-      where: { bomId, equipmentId },
+      where: { bomId, equipmentId, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'BOM line not found on this equipment' });
@@ -1060,7 +1060,7 @@ router.put('/:id/bom/:bomId', authorizeMinRole('Technician'), validate(equipment
 
     const bomItem = await prisma.equipmentBOMMaterial.update({
       where: { bomId },
-      data: { quantity: req.body.quantity },
+      data: { quantity: req.body.quantity, modifiedBy: req.user!.userId },
     });
 
     await logAuditAction({ table: 'EquipmentBOMMaterial', recordId: String(bomId), action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
@@ -1078,8 +1078,8 @@ router.put('/:id/bom/:bomId', authorizeMinRole('Technician'), validate(equipment
  *   delete:
  *     summary: Remove a spare part from an equipment BOM
  *     description: >
- *       Hard-deletes one BOM line. Per rule 3.4 child rows without an isDeleted
- *       column are removed outright; the audit entry is the retained record.
+ *       Soft-deletes one BOM line (isDeleted=true), so it drops out of the BOM
+ *       but the row is retained. Requires the Maintenance Supervisor role.
  *     tags: [Equipment]
  *     security:
  *       - bearerAuth: []
@@ -1117,13 +1117,16 @@ router.delete('/:id/bom/:bomId', authorizeMinRole('Maintenance Supervisor'), asy
     const bomId = String(req.params.bomId);
 
     const existing = await prisma.equipmentBOMMaterial.findFirst({
-      where: { bomId, equipmentId },
+      where: { bomId, equipmentId, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'BOM line not found on this equipment' });
     }
 
-    await prisma.equipmentBOMMaterial.delete({ where: { bomId } });
+    await prisma.equipmentBOMMaterial.update({
+      where: { bomId },
+      data: { isDeleted: true, modifiedBy: req.user!.userId },
+    });
 
     await logAuditAction({ table: 'EquipmentBOMMaterial', recordId: String(bomId), action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 

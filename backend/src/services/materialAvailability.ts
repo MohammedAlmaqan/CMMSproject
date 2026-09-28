@@ -49,6 +49,7 @@ export async function getMaterialAvailability(materialId: string): Promise<Mater
   const aggregate = await prisma.workOrderMaterial.aggregate({
     where: {
       materialId,
+      isDeleted: false,
       workOrder: {
         isDeleted: false,
         status: { notIn: [...RESERVATION_RELEASING_WORK_ORDER_STATUSES] },
@@ -102,8 +103,8 @@ export async function assertReservable({
   // where a reservation is missing from that total is the line being edited, so
   // give its old value back before comparing.
   if (excludeWoMaterialId) {
-    const existing = await prisma.workOrderMaterial.findUnique({
-      where: { woMaterialId: excludeWoMaterialId },
+    const existing = await prisma.workOrderMaterial.findFirst({
+      where: { woMaterialId: excludeWoMaterialId, isDeleted: false },
       select: { reservationQuantity: true },
     });
     const priorReservation = existing?.reservationQuantity ?? 0;

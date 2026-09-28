@@ -266,7 +266,7 @@ describe('associated notification (row 47)', () => {
     expect(r.notificationId).toBe('N1');
     expect(client.notification.create).toHaveBeenCalledTimes(1);
     expect(client.workOrderNotifLink.create).toHaveBeenCalledWith({
-      data: { workOrderId: 'WO1', notificationId: 'N1' },
+      data: { workOrderId: 'WO1', notificationId: 'N1', createdBy: 'scheduler', modifiedBy: 'scheduler' },
     });
   });
 

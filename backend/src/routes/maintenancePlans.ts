@@ -164,12 +164,14 @@ router.get('/', async (req: Request, res: Response) => {
         taskList: { select: { taskListId: true, code: true, description: true } },
         // D-10: the target list is what the plan actually covers, so it belongs
         // in the list response rather than only on the detail route.
-        targets: {          include: {
+        targets: {
+          where: { isDeleted: false },
+          include: {
             equipment: { select: { equipmentId: true, equipmentCode: true, name: true } },
             functionalLocation: { select: { functionalLocationId: true, locationCode: true, description: true } },
           },
         },
-        planMeters: true,
+        planMeters: { where: { isDeleted: false } },
       },
       orderBy: { createdDate: 'desc' },
     });
@@ -271,7 +273,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         equipment: true,
         workCenter: true,
         taskList: { include: { operations: { where: { isDeleted: false }, include: { craft: true }, orderBy: { sequenceNumber: 'asc' } } } },
-        planMeters: { include: { meter: true } },
+        planMeters: { where: { isDeleted: false }, include: { meter: true } },
       },
     });
 
@@ -436,11 +438,11 @@ router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdate
     // plan is never left straddling two states - strategy switched to Meter,
     // thresholds not yet attached.
     const existingTargets = await prisma.maintenancePlanTarget.findMany({
-      where: { planId: id },
+      where: { planId: id, isDeleted: false },
       select: { equipmentId: true, functionalLocationId: true },
     });
     const existingMeterCount = await prisma.maintenancePlanMeter.count({
-      where: { planId: id },
+      where: { planId: id, isDeleted: false },
     });
     const issues = planPatchIssues(
       req.body,
@@ -484,9 +486,14 @@ router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdate
     // Targets and meters are replaced wholesale rather than patched field by
     // field: the caller is stating the plan's current coverage, and a partial
     // diff over a set with no natural ordering is where duplicates creep in.
+    // Prior sets are soft-deleted so generation (which reads live targets only)
+    // never sees them; the history of what the plan covered survives.
     if (targets !== undefined) {
       await prisma.$transaction([
-        prisma.maintenancePlanTarget.deleteMany({ where: { planId: id } }),
+        prisma.maintenancePlanTarget.updateMany({
+          where: { planId: id, isDeleted: false },
+          data: { isDeleted: true, modifiedBy: req.user!.userId },
+        }),
         prisma.maintenancePlanTarget.createMany({
           data: normaliseTargets(targets, null, null).map((t) => ({
             planId: id,
@@ -498,7 +505,10 @@ router.put('/:id', authorizeMinRole('Requester'), validate(maintenancePlanUpdate
     }
     if (planMeters !== undefined) {
       await prisma.$transaction([
-        prisma.maintenancePlanMeter.deleteMany({ where: { planId: id } }),
+        prisma.maintenancePlanMeter.updateMany({
+          where: { planId: id, isDeleted: false },
+          data: { isDeleted: true, modifiedBy: req.user!.userId },
+        }),
         prisma.maintenancePlanMeter.createMany({
           data: planMeters.map((m: { meterId: string; meterInterval: number }) => ({
             planId: id,
@@ -578,10 +588,24 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       return res.status(404).json({ error: 'Maintenance plan not found' });
     }
 
-    await prisma.maintenancePlan.update({
-      where: { planId: id },
-      data: { isDeleted: true, modifiedBy: req.user!.userId },
-    });
+    // The plan's targets and meters retire with it. Generation never sees a
+    // deleted plan, but leaving the child rows live would inflate target/meter
+    // tallies and defeat the point of the sweep: children of a deleted plan are
+    // historical, exactly like a task list's operations on task-list delete.
+    await prisma.$transaction([
+      prisma.maintenancePlanTarget.updateMany({
+        where: { planId: id, isDeleted: false },
+        data: { isDeleted: true, modifiedBy: req.user!.userId },
+      }),
+      prisma.maintenancePlanMeter.updateMany({
+        where: { planId: id, isDeleted: false },
+        data: { isDeleted: true, modifiedBy: req.user!.userId },
+      }),
+      prisma.maintenancePlan.update({
+        where: { planId: id },
+        data: { isDeleted: true, modifiedBy: req.user!.userId },
+      }),
+    ]);
 
     await logAuditAction({ table: 'MaintenancePlan', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 

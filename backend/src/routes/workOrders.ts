@@ -170,19 +170,21 @@ router.get('/:id', async (req: Request, res: Response) => {
         workCenter: true,
         supervisor: { select: { userId: true, fullName: true, username: true } },
     reportedBy: { select: { userId: true, fullName: true, username: true } },
-        operations: { include: { craft: true }, orderBy: { sequenceNumber: 'asc' } },
+        operations: { where: { isDeleted: false }, include: { craft: true }, orderBy: { sequenceNumber: 'asc' } },
         // operation included so the screen can group a material line under the
         // step that needs it, which is the point of SOW 3.1.5.
-        woMaterials: { include: { material: true, operation: true } },
-        externalServices: true,
+        woMaterials: { where: { isDeleted: false }, include: { material: true, operation: true } },
+        externalServices: { where: { isDeleted: false } },
         checklists: {
+          where: { isDeleted: false },
           include: {
             template: true,
-            items: { include: { item: true } },
+            items: { where: { isDeleted: false }, include: { item: true } },
           },
         },
-        costSplits: true,
+        costSplits: { where: { isDeleted: false } },
         notifications: {
+          where: { isDeleted: false },
           include: {
             notification: { select: { notificationId: true, notificationNumber: true, description: true, status: true } },
           },
@@ -195,7 +197,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     }
 
     const comments = await prisma.comment.findMany({
-      where: { entityType: 'WorkOrder', entityId: workOrder.workOrderId },
+      where: { entityType: 'WorkOrder', entityId: workOrder.workOrderId, isDeleted: false },
       include: { user: { select: { userId: true, fullName: true } } },
       orderBy: { createdDate: 'desc' },
     });
@@ -749,7 +751,7 @@ router.put(
     }
 
     if (requiresAtLeastOneOperation(workOrder.status, newStatus)) {
-      const operationCount = await prisma.workOrderOperation.count({ where: { workOrderId: id } });
+      const operationCount = await prisma.workOrderOperation.count({ where: { workOrderId: id, isDeleted: false } });
       if (operationCount === 0) {
         await logAuditFieldChange({
 
@@ -772,11 +774,11 @@ router.put(
       // could never match because attach pre-filled 'NA'; the rule now keys off
       // an unanswered (null) item instead. See utils/checklistRules.ts.
       const mandatoryChecklists = await prisma.workOrderChecklist.findMany({
-        where: { workOrderId: id, template: { isMandatory: true } },
+        where: { workOrderId: id, isDeleted: false, template: { isMandatory: true, isDeleted: false } },
         select: {
           status: true,
           template: { select: { name: true } },
-          items: { select: { response: true } },
+          items: { where: { isDeleted: false }, select: { response: true } },
         },
       });
 
@@ -833,7 +835,7 @@ router.put(
     const linkedNotifications =
       newStatus === 'Completed'
         ? await prisma.workOrderNotifLink.findMany({
-            where: { workOrderId: id },
+            where: { workOrderId: id, isDeleted: false },
             select: { notificationId: true },
           })
         : [];

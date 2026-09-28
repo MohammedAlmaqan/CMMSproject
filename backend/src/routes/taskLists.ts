@@ -282,8 +282,9 @@ router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), 
       },
       include: {
         operations: {
+          where: { isDeleted: false },
           orderBy: { sequenceNumber: 'asc' },
-          include: { craft: true, materials: { include: { material: true } } },
+          include: { craft: true, materials: { where: { isDeleted: false }, include: { material: true } } },
         },
       },
     });
@@ -400,8 +401,9 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
       },
       include: {
         operations: {
+          where: { isDeleted: false },
           orderBy: { sequenceNumber: 'asc' },
-          include: { craft: true, materials: { include: { material: true } } },
+          include: { craft: true, materials: { where: { isDeleted: false }, include: { material: true } } },
         },
       },
     });
@@ -409,13 +411,9 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
     if (operations) {
       // 3.4: soft-replace operations — TaskListOperation carries isDeleted, so the previous
       // set is soft-deleted (updateMany) instead of hard-deleted; list/detail filters below
-      // then hide them historically while the WorkOrder-PM-copy path never sees them.
-      //
-      // The requirements are hard-deleted first. TaskListMaterial is a composition
-      // child of the operation and, per the same rule 3.4 reasoning that applies to
-      // WorkOrderMaterial, carries no isDeleted column. Left in place they would
-      // outlive every operation they describe: the operations become invisible, the
-      // requirements do not, and the row grows on each edit of the task list.
+      // then hide them historically while the WorkOrder-PM-copy path never sees them. The
+      // requirements are soft-deleted too, matching the operations they describe — left
+      // live they would outlive every operation and the row set would grow on each edit.
       const superseded = await prisma.taskListOperation.findMany({
         where: { taskListId: String(req.params.id), isDeleted: false },
         select: { taskOperationId: true },
@@ -423,8 +421,9 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
 
       await prisma.$transaction(async (tx) => {
         if (superseded.length > 0) {
-          await tx.taskListMaterial.deleteMany({
+          await tx.taskListMaterial.updateMany({
             where: { taskOperationId: { in: superseded.map((o) => o.taskOperationId) } },
+            data: { isDeleted: true, modifiedBy: req.user!.userId },
           });
         }
 
@@ -464,13 +463,13 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
       });
     }
 
-    const updated = await prisma.taskList.findUnique({
-      where: { taskListId: String(req.params.id) },
+    const updated = await prisma.taskList.findFirst({
+      where: { taskListId: String(req.params.id), isDeleted: false },
       include: {
         operations: {
           where: { isDeleted: false },
           orderBy: { sequenceNumber: 'asc' },
-          include: { craft: true, materials: { include: { material: true } } },
+          include: { craft: true, materials: { where: { isDeleted: false }, include: { material: true } } },
         },
         workCenter: {
           select: { workCenterId: true, code: true, name: true },
@@ -564,9 +563,8 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
     // steps keep `isDeleted: false`, so they still reference their craft, and a
     // craft could then never be retired (crafts.ts refuses retirement while a
     // task list step points at it). They are soft-deleted here for the same
-    // reason the update path does it, and the requirements are hard-deleted
-    // first because TaskListMaterial is a composition child with no isDeleted
-    // column, so left in place they would outlive every operation they describe.
+    // reason the update path does it, and the requirements are soft-deleted
+    // with them so nothing outlives the operations it describes.
     const superseded = await prisma.taskListOperation.findMany({
       where: { taskListId: String(req.params.id), isDeleted: false },
       select: { taskOperationId: true },
@@ -574,8 +572,9 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
 
     await prisma.$transaction(async (tx) => {
       if (superseded.length > 0) {
-        await tx.taskListMaterial.deleteMany({
+        await tx.taskListMaterial.updateMany({
           where: { taskOperationId: { in: superseded.map((o) => o.taskOperationId) } },
+          data: { isDeleted: true, modifiedBy: req.user!.userId },
         });
       }
 

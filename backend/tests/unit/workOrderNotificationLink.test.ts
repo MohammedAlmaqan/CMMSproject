@@ -20,8 +20,9 @@ const app = readFileSync(resolve(here, '../../../app/src/App.tsx'), 'utf8');
 describe('the work order read already carried the links', () => {
   it('includes the notification relation, so no extra query is needed', () => {
     // The gap was presentation only. Fetching again would have been the wrong
-    // fix for a field that was already in the payload.
-    expect(route).toMatch(/notifications: \{\s*include: \{\s*notification: \{ select: \{ notificationId: true, notificationNumber: true, description: true, status: true \} \}/);
+    // fix for a field that was already in the payload. The sweep's isDeleted
+    // filter on the link list sits in front of the include.
+    expect(route).toMatch(/notifications: \{\s*where: \{ isDeleted: false \},\s*include: \{\s*notification: \{ select: \{ notificationId: true, notificationNumber: true, description: true, status: true \} \}/);
   });
 });
 

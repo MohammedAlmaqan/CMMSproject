@@ -139,7 +139,7 @@ describe('maintenance plans routes', () => {
     expect(on.status).toBe(200);
     expect(on.body.strategyType).toBe('Meter');
     expect(
-      await prisma.maintenancePlanMeter.count({ where: { planId: createdId, meterId } })
+      await prisma.maintenancePlanMeter.count({ where: { planId: createdId, meterId, isDeleted: false } })
     ).toBe(1);
 
     // And back to a pure Time plan, which means dropping the threshold again.
@@ -149,7 +149,7 @@ describe('maintenance plans routes', () => {
       .send({ strategyType: 'Time', planMeters: [] });
     expect(off.status).toBe(200);
     expect(off.body.strategyType).toBe('Time');
-    expect(await prisma.maintenancePlanMeter.count({ where: { planId: createdId } })).toBe(0);
+    expect(await prisma.maintenancePlanMeter.count({ where: { planId: createdId, isDeleted: false } })).toBe(0);
   });
 
   it('rejects a partial update that would put endDate before startDate', async () => {

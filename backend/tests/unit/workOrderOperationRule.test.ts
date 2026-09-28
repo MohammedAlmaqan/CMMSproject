@@ -65,7 +65,7 @@ describe('the work order status route enforces it', () => {
     expect(workOrderRoute).toMatch(
       /requiresAtLeastOneOperation\(workOrder\.status, newStatus\)/
     );
-    expect(workOrderRoute).toMatch(/prisma\.workOrderOperation\.count\(\{ where: \{ workOrderId: id \} \}\)/);
+    expect(workOrderRoute).toMatch(/prisma\.workOrderOperation\.count\(\{ where: \{ workOrderId: id, isDeleted: false \} \}\)/);
   });
 
   it('refuses with 409 rather than a 400, since the request is well formed', () => {

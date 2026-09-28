@@ -18,14 +18,14 @@ export async function nextSequence(db: PrismaClient, code: string): Promise<numb
 }
 
 export async function generateWoNumber(): Promise<string> {
-  const prefixConfig = await prisma.systemConfig.findUnique({ where: { key: 'wo_number_prefix' } });
+  const prefixConfig = await prisma.systemConfig.findFirst({ where: { key: 'wo_number_prefix', isDeleted: false } });
   const prefix = prefixConfig?.value || 'WO';
   const sequence = await nextSequence(prisma, 'WORK_ORDER');
   return `${prefix}-${String(sequence).padStart(6, '0')}`;
 }
 
 export async function generateNotifNumber(): Promise<string> {
-  const prefixConfig = await prisma.systemConfig.findUnique({ where: { key: 'notif_number_prefix' } });
+  const prefixConfig = await prisma.systemConfig.findFirst({ where: { key: 'notif_number_prefix', isDeleted: false } });
   const prefix = prefixConfig?.value || 'N';
   const sequence = await nextSequence(prisma, 'NOTIFICATION');
   return `${prefix}-${String(sequence).padStart(6, '0')}`;

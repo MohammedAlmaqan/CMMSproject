@@ -50,6 +50,7 @@ router.get('/backlog', async (_req: Request, res: Response) => {
     const hoursByStatus = await prisma.workOrderOperation.groupBy({
       by: ['workOrderId'],
       where: {
+        isDeleted: false,
         workOrder: { isDeleted: false, status: { notIn: ['Completed', 'Closed', 'Cancelled'] } },
       },
       _sum: { plannedHours: true },
@@ -534,6 +535,7 @@ router.get('/material-consumption', async (_req: Request, res: Response) => {
     const materials = await prisma.workOrderMaterial.groupBy({
       by: ['materialId'],
       where: {
+        isDeleted: false,
         workOrder: { isDeleted: false },
         actualQuantity: { gt: 0 },
       },

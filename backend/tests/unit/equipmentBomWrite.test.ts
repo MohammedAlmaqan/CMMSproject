@@ -42,7 +42,16 @@ describe('equipment BOM write schemas, SOW 3.1.2 and 3.1.5', () => {
 
   it('scopes BOM writes to the equipment in the path', () => {
     // Guards a cross-tenant style bug: a bomId belonging to another equipment
-    // must 404 rather than be edited through the wrong parent's URL.
-    expect(equipmentRoute).toMatch(/where: \{ bomId, equipmentId \}/);
+    // must 404 rather than be edited through the wrong parent's URL. The
+    // sweep's isDeleted filter rides on the same where clause, so both PUT and
+    // DELETE read `where: { bomId, equipmentId, isDeleted: false }`.
+    expect(equipmentRoute).toMatch(/where: \{ bomId, equipmentId, isDeleted: false \}/);
+  });
+
+  it('refuses to resurrect a retired line on re-add', () => {
+    // The dup-guard and the retire path both match on active rows only, so a
+    // soft-deleted line can be re-added exactly once and stay unique.
+    expect(equipmentRoute).toMatch(/where: \{ equipmentId, materialId, isDeleted: false \}/);
+    expect(equipmentRoute).toMatch(/data: \{ isDeleted: true, modifiedBy: req\.user!\.userId \}/);
   });
 });

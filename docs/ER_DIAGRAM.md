@@ -451,11 +451,11 @@ promising more than the schema delivers.
    `USER.workCenterId` are all nullable, so a child may exist without the parent row.
    `WORK_ORDER.functionalLocationId` and `WORK_ORDER.workCenterId` are **required**.
 
-6. **Soft delete is not uniform.** 18 of the 35 tables carry `isDeleted` and are soft
-   deleted; the remaining 17 are hard deleted. In particular every work-order child
-   collection (`WORK_ORDER_OPERATION`, `WORK_ORDER_MATERIAL`, `EXTERNAL_SERVICE_COST`,
-   `COST_SPLIT`, `WORK_ORDER_CHECKLIST`, `WORK_ORDER_CHECKLIST_ITEM`) is hard deleted,
-   while `WORK_ORDER` itself is soft deleted. Per-table detail is in the data dictionary.
+6. **Soft delete is nearly uniform.** 34 of the 38 tables carry `isDeleted` and are soft
+   deleted (the E.12 sweep brought the work-order child and configuration tables onto it).
+   The four that never are, deliberately, are `REFRESH_TOKEN` (revoked, not deleted),
+   `SEQUENCE_COUNTER` (numeric semaphore) and the immutable append-only `AUDIT_LOG_ENTRY`
+   and `WORK_ORDER_SNAPSHOT`. Per-table detail is in the data dictionary.
 
 7. **Business codes are unique only among live rows.** Uniqueness of `username`,
    `locationCode`, `equipmentCode`, `WorkCenter.code`, `materialCode`, `TaskList.code`,

@@ -23,6 +23,7 @@ export async function acquireStartupLock(): Promise<boolean> {
 
   const foreign = await prisma.schedulerRun.findFirst({
     where: {
+      isDeleted: false,
       status: 'running',
       heartbeatAt: { gt: freshAt },
       OR: [{ hostname: { not: hostname } }, { pid: { not: pid } }],
@@ -91,9 +92,9 @@ export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
     where: { isDeleted: false, activeFlag: true, strategyType: { in: ['Time', 'Meter', 'Combined'] } },
     include: {
       equipment: { select: { functionalLocationId: true } },
-      taskList: { include: { operations: true } },
-      targets: { include: { equipment: true, functionalLocation: true } },
-      planMeters: true,
+      taskList: { include: { operations: { where: { isDeleted: false } } } },
+      targets: { where: { isDeleted: false }, include: { equipment: true, functionalLocation: true } },
+      planMeters: { where: { isDeleted: false } },
     },
   });
 

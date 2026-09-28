@@ -103,7 +103,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const operations = await prisma.workOrderOperation.findMany({
-      where: { workOrderId: workOrderId as string },
+      where: { workOrderId: workOrderId as string, isDeleted: false },
       include: { craft: true },
       orderBy: { sequenceNumber: 'asc' },
     });
@@ -204,8 +204,8 @@ router.post('/', authorizeMinRole('Technician'), validate(operationCreateSchema)
 router.put('/:id', authorizeMinRole('Technician'), validate(operationUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const existing = await prisma.workOrderOperation.findUnique({
-      where: { operationId: id },
+    const existing = await prisma.workOrderOperation.findFirst({
+      where: { operationId: id, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Operation not found' });
@@ -238,10 +238,11 @@ router.put('/:id', authorizeMinRole('Technician'), validate(operationUpdateSchem
   }
 });
 
-// 3.4: WorkOrderOperation rows are composition children of a WorkOrder and carry no isDeleted
-// column — hard delete is deliberate. The laborEntry cascade is hard too (and must stay hard):
-// soft-deleting labor would leave isDeleted=true rows under a hard-deleted operation (FK
-// violation on the row delete) and would keep them in cost recomputation as orphans.
+// Soft delete: the operation row is retained with isDeleted=true so settled
+// history renders (the work order snapshot holds the frozen numbers) and the
+// audit trail stays intact. Its labour entries are retired with it — they carry
+// the same isDeleted flag and cost recomputation filters them out, so actual
+// labour cost drops exactly as it did on a hard delete.
 
 /**
  * @openapi
@@ -249,10 +250,9 @@ router.put('/:id', authorizeMinRole('Technician'), validate(operationUpdateSchem
  *   delete:
  *     summary: Delete a work order operation
  *     description: >
- *       Hard delete - WorkOrderOperation carries no isDeleted column, per rule 3.4 the parent
- *       work order is the soft-delete boundary. Any labour entries booked against the
- *       operation are removed with it, so record actual hours before deleting. Requires
- *       the Technician role.
+ *       Soft delete - the operation row and its labour entries are marked
+ *       isDeleted=true. Cost recomputation excludes them, and the work order
+ *       history keeps rendering the retired steps. Requires the Technician role.
  *     tags: [Work Order Operations]
  *     security:
  *       - bearerAuth: []
@@ -283,19 +283,21 @@ router.put('/:id', authorizeMinRole('Technician'), validate(operationUpdateSchem
 router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const existing = await prisma.workOrderOperation.findUnique({
-      where: { operationId: id },
+    const existing = await prisma.workOrderOperation.findFirst({
+      where: { operationId: id, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Operation not found' });
     }
 
-    await prisma.laborEntry.deleteMany({
-      where: { operationId: id },
+    await prisma.laborEntry.updateMany({
+      where: { operationId: id, isDeleted: false },
+      data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
-    await prisma.workOrderOperation.delete({
+    await prisma.workOrderOperation.update({
       where: { operationId: id },
+      data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
     await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });

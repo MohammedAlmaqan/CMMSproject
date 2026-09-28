@@ -80,8 +80,14 @@ describe('the configuration endpoint', () => {
     expect(route).toMatch(/isDefault: !byKey\.has\(setting\.key\)/);
   });
 
-  it('upserts, so saving a prefix that has never been set works', () => {
-    expect(route).toMatch(/prisma\.systemConfig\.upsert\(/);
+  it('creates or updates, so saving a prefix that has never been set works', () => {
+    // key is not a plain @unique anymore (F3 in schema.prisma), so the route
+    // reads the active row with findFirst and branches on the result instead
+    // of upserting off the key.
+    expect(route).toMatch(/prisma\.systemConfig\.findFirst\(\{ where: \{ key, isDeleted: false \} \}\)/);
+    expect(route).toMatch(/previous\s*\?/);
+    expect(route).toMatch(/prisma\.systemConfig\.create\(\{/);
+    expect(route).not.toMatch(/prisma\.systemConfig\.upsert\(/);
   });
 
   it('audits the change with the previous value', () => {

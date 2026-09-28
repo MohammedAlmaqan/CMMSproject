@@ -192,10 +192,13 @@ router.get('/work-order/:woId', async (req: Request, res: Response) => {
   try {
     const woId = req.params.woId as string;
     const checklists = await prisma.workOrderChecklist.findMany({
-      where: { workOrderId: woId },
+      where: { workOrderId: woId, isDeleted: false, template: { isDeleted: false } },
       include: {
         template: true,
-        items: { include: { item: true } },
+        items: {
+          where: { isDeleted: false, item: { isDeleted: false } },
+          include: { item: true },
+        },
         signer: { select: { userId: true, fullName: true } },
       },
     });
@@ -260,7 +263,7 @@ router.post('/work-order/:woId/attach', authorizeMinRole('Technician'), validate
 
     const template = await prisma.safetyChecklistTemplate.findFirst({
       where: { checklistTemplateId, isDeleted: false },
-      include: { items: true },
+      include: { items: { where: { isDeleted: false } } },
     });
     if (!template) {
       return res.status(404).json({ error: 'Checklist template not found' });
@@ -285,7 +288,10 @@ router.post('/work-order/:woId/attach', authorizeMinRole('Technician'), validate
       },
       include: {
         template: true,
-        items: { include: { item: true } },
+        items: {
+          where: { isDeleted: false, item: { isDeleted: false } },
+          include: { item: true },
+        },
       },
     });
 
@@ -350,8 +356,8 @@ router.put('/work-order-checklist/:id', authorizeMinRole('Technician'), validate
     const id = req.params.id as string;
     const { status, signedBy } = req.body;
 
-    const existing = await prisma.workOrderChecklist.findUnique({
-      where: { woChecklistId: id },
+    const existing = await prisma.workOrderChecklist.findFirst({
+      where: { woChecklistId: id, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Work order checklist not found' });
@@ -372,7 +378,10 @@ router.put('/work-order-checklist/:id', authorizeMinRole('Technician'), validate
       data: updateData,
       include: {
         template: true,
-        items: { include: { item: true } },
+        items: {
+          where: { isDeleted: false, item: { isDeleted: false } },
+          include: { item: true },
+        },
         signer: { select: { userId: true, fullName: true } },
       },
     });
@@ -437,8 +446,8 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
     const id = req.params.id as string;
     const { response, comment } = req.body;
 
-    const existing = await prisma.workOrderChecklistItem.findUnique({
-      where: { woChecklistItemId: id },
+    const existing = await prisma.workOrderChecklistItem.findFirst({
+      where: { woChecklistItemId: id, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Checklist item not found' });
@@ -466,8 +475,8 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
       existing.response !== null && existing.response.trim() !== '' &&
       (item.response === null || item.response.trim() === '');
     if (removedAnswer) {
-      const checklist = await prisma.workOrderChecklist.findUnique({
-        where: { woChecklistId: item.woChecklistId },
+      const checklist = await prisma.workOrderChecklist.findFirst({
+        where: { woChecklistId: item.woChecklistId, isDeleted: false },
         select: { status: true },
       });
       if (checklist?.status === 'Completed') {
@@ -488,8 +497,9 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
   }
 });
 
-// 3.4: WorkOrderChecklist/WorkOrderChecklistItem carry no isDeleted column — hard delete is
-// deliberate (composition children of a WorkOrder; the WO is the soft-delete boundary).
+// 3.4: soft delete — the checklist instance and its item instances are retained
+// (isDeleted=true) and drop out of all live reads; the work order remains the user-visible
+// delete boundary, but the evidence trail survives the checklist removal.
 
 /**
  * @openapi
@@ -497,9 +507,9 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
  *   delete:
  *     summary: Delete a work order checklist
  *     description: >
- *       Hard delete - the checklist instance and its item instances carry no isDeleted
- *       column, per rule 3.4 the parent work order is the soft-delete boundary. Requires
- *       the Technician role.
+ *       Soft delete - marks the checklist instance and its item instances isDeleted=true so
+ *       they are filtered out of later reads but the rows are retained. Requires the
+ *       Technician role.
  *     tags: [Safety Checklists]
  *     security:
  *       - bearerAuth: []
@@ -530,19 +540,21 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
 router.delete('/work-order-checklist/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const existing = await prisma.workOrderChecklist.findUnique({
-      where: { woChecklistId: id },
+    const existing = await prisma.workOrderChecklist.findFirst({
+      where: { woChecklistId: id, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Work order checklist not found' });
     }
 
-    await prisma.workOrderChecklistItem.deleteMany({
+    await prisma.workOrderChecklistItem.updateMany({
       where: { woChecklistId: id },
+      data: { isDeleted: true },
     });
 
-    await prisma.workOrderChecklist.delete({
+    await prisma.workOrderChecklist.update({
       where: { woChecklistId: id },
+      data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
     await logAuditAction({ table: 'WorkOrderChecklist', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });

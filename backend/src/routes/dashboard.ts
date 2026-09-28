@@ -188,7 +188,7 @@ router.get('/kpis', async (_req: Request, res: Response) => {
 router.get('/alerts', async (req: Request, res: Response) => {
   try {
     const alerts = await prisma.systemAlert.findMany({
-      where: { userId: req.user!.userId },
+      where: { userId: req.user!.userId, isDeleted: false },
       orderBy: { createdDate: 'desc' },
       take: 20,
     });

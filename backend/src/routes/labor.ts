@@ -116,7 +116,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const operations = await prisma.workOrderOperation.findMany({
-      where: { workOrderId: workOrderId as string },
+      where: { workOrderId: workOrderId as string, isDeleted: false },
       select: { operationId: true },
     });
 
@@ -164,7 +164,7 @@ router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), as
       });
     }
 
-    const opExists = await prisma.workOrderOperation.findUnique({ where: { operationId } });
+    const opExists = await prisma.workOrderOperation.findFirst({ where: { operationId, isDeleted: false } });
     if (!opExists) {
       return res.status(404).json({ error: 'Operation not found' });
     }
@@ -187,7 +187,7 @@ router.post('/', authorizeMinRole('Technician'), validate(laborCreateSchema), as
       },
     });
 
-    const op = await prisma.workOrderOperation.findUnique({ where: { operationId } });
+    const op = await prisma.workOrderOperation.findFirst({ where: { operationId, isDeleted: false } });
     if (op) await recomputeWorkOrderCosts(op.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
     await logAuditAction({ table: 'LaborEntry', recordId: entry.laborEntryId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
@@ -316,7 +316,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(laborUpdateSchema), 
       },
     });
 
-    const op = await prisma.workOrderOperation.findUnique({ where: { operationId: operationId || existing.operationId } });
+    const op = await prisma.workOrderOperation.findFirst({ where: { operationId: operationId || existing.operationId, isDeleted: false } });
     if (op) await recomputeWorkOrderCosts(op.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
     await logAuditAction({ table: 'LaborEntry', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
@@ -394,7 +394,7 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
       data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
-    const op = await prisma.workOrderOperation.findUnique({ where: { operationId: existing.operationId } });
+    const op = await prisma.workOrderOperation.findFirst({ where: { operationId: existing.operationId, isDeleted: false } });
     if (op) await recomputeWorkOrderCosts(op.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
     await logAuditAction({ table: 'LaborEntry', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });

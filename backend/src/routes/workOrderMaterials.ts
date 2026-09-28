@@ -111,7 +111,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const materials = await prisma.workOrderMaterial.findMany({
-      where: { workOrderId: workOrderId as string },
+      where: { workOrderId: workOrderId as string, isDeleted: false },
       include: { material: true, operation: true },
     });
 
@@ -134,8 +134,8 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
     // SOW 3.1.5. The link is only useful if it is true, so confirm the named
     // operation is on this work order before storing it.
     if (needsOperationCheck(operationId)) {
-      const operation = await prisma.workOrderOperation.findUnique({
-        where: { operationId: operationId as string },
+      const operation = await prisma.workOrderOperation.findFirst({
+        where: { operationId: operationId as string, isDeleted: false },
         select: { workOrderId: true },
       });
       const rejection = materialOperationRejection(operation?.workOrderId ?? null, workOrderId);
@@ -161,6 +161,8 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
         actualQuantity: actualQuantity || 0,
         unitCost: unitCost || 0,
         reservationQuantity: nextReservation,
+        createdBy: req.user!.userId,
+        modifiedBy: req.user!.userId,
       },
     });
 
@@ -235,8 +237,8 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
 router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const existing = await prisma.workOrderMaterial.findUnique({
-      where: { woMaterialId: id },
+    const existing = await prisma.workOrderMaterial.findFirst({
+      where: { woMaterialId: id, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Work order material not found' });
@@ -249,8 +251,8 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
     // line is a child of its work order and is not moved between jobs here,
     // because that would silently restate the cost history of both.
     if (needsOperationCheck(operationId)) {
-      const operation = await prisma.workOrderOperation.findUnique({
-        where: { operationId: operationId as string },
+      const operation = await prisma.workOrderOperation.findFirst({
+        where: { operationId: operationId as string, isDeleted: false },
         select: { workOrderId: true },
       });
       const rejection = materialOperationRejection(operation?.workOrderId ?? null, existing.workOrderId);
@@ -280,6 +282,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
         ...(actualQuantity !== undefined && { actualQuantity }),
         ...(unitCost !== undefined && { unitCost }),
         ...(reservationQuantity !== undefined && { reservationQuantity }),
+        modifiedBy: req.user!.userId,
       },
     });
 
@@ -300,9 +303,10 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
   }
 });
 
-// 3.4: WorkOrderMaterial rows are composition children of a WorkOrder and carry no isDeleted
-// column — hard delete is deliberate (transactional WO line item; the WO is the soft-delete
-// boundary). Cost recompute runs after removal so planned/actual costs reflect the live set.
+// Soft delete: the WO material line is retained with isDeleted=true. Cost
+// recomputation runs afterwards so planned/actual costs reflect only the live
+// lines, and the reservation aggregate excludes the retired line so its
+// reserved stock is released (see services/materialAvailability.ts).
 
 /**
  * @openapi
@@ -310,9 +314,9 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
  *   delete:
  *     summary: Delete a work order material line
  *     description: >
- *       Hard delete - WorkOrderMaterial carries no isDeleted column, per rule 3.4 the parent
- *       work order is the soft-delete boundary. Requires the Technician role. The work
- *       order's cost is recomputed afterwards.
+ *       Soft delete - the line is marked isDeleted=true. The work order's cost
+ *       is recomputed afterwards and the line's reserved stock is released.
+ *       Requires the Technician role.
  *     tags: [Work Order Materials]
  *     security:
  *       - bearerAuth: []
@@ -343,15 +347,16 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
 router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const existing = await prisma.workOrderMaterial.findUnique({
-      where: { woMaterialId: id },
+    const existing = await prisma.workOrderMaterial.findFirst({
+      where: { woMaterialId: id, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Work order material not found' });
     }
 
-    await prisma.workOrderMaterial.delete({
+    await prisma.workOrderMaterial.update({
       where: { woMaterialId: id },
+      data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
     await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });

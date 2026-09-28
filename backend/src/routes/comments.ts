@@ -123,9 +123,9 @@ router.use(authenticate);
  *   delete:
  *     summary: Delete a comment
  *     description: >
- *       Hard delete - Comment has no isDeleted column, per rule 3.4 the parent entity is the
- *       soft-delete boundary. Only the comment's own author or an Administrator may delete
- *       it; anyone else receives HTTP 403. Writes an AuditLogEntry with action Delete.
+ *       Soft delete - marks the comment isDeleted=true so it drops out of the live entity
+ *       thread but the row is retained. Only the comment's own author or an Administrator may
+ *       delete it; anyone else receives HTTP 403. Writes an AuditLogEntry with action Delete.
  *     tags: [Comments]
  *     security:
  *       - bearerAuth: []
@@ -162,7 +162,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const comments = await prisma.comment.findMany({
-      where: { entityType: entityType as string, entityId: entityId as string },
+      where: { entityType: entityType as string, entityId: entityId as string, isDeleted: false },
       include: { user: { select: { userId: true, fullName: true, username: true } } },
       orderBy: { createdDate: 'desc' },
     });
@@ -184,6 +184,8 @@ router.post('/', authorizeMinRole('Requester'), validate(commentCreateSchema), a
         entityId,
         userId: req.user!.userId,
         content,
+        createdBy: req.user!.userId,
+        modifiedBy: req.user!.userId,
       },
       include: { user: { select: { userId: true, fullName: true, username: true } } },
     });
@@ -197,13 +199,13 @@ router.post('/', authorizeMinRole('Requester'), validate(commentCreateSchema), a
   }
 });
 
-// 3.4: Comment carries no isDeleted column — hard delete is deliberate (user-entered text is
-// removed from the live entity thread; the entity itself is the soft-delete boundary).
+// 3.4: soft delete — the comment row is retained (isDeleted=true) so the author/thread history
+// survives; deleted comments drop out of the live entity thread.
 router.delete('/:id', authorizeMinRole('Requester'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const existing = await prisma.comment.findUnique({
-      where: { commentId: id },
+    const existing = await prisma.comment.findFirst({
+      where: { commentId: id, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Comment not found' });
@@ -212,8 +214,9 @@ router.delete('/:id', authorizeMinRole('Requester'), async (req: Request, res: R
       return res.status(403).json({ error: 'Only the comment author or an administrator can delete this comment' });
     }
 
-    await prisma.comment.delete({
+    await prisma.comment.update({
       where: { commentId: id },
+      data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
     await logAuditAction({ table: 'Comment', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });

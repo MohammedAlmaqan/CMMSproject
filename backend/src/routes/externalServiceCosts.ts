@@ -105,7 +105,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const services = await prisma.externalServiceCost.findMany({
-      where: { workOrderId: workOrderId as string },
+      where: { workOrderId: workOrderId as string, isDeleted: false },
     });
 
     res.json(services);
@@ -127,6 +127,8 @@ router.post('/', authorizeMinRole('Technician'), validate(externalServiceCreateS
         cost,
         invoiceRef: invoiceRef || '',
         category: category || defaultServiceCostCategory,
+        createdBy: req.user!.userId,
+        modifiedBy: req.user!.userId,
       },
     });
 
@@ -192,8 +194,8 @@ router.post('/', authorizeMinRole('Technician'), validate(externalServiceCreateS
 router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const existing = await prisma.externalServiceCost.findUnique({
-      where: { serviceCostId: id },
+    const existing = await prisma.externalServiceCost.findFirst({
+      where: { serviceCostId: id, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'External service not found' });
@@ -209,6 +211,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdat
         ...(cost !== undefined && { cost }),
         ...(invoiceRef !== undefined && { invoiceRef }),
         ...(category !== undefined && { category }),
+        modifiedBy: req.user!.userId,
       },
     });
 
@@ -223,8 +226,8 @@ router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdat
   }
 });
 
-// 3.4: ExternalServiceCost carries no isDeleted column — hard delete is deliberate
-// (transactional WO line item; the WO is the soft-delete boundary).
+// Soft delete: the cost line is retained with isDeleted=true. Cost recomputation
+// excludes it, so actualCost reflects only the live service lines.
 
 /**
  * @openapi
@@ -232,9 +235,8 @@ router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdat
  *   delete:
  *     summary: Delete an external service cost line
  *     description: >
- *       Hard delete - the table has no isDeleted column, per rule 3.4 the parent work order
- *       is the soft-delete boundary. The work order's actualCost is recomputed afterwards.
- *       Requires the Technician role.
+ *       Soft delete - the line is marked isDeleted=true. The work order's
+ *       actualCost is recomputed afterwards. Requires the Technician role.
  *     tags: [External Services]
  *     security:
  *       - bearerAuth: []
@@ -265,15 +267,16 @@ router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdat
 router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const existing = await prisma.externalServiceCost.findUnique({
-      where: { serviceCostId: id },
+    const existing = await prisma.externalServiceCost.findFirst({
+      where: { serviceCostId: id, isDeleted: false },
     });
     if (!existing) {
       return res.status(404).json({ error: 'External service not found' });
     }
 
-    await prisma.externalServiceCost.delete({
+    await prisma.externalServiceCost.update({
       where: { serviceCostId: id },
+      data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
 
     await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });

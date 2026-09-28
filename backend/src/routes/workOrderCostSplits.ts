@@ -65,7 +65,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const workOrder = await prisma.workOrder.findFirst({
-      where: { workOrderId },
+      where: { workOrderId, isDeleted: false },
       select: { workOrderId: true, actualCost: true, plannedCost: true, costCenterCode: true },
     });
     if (!workOrder) {
@@ -73,7 +73,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const splits = await prisma.costSplit.findMany({
-      where: { workOrderId },
+      where: { workOrderId, isDeleted: false },
       orderBy: { costCenterCode: 'asc' },
     });
 
@@ -153,7 +153,7 @@ router.put('/', authorizeMinRole('Maintenance Planner'), validate(costSplitRepla
     const { workOrderId, splits } = req.body;
 
     const workOrder = await prisma.workOrder.findFirst({
-      where: { workOrderId },
+      where: { workOrderId, isDeleted: false },
       select: { workOrderId: true },
     });
     if (!workOrder) {
@@ -166,21 +166,23 @@ router.put('/', authorizeMinRole('Maintenance Planner'), validate(costSplitRepla
     }
 
     const removed = await prisma.costSplit.findMany({
-      where: { workOrderId },
+      where: { workOrderId, isDeleted: false },
       select: { splitId: true },
     });
 
     // Replace, do not upsert-per-line: a transaction is what makes a rejected
-    // validation and a successful write mutually exclusive here.
+    // validation and a successful write mutually exclusive here. The previous
+    // lines are retired (isDeleted=true) rather than destroyed, so the audit
+    // trail keeps the allocation history.
     const updated = await prisma.$transaction(async (tx) => {
-      await tx.costSplit.deleteMany({ where: { workOrderId } });
+      await tx.costSplit.updateMany({ where: { workOrderId, isDeleted: false }, data: { isDeleted: true, modifiedBy: req.user!.userId } });
       if (splits.length === 0) {
         return [];
       }
       const created = [];
       for (const split of splits) {
         created.push(await tx.costSplit.create({
-          data: { workOrderId, costCenterCode: split.costCenterCode, percentage: split.percentage },
+          data: { workOrderId, costCenterCode: split.costCenterCode, percentage: split.percentage, createdBy: req.user!.userId, modifiedBy: req.user!.userId },
         }));
       }
       return created;
@@ -206,8 +208,9 @@ router.put('/', authorizeMinRole('Maintenance Planner'), validate(costSplitRepla
  *   delete:
  *     summary: Clear a work order's cost allocation
  *     description: >
- *       Removes the named split line and re-validates what is left, so a work
- *       order is never left with a partial allocation. Deleting the final line
+ *       Retires the named split line (isDeleted=true) and re-validates what is
+ *       left, so a work order is never left with a partial allocation. Deleting
+ *       the final line
  *       is allowed: the work order then reverts to being charged wholly to its
  *       own cost centre, which is a valid end state.
  *     tags: [CostSplits]
@@ -236,13 +239,13 @@ router.put('/', authorizeMinRole('Maintenance Planner'), validate(costSplitRepla
 router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
   try {
     const splitId = String(req.params.id);
-    const existing = await prisma.costSplit.findUnique({ where: { splitId } });
+    const existing = await prisma.costSplit.findFirst({ where: { splitId, isDeleted: false } });
     if (!existing) {
       return res.status(404).json({ error: 'Cost split not found' });
     }
 
     const remaining = await prisma.costSplit.findMany({
-      where: { workOrderId: existing.workOrderId, NOT: { splitId } },
+      where: { workOrderId: existing.workOrderId, isDeleted: false, NOT: { splitId } },
       select: { costCenterCode: true, percentage: true },
     });
     const check = checkAllocation(remaining);
@@ -250,7 +253,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
       return res.status(400).json({ error: describeProblem(check.problem) });
     }
 
-    await prisma.costSplit.delete({ where: { splitId } });
+    await prisma.costSplit.update({ where: { splitId }, data: { isDeleted: true, modifiedBy: req.user!.userId } });
 
     await logAuditAction({ table: 'CostSplit', recordId: splitId, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 

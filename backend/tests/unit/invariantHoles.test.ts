@@ -112,9 +112,12 @@ describe('deleting a task list retires its steps', () => {
       /taskListOperation\.updateMany\(\{[\s\S]{0,200}isDeleted: true/);
   });
 
-  it('hard-deletes the requirements first, since they carry no isDeleted', () => {
+  it('soft-deletes the requirements with the steps, so nothing outlives them', () => {
+    // The sweep added isDeleted to TaskListMaterial, so the requirements now
+    // retire alongside the step they describe instead of being hard-deleted.
+    // A live requirement under a dead step would leak material rows forever.
     expect(taskListRoute).toMatch(
-      /taskListMaterial\.deleteMany\(\{[\s\S]{0,200}taskOperationId: \{ in: superseded/);
+      /taskListMaterial\.updateMany\(\{[\s\S]{0,200}taskOperationId: \{ in: superseded[\s\S]{0,200}isDeleted: true/);
   });
 
   it('does the three writes in one transaction', () => {

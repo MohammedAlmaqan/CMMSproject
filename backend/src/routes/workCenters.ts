@@ -206,6 +206,7 @@ router.get('/capacity', async (req: Request, res: Response) => {
         plannedStart: true,
         plannedFinish: true,
         operations: {
+          where: { isDeleted: false },
           select: { craftId: true, plannedHours: true },
         },
       },
