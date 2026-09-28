@@ -969,7 +969,7 @@ The E.11 boundary note deferred **19 §3 rows** that E.9 restated as *clauses wh
 | F.2 | BOM and operation-material suites (F0c, F0d, F0j) | ✅ | `POST/PUT/DELETE /api/equipment/:id/bom` and the operation-scoped material write are exercised end-to-end. | *this commit* |
 | F.3 | Attachment missing-parent suite (F0e) | ✅ | Upload/list/download/delete all return 400 for a missing parent. | *this commit* |
 | F.4 | Capacity-board suite (F0g) | ✅ | `buildCapacityBoard` runs against live data; board shape asserted. | *this commit* |
-| F.5 | Notification lifecycle suites: M3, transition validity, mandatory pair, link navigation, close on completion (F0k–F0o) | ⬜ | M3 auto-created on completion; notification transition map driven both ways; at-least-one rule asserted; navigation split decided (F0n); auto-close asserted. | — |
+| F.5 | Notification lifecycle suites: M3, transition validity, mandatory pair, link navigation, close on completion (F0k–F0o) | ✅ | M3 auto-created on completion; notification transition map driven both ways; at-least-one rule asserted; navigation split decided (F0n); auto-close asserted. | *this commit* |
 | F.6 | Work-order rules suites: prefix config, operation update (F0p, F0q) | ⬜ | A route test proves the configured WO-number prefix; a `PUT` operation update survives the Zod parse. | — |
 | F.7 | Labour attribution suite (F0r) | ⬜ | Session-derived technician is authoritative; client-supplied `userId` cannot override. | — |
 | F.8 | Cost-split suite (F0s) | ⬜ | 100% validation and read-back over the route; the static source-reading unit test is superseded. | — |
