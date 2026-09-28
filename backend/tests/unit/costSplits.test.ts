@@ -170,36 +170,13 @@ describe('cost split write path, SOW 3.5.2', () => {
     expect(costSplitItemSchema.safeParse({ costCenterCode: 'A', percentage: 100 }).success).toBe(false);
   });
 
-  it('exposes a read, a set replacement, and a clear', () => {
-    expect(route).toMatch(/router\.get\('\/'/);
-    expect(route).toMatch(/router\.put\('\/'/);
-    expect(route).toMatch(/router\.delete\('\/:id'/);
-  });
-
+  // The read/set/clear HTTP behaviours, the transaction, the re-validation on
+  // partial delete, the allocatedActualCost read-back, its reconciliation
+  // invariant, and both audit rows are now exercised against the live app by
+  // backend/tests/routes/workOrderCostSplits.test.ts — static source-reading
+  // is superseded here. The one fact only the source can prove is the absence
+  // of a per-line append, so that guard is kept.
   it('does not offer a per-line append, which could not hold the invariant', () => {
     expect(route).not.toMatch(/router\.post\('\/'/);
-  });
-
-  it('validates before writing, and writes the replacement in one transaction', () => {
-    expect(route).toMatch(/const check = checkAllocation\(splits\);/);
-    expect(route).toMatch(/prisma\.\$transaction/);
-  });
-
-  it('re-validates what remains when a single line is cleared', () => {
-    expect(route).toMatch(/const check = checkAllocation\(remaining\);/);
-  });
-
-  it('reports the allocated amount of each share on read', () => {
-    expect(route).toMatch(/allocatedActualCost/);
-  });
-
-  it('audits the replacement and the clear', () => {
-    expect(route).toMatch(/table: 'CostSplit', recordId: workOrderId, action: 'Update'/);
-    expect(route).toMatch(/table: 'CostSplit', recordId: splitId, action: 'Delete'/);
-  });
-
-  it('is mounted in the api', () => {
-    const index = readFileSync(resolve(here, '../../src/index.ts'), 'utf8');
-    expect(index).toMatch(/app\.use\('\/api\/work-order-cost-splits'/);
   });
 });
