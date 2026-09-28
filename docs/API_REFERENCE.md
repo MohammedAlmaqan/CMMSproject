@@ -349,7 +349,7 @@ Use `/api/users/options` for dropdown and assignee fields; it is available from 
 
 These are documented gaps, not bugs to work around silently. All are tracked as v1.1 items.
 
-- Monetary fields (`standardCost`, `cost`, `unitCost`, `costRatePerHour`, work order cost totals) are Float rather than Decimal.
+- Monetary fields (`standardCost`, `cost`, `unitCost`, `costRatePerHour`, `hourlyRate`, `plannedCost`, `actualCost`, work order cost totals) are `DECIMAL(12,2)` since D-17/E.13 and are served to the API as JSON numbers. Quantity/duration columns (`currentStock`, hours, `percentage`) remain binary float.
 - `MaintenancePlan.functionalLocationId` is not enforced as a foreign key.
 - Failure codes and causes are not yet referenced by any work order column.
 - `WorkOrderOperation.status` and several other status and type columns are free text rather than constrained enums.

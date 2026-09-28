@@ -221,8 +221,8 @@ router.get('/cost-summary', async (_req: Request, res: Response) => {
         monthlyMap.set(key, { planned: 0, actual: 0 });
       }
       const entry = monthlyMap.get(key)!;
-      entry.planned += wo.plannedCost;
-      entry.actual += wo.actualCost;
+      entry.planned += Number(wo.plannedCost);
+      entry.actual += Number(wo.actualCost);
     }
 
     const result = Array.from(monthlyMap.entries())

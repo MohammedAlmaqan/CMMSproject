@@ -79,7 +79,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     // Reported against actualCost, the figure 3.5.1 reports and the one a cost
     // centre is actually charged.
-    const amounts = allocate(workOrder.actualCost || 0, splits);
+    const amounts = allocate(Number(workOrder.actualCost || 0), splits);
     const allocated = splits.map((split, index) => ({
       ...split,
       allocatedActualCost: amounts[index],

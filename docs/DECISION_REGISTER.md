@@ -114,7 +114,7 @@ One line per decision, so the reasoning is auditable without re-reading the opti
 | **D-14** | They are Deferred rather than failed, but an unowned deferred obligation resurfaces as a defect at month two. |
 | **D-15** | The role hierarchy makes Viewer the read-only tier, so "any authenticated user" is best read as "any holder of the Requester capability". 3.3.2's Close role floor was remediated the same way. |
 | **D-16** | One authoritative rate removes a silent ambiguity. Craft rate is the correct granularity for labour cost, and no requirement consumes a work-centre rate. |
-| **D-17** | Phase F builds 3.5.3 cost rollups and 3.7.1 cost reports; producing new cost reporting on binary floating point bakes rounding differences into new work and leaves the totals unauditable. Migrating before the rollups exist is cheaper than after. |
+| **D-17** | Phase F builds 3.5.3 cost rollups and 3.7.1 cost reports; producing new cost reporting on binary floating point bakes rounding differences into new work and leaves the totals unauditable. Migrating before the rollups exist is cheaper than after. **IMPLEMENTED in Phase E**, E.13: the seven monetary columns are `DECIMAL(12,2)`, still served to the API as JSON numbers, and deferred D6 is promoted out of v1.1. |
 
 
 ## 5. The 77-row disposition worksheet

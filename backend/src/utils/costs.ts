@@ -56,7 +56,7 @@ export async function recomputeWorkOrderCosts(workOrderId: string, actor: CostAc
   // One row per figure that actually moved, naming the field so the trail
   // says which number changed rather than only that "costs" changed.
   // String() keeps this correct if D-17 later moves the columns to Decimal.
-  if (prior && prior.plannedCost !== plannedCost) {
+  if (prior && Number(prior.plannedCost) !== plannedCost) {
     await logAuditFieldChange({
       table: 'WorkOrder',
       recordId: workOrderId,
@@ -68,7 +68,7 @@ export async function recomputeWorkOrderCosts(workOrderId: string, actor: CostAc
       ipAddress: actor.ipAddress,
     });
   }
-  if (prior && prior.actualCost !== actualCost) {
+  if (prior && Number(prior.actualCost) !== actualCost) {
     await logAuditFieldChange({
       table: 'WorkOrder',
       recordId: workOrderId,

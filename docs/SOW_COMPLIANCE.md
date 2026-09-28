@@ -341,7 +341,7 @@ Notes are populated for `Partial`, `Not Met` and `Waived`. Every row carries an 
 
 Agreed with the Client for delivery after go-live. Each item is **not** a v1.0.0 blocker.
 
-> **How this table relates to the matrix.** The eight items below are *deferred work items*. They are not one-to-one with the matrix rows marked `Deferred`: a matrix row is marked `Deferred` only when the **entire** clause is out of v1.0.0 scope. Several items below are partial remedies for clauses that are therefore marked `Partial` or `Not Met` — for example D7 (one missing foreign key) leaves §5.3 `Partial`, and D5 (missing cause-code wiring) leaves §3.1.4 `Partial`. The clause-level status always reflects what the client can use today, not when the fix is scheduled.
+> **How this table relates to the matrix.** The seven items below are *deferred work items*. They are not one-to-one with the matrix rows marked `Deferred`: a matrix row is marked `Deferred` only when the **entire** clause is out of v1.0.0 scope. Several items below are partial remedies for clauses that are therefore marked `Partial` or `Not Met` — for example D7 (one missing foreign key) leaves §5.3 `Partial`, and D5 (missing cause-code wiring) leaves §3.1.4 `Partial`. The clause-level status always reflects what the client can use today, not when the fix is scheduled. (Deferred item D6 — the `Float` → `Decimal` migration — was **promoted out of this table** and delivered in Phase E as D-17/E.13; see `CMMS_FINALIZATION_TRACKER.md` E.13.)
 
 | # | Item | SOW § | Evidence / tracker reference |
 |---|---|---|---|
@@ -350,7 +350,6 @@ Agreed with the Client for delivery after go-live. Each item is **not** a v1.0.0
 | D3 | 200-user load test | §4.1 | `CMMS_FINALIZATION_TRACKER.md:301-306`; `docs/ARCHITECTURE.md:264` |
 | D4 | PostgreSQL connection-pool sizing and `max_connections` tuning to clear P2028 | §4.1 | `docs/ARCHITECTURE.md:263` (15 of 140 logins returned HTTP 500 under 50-VU load) |
 | D5 | CauseCode and FailureCode wiring into notifications and work orders | §3.1.4 | `CMMS_FINALIZATION_TRACKER.md:301-306`; `CauseCode` has no route in `backend/src/routes/` |
-| D6 | `Float` → `Decimal` migration for all monetary and quantity columns | §5.3 | `CMMS_FINALIZATION_TRACKER.md:301-306`; floating-point cost columns in `backend/prisma/schema.prisma` |
 | D7 | `MaintenancePlan.functionalLocationId` foreign-key relation | §5.3 | `CMMS_FINALIZATION_TRACKER.md:301-306`; `backend/prisma/schema.prisma:459-494` |
 | D8 | Database-enforced enums to replace free-text status and type columns | §5.3 | `CMMS_FINALIZATION_TRACKER.md:301-306`; status columns are `String` in `backend/prisma/schema.prisma` and validated only in `backend/src/utils/validation.ts` |
 
@@ -397,7 +396,7 @@ Every limitation acknowledged in the B.5 documentation, plus the gaps this audit
 | L15 | No report or dashboard is reconciled against a manual calculation | §6.4 | `scripts/verify/verify_g5.py` (HTTP 200 assertions only) | **V1.1-UAT** — a UAT pack that recomputes each report independently and compares totals |
 | L16 | Equipment BOM lines, cost splits, and plan meters are read-only | §3.1.2, §3.5.2, §3.4.2 | `EquipmentBOMMaterial`, `CostSplit`, `MaintenancePlanMeter` appear in no write route | **V1.1-MASTER** — write endpoints and screens for BOM lines, cost splits with 100% validation, and plan meters |
 | L17 | Cause codes have no API at all | §3.1.4 | `CauseCode` absent from `backend/src/routes/` | **D5** (deferred) — cause code management and wiring into notifications and work orders |
-| L18 | Monetary and quantity columns are floating point | §5.3 | `backend/prisma/schema.prisma` (`Float` cost/stock fields) | **D6** (deferred) — migrate to `Decimal` |
+| L18 | Quantity and duration columns are floating point; the monetary columns now store `DECIMAL(12,2)` | §5.3 | Monetary fields are `Decimal(12,2)` in `backend/prisma/schema.prisma` since D-17/E.13; `currentStock`, duration hours, `actualQuantity` and `CostSplit.percentage` remain `Float` | **D-17 / E.13 (done)** — monetary columns migrated; the remaining `Float` quantity/duration columns stay binary by decision (D-17 was scoped to monetary columns) |
 | L19 | Status and type columns are free text, validated only in application code | §5.3 | `backend/prisma/schema.prisma` (`String` status columns); `backend/src/utils/validation.ts` | **D8** (deferred) — database-level enums or check constraints |
 | L20 | No API versioning; all routes are mounted unversioned | §5.4 | `backend/src/index.ts:199-222`; `docs/openapi.json` has no version segment | **V1.1-API** — introduce `/api/v1` with the current routes preserved behind a compatibility layer |
 | L21 | No bulk endpoint for functional locations; bulk is CSV-only for two entities | §3.10, §5.4 | `POST /api/equipment/import`, `POST /api/materials/import` | **V1.1-API** — JSON-array bulk endpoints for equipment, functional locations, and materials |

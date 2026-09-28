@@ -81,6 +81,55 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 
+// D-17: monetary columns became DECIMAL(12,2), and Prisma client serialises a
+// Decimal as its string form. Normalise every Decimal back to a JSON number at
+// the response boundary so the API wire format is unchanged -- no caller sees a
+// string where a number used to be, and tests asserting numeric bodies stay
+// valid. This wraps the core res.json; per-route middleware that re-assigns
+// res.json (the audit trail) captures this wrapper as its "original", so it
+// composes inside out without duplicating the conversion.
+//
+// Detection is structural, not `instanceof Prisma.Decimal`: module duplication
+// makes class identity unreliable across the test runner and the app, while the
+// value itself is stable -- a decimal.js instance carries a toNumber method.
+// Date is excluded first because it also has toJSON. A JSON.stringify replacer
+// would not work here: stringify invokes the value's own toJSON (which returns
+// the decimal STRING) before the replacer ever sees it, so the walk below does
+// the conversion itself and leaves stringify to do only its normal job.
+function isPrismaDecimal(value: unknown): value is { toNumber: () => number } {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    value instanceof Date ||
+    Array.isArray(value)
+  ) {
+    return false;
+  }
+  return typeof (value as { toNumber?: unknown }).toNumber === 'function';
+}
+
+function normalizeDecimals(value: unknown): unknown {
+  if (isPrismaDecimal(value)) return value.toNumber();
+  if (Array.isArray(value)) return value.map(normalizeDecimals);
+  if (typeof value === 'object' && value !== null) {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(value)) {
+      out[key] = normalizeDecimals((value as Record<string, unknown>)[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
+app.use((_req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = function (body: unknown) {
+    if (body === undefined) return originalJson.call(res);
+    return originalJson.call(res, normalizeDecimals(body));
+  };
+  next();
+});
+
 // Inside a mounted router `req.url` is relative to the mount point, so the raw
 // value would log as `/tree` instead of `/api/failure-codes/tree`. `originalUrl`
 // keeps the full path. The query string is dropped because it can carry tokens.

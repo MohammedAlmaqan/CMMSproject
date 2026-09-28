@@ -74,7 +74,7 @@ router.get('/export.csv', async (req: Request, res: Response) => {
         m.materialCode,
         m.description,
         m.unitOfMeasure,
-        m.standardCost,
+        Number(m.standardCost),
         m.currentStock,
       ]),
     ];
@@ -253,8 +253,8 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
  *                   materialCode: { type: string }
  *                   description: { type: string }
  *                   unitOfMeasure: { type: string }
- *                   standardCost: { type: number, format: float, nullable: true, description: "Float-typed in v1.0.0; Decimal migration is v1.1" }
- *                   currentStock: { type: number, format: float, nullable: true, description: "Float-typed in v1.0.0; Decimal migration is v1.1" }
+ *                   standardCost: { type: number, format: float, nullable: true, description: "Stored as DECIMAL(12,2) since Phase E (D-17); served as a JSON number" }
+ *                   currentStock: { type: number, format: float, nullable: true, description: "Quantity column; stays binary float (not in the D-17 monetary scope)" }
  *                   createdBy: { type: string }
  *                   createdDate: { type: string, format: date-time }
  *                   modifiedBy: { type: string }

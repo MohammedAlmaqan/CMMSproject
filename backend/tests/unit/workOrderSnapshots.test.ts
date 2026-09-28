@@ -33,4 +33,13 @@ describe('serializeWorkOrderSnapshot', () => {
     const out = serializeWorkOrderSnapshot({ status: 'Planned', woNumber: 'WO-1', flag: false, cost: 12.5 });
     expect(out).toEqual({ status: 'Planned', woNumber: 'WO-1', flag: false, cost: 12.5 });
   });
+
+  it('writes Decimal money values as numbers, not their object internals (D-17)', () => {
+    const out = serializeWorkOrderSnapshot({
+      plannedCost: { toNumber: (): number => 45.5 },
+      actualCost: { toNumber: (): number => 0 },
+    });
+    expect(out).toEqual({ actualCost: 0, plannedCost: 45.5 });
+    expect(typeof out.actualCost).toBe('number');
+  });
 });

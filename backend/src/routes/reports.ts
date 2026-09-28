@@ -385,8 +385,8 @@ router.get('/cost-summary', async (_req: Request, res: Response) => {
         costMap.set(wo.costCenterCode, { planned: 0, actual: 0 });
       }
       const entry = costMap.get(wo.costCenterCode)!;
-      entry.planned += wo.plannedCost;
-      entry.actual += wo.actualCost;
+      entry.planned += Number(wo.plannedCost);
+      entry.actual += Number(wo.actualCost);
     }
 
     const result = Array.from(costMap.entries()).map(([costCenterCode, data]) => ({
@@ -559,7 +559,7 @@ router.get('/material-consumption', async (_req: Request, res: Response) => {
         description: detail?.description || '',
         unitOfMeasure: detail?.unitOfMeasure || '',
         totalQuantityUsed: m._sum.actualQuantity || 0,
-        totalCost: Math.round((m._sum.actualQuantity || 0) * (m._sum.unitCost || 0) * 100) / 100,
+        totalCost: Math.round((Number(m._sum.actualQuantity) || 0) * (Number(m._sum.unitCost) || 0) * 100) / 100,
         usageCount: m._count.woMaterialId,
       };
     });

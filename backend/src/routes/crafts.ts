@@ -36,7 +36,7 @@ router.use(authenticate);
  *                   workCenterId: { type: string }
  *                   craftCode: { type: string }
  *                   description: { type: string }
- *                   hourlyRate: { type: number, format: float, description: "Float-typed in v1.0.0; Decimal migration is v1.1" }
+ *                   hourlyRate: { type: number, format: float, description: "Stored as DECIMAL(12,2) since Phase E (D-17); served as a JSON number" }
  *                   createdBy: { type: string }
  *                   createdDate: { type: string, format: date-time }
  *                   modifiedBy: { type: string }
@@ -97,7 +97,7 @@ router.get('/', async (_req: Request, res: Response) => {
  *               hourlyRate:
  *                 type: number
  *                 minimum: 0
- *                 description: "Craft-specific rate. Float-typed in v1.0.0; Decimal migration is v1.1"
+ *                 description: "Craft-specific rate. Stored as DECIMAL(12,2) since Phase E (D-17); served as a JSON number"
  *     responses:
  *       '201':
  *         description: Craft created

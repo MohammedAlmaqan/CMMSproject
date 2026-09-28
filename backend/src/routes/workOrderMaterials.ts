@@ -51,7 +51,7 @@ router.use(authenticate);
  *                   operationId: { type: string, nullable: true, description: "SOW 3.1.5 - the operation this part is issued to, null for a job-level line" }
  *                   plannedQuantity: { type: number, format: float }
  *                   actualQuantity: { type: number, format: float, nullable: true }
- *                   unitCost: { type: number, format: float, nullable: true, description: "Float-typed in v1.0.0; Decimal migration is v1.1" }
+ *                   unitCost: { type: number, format: float, nullable: true, description: "Stored as DECIMAL(12,2) since Phase E (D-17); served as a JSON number" }
  *                   reservationQuantity: { type: number, format: float, nullable: true }
  *       '400':
  *         description: workOrderId query parameter is required

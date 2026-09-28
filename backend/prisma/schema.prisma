@@ -142,7 +142,7 @@ model WorkCenter {
   code               String   // F3: partial unique index (isDeleted=false)
   name               String
   dailyCapacityHours Float
-  costRatePerHour    Float
+  costRatePerHour    Decimal @db.Decimal(12, 2)
   isActive           Boolean  @default(true)
   createdBy          String   @default("system")
   createdDate        DateTime @default(now())
@@ -162,7 +162,7 @@ model Craft {
   workCenterId String
   craftCode    String
   description  String
-  hourlyRate   Float
+  hourlyRate   Decimal @db.Decimal(12, 2)
   createdBy    String   @default("system")
   createdDate  DateTime @default(now())
   modifiedBy   String   @default("system")
@@ -179,7 +179,7 @@ model Material {
   materialCode String   // F3: partial unique index (isDeleted=false)
   description  String
   unitOfMeasure String
-  standardCost Float
+  standardCost Decimal @db.Decimal(12, 2)
   currentStock Float   @default(0)
   createdBy    String   @default("system")
   createdDate  DateTime @default(now())
@@ -353,8 +353,8 @@ model WorkOrder {
   internalOrder       String   @default("")
   breakdownFlag       Boolean  @default(false)
   safetyCriticalFlag  Boolean  @default(false)
-  plannedCost         Float    @default(0)
-  actualCost          Float    @default(0)
+  plannedCost         Decimal @db.Decimal(12, 2) @default(0)
+  actualCost          Decimal @db.Decimal(12, 2) @default(0)
   createdBy           String   @default("system")
   createdDate         DateTime @default(now())
   modifiedBy          String   @default("system")
@@ -451,7 +451,7 @@ model WorkOrderMaterial {
   operationId        String?
   plannedQuantity    Float
   actualQuantity     Float  @default(0)
-  unitCost           Float  @default(0)
+  unitCost           Decimal @db.Decimal(12, 2) @default(0)
   reservationQuantity Float @default(0)
   createdBy           String   @default("system")
   createdDate         DateTime @default(now())
@@ -486,7 +486,7 @@ model ExternalServiceCost {
   workOrderId   String
   vendor        String
   description   String
-  cost          Float
+  cost          Decimal @db.Decimal(12, 2)
   invoiceRef    String
   // SOW 3.3.6: travel and permits are "additional miscellaneous costs ... as
   // line items", and without a discriminator they are indistinguishable from a

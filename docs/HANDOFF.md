@@ -44,7 +44,7 @@ Recorded in `CMMS_FINALIZATION_TRACKER.md` under **Post-Go-Live Backlog (v1.1)**
 
 1. **`CauseCode` / `FailureCode` are orphaned** — no column on `WorkOrder`, `Notification` or `WorkOrderOperation` references either, so failure/cause cannot be captured against a work order. **7.6 must record this as Partial — failure/cause capture not wired to WO.**
 2. **`MaintenancePlan.functionalLocationId` has no `@relation`** — nullable and unenforced, unlike the required `workCenterId` / `taskListId`.
-3. **`Float` not `Decimal` for financial fields** — `standardCost`, `currentStock`, `unitCost`, `plannedCost`, `actualCost`, `cost`, `percentage`, `hourlyRate`, `costRatePerHour` and all quantity columns. **Flagged prominently: v1.0.0 ships with Float-typed financial fields; the Decimal migration is a v1.1 remediation item.** Rounding drift in cost reporting is expected, not a v1.0.0 defect. Marked **Priority** in the backlog.
+3. **Quantity/duration columns remain `Float`** — `currentStock`, `percentage`, `plannedHours`, `hoursWorked`, `actualQuantity` and the other quantity columns. **Superseded by D-17/E.13:** the seven monetary columns (`standardCost`, `unitCost`, `plannedCost`, `actualCost`, `cost`, `hourlyRate`, `costRatePerHour`) are now `DECIMAL(12,2)` and round-trip exactly; deferred D6 was promoted out of v1.1. The residual Float columns are quantity/duration only and are covered by `roundMoney` at the persist boundary.
 4. **Unenforced free-text status/type columns** — permitted values live only in schema comments; validated at the API boundary by zod instead.
 
 ### Verified good — not a defect

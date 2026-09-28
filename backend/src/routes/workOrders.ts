@@ -409,7 +409,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
         materials: op.materials.map((m) => ({
           materialId: m.materialId,
           quantity: m.quantity,
-          standardCost: m.material.standardCost || 0,
+          standardCost: Number(m.material.standardCost || 0),
         })),
       }));
     }

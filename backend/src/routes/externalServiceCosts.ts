@@ -49,7 +49,7 @@ router.use(authenticate);
  *                   workOrderId: { type: string }
  *                   vendor: { type: string }
  *                   description: { type: string }
- *                   cost: { type: number, format: float, description: "Float-typed in v1.0.0; Decimal migration is v1.1" }
+ *                   cost: { type: number, format: float, description: "Stored as DECIMAL(12,2) since Phase E (D-17); served as a JSON number" }
  *                   invoiceRef: { type: string }
  *                   category: { type: string, enum: [Service, Travel, Permit, Other], description: "SOW 3.3.6: Service is a contractor invoice; Travel/Permit/Other are the additional miscellaneous costs. Defaults to Service." }
  *       '400':

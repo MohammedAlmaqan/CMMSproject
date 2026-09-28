@@ -88,7 +88,7 @@ erDiagram
         string code UK
         string name
         float dailyCapacityHours
-        float costRatePerHour
+        decimal(12,2) costRatePerHour
         boolean isActive
     }
 
@@ -96,14 +96,14 @@ erDiagram
         string craftId PK
         string craftCode
         string workCenterId FK
-        float hourlyRate
+        decimal(12,2) hourlyRate
     }
 
     MATERIAL {
         string materialId PK
         string materialCode UK
         string unitOfMeasure
-        float standardCost
+        decimal(12,2) standardCost
         float currentStock
     }
 
@@ -199,7 +199,7 @@ erDiagram
         float plannedQuantity
         float actualQuantity
         float reservationQuantity
-        float unitCost
+        decimal(12,2) unitCost
     }
 
     LABOR_ENTRY {
@@ -215,7 +215,7 @@ erDiagram
         string workOrderId FK
         string vendor
         string description
-        float cost
+        decimal(12,2) cost
         string invoiceRef
     }
 

@@ -36,7 +36,7 @@ router.use(authenticate);
  *                   code: { type: string }
  *                   name: { type: string }
  *                   dailyCapacityHours: { type: number, format: float }
- *                   costRatePerHour: { type: number, format: float, description: "Float-typed in v1.0.0; Decimal migration is v1.1" }
+ *                   costRatePerHour: { type: number, format: float, description: "Stored as DECIMAL(12,2) since Phase E (D-17); served as a JSON number" }
  *                   isActive: { type: boolean }
  *       '401':
  *         description: Missing or invalid bearer token

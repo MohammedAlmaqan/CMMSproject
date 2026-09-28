@@ -169,7 +169,7 @@ describe('creating a work order from a task list carries the requirements', () =
     // requirement at the default rate of 0 would quietly drop the whole parts
     // bill out of the work order's planned cost.
     expect(workOrders).toMatch(/unitCost: required\.standardCost/);
-    expect(workOrders).toMatch(/standardCost: m\.material\.standardCost \|\| 0/);
+    expect(workOrders).toMatch(/standardCost: Number\(m\.material\.standardCost \|\| 0\)/);
   });
 
   it('issues nothing, because the template is a plan', () => {

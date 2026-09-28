@@ -72,7 +72,23 @@ export interface WorkOrderCostBreakdown {
   actualCost: number;
 }
 
-const num = (v: number | null | undefined): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+/**
+ * A numeric input the cost arithmetic accepts. The interfaces above type the
+ * money fields as `number`, but the caller hands over Prisma rows cast through
+ * `as unknown as WorkOrderCostInput` (by design: this module stays Prisma-free),
+ * so the money columns arrive as `Decimal` instances. Coercing both keeps the
+ * arithmetic honest without importing Prisma here.
+ */
+type NumericInput = number | { toNumber: () => number } | null | undefined;
+
+const num = (v: NumericInput): number => {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  if (v !== null && v !== undefined) {
+    const n = v.toNumber();
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+};
 
 /** The SOW's misc-cost categories. Everything else is a contracted service. */
 const isMiscCategory = (category: string | null | undefined): boolean =>

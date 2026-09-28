@@ -19,7 +19,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | Soft delete | `isDeleted Boolean @default(false)`. 34 of 38 tables. Queries must filter on it. The four exceptions are deliberate and documented in their rows: `RefreshToken` (revoked, not deleted), `AuditLogEntry` (immutable append-only, the purge-with-retention target of §4.3), `WorkOrderSnapshot` (immutable history) and `SequenceCounter` (numeric semaphore). |
 | `modifiedDate` | `DateTime @updatedAt` on soft-deleted tables, so the application must set the value. `Attachment` deviates — see its row. |
 | `createdBy` / `modifiedBy` | Free-text `String @default("system")`, holding a user id or the literal `system`. **Not** a foreign key, so a deleted or bad actor id will not be rejected. |
-| Monetary / quantity values | `Float`, not `Decimal`. Exact-currency arithmetic on these columns will drift. |
+| Monetary values | `Decimal(12,2)` since D-17/E.13 (`costRatePerHour`, `hourlyRate`, `standardCost`, `plannedCost`, `actualCost`, `unitCost`, `ExternalServiceCost.cost`). Quantity / duration / percentage values stay `Float`; exact-currency arithmetic on those still drifts, but monetary figures now round-trip exactly. |
 | Status and type columns | Free-text `String`; allowed values are recorded only as schema comments, not as enums or check constraints. |
 | Polymorphic links | `Comment` and `Attachment` point at their target via `entityType` + `entityId` with no foreign key. Integrity is the application's responsibility. |
 
@@ -54,9 +54,9 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 
 | Table | Purpose | Key fields | Foreign keys | Delete |
 | --- | --- | --- | --- | --- |
-| `WorkCenter` | Owning unit, with capacity and cost rate. | `workCenterId` PK; `code` (partial unique); `name`; `dailyCapacityHours Float`; `costRatePerHour Float`; `isActive` (default true) | none | Soft |
-| `Craft` | Trade/skill available in a work centre. | `craftId` PK; `craftCode`; `description`; `hourlyRate Float` | `workCenterId` → `WorkCenter`, required | Soft |
-| `Material` | Spare part master, with cost and stock. | `materialId` PK; `materialCode` (partial unique); `description`; `unitOfMeasure`; `standardCost Float`; `currentStock Float` (default 0) | none | Soft |
+| `WorkCenter` | Owning unit, with capacity and cost rate. | `workCenterId` PK; `code` (partial unique); `name`; `dailyCapacityHours Float`; `costRatePerHour Decimal(12,2)`; `isActive` (default true) | none | Soft |
+| `Craft` | Trade/skill available in a work centre. | `craftId` PK; `craftCode`; `description`; `hourlyRate Decimal(12,2)` | `workCenterId` → `WorkCenter`, required | Soft |
+| `Material` | Spare part master, with cost and stock. | `materialId` PK; `materialCode` (partial unique); `description`; `unitOfMeasure`; `standardCost Decimal(12,2)`; `currentStock Float` (default 0) | none | Soft |
 | `EquipmentBOMMaterial` | Bill of materials: parts standard to an asset. | `bomId` PK; `quantity Float` | `equipmentId` → `Equipment`; `materialId` → `Material`, both required | Soft |
 | `FailureCode` | Hierarchical failure classification. | `failureCodeId` PK; `code`; `description`; `parentCodeId?` | `parentCodeId` → self, nullable. Self-referencing hierarchy. | Soft |
 | `CauseCode` | Cause classification. **No foreign key anywhere and no referencing column in the schema** — see [Known gaps](#known-gaps). | `causeCodeId` PK; `code`; `description` | none | Soft |
@@ -69,12 +69,12 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | Table | Purpose | Key fields | Foreign keys | Delete |
 | --- | --- | --- | --- | --- |
 | `Notification` | Breakdown/maintenance request raised against an asset. | `notificationId` PK; `notificationNumber` (partial unique); `type` M1/M2/M3; `priority` High/Medium/Low; `description`; `breakdownFlag` (default false); `status` Open/In Process/Completed/Converted, default Open | `functionalLocationId` → `FunctionalLocation`, required; `equipmentId` → `Equipment`, nullable; `reportedByUserId` → `User`, required | Soft |
-| `WorkOrder` | The central maintenance order. | `workOrderId` PK; `woNumber` (partial unique); `type` CM/PM/PdM/EM/CAL; `priority`; `status` default Draft across Draft, Planned, Scheduled, In Progress, Suspended, Completed, Closed, Cancelled; `description`; `costCenterCode` (default `""`); `internalOrder` (default `""`); `breakdownFlag`; `safetyCriticalFlag`; `plannedStart?`/`plannedFinish?`; `actualStart?`/`actualFinish?`; `plannedCost Float`; `actualCost Float`; `sourcePlanId?`; `sourcePlanCycle?` | `functionalLocationId` and `workCenterId` required; `equipmentId` nullable; `supervisorUserId` → `User`, required | Soft |
+| `WorkOrder` | The central maintenance order. | `workOrderId` PK; `woNumber` (partial unique); `type` CM/PM/PdM/EM/CAL; `priority`; `status` default Draft across Draft, Planned, Scheduled, In Progress, Suspended, Completed, Closed, Cancelled; `description`; `costCenterCode` (default `""`); `internalOrder` (default `""`); `breakdownFlag`; `safetyCriticalFlag`; `plannedStart?`/`plannedFinish?`; `actualStart?`/`actualFinish?`; `plannedCost Decimal(12,2)`; `actualCost Decimal(12,2)`; `sourcePlanId?`; `sourcePlanCycle?` | `functionalLocationId` and `workCenterId` required; `equipmentId` nullable; `supervisorUserId` → `User`, required | Soft |
 | `WorkOrderNotifLink` | Many-to-many join: notification converted into a work order. | composite PK `(workOrderId, notificationId)` | both required → `WorkOrder`, `Notification` | Soft |
 | `WorkOrderOperation` | Ordered execution step on a work order. | `operationId` PK; `sequenceNumber Int`; `description`; `plannedHours Float`; `numberOfTechnicians Int` (default 1); `actualHours Float` (default 0); `status` Pending/In Progress/Completed, default Pending | `workOrderId` → `WorkOrder`; `craftId` → `Craft`, both required | Soft |
-| `WorkOrderMaterial` | Part consumed on a work order. | `woMaterialId` PK; `plannedQuantity Float`; `actualQuantity Float` (default 0); `unitCost Float` (default 0); `reservationQuantity Float` (default 0) | `workOrderId` → `WorkOrder`; `materialId` → `Material`, both required | Soft |
+| `WorkOrderMaterial` | Part consumed on a work order. | `woMaterialId` PK; `plannedQuantity Float`; `actualQuantity Float` (default 0); `unitCost Decimal(12,2)` (default 0); `reservationQuantity Float` (default 0) | `workOrderId` → `WorkOrder`; `materialId` → `Material`, both required | Soft |
 | `LaborEntry` | Actual hours booked by a technician. | `laborEntryId` PK; `hoursWorked Float`; `entryDateTime` (default now); `notes?` | `operationId` → `WorkOrderOperation`; `userId` → `User`, both required | Soft |
-| `ExternalServiceCost` | Vendor invoice line against a work order. | `serviceCostId` PK; `vendor`; `description`; `cost Float`; `invoiceRef` | `workOrderId` → `WorkOrder`, required | Soft |
+| `ExternalServiceCost` | Vendor invoice line against a work order. | `serviceCostId` PK; `vendor`; `description`; `cost Decimal(12,2)`; `invoiceRef` | `workOrderId` → `WorkOrder`, required | Soft |
 | `CostSplit` | Percentage allocation of a work order to cost centres. | `splitId` PK; `costCenterCode`; `percentage Float` | `workOrderId` → `WorkOrder`, required | Soft |
 
 ## Safety
@@ -124,9 +124,7 @@ enforce what the domain implies.
 3. **Polymorphic references have no integrity.** `Comment`, `Attachment` and the
    `relatedEntity*` pair on `SystemAlert` can point at a missing or wrong-type row. The
    same applies to `createdBy`/`modifiedBy`/`uploadedByUserId`, which are free text.
-4. **Costs and quantities are `Float`.** `standardCost`, `currentStock`, `unitCost`,
-   `plannedCost`, `actualCost`, `cost`, `percentage`, `hourlyRate`, `costRatePerHour` and
-   the quantity columns are all binary floating point. Rounding differences are expected.
+4. **Monetary columns are `DECIMAL(12,2)`; quantity columns remain `Float`.** The seven monetary columns (`standardCost`, `unitCost`, `plannedCost`, `actualCost`, `cost`, `hourlyRate`, `costRatePerHour`) are exact `Decimal(12,2)` since D-17/E.13 and round-trip exactly. `currentStock` and the quantity / duration hours / `percentage` columns are still binary floating point, so arithmetic on those drifts and needs `roundMoney`. |
 5. **Status and type columns are unenforced free text.** The permitted values live only in
    schema comments; nothing at the database level rejects an unexpected value.
 6. **Four tables are not soft-deletable by design.** The E.12 sweep brought every remaining child, join and configuration table onto `isDeleted`, so the former hard-deleted-children gap is closed. The only exceptions are `RefreshToken` (revoked, never deleted), `SequenceCounter` (a numeric semaphore), and the immutable append-only `AuditLogEntry` and `WorkOrderSnapshot` (§3.6). The §4.3 purge job with the 7-year retention default is still a seed comment only — nothing in the application archives or purges audit rows yet.
