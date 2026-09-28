@@ -131,6 +131,18 @@ router.post('/', authorizeMinRole('Technician'), validate(woMaterialCreateSchema
       return res.status(404).json({ error: 'Material not found' });
     }
 
+    // An unknown work order used to fall out of the foreign key as a 500. The
+    // caller named a job that does not exist, which is a not-found, not an
+    // internal fault, and costing the line would have recomputed totals for
+    // nothing anyway.
+    const workOrderExists = await prisma.workOrder.findFirst({
+      where: { workOrderId, isDeleted: false },
+      select: { workOrderId: true },
+    });
+    if (!workOrderExists) {
+      return res.status(404).json({ error: 'Work order not found' });
+    }
+
     // SOW 3.1.5. The link is only useful if it is true, so confirm the named
     // operation is on this work order before storing it.
     if (needsOperationCheck(operationId)) {

@@ -966,7 +966,7 @@ The E.11 boundary note deferred **19 §3 rows** that E.9 restated as *clauses wh
 |---|---|---|---|---|
 | F.0 | Phase F scope recorded (the 19-hold plan above) | ✅ | Every residual row mapped to its matrix row by `docs/SOW_COMPLIANCE.md` line; the 19 count reconciled (18 clauses; the BOM entry spans `:84` and `:96`); no row promoted and no matrix claim changed by the recording. | *this commit* |
 | F.1 | Master-data write-path suites: tree counts, location rules, crafts, task lists, template copy (F0a, F0b, F0f, F0h, F0i) | ✅ | Five suites over live PostgreSQL; each asserts exactly the clause it names; rows promoted to `Met` only where the behaviour holds. | *this commit* |
-| F.2 | BOM and operation-material suites (F0c, F0d, F0j) | ⬜ | `POST/PUT/DELETE /api/equipment/:id/bom` and the operation-scoped material write are exercised end-to-end. | — |
+| F.2 | BOM and operation-material suites (F0c, F0d, F0j) | ✅ | `POST/PUT/DELETE /api/equipment/:id/bom` and the operation-scoped material write are exercised end-to-end. | *this commit* |
 | F.3 | Attachment missing-parent suite (F0e) | ⬜ | Upload/list/download/delete all return 400 for a missing parent. | — |
 | F.4 | Capacity-board suite (F0g) | ⬜ | `buildCapacityBoard` runs against live data; board shape asserted. | — |
 | F.5 | Notification lifecycle suites: M3, transition validity, mandatory pair, link navigation, close on completion (F0k–F0o) | ⬜ | M3 auto-created on completion; notification transition map driven both ways; at-least-one rule asserted; navigation split decided (F0n); auto-close asserted. | — |
