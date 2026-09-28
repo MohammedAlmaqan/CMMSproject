@@ -25,13 +25,28 @@ import {
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { equipmentService } from '@/services/equipmentService';
-import { workOrderService } from '@/services/workOrderService';
 import { attachmentService } from '@/services/attachmentService';
 import { ApiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import type { Equipment, FunctionalLocation, WorkOrder, EquipmentMeter, Attachment } from '@/types';
+import type { Equipment, FunctionalLocation, EquipmentMeter, EquipmentHistoryEntry, Attachment } from '@/types';
 
 type EqTab = 'general' | 'parameters' | 'history' | 'meters' | 'documents';
+
+// SOW 3.6 draws history from its own endpoint rather than a capped front-page
+// list, so an equipment that has more than one page of maintenance is still
+// seen in full: keep walking pages until the server says the list is exhausted.
+async function loadWorkOrderHistory(id: string): Promise<EquipmentHistoryEntry[]> {
+  const rows: EquipmentHistoryEntry[] = [];
+  const pageSize = 200;
+  let skip = 0;
+  for (;;) {
+    const res = await equipmentService.getHistory(id, { skip, take: pageSize });
+    rows.push(...res.data);
+    if (skip + res.data.length >= res.total) break;
+    skip += res.data.length;
+  }
+  return rows;
+}
 
 export default function EquipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,7 +55,7 @@ export default function EquipmentDetailPage() {
 
   const [eq, setEq] = useState<Equipment | null>(null);
   const [eqLocation, setEqLocation] = useState<FunctionalLocation | null>(null);
-  const [eqWorkOrders, setEqWorkOrders] = useState<WorkOrder[]>([]);
+  const [eqWorkOrders, setEqWorkOrders] = useState<EquipmentHistoryEntry[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attBusy, setAttBusy] = useState<string | null>(null);
   const [attError, setAttError] = useState<string | null>(null);
@@ -57,14 +72,14 @@ export default function EquipmentDetailPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [eqRes, woRes, attRes] = await Promise.all([
+      const [eqRes, historyRes, attRes] = await Promise.all([
         equipmentService.getById(id!),
-        workOrderService.getAll({ equipmentId: id!, take: 200 }),
+        loadWorkOrderHistory(id!),
         attachmentService.getByEntity('Equipment', id!),
       ]);
       setEq(eqRes);
       setEqLocation(eqRes.functionalLocation || null);
-      setEqWorkOrders(woRes.data);
+      setEqWorkOrders(historyRes);
       setAttachments(attRes);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Failed to load equipment');
@@ -296,12 +311,23 @@ export default function EquipmentDetailPage() {
                             {wo.status}
                           </span>
                         </div>
-                        <span className="text-tertiary text-xs">{wo.actualCost.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+                        <span className="text-tertiary text-xs">
+                          {wo.cost !== null && wo.cost !== undefined
+                            ? wo.cost.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+                            : '-'}
+                        </span>
                       </div>
                       <p className="text-secondary text-xs mt-1">{wo.description}</p>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-tertiary text-xs"><Calendar className="w-3 h-3 inline mr-1" />{wo.plannedStart ? new Date(wo.plannedStart).toLocaleDateString() : '-'}</span>
                         <span className="text-tertiary text-xs"><Tag className="w-3 h-3 inline mr-1" />{wo.breakdownFlag ? 'Breakdown' : 'Normal'}</span>
+                        <span className="text-tertiary text-xs">
+                          <Activity className="w-3 h-3 inline mr-1" />
+                          {wo.downtimeHours !== null && wo.downtimeHours !== undefined ? `${wo.downtimeHours}h downtime` : 'No downtime recorded'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-tertiary text-xs">Raised {new Date(wo.createdDate).toLocaleDateString()}</span>
                       </div>
                     </div>
                   ))

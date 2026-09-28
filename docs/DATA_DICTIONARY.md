@@ -16,21 +16,21 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | Table naming | Model name == table name. The schema declares no `@@map`. |
 | Primary keys | `String @id @default(uuid())`, named `<model>Id`. Three exceptions noted per table. |
 | Business codes | Plain `String` columns, **not** `@unique` in Prisma. Uniqueness is enforced by partial unique indexes created in migrations, scoped to `WHERE "isDeleted" = false`. A soft-deleted row releases its code for reuse. |
-| Soft delete | `isDeleted Boolean @default(false)`. 18 of 35 tables. Queries must filter on it. |
+| Soft delete | `isDeleted Boolean @default(false)`. 18 of 38 tables. Queries must filter on it. The exceptions are the hard-deleted child/join/configuration tables (§4.3) and `WorkOrderSnapshot`, which is deliberately immutable and must not be deletable. |
 | `modifiedDate` | `DateTime @updatedAt` on soft-deleted tables, so the application must set the value. `Attachment` deviates — see its row. |
 | `createdBy` / `modifiedBy` | Free-text `String @default("system")`, holding a user id or the literal `system`. **Not** a foreign key, so a deleted or bad actor id will not be rejected. |
 | Monetary / quantity values | `Float`, not `Decimal`. Exact-currency arithmetic on these columns will drift. |
 | Status and type columns | Free-text `String`; allowed values are recorded only as schema comments, not as enums or check constraints. |
 | Polymorphic links | `Comment` and `Attachment` point at their target via `entityType` + `entityId` with no foreign key. Integrity is the application's responsibility. |
 
-### Audit coverage across the 35 tables
+### Audit coverage across the 38 tables
 
 | Audit shape | Count | Tables |
 | --- | --- | --- |
 | Full audit set + `isDeleted` | 18 | `User`, `FunctionalLocation`, `Equipment`, `EquipmentMeter`, `MeterReading`, `WorkCenter`, `Craft`, `Material`, `FailureCode`, `CauseCode`, `TaskList`, `TaskListOperation`, `Notification`, `WorkOrder`, `LaborEntry`, `SafetyChecklistTemplate`, `MaintenancePlan`, `Attachment` |
-| Full audit set, no `isDeleted` (hard deleted) | 2 | `WorkOrderOperation`, `WorkOrderChecklist` |
+| Full audit set, no `isDeleted` (hard deleted) | 3 | `WorkOrderOperation`, `WorkOrderChecklist`, `TaskListMaterial` |
 | `createdDate` only | 2 | `SystemAlert`, `Comment` |
-| No audit columns | 13 | `RefreshToken`, `EquipmentBOMMaterial`, `WorkOrderNotifLink`, `WorkOrderMaterial`, `ExternalServiceCost`, `ChecklistItem`, `WorkOrderChecklistItem`, `MaintenancePlanMeter`, `CostSplit`, `AuditLogEntry`, `SystemConfig`, `SchedulerRun`, `SequenceCounter` |
+| No audit columns | 15 | `RefreshToken`, `EquipmentBOMMaterial`, `WorkOrderNotifLink`, `WorkOrderMaterial`, `ExternalServiceCost`, `ChecklistItem`, `WorkOrderChecklistItem`, `MaintenancePlanMeter`, `CostSplit`, `AuditLogEntry`, `SystemConfig`, `SchedulerRun`, `SequenceCounter`, `MaintenancePlanTarget`, `WorkOrderSnapshot` (immutable by design — see the System section row) |
 
 ---
 
@@ -62,6 +62,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | `CauseCode` | Cause classification. **No foreign key anywhere and no referencing column in the schema** — see [Known gaps](#known-gaps). | `causeCodeId` PK; `code`; `description` | none | Soft |
 | `TaskList` | Reusable standard job, scoped to a work centre. | `taskListId` PK; `code` (partial unique); `description`; `equipmentClass?`; `equipmentId?` | `workCenterId` → `WorkCenter`, required; `equipmentId` → `Equipment`, nullable | Soft |
 | `TaskListOperation` | Ordered step in a task list. | `taskOperationId` PK; `sequenceNumber Int`; `description`; `plannedHours Float`; `numberOfTechnicians Int` | `taskListId` → `TaskList`; `craftId` → `Craft`, both required | Soft |
+| `TaskListMaterial` | Material planned for a task-list operation. | `taskListMaterialId` PK; `quantity Float` | `taskOperationId` → `TaskListOperation`; `materialId` → `Material`, both required. Unique on `(taskOperationId, materialId)` | Hard |
 
 ## Work Management
 
@@ -91,6 +92,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | --- | --- | --- | --- | --- |
 | `MaintenancePlan` | Preventive strategy producing scheduled work orders. | `planId` PK; `planCode` (partial unique on active rows only); `description`; `strategyType` Time/Meter/Combined; `intervalValue Int`; `intervalUnit` Days/Weeks/Months; `callHorizonValue Int` (default 7); `callHorizonUnit` Days/Units (default Days); `startDate`; `endDate?`; `activeFlag` (default true); `functionalLocationId?` | `workCenterId` → `WorkCenter` and `taskListId` → `TaskList`, both **required**; `equipmentId` → `Equipment`, nullable. `functionalLocationId` is a plain nullable column with **no** relation. | Soft |
 | `MaintenancePlanMeter` | Meter trigger interval for a plan. | `planMeterId` PK; `meterInterval Float` | `planId` → `MaintenancePlan`; `meterId` → `EquipmentMeter`, both required | Hard |
+| `MaintenancePlanTarget` | Equipment or location a plan schedules against. | `planTargetId` PK; `equipmentId?`; `functionalLocationId?`. CASCADE: deleting the plan takes its targeting with it — the row is only meaningful as part of the plan's definition. NULLs not part of a unique constraint, and a CHECK requires at least one target (see [Known gaps](#known-gaps)). | `planId` → `MaintenancePlan` (`onDelete: Cascade`); `equipmentId` → `Equipment`, `functionalLocationId` → `FunctionalLocation`, both nullable | Hard |
 
 ## System
 
@@ -103,6 +105,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | `SystemConfig` | Key/value application settings. | `configId` PK; `key` `@unique`; `value` | none | Hard |
 | `SchedulerRun` | PM scheduler execution record, with heartbeat for single-instance locking. | `schedulerRunId` PK; `hostname`; `pid Int`; `status` running/success/error; `startedAt`; `heartbeatAt`; `completedAt?`; `plansEvaluated Int`; `wosCreated Int`; `wosSkipped Int`; `errorMessage?`. Indexed on `(status, heartbeatAt)` and `(completedAt)`. | none | Hard |
 | `SequenceCounter` | Document number allocation. | `code` PK (this table's PK is a `String` business key, not a generated uuid); `value Int` (default 0) | none | Hard |
+| `WorkOrderSnapshot` | Append-only copy of a work order at each status change. | `snapshotId` PK; `workOrderId`; `status` (repeated for queryability); `snapshot` (a complete `Json` copy — every scalar field, dates ISO, keys sorted); `takenByUserId`; `takenAt` (default now). Indexed on `(workOrderId, takenAt)`. **Immutable by design**: no `isDeleted`/`modifiedBy`/`modifiedDate` and no update or delete surface anywhere — this is what "stored as an immutable record" means. | `workOrderId` → `WorkOrder` (`onDelete: Restrict`); `takenByUserId` → `User` | Hard |
 
 ---
 
@@ -136,10 +139,10 @@ enforce what the domain implies.
 Reconcile the model count and this document after any schema change:
 
 ```powershell
-# must be 35
+# must be 38
 (Select-String -Path backend\prisma\schema.prisma -Pattern '^model ').Count
 
-# soft-delete split: 18 yes / 17 no
+# soft-delete split: 18 yes / 20 no
 (Select-String -Path backend\prisma\schema.prisma -Pattern '^\s+isDeleted\s+Boolean').Count
 
 # every model must appear exactly once in this document
@@ -151,7 +154,7 @@ Compare-Object $schema $document
 ```
 
 The row pattern is anchored on the `Soft`/`Hard` delete column so that it matches only the
-seven domain tables and not the conventions table above them. `Compare-Object` must return
-nothing, which proves the dictionary and the schema describe the same 35 tables. A
+table rows and not the conventions table above them. `Compare-Object` must return
+nothing, which proves the dictionary and the schema describe the same 38 tables. A
 `Generated` migration diff is the final check for anything the schema file alone does not
 show.

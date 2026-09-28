@@ -414,4 +414,110 @@ describe('work orders routes', () => {
       expect(res.status).toBe(400);
     });
   });
+
+  describe('work order history (SOW 3.6)', () => {
+    it('writes one immutable snapshot per successful transition and none for a rejected one, then serves them oldest first', async () => {
+      // The snapshot is the state the work order holds AFTER the change, so a
+      // walk that started at Draft and passed through four hops leaves exactly
+      // four rows, ending on the 'Completed' copy -- and a transition that the
+      // route refuses must not leave a row behind.
+      const made = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body({ description: 'history walk' }));
+      expect(made.status).toBe(201);
+      const id = made.body.workOrderId;
+      extraIds.push(id);
+
+      const rejected = await api()
+        .put(`/api/work-orders/${id}/status`)
+        .set(authHeaders(ctx.technicianToken))
+        .send({ status: 'Completed' });
+      expect(rejected.status).toBe(400);
+
+      await addOperation(id);
+
+      for (const step of ['Planned', 'Scheduled', 'In Progress', 'Completed']) {
+        const r = await api()
+          .put(`/api/work-orders/${id}/status`)
+          .set(authHeaders(ctx.technicianToken))
+          .send({ status: step });
+        expect(r.status).toBe(200);
+      }
+
+      const rows = await prisma.workOrderSnapshot.findMany({
+        where: { workOrderId: id },
+        orderBy: { takenAt: 'asc' },
+      });
+      // The technician drives the walk, so every snapshot records the same
+      // actor: the user who performed the transition.
+      const technician = await prisma.user.findFirstOrThrow({ where: { username: 'tech1' } });
+      expect(rows.map((row) => row.status)).toEqual(['Planned', 'Scheduled', 'In Progress', 'Completed']);
+      for (const row of rows) {
+        expect(row.takenByUserId).toBe(technician.userId);
+        expect(row.status).toBe((row.snapshot as Record<string, unknown>).status);
+      }
+
+      const first = rows[0].snapshot as Record<string, unknown>;
+      // The stored copy is the full scalar record, dates frozen to ISO strings.
+      // (JSONB does not guarantee a key order on the way back out, so sortedness
+      // is asserted on the serializer itself in tests/unit.)
+      expect(first.description).toBe('history walk');
+      expect(first.status).toBe('Planned');
+      expect(first.workOrderId).toBe(id);
+      expect(typeof first.createdDate).toBe('string');
+
+      const res = await api().get(`/api/work-orders/${id}/history`).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(4);
+      expect(res.body.data.map((d: { status: string }) => d.status)).toEqual([
+        'Planned',
+        'Scheduled',
+        'In Progress',
+        'Completed',
+      ]);
+      expect(res.body.data[3].takenBy.userId).toBe(technician.userId);
+      expect(res.body.data[3].snapshot.woNumber).toMatch(/^WO-/);
+      expect(res.body.data[3].snapshot.status).toBe('Completed');
+    });
+
+    it('does not write a snapshot for a plain edit, and a deleted work order stops serving history from the API', async () => {
+      const made = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body({ description: 'edit no snapshot' }));
+      expect(made.status).toBe(201);
+      const id = made.body.workOrderId;
+      extraIds.push(id);
+
+      const edited = await api()
+        .put(`/api/work-orders/${id}`)
+        .set(authHeaders(ctx.operatorToken))
+        .send({ description: 'edited, still no snapshot' });
+      expect(edited.status).toBe(200);
+
+      await addOperation(id);
+      const moved = await api()
+        .put(`/api/work-orders/${id}/status`)
+        .set(authHeaders(ctx.technicianToken))
+        .send({ status: 'Planned' });
+      expect(moved.status).toBe(200);
+
+      // One snapshot: the edit must not have produced one.
+      expect(await prisma.workOrderSnapshot.count({ where: { workOrderId: id } })).toBe(1);
+      expect(moved.body.status).toBe('Planned');
+
+      await api().delete(`/api/work-orders/${id}`).set(authHeaders(ctx.adminToken));
+
+      // The history endpoint mirrors GET /:id: a retired work order is not
+      // served any more. The immutable rows themselves are kept -- there is no
+      // delete path for them anywhere -- so nothing a reviewer needs has been
+      // destroyed, it has just stopped being read from the API.
+      const res = await api().get(`/api/work-orders/${id}/history`).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(404);
+      expect(await prisma.workOrderSnapshot.count({ where: { workOrderId: id } })).toBe(1);
+    });
+
+    it('returns 401 without a token and 404 for an unknown work order', async () => {
+      const anon = await api().get('/api/work-orders/not-a-real-id/history');
+      expect(anon.status).toBe(401);
+
+      const unknown = await api().get('/api/work-orders/not-a-real-id/history').set(authHeaders(ctx.adminToken));
+      expect(unknown.status).toBe(404);
+    });
+  });
 });

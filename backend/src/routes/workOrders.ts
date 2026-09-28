@@ -5,6 +5,7 @@ import { logAuditFieldChange, logAuditAction } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber, generateNotifNumber } from '../utils/sequence.js';
 import { canTransition } from '../utils/transitions.js';
+import { serializeWorkOrderSnapshot } from '../utils/workOrderSnapshots.js';
 import { requiresAtLeastOneOperation, missingOperationMessage } from '../utils/workOrderRules.js';
 import { findBlockingChecklist, describeBlockedChecklist } from '../utils/checklistRules.js';
 import { logger } from '../utils/logger.js';
@@ -269,6 +270,86 @@ router.get('/:id', async (req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
+/**
+ * @openapi
+ * /api/work-orders/{id}/history:
+ *   get:
+ *     summary: Work order history (immutable snapshots)
+ *     description: >
+ *       SOW 3.6. Returns the complete snapshot of the work order taken at each
+ *       status change, oldest first. Snapshot rows are append-only: they are
+ *       created only inside a successful status transition and have no update
+ *       or delete surface anywhere in the API.
+ *     tags: [Work Orders]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Chronological list of immutable snapshots
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       snapshotId: { type: string }
+ *                       workOrderId: { type: string }
+ *                       status: { type: string }
+ *                       takenAt: { type: string, format: date-time }
+ *                       takenBy:
+ *                         type: object
+ *                         properties:
+ *                           userId: { type: string }
+ *                           fullName: { type: string }
+ *                           username: { type: string }
+ *                       snapshot: { type: object }
+ *                 total: { type: integer }
+ *       '404':
+ *         description: Work order not found
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/:id/history',
+  async (req: Request, res: Response) => {
+    try {
+      const id = req.params.id as string;
+      const workOrder = await prisma.workOrder.findFirst({
+        where: { workOrderId: id, isDeleted: false },
+        select: { workOrderId: true },
+      });
+      if (!workOrder) {
+        return res.status(404).json({ error: 'Work order not found' });
+      }
+
+      // SOW 3.6 work order history. Snapshots are append-only by construction:
+      // nothing in the API can create one except a successful status change, and
+      // there is no update or delete route on this model at all. The snapshot
+      // JSON is returned as stored so a reader can see the work order exactly as
+      // it was at each change.
+      const data = await prisma.workOrderSnapshot.findMany({
+        where: { workOrderId: id },
+        include: {
+          takenBy: { select: { userId: true, fullName: true, username: true } },
+        },
+        orderBy: { takenAt: 'asc' },
+      });
+
+      res.json({ data, total: data.length });
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching work order history');
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
 router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema), async (req: Request, res: Response) => {
   try {
     const {
@@ -778,6 +859,23 @@ router.put(
       const wo = await tx.workOrder.update({
         where: { workOrderId: id },
         data: updateData,
+      });
+
+      // SOW 3.6 work order history: a complete, immutable snapshot of the work
+      // order at each major status change. Written in the same transaction as
+      // the status move so a work order can never change status without its
+      // history entry; the copied row is the state it now holds, which is what
+      // each snapshot means. There is no update or delete surface for these
+      // rows anywhere in the API.
+      await tx.workOrderSnapshot.create({
+        data: {
+          workOrderId: wo.workOrderId,
+          status: wo.status,
+          snapshot: serializeWorkOrderSnapshot(
+            wo as unknown as Record<string, unknown>
+          ),
+          takenByUserId: req.user!.userId,
+        },
       });
 
       if (newStatus === 'Completed') {

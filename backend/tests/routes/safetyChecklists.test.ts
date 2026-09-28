@@ -40,6 +40,7 @@ describe('safety checklists routes', () => {
       await prisma.safetyChecklistTemplate.deleteMany({ where: { checklistTemplateId: templateId } }).catch(() => {});
       await prisma.auditLogEntry.deleteMany({ where: { recordId: templateId } }).catch(() => {});
     }
+    await prisma.workOrderSnapshot.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
     await prisma.workOrder.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
   });
 
@@ -152,9 +153,10 @@ describe('SOW 3.3.7 mandatory checklist gate on the work order status route', ()
       await prisma.checklistItem.deleteMany({ where: { checklistTemplateId: mandatoryTemplateId } });
       await prisma.safetyChecklistTemplate.deleteMany({ where: { checklistTemplateId: mandatoryTemplateId } });
     }
-    if (gateWoId) {
+if (gateWoId) {
       await prisma.workOrderOperation.deleteMany({ where: { workOrderId: gateWoId } });
       await prisma.auditLogEntry.deleteMany({ where: { recordId: gateWoId } });
+      await prisma.workOrderSnapshot.deleteMany({ where: { workOrderId: gateWoId } });
       await prisma.workOrder.deleteMany({ where: { workOrderId: gateWoId } });
     }
     for (const id of ids) {

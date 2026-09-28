@@ -35,6 +35,7 @@ model User {
   workOrderChecklists WorkOrderChecklist[]
   refreshTokens     RefreshToken[]
   systemAlerts      SystemAlert[]
+  workOrderSnapshots WorkOrderSnapshot[]
 }
 
 model RefreshToken {
@@ -368,6 +369,30 @@ model WorkOrder {
   checklists         WorkOrderChecklist[]
   costSplits         CostSplit[]
   notifications      WorkOrderNotifLink[]
+  snapshots          WorkOrderSnapshot[]
+}
+
+// SOW 3.6 "Work Order History". A complete, immutable copy of the work order
+// taken at each status change. The absence of modifiedBy/modifiedDate/isDeleted
+// is deliberate: this record cannot be edited, retired or hidden, which is what
+// "stored as immutable records" asks for. The parent can be soft-deleted and the
+// history survives; a hard delete of a work order row is refused (Restrict)
+// once its history exists.
+model WorkOrderSnapshot {
+  snapshotId    String   @id @default(uuid())
+  workOrderId   String
+  workOrder     WorkOrder @relation(fields: [workOrderId], references: [workOrderId], onDelete: Restrict)
+  // The status the snapshot captures, repeated for queryability even though the
+  // JSON below carries it too.
+  status        String
+  // Frozen copy of the work order's record at capture time: every scalar field,
+  // dates as ISO strings, keys sorted so consecutive snapshots diff cleanly.
+  snapshot      Json
+  takenByUserId String
+  takenBy       User     @relation(fields: [takenByUserId], references: [userId])
+  takenAt       DateTime @default(now())
+
+  @@index([workOrderId, takenAt])
 }
 
 model WorkOrderNotifLink {

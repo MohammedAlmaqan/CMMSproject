@@ -1,5 +1,5 @@
 import { api, getAuthToken, ApiError, notifyApiActivity } from '@/lib/api';
-import type { Equipment } from '@/types';
+import type { Equipment, EquipmentHistoryEntry } from '@/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -13,6 +13,11 @@ export const equipmentService = {
   getAll: (params?: { search?: string; functionalLocationId?: string; criticality?: string; equipmentClass?: string }) =>
     api.get<Equipment[]>('/equipment', params as any),
   getById: (id: string) => api.get<Equipment>(`/equipment/${id}`),
+  getHistory: (id: string, params?: { skip?: number; take?: number }) =>
+    api.get<{ data: EquipmentHistoryEntry[]; total: number; skip: number; take: number }>(
+      `/equipment/${id}/history`,
+      params
+    ),
   create: (data: Partial<Equipment>) => api.post<Equipment>('/equipment', data),
   update: (id: string, data: Partial<Equipment>) => api.put<Equipment>(`/equipment/${id}`, data),
   delete: (id: string) => api.delete(`/equipment/${id}`),

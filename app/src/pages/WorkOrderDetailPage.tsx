@@ -41,7 +41,6 @@ import { workOrderMaterialService } from '@/services/workOrderMaterialService';
 import { laborService } from '@/services/laborService';
 import { externalServiceService } from '@/services/externalServiceService';
 import { safetyChecklistService } from '@/services/safetyChecklistService';
-import { auditLogService } from '@/services/auditLogService';
 import { commentService } from '@/services/commentService';
 import { attachmentService } from '@/services/attachmentService';
 import { userService } from '@/services/userService';
@@ -52,7 +51,7 @@ import type {
   WorkOrder,
   WorkOrderStatus,
   OperationStatus,
-  AuditLogEntry,
+  WorkOrderSnapshotEntry,
   Comment,
   LaborEntry,
   User,
@@ -223,7 +222,7 @@ export default function WorkOrderDetailPage() {
   const [activeTab, setActiveTab] = useState<DetailTab>('operations');
   const [wo, setWo] = useState<WorkOrderDetail | null>(null);
   const [labor, setLabor] = useState<LaborEntryDetail[]>([]);
-  const [history, setHistory] = useState<AuditLogEntry[]>([]);
+  const [history, setHistory] = useState<WorkOrderSnapshotEntry[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [crafts, setCrafts] = useState<Craft[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -273,11 +272,11 @@ export default function WorkOrderDetailPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const isAdmin = hasPermission(['Administrator']);
-      const [woData, laborData, auditData, usersData, craftsData, materialsData, templatesData, attachmentsData] = await Promise.all([
+const isAdmin = hasPermission(['Administrator']);
+      const [woData, laborData, historyData, usersData, craftsData, materialsData, templatesData, attachmentsData] = await Promise.all([
         workOrderService.getById(id!),
         laborService.getByWorkOrder(id!),
-        isAdmin ? auditLogService.getAll({ search: id!, take: 100 }) : Promise.resolve({ data: [] }),
+        workOrderService.getHistory(id!),
         isAdmin ? userService.getAll() : Promise.resolve([]),
         craftService.getAll(),
         materialService.getAll(),
@@ -286,7 +285,7 @@ export default function WorkOrderDetailPage() {
       ]);
       setWo(woData as WorkOrderDetail);
       setLabor(laborData as LaborEntryDetail[]);
-      setHistory((auditData?.data || []).filter((a) => a.recordId === id!));
+      setHistory(historyData?.data || []);
       setUsers(usersData);
       setCrafts(craftsData);
       setMaterials(materialsData);
@@ -1902,40 +1901,33 @@ export default function WorkOrderDetailPage() {
 
         {activeTab === 'history' && (
           <div className="industrial-card rounded overflow-hidden">
-            {history.length === 0 ? (
+{history.length === 0 ? (
               <EmptyState label="No history entries" />
             ) : (
-              <table className="w-full">
-                <thead>
-                  <tr style={{ backgroundColor: '#27272A' }}>
-                    {['Timestamp', 'Action', 'Field', 'Old Value', 'New Value', 'User', 'IP'].map((h) => (
-                      <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((h, idx) => {
-                    const user = users.find((u) => u.userId === h.userId);
-                    return (
-                      <tr key={h.auditId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
-                        <td className={`${tdCls} font-mono text-xs text-secondary`}>{new Date(h.timestamp).toLocaleString()}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr style={{ backgroundColor: '#27272A' }}>
+                      {['Status', 'Snapshot Date', 'Changed By', 'Planned Cost', 'Actual Cost'].map((h) => (
+                        <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((h, idx) => (
+                      <tr key={h.snapshotId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
                         <td className={tdCls}>
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${
-                            h.action === 'Create' ? 'badge-completed' : h.action === 'Update' ? 'badge-in-progress' : 'badge-cancelled'
-                          }`}>
-                            {h.action}
-                          </span>
+                          <span className="text-xs px-1.5 py-0.5 rounded badge-in-progress">{h.status}</span>
                         </td>
-                        <td className={`${tdCls} font-mono text-xs text-secondary`}>{h.fieldName || '-'}</td>
-                        <td className={`${tdCls} text-xs text-red-status`}>{h.oldValue || '-'}</td>
-                        <td className={`${tdCls} text-xs text-green-status`}>{h.newValue || '-'}</td>
-                        <td className={`${tdCls} text-xs text-primary`}>{user?.fullName || h.userId}</td>
-                        <td className={`${tdCls} font-mono text-xs text-tertiary`}>{h.ipAddress}</td>
+                        <td className={`${tdCls} font-mono text-xs text-secondary`}>{new Date(h.takenAt).toLocaleString()}</td>
+                        <td className={`${tdCls} text-xs text-primary`}>{h.takenBy?.fullName || h.takenBy?.username || 'System'}</td>
+                        <td className={`${tdCls} text-xs text-secondary`}>{formatMoney(h.snapshot?.plannedCost)}</td>
+                        <td className={`${tdCls} text-xs text-secondary`}>{formatMoney(h.snapshot?.actualCost)}</td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
@@ -1969,6 +1961,12 @@ function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatMoney(v: unknown): string {
+  return typeof v === 'number' && Number.isFinite(v)
+    ? v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : '-';
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {

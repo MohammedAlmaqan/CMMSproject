@@ -18,6 +18,7 @@ vi.mock('@/services/workOrderService', () => ({
   workOrderService: {
     getAll: vi.fn(),
     getById: vi.fn(),
+    getHistory: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -106,6 +107,7 @@ describe('WorkOrderDetailPage', () => {
     useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
     vi.clearAllMocks();
     vi.mocked(workOrderService.getById).mockResolvedValue(baseWo);
+    vi.mocked(workOrderService.getHistory).mockResolvedValue({ data: [], total: 0 });
     vi.mocked(laborService.getByWorkOrder).mockResolvedValue([]);
     vi.mocked(auditLogService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 100 });
     vi.mocked(userService.getAll).mockResolvedValue([]);

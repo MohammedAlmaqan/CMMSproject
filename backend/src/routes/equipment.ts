@@ -491,6 +491,145 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/equipment/{id}/history:
+ *   get:
+ *     summary: Equipment maintenance history
+ *     description: >
+ *       SOW 3.6. Chronological list of every work order raised on the equipment,
+ *       across all statuses including completed ones, with the date, type, cost
+ *       and downtime (hours) the requirement asks for. Soft-deleted work orders
+ *       are excluded. Downtime is actual finish minus actual start in hours,
+ *       rounded to two decimals, and null when no actual start or finish was
+ *       recorded.
+ *     tags: [Equipment]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: skip
+ *         required: false
+ *         schema: { type: integer, default: 0 }
+ *       - in: query
+ *         name: take
+ *         required: false
+ *         schema: { type: integer, default: 100, maximum: 1000 }
+ *     responses:
+ *       '200':
+ *         description: Chronological maintenance history, oldest first
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       workOrderId: { type: string }
+ *                       woNumber: { type: string }
+ *                       type: { type: string }
+ *                       status: { type: string }
+ *                       breakdownFlag: { type: boolean }
+ *                       description: { type: string }
+ *                       createdDate: { type: string, format: date-time }
+ *                       plannedStart: { type: string, format: date-time, nullable: true }
+ *                       plannedFinish: { type: string, format: date-time, nullable: true }
+ *                       cost: { type: number, nullable: true }
+ *                       plannedCost: { type: number, nullable: true }
+ *                       downtimeHours: { type: number, nullable: true }
+ *                 total: { type: integer }
+ *                 skip: { type: integer }
+ *                 take: { type: integer }
+ *       '404':
+ *         description: Equipment not found
+ *       '500':
+ *         description: Internal server error
+ */
+// SOW 3.6 equipment maintenance history: the chronological list of every work
+// order ever raised on the equipment, with the fields the requirement names
+// (date, type, cost, downtime in hours). Served from its own path so the UI
+// does not need to pull `take: 200` rows and assemble history client-side.
+router.get('/:id/history', async (req: Request, res: Response) => {
+  try {
+    const equipmentId = String(req.params.id);
+    const equipment = await prisma.equipment.findFirst({
+      where: { equipmentId, isDeleted: false },
+      select: { equipmentId: true },
+    });
+    if (!equipment) {
+      return res.status(404).json({ error: 'Equipment not found' });
+    }
+
+    const skip = Math.max(0, parseInt(String(req.query.skip ?? '0'), 10) || 0);
+    const requestedTake = Math.max(0, parseInt(String(req.query.take ?? '100'), 10) || 0);
+    const take = Math.min(requestedTake, 1000);
+
+    const where = { equipmentId, isDeleted: false };
+
+    const data = await prisma.workOrder.findMany({
+      where,
+      select: {
+        workOrderId: true,
+        woNumber: true,
+        type: true,
+        status: true,
+        breakdownFlag: true,
+        description: true,
+        createdDate: true,
+        plannedStart: true,
+        plannedFinish: true,
+        plannedCost: true,
+        actualCost: true,
+        actualStart: true,
+        actualFinish: true,
+      },
+      orderBy: { createdDate: 'asc' },
+      skip,
+      take,
+    });
+
+    const total = await prisma.workOrder.count({ where });
+
+    res.json({
+      data: data.map((wo) => ({
+        workOrderId: wo.workOrderId,
+        woNumber: wo.woNumber,
+        type: wo.type,
+        status: wo.status,
+        breakdownFlag: wo.breakdownFlag,
+        description: wo.description,
+        createdDate: wo.createdDate,
+        plannedStart: wo.plannedStart,
+        plannedFinish: wo.plannedFinish,
+        cost: wo.actualCost,
+        plannedCost: wo.plannedCost,
+        // Downtime per SOW 3.6 is the elapsed time the equipment was out of
+        // service because of the work; a work order that never recorded an
+        // actual start or finish has no measurable downtime, so it is null.
+        downtimeHours:
+          wo.actualFinish && wo.actualStart
+            ? Math.round(
+                ((wo.actualFinish.getTime() - wo.actualStart.getTime()) /
+                  3_600_000) *
+                  100
+              ) / 100
+            : null,
+      })),
+      total,
+      skip,
+      take,
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Error fetching equipment maintenance history');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.post('/', authorizeMinRole('Technician'), validate(equipmentCreateSchema), async (req: Request, res: Response) => {
   try {
     const {

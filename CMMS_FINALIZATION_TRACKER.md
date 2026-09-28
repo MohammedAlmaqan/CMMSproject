@@ -4,7 +4,7 @@
 **Tracker created:** 2026-09-22
 **Total estimate:** ~26-40 working days
 **Critical path:** Phase 8 - Production Readiness. Sections A through E; E is the last, and D-17 (`Float` -> `Decimal`) is its final item.
-**Status:** Phases 0-7 complete. **Phase 8 - Production Readiness: A complete (gate passed) | B code complete | C code complete | D complete and verified | E in progress, through E.10.** Matrix: **81 of 214 clauses `Met`**, 65 Partial, 35 Not Met. The audit workstream is done and Phase E stops here for review; what remains is rows 55/56, the 16-model soft-delete sweep, then D-17. **A row is verified at the SHA where its test was green** — a commit cannot contain its own hash, so the evidence cell cites the tested SHA and that run's CI ID rather than the tip.
+**Status:** Phases 0-7 complete. **Phase 8 - Production Readiness: A complete (gate passed) | B code complete | C code complete | D complete and verified | E in progress, through E.11.** Matrix: **83 of 214 clauses `Met`**, 64 Partial, 34 Not Met. The §3.6 history workstream is done (Work Order History and Equipment Maintenance History are both `Met`, residual L25 closed) and Phase E stops here for review; what remains is the 16-model soft-delete sweep, then D-17. **A row is verified at the SHA where its test was green** — a commit cannot contain its own hash, so the evidence cell cites the tested SHA and that run's CI ID rather than the tip.
 
 ## Status Legend
 
@@ -540,7 +540,7 @@ https://github.com/MohammedAlmaqan/CMMSproject/actions/runs/36326909767
 
 Rows 19, 26, 31, 32, 34, 38, 49, 55, 56, 57, plus three cross-cutting items: D-3 (the technician multiplier), D-17 (`Float` → `Decimal` for monetary columns), and the 16-model soft-delete sweep. This is the highest-risk phase of Phase 8 — two of the three cross-cutting items change the schema, and the third changes what every read in the system returns.
 
-Rows 19, 26, 31, 32, 34, 38, 49 and 57 are done, along with D-3. What remains is **rows 55 and 56, the 16-model soft-delete sweep, then D-17 last** — in that order, and Phase E stops at each boundary for review.
+Rows 19, 26, 31, 32, 34, 38, 49, 55 and 56 are done, along with D-3. Row 57 closed on the E.10 restatement, not on a code change. What remains is **the 16-model soft-delete sweep, then D-17 last** — in that order, and Phase E stops at each boundary for review.
 
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
@@ -552,8 +552,9 @@ Rows 19, 26, 31, 32, 34, 38, 49 and 57 are done, along with D-3. What remains is
 | E.6 | Fix the E.3 migration backfill and the E.4 update schema | ✅ | Both E.3 and E.4 were red on CI. Neither was a test-logic problem; both were ways of writing a value that the database would not accept. | `fa79ef0` |
 | E.7 | Stop the row-31 reservation tests mutating the shared work order (row 32 wording, D-16) | ✅ | The release test cancelled a work order the rest of the file depends on; it now owns its own. Row 32 closed on D-16, with no code change. | `98c356e` |
 | E.8 | Stop PM generation writing `'scheduler'` into a user foreign key | ✅ | Every scheduled work order generation was failing on `WorkOrder_reportedByUserId_fkey`. Found by reproducing CI locally, not by guessing. | `96988dd` |
-| E.9 | One-shot DB-backed diagnostic: re-test every row held on "never run against a live database" | ✅ | All 20 held rows examined clause by clause against the real suite. One promoted on genuine coverage; 19 re-stated as the specific untested clause. | *this commit* |
-| E.10 | Audit workstream: enforce field diffs and actor metadata in the type system (rows 38, 57) | ✅ | Measured before touching anything: **10 of 84** real route call sites carried both old and new values (the earlier "86" was a raw grep that counted the definition and the import). The row-57 premise turned out to be wrong — all **323/323** audit rows already in the database carried an IP address — so the real gap was field diffs and write-site coverage, not missing IPs. Both matrix rows restated from the measurement. `logAudit` no longer exists: `logAuditFieldChange` requires field, old and new; `logAuditAction` cannot accept value fields at all; both require user and IP. 84 call sites across 22 route files migrated. Turning enforcement on immediately surfaced **six** call sites that passed a `fieldName` with no values behind it, which the trail had been presenting as diffs. Master-data edits on nine registries and work-order cost recomputes now record per-column old/new via a shared differ. | *this commit* |
+| E.9 | One-shot DB-backed diagnostic: re-test every row held on "never run against a live database" | ✅ | All 20 held rows examined clause by clause against the real suite. One promoted on genuine coverage; 19 re-stated as the specific untested clause. | `6c5b926` |
+| E.10 | Audit workstream: enforce field diffs and actor metadata in the type system (rows 38, 57) | ✅ | Measured before touching anything: **10 of 84** real route call sites carried both old and new values (the earlier "86" was a raw grep that counted the definition and the import). The row-57 premise turned out to be wrong — all **323/323** audit rows already in the database carried an IP address — so the real gap was field diffs and write-site coverage, not missing IPs. Both matrix rows restated from the measurement. `logAudit` no longer exists: `logAuditFieldChange` requires field, old and new; `logAuditAction` cannot accept value fields at all; both require user and IP. 84 call sites across 22 route files migrated. Turning enforcement on immediately surfaced **six** call sites that passed a `fieldName` with no values behind it, which the trail had been presenting as diffs. Master-data edits on nine registries and work-order cost recomputes now record per-column old/new via a shared differ. | `8a155bf` |
+| E.11 | Work Order History + Equipment Maintenance History (rows 55, 56) | ✅ | Each successful work-order status change stores a complete immutable snapshot of the work order (`WorkOrderSnapshot`, migration `20260928151746_work_order_snapshot`), written inside the status-transition transaction so a change can never occur without its history row; `GET /api/work-orders/:id/history` serves them oldest-first. `GET /api/equipment/:id/history` serves the full chronological maintenance history per equipment — date, type, cost, planned cost, and downtime hours derived from the actual start/finish exactly as the downtime report does — paginated and excluding soft-deleted work orders. Residual **L25 closed**. | *this commit* |
 
 **E.10 decisions worth recording**
 
@@ -578,6 +579,40 @@ Rows 19, 26, 31, 32, 34, 38, 49 and 57 are done, along with D-3. What remains is
 | Database inspection | 0 action rows leaking field values; 0 rows missing `userId` or `ipAddress`; cost and master-data diffs present with both old and new |
 
 The 12 new cases cover the differ's decision logic, and were checked by mutation rather than trusted: making it skip any field that exists fails 5 of them, and removing the stable JSON key ordering fails 1. The silent no-op — a registry that matches nothing and audits nothing while looking correct — is the failure mode this code is most able to produce, so it is the one the tests were written against.
+
+E.10 CI: run **36347996951**, `conclusion: success`, for exact SHA `8a155bf`. E.9's SHA is `6c5b926`.
+
+#### E.11 — Work Order History and Equipment Maintenance History (rows 55, 56), and lessons from a JSONB column
+
+Row 55 (§3.6 Work Order History) and row 56 (§3.6 Equipment Maintenance History) both reached `Met`. The register had row 55 `Not Met` and row 56 `Partial`; both rows, the residual **L25**, and the `SOW_COMPLIANCE.md` §5.3/§4.3 "18 of 35" counts are updated in the same commit.
+
+**E.11 decisions worth recording**
+
+- **A snapshot, not a diff.** `WorkOrderSnapshot` stores a complete copy of the work order — every scalar field, dates as ISO strings, keys sorted — rather than a per-field change record. The audit log already owns field-level diffs; a snapshot is what lets "the work order as it was when it entered `Completed`" be reconstructed without replaying diffs. The two coexist: this row is not the audit row's replacement.
+- **Written inside the status-transition transaction, so it cannot drift.** The snapshot is created in the same `$transaction` that performs the `status` update, on the transaction client. A status change that fails rolls both back; a change that succeeds has its history row in the same commit. It is written on every successful transition, and **not** on create, on convert-to-work-order, or on PM generation — those are not status changes.
+- **Immutable by omission.** `WorkOrderSnapshot` deliberately has no `isDeleted`, `modifiedBy`, or `modifiedDate`. There is no update, delete, or restore surface anywhere in the API, which is the operational meaning of the SOW's "stored as immutable records". It is the third table (with `AuditLogEntry` and `RefreshToken`) that intentionally breaks the §5.3 "every table carries IsDeleted" convention, and the §4.3/§5.3 rows now say so explicitly instead of counting it as a gap.
+- **`User.username` is not `@unique`, and PostgreSQL enforces that.** Fixtures that drive status transitions in tests address the technician by `findFirstOrThrow({ where: { username: 'tech1' } })`, not `findUniqueOrThrow`. Half the configured user accounts share a username; only `id` is unique.
+- **The history endpoint hugs the resource, not the data.** `GET /api/work-orders/:id/history` returns 404 for a soft-deleted work order, mirroring `GET /api/work-orders/:id`. The snapshot rows physically remain — they are append-only and are never purged with the soft delete — but the API stops serving them. A correction mid-E.11: an earlier test asserted history survived soft-delete with 200, and was rewritten to the 404 contract the route actually enforces.
+- **JSONB does not promise key order.** The serializer sorts keys, but PostgreSQL does not guarantee to return them sorted, so sortedness is asserted on the serializer in a DB-free unit test, not on round-tripped rows. The DB-backed tests assert content semantics: a row per transition, the right statuses and timestamps, the right `takenBy`.
+- **The downtime figure reuses the report's derivation.** `actualFinish − actualStart` in hours, rounded to 2dp, and `null` when either timestamp was never recorded — the same rule as the downtime report (`backend/src/routes/reports.ts:472-473`). One downtime definition across two surfaces, so the two cannot disagree.
+- **The front-end stat cards are no longer hostage to the front-page list.** `EquipmentDetailPage` replaced a `getAll({ equipmentId })` capped at 200 with a module-level pagination loop over the dedicated history endpoint (200/page until `total`). The page's history and its cost/downtime cards now read the same complete data set.
+- **The migration carries unrelated drift because it reconciles the chain.** `20260928151746_work_order_snapshot` also normalises pre-existing drift: `MaintenancePlanTarget` FKs were `ON DELETE CASCADE` in the migration but `SET NULL` in `schema.prisma`, two indexes existed only as migrations, and `TaskListMaterial.modifiedDate` had a migration-time `DEFAULT` the schema never declared. The decision was to keep them in this migration — reconciling the chain with `schema.prisma` is safe and non-data-lossy, and a fresh-DB `prisma migrate deploy` applies the whole chain cleanly. What it is **not** is evidence about rows 55/56, which is why this migration is verified by the fresh-deploy and the DB-backed suite it sits behind, not as a standalone gate.
+
+**E.11 verification**
+
+| Gate | Result |
+|---|---|
+| `tsc -b` (backend, frontend) | exit 0 both packages |
+| `eslint src tests` (backend) | 42 errors, identical set to the `HEAD` baseline — **no new violations** (delta script: 0 positive) |
+| Frontend lint, touched files | only pre-existing offenders (`equipmentService.ts:14`, `workOrderService.ts:9`, one pre-existing hook-dep warning) |
+| Frontend `npm run build` | exit 0 |
+| Unit suite (no DB) | **529 cases across 30 files**, all passing (524 before; 5 new for the serializer) |
+| Full DB-backed suite on `cmms_gate` | **744 tests across 55 files**, all passing (733 before; 11 new: 3 work-order history, 3 equipment history, 5 serializer) |
+| `@openapi` strict YAML | **113 blocks, 0 failures** |
+| Migration | `20260928151746_work_order_snapshot` applied to `cmms_gate`; fresh-DB `prisma migrate deploy` on `cmms_gate_fresh` applies the full chain |
+| Database inspection | one immutable snapshot row per status transition; none on plain edits; equipment history rows carry correct cost and downtime; sortedness covered by the unit suite |
+
+**Phase F 19-hold deferral, recorded now.** E.9 restated 19 §3 rows held on `IMPLEMENTED, NOT VERIFIED` as clauses whose behaviour **no test exercises**. E.11 does not reopen any of them, and its 744-case green run is evidence only about the tests that exist. The DB-backed suites that must exist before any of those 19 rows can move are **Phase F's work**, and the E.11 verification table above deliberately claims nothing about them. Recording the constraint at each phase boundary is what stops a later reader treating a green run as coverage it does not have.
 
 #### E.1, stated as raw output
 

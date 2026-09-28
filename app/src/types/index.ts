@@ -297,6 +297,34 @@ export interface WorkOrder extends Auditable {
  */
 export type WorkOrderCreateInput = Partial<WorkOrder> & { taskListId?: string | null };
 
+// ─── Work Order History (§3.6) ───
+// One immutable snapshot of a work order, taken at each status change. The
+// `snapshot` object is the frozen copy of the work order's own record.
+export interface WorkOrderSnapshotEntry {
+  snapshotId: string;
+  workOrderId: string;
+  status: string;
+  snapshot: Record<string, unknown>;
+  takenBy: { userId: string; fullName: string; username: string };
+  takenAt: string;
+}
+
+// ─── Equipment Maintenance History (§3.6) ───
+export interface EquipmentHistoryEntry {
+  workOrderId: string;
+  woNumber: string;
+  type: WorkOrderType;
+  status: WorkOrderStatus;
+  breakdownFlag: boolean;
+  description: string;
+  createdDate: string;
+  plannedStart: string | null;
+  plannedFinish: string | null;
+  cost: number | null;
+  plannedCost: number | null;
+  downtimeHours: number | null;
+}
+
 // ─── Work Order Operation (§3.3.3) ───
 export type OperationStatus = 'Pending' | 'In Progress' | 'Completed';
 
