@@ -9,6 +9,7 @@ let entityId = '';
 let createdId = '';
 let storagePath = '';
 
+const fileBuffer = Buffer.from('attachment integration test', 'utf8');
 const UPLOADS_ROOT = path.join(path.dirname(fileURLToPath(new URL('../../', import.meta.url))), 'uploads');
 
 describe('attachments routes', () => {
@@ -27,8 +28,6 @@ describe('attachments routes', () => {
       await prisma.auditLogEntry.deleteMany({ where: { recordId: createdId } }).catch(() => {});
     }
   });
-
-  const fileBuffer = Buffer.from('attachment integration test', 'utf8');
 
   it('rejects create by a below-Requester role with 403', async () => {
     const res = await api()
@@ -82,5 +81,71 @@ describe('attachments routes', () => {
     expect(
       await prisma.auditLogEntry.count({ where: { tableName: 'Attachment', recordId: createdId, action: 'Delete' } })
     ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('downloads refuse an attachment that does not exist (404)', async () => {
+    const res = await api().get('/api/attachments/no-such-attachment/download').set(authHeaders(ctx.adminToken));
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Attachment not found');
+  });
+
+  it('deletes refuse an attachment that does not exist (404)', async () => {
+    const res = await api().delete('/api/attachments/no-such-attachment').set(authHeaders(ctx.adminToken));
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Attachment not found');
+  });
+})
+
+describe('attachment missing-parent refusals (SOW 3.1.2, :85)', () => {
+  const orphanProbe = async () => {
+    // An upload to a nonexistent parent must not leave a row or a file for it
+    // to grow into later: the row can never be listed, downloaded or deleted
+    // from any screen once its parent is gone.
+    expect(await prisma.attachment.count({ where: { entityType: 'Equipment', entityId: 'no-such-equipment' } })).toBe(0);
+    expect(fs.existsSync(path.join(UPLOADS_ROOT, 'Equipment', 'no-such-equipment'))).toBe(false);
+  };
+
+  it('uploads refuse an equipment that does not exist (404)', async () => {
+    const res = await api()
+      .post('/api/attachments')
+      .set(authHeaders(ctx.operatorToken))
+      .field('entityType', 'Equipment')
+      .field('entityId', 'no-such-equipment')
+      .attach('file', fileBuffer, 'note.txt');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Equipment not found');
+    await orphanProbe();
+  });
+
+  it('uploads refuse a work order that does not exist (404)', async () => {
+    const res = await api()
+      .post('/api/attachments')
+      .set(authHeaders(ctx.operatorToken))
+      .field('entityType', 'WorkOrder')
+      .field('entityId', 'no-such-work-order')
+      .attach('file', fileBuffer, 'note.txt');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('WorkOrder not found');
+  });
+
+  it('uploads refuse a notification that does not exist (404)', async () => {
+    const res = await api()
+      .post('/api/attachments')
+      .set(authHeaders(ctx.operatorToken))
+      .field('entityType', 'Notification')
+      .field('entityId', 'no-such-notification')
+      .attach('file', fileBuffer, 'note.txt');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Notification not found');
+  });
+
+  it('uploads refuse a parent type that is not one of the three (400 from the schema)', async () => {
+    const res = await api()
+      .post('/api/attachments')
+      .set(authHeaders(ctx.operatorToken))
+      .field('entityType', 'Bogus')
+      .field('entityId', 'no-such-thing')
+      .attach('file', fileBuffer, 'note.txt');
+    expect(res.status).toBe(400);
   });
 })
