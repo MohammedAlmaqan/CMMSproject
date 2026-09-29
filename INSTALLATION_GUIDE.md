@@ -454,9 +454,9 @@ scripts\k6\k6.exe run scripts\k6\smoke.js
 
 The script drives 50 VUs through a 2-minute ramp, 5 minutes at steady state, and a 1-minute ramp-down, exercising login → `GET /api/work-orders?take=10` → `GET /api/work-orders/:id`. Each VU signs in once and then loops the read path; signing in on every iteration would exceed even the 200/15min ceiling. There is no server-side logout endpoint because access tokens are stateless JWTs, so the session ends client-side in `teardown()`. Override the target and credentials with `BASE_URL`, `CMMS_USER`, `CMMS_PASS`, and `THINK_TIME`.
 
-The **100-VU acceptance run** (SOW §6.4.3) is the same script shape at 100 VUs — `scripts\k6\k6.exe run scripts\k6\acceptance.js`. It was executed 2026-09-29 against a current-schema `cmms` database: the steady read path passed (list + detail all HTTP 200, steady `p(95)` 51.78 ms), while the login burst reproduced the recorded P2028 pool-exhaustion issue (55 of 200 logins HTTP 500, then k6's login retries tripped the 200/15min `K6_MODE` limiter). Ensure the target database schema is current (`npx prisma migrate deploy`) before treating the read results as authoritative.
+The **100-VU acceptance run** (SOW §6.4.3) is the same login → list → detail path at 100 VUs — `scripts\k6\k6.exe run scripts\k6\acceptance.js`. It executes 2026-09-29 as **one ramp-hold-down scenario** (2-minute ramp to 100, 5-minute hold, 1-minute ramp-down) so only ~100 VUs exist and the run stays inside the 200/15-min `K6_MODE` login ceiling without tripping it; **do not** re-add a multi-scenario layout, as three fresh 100-VU pools sign in ~300 times and trip that limiter. The post-fix (G.6) run passed cleanly: `http_req_failed` 0.00%, p(95) 235.65 ms, 0 P2028. Ensure the target database schema is current (`npx prisma migrate deploy`) before treating the read results as authoritative.
 
-Thresholds that fail the run: `http_req_duration{scenario:steady}` p95 must stay under 2000 ms, and `http_req_failed` must stay under 1%.
+Thresholds that fail the run: `http_req_duration{scenario:load}` p95 must stay under 2000 ms, and `http_req_failed` must stay under 1%.
 
 ### Scope: this is not the SOW §4.1 capacity proof
 

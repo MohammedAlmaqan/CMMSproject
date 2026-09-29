@@ -597,8 +597,8 @@ Recorded here so that nobody plans an operation around a feature that does not e
 
 | Item | Status |
 |---|---|
-| **200-concurrent-user capacity test** | **Deferred post-go-live.** Blocked on the Prisma pool issue in [14.3](#143-prisma-p2028---connection-pool-exhaustion). Do not quote the k6 smoke numbers as capacity evidence |
-| Prisma connection-pool exhaustion (`P2028`) | Open post-go-live issue. Fix documented in [14.3](#143-prisma-p2028---connection-pool-exhaustion) |
+| **200-concurrent-user capacity test** | **Deferred post-go-live.** Recorded P2028 decision. Do not quote the k6 smoke numbers as capacity evidence |
+| Prisma connection-pool exhaustion (`P2028`) | **Resolved 2026-09-29.** Never observed in the passing 100-VU run after the fix in [14.3](#143-prisma-p2028---connection-pool-exhaustion) |
 | IIS `curl` verification | Untested; the HTTPS path in the installation guide has not been verified end to end |
 | User create / delete API | Never implemented. Database procedure in [6.1](#61-create-a-user) and [6.7](#67-delete-or-decommission-a-user) |
 | User create audit trail | Not possible while creation bypasses the application. See [8](#8-audit-log) |
@@ -641,25 +641,30 @@ Almost always CORS. The API rejects the browser's request, so every call fails w
 
 ### 14.3 Prisma `P2028` - connection pool exhaustion
 
-**Symptom:** a burst of requests, especially simultaneous sign-ins, returns HTTP 500 with `PrismaClientKnownRequestError` `P2028`, "Unable to start a transaction in the given time". Simple reads usually stay healthy, so a monitor watching only the read path will not see it.
+**Symptom:** a burst of requests, especially simultaneous sign-ins, returns HTTP 500 with `PrismaClientKnownRequestError` `P2028`. It has two faces. The first is "Unable to start a transaction in the given time": the pool starved before a transaction could even begin. The second is "Transaction already closed: A query cannot be executed on an expired transaction ... timeout for this transaction was 5000 ms": an interactive transaction waited for the account row lock (`FOR UPDATE`) longer than Prisma's default 5-second interactive-transaction timeout, so Prisma rolled it back. Simple reads usually stay healthy, so a monitor watching only the read path will not see it.
 
-**Cause:** the Prisma client uses its default connection pool - roughly `2 x CPU cores + 1` - and every sign-in opens a transaction to serialise the failure count. A burst of concurrent sign-ins can exhaust it. This was observed during the k6 smoke run: 15 of 140 concurrent logins failed this way while the read path stayed inside its latency budget.
+**Cause:** the Prisma client uses its default connection pool - roughly `2 x CPU cores + 1` - and every sign-in opens a transaction to serialise the failure count. A burst of concurrent sign-ins can exhaust it. In the 100-VU acceptance run (2026-09-29) the login transaction also held a `FOR UPDATE` row lock across the bcrypt comparison itself, so concurrent sign-ins to the same account serialized behind the lock while each held a pooled connection for the whole comparison; the burst exhausted the default pool (9 connections on this host) and 55 of 200 logins failed with P2028. After that first fix, a second run still failed: pool-starvation P2028 was gone, but queued logins now hit Prisma's interactive-transaction timeout (35 of the run's login requests returned 500 after the 5-second ceiling passed at ~6-7 s of queueing behind the row lock).
 
-**Fix:** size the pool explicitly in `DATABASE_URL` and raise PostgreSQL's connection limit to match.
+**Fix (two parts applied together on 2026-09-29):**
+
+1. **Verify the password before the transaction.** The bcrypt comparison moved out of the login transaction (the hash is already read by the outer query), so the `FOR UPDATE` row lock is held only for the quick in-database accounting.
+2. **Size the pool explicitly and raise the transaction and acquire ceilings.** In `DATABASE_URL`:
 
 ```
-postgresql://USER:PASSWORD@HOST:5432/cmms?connection_limit=20&pool_timeout=20
+postgresql://USER:PASSWORD@HOST:5432/cmms?connection_limit=20&pool_timeout=30000
 ```
 
-Then in `postgresql.conf`:
+Note `pool_timeout` is in **milliseconds** (the default is 10,000 = 10 s); a value like `20` would be 20 ms and make matters worse. Then in `postgresql.conf`:
 
 ```
 max_connections = 100
 ```
 
-and restart PostgreSQL and the API. Choose `connection_limit` so that **all** application instances together stay well below `max_connections` - each instance opens its own pool, so three instances at `connection_limit=20` need 60 connections, plus room for your administrative sessions and the restore drill. A too-large `connection_limit` turns pool exhaustion into PostgreSQL connection exhaustion, which is a harder outage.
+and restart PostgreSQL and the API. The login route's `$transaction` also passes `{ maxWait: 30000, timeout: 30000 }` (see `backend/src/routes/auth.ts`) so a login that has to wait its turn on the account lock is allowed to start instead of being rolled back by Prisma's 5-second default. Choose `connection_limit` so that **all** application instances together stay well below `max_connections` - each instance opens its own pool, so three instances at `connection_limit=20` need 60 connections, plus room for your administrative sessions and the restore drill. A too-large `connection_limit` turns pool exhaustion into PostgreSQL connection exhaustion, which is a harder outage.
 
-This remains an open post-go-live item and should be resolved before any 200-user test.
+Applied to this host on 2026-09-29: the bcrypt-out-of-transaction change, the pool sizing (`backend/.env`/`.env.example`), and the raised transaction ceilings are all in place, and the 100-VU acceptance run passed cleanly - 0 P2028, 0 HTTP 500, 0 login limiters tripped (see the tracker G.6). The acceptance script itself was also reshaped to a single 100-VU scenario so it signs in ~100 times per run rather than ~300 (see `scripts/k6/acceptance.js`); the K6_MODE login limiter in `backend/src/index.ts` stays at 200 per 15 minutes and must not be raised to make a load test pass.
+
+The 200-user test (SOW §4.1) remains a separate deferred capacity exercise; see the decision register.
 
 ### 14.4 A user cannot sign in
 

@@ -374,7 +374,7 @@ not.
 | Client signature on §6 | Gate A | Not held |
 | Windows Server with IIS + ARR | §4.2 TLS rehearsal, Phase G | **Held on this host** (`W3SVC` running, ARR 3.0 + URL Rewrite 2.1 installed, `http://localhost` → 200) — rehearsal requires an elevated shell to configure the site binding, certificate and rules |
 | Live PostgreSQL target + `PGPASSWORD` | First real backup/restore drill, Phase G | **Held and rehearsed** (PostgreSQL 18 at `localhost:5432`, `PGPASSWORD` set, `backup.bat`/`restore-drill.bat` with the PG-18 fallback path). The full drill **passed 2026-09-29** (189 work orders restored in 5.75 s, 75/75 attachments, drill DB dropped). The second backup target for the WAL/RPO proof remains **pending verification**, not a scope reduction |
-| `k6.exe` | §6.4.3 100-VU and §4.1 200-VU runs | **Held and run** (`scripts\k6\k6.exe` v2.3.0). The 100-VU run executed 2026-09-29: read path passed (steady p95 51.78 ms), login burst reproduced P2028 (55/200 logins); the 200-VU run stays **deferred** by the recorded P2028 decision |
+| `k6.exe` | §6.4.3 100-VU and §4.1 200-VU runs | **Held and run** (`scripts\k6\k6.exe` v2.3.0). The 100-VU run executed 2026-09-29 and now passes **cleanly after G.6**: `http_req_failed` 0.00%, p(95) 235.65 ms, 0 P2028 / 0×500 / 0×429 (login 200×101). The 200-VU run stays **deferred** by the recorded P2028 decision (ADMIN_GUIDE 14.3 resolves the pool issue; the §4.1 capacity test is a separate, still-deferred exercise) |
 | Azure AD tenant + app registration | D-5(a), OAuth2/OIDC | Not held |
 | Client legacy data (Excel/paper) | §5.7 importers, §6.4.5 migration accuracy | Not held |
 | Dry-run migration window | §6.4.5 | Not scheduled |

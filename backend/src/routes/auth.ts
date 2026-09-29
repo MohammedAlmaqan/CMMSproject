@@ -131,6 +131,26 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(423).json(ACCOUNT_LOCKED);
     }
 
+    // The password comparison is deliberately performed outside the transaction.
+    // Comparing with bcrypt is CPU-bound (tens to hundreds of milliseconds) and
+    // previously ran while the transaction held `FOR UPDATE` on the user row, so
+    // every concurrent sign-in to the same account serialized behind the lock and
+    // held a pooled connection for the whole comparison - the default pool
+    // (2 x cores + 1 = 9 on this host) then starved and logins failed with P2028
+    // "Unable to start a transaction in the given time". The hash compared here is
+    // the row read above; the transaction still re-checks active/deleted/locked
+    // state under the row lock, so the lockout accounting is unchanged.
+    const passwordValid = await bcrypt.compare(password, user.passwordHash);
+
+    // The transaction is short (a few fast queries under the account row lock),
+    // but under a concurrent login burst the queued transactions can wait longer
+    // than Prisma's defaults for the FOR UPDATE lock: the interactive-transaction
+    // timeout (5000 ms) and connection-acquisition maxWait (2000 ms) both fired as
+    // P2028 "Transaction already closed" / pool P2028 during the 100-VU run. These
+    // options raise those ceilings to match pool_timeout in .env rather than
+    // serializing more work, so queued logins are allowed to start instead of
+    // dying while waiting their turn. See ADMIN_GUIDE 14.3.
+    const TX_OPTIONS = { maxWait: 30000, timeout: 30000 };
     const outcome = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "userId" FROM "User" WHERE "userId" = ${user.userId} FOR UPDATE`;
       const currentUser = await tx.user.findUnique({ where: { userId: user.userId } });
@@ -142,9 +162,8 @@ router.post('/login', async (req: Request, res: Response) => {
         return { status: 423 as const };
       }
 
-      const valid = await bcrypt.compare(password, currentUser.passwordHash);
       const loginTime = now;
-      if (valid) {
+      if (passwordValid) {
         await tx.user.update({
           where: { userId: currentUser.userId },
           data: {
@@ -243,7 +262,7 @@ router.post('/login', async (req: Request, res: Response) => {
         });
       }
       return { status: shouldLock ? 423 as const : 401 as const };
-    });
+    }, TX_OPTIONS);
 
     if (outcome.status === 423) {
       return res.status(423).json(ACCOUNT_LOCKED);

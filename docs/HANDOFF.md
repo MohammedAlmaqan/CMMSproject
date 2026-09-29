@@ -53,7 +53,7 @@ Work orders are soft-deleted and **children are retained** under the parent row,
 
 ### Open residuals (2)
 
-1. **P2028 Prisma pool exhaustion** — 15 of ~140 concurrent logins returned HTTP 500 under the 6.5 k6 run. **Phase 8 blocker for the SOW §4.1 200-user load test only; NOT a v1.0.0 release blocker.** Needs Prisma pool sizing + PostgreSQL `max_connections` tuning.
+1. **P2028 Prisma pool exhaustion — ✅ resolved (2026-09-29).** 15 of ~140 concurrent logins returned HTTP 500 under the 6.5 k6 run; the 100-VU acceptance run reproduced it (55/200). Fixed in G.6 (bcrypt outside the login transaction, `connection_limit=20&pool_timeout=30000`, `max_connections=100`, interactive-transaction `timeout`/`maxWait` 30 s; see ADMIN_GUIDE 14.3). Post-fix 100-VU run: 0 P2028, 0×500, 0×429. The SOW §4.1 200-user capacity test remains a separate **post-go-live** exercise.
 2. **IIS `curl` verification untested** — the 6.3/Item-4 IIS reverse-proxy steps (ARR `X-Forwarded-For` overwrite, `BIND_HOST=127.0.0.1`, firewall rule) are documented but have **never been executed against a real IIS deployment**. Needs a live Windows server with ARR installed.
 
 ### Housekeeping

@@ -10,8 +10,17 @@
  *   scripts\k6\k6.exe run scripts\k6\acceptance.js
  *
  * The backend must be started with K6_MODE=1 (and a non-production NODE_ENV) so
- * the login rate limiter allows 200 sign-ins per 15 minutes. See
- * INSTALLATION_GUIDE.md.
+ * the login rate limiter allows 200 sign-ins per 15 minutes. That ceiling is a
+ * deliberate policy control and must not be raised to make this script pass.
+ * See INSTALLATION_GUIDE.md.
+ *
+ * One scenario only, on purpose. k6 gives every VU its own JS runtime, so a
+ * "ramp / steady / rampdown" multi-scenario layout created three fresh pools of
+ * 100 VUs and therefore ~300 first-time logins per run — over the documented
+ * 200 sign-ins / 15 minutes even with no retries, so the run was tripping the
+ * limiter it was supposed to respect. A single ramping-vus scenario reuses one
+ * pool of 100 VUs: 100 first-time logins, comfortably inside the ceiling, while
+ * still exercising a ramp, a 5-minute flat hold, and a ramp-down.
  */
 import http from 'k6/http';
 import { check, sleep } from 'k6';
@@ -28,37 +37,22 @@ const detailSkipped = new Counter('workorder_detail_skipped');
 
 export const options = {
   scenarios: {
-    // 100 VUs brought up over 2 minutes.
-    ramp: {
+    // One pool of 100 VUs: ramp 0->100 over 2 minutes, hold 5 minutes, ramp
+    // back to 0 over 1 minute. The p95 threshold covers the whole run.
+    load: {
       executor: 'ramping-vus',
       exec: 'acceptance',
       startVUs: 0,
-      stages: [{ duration: '2m', target: 100 }],
+      stages: [
+        { duration: '2m', target: 100 },
+        { duration: '5m', target: 100 },
+        { duration: '1m', target: 0 },
+      ],
       gracefulRampDown: '0s',
-      tags: { phase: 'ramp' },
-    },
-    // 100 VUs held flat for 5 minutes — the only scenario the p95 threshold covers.
-    steady: {
-      executor: 'constant-vus',
-      exec: 'acceptance',
-      vus: 100,
-      duration: '5m',
-      startTime: '2m',
-      tags: { phase: 'steady' },
-    },
-    // 100 VUs wound back to 0 over 1 minute.
-    rampdown: {
-      executor: 'ramping-vus',
-      exec: 'acceptance',
-      startVUs: 100,
-      stages: [{ duration: '1m', target: 0 }],
-      startTime: '7m',
-      gracefulRampDown: '0s',
-      tags: { phase: 'rampdown' },
     },
   },
   thresholds: {
-    'http_req_duration{scenario:steady}': ['p(95)<2000'],
+    'http_req_duration{scenario:load}': ['p(95)<2000'],
     http_req_failed: ['rate<0.01'],
   },
 };
