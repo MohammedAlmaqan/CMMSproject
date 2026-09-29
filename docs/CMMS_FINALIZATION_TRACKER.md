@@ -1140,7 +1140,40 @@ R.7 is where rows 51-54, 60-67 are finally promoted, and it is also the first pl
 | Step | Scope | Status | Verification | Evidence |
 |---|---|---|---|---|
 | R.0 | Phase R scope: 14 Build rows named, dependency order, §6.4 mapping, sequence R.1-R.8 | ✅ | Plan reviewed against the running app and the register; 14 rows reconciled with register Phase F. R.0 accepted with the R.4 rewrite, and the R.6/R.7 confirmations the plan carries. | `11ef241` / `2948602` |
-| R.1 | Cost rollup engine, four axes, derived from base tables | ✅ | `backend/src/utils/costRollup.ts` (Prisma-free, the arithmetic) and `costRollupData.ts` (the loader). 16 unit tests, each axis carrying its own cases and the location axis measured against an independent reference implementation. `backend/scripts/r1-differential.ts` runs 11 live-DB checks: every axis preserves the grand total, own-totals count each work order exactly once, each root carries the whole tree, and per-WO figures agree with a separate `computeWorkOrderCosts` recomputation. Gate 66 files / 867 tests. | *this commit* |
+| R.1 | Cost rollup engine, four axes, derived from base tables | ✅ | `backend/src/utils/costRollup.ts` (Prisma-free, the arithmetic) and `costRollupData.ts` (the loader). 16 unit tests, each axis carrying its own cases and the location axis measured against an independent reference implementation. `backend/scripts/r1-differential.ts` runs 11 live-DB checks: every axis preserves the grand total, own-totals count each work order exactly once, each root carries the whole tree, and per-WO figures agree with a separate `computeWorkOrderCosts` recomputation. Gate 66 files / 867 tests. | `2071189` |
+| R.2 | Report filtering: shared parser on all 7 handlers | ✅ | `backend/src/utils/reportFilters.ts`: one parser, 27 unit tests. `backend/src/routes/reports.ts` gained `resolveReportScope` and all 7 handlers now filter. 10 new route tests. `backend/scripts/r2-differential.ts` runs 14 live-DB checks. Gate 67 files / 904 tests. | *this commit* |
+
+**R.2 evidence.** The filter reaches the query, which is the part a status test cannot show. 14 live checks: an empty filter reproduces the unfiltered count, a window spanning every work order includes every work order, a window before any work order excludes all of them, the end of the range is inclusive of the whole final day, disjoint day windows partition the total exactly, an equipment and a work-centre filter each return precisely their own rows, a filter naming nothing returns nothing, and a location's subtree is never smaller than the node itself.
+
+```
+open work orders: 4
+PASS  an empty filter reproduces the unfiltered count  [4 vs 4]
+PASS  a window spanning every work order includes every work order  [4 vs 4]
+PASS  a window before any work order excludes every work order  [0 matched]
+PASS  the end of the range is inclusive of the whole final day  [4 vs 4 (4 on the final day)]
+PASS  disjoint day windows partition the total  [4 vs 4 (all on 2026-09-24)]
+PASS  an equipment filter returns exactly that equipment  [3 vs 3]
+PASS  an equipment filter matching nothing returns nothing  [0 matched]
+PASS  a work centre filter returns exactly that work centre  [4 vs 4]
+PASS  location ba5f6065-...-9b7d5bd9b7b6 exact match  [3 vs 3]
+PASS  location ba5f6065-...-9b7d5bd9b7b6 subtree  [3 vs 3 over 4 locations]
+PASS  location ba5f6065-...-9b7d5bd9b7b6 subtree is never smaller than the node  [3 >= 3]
+PASS  an unknown location returns nothing rather than everything  [0 matched]
+PASS  every live location is reachable from some node  [6 of 6]
+```
+
+**R.0's "six of seven ignore the request" was re-verified against `2071189` and is accurate.** `downtime` was among them: it took `async (_req: Request, ...)` like the other five, so it could not filter. A later reading suggested otherwise and that reading was wrong; `git show 2071189:backend/src/routes/reports.ts` settles it. All 7 signatures now take `req`.
+
+**Three decisions inside R.2 that the matrix does not record.**
+
+- **A bad filter is a 400 with its reasons, never an empty report.** An empty result set reads as "nothing happened", which for a maintenance report is the most dangerous answer available. Unparseable dates, reversed ranges, a non-boolean descendant flag and a repeated parameter are all 400s carrying the specific complaint.
+- **`to` is closed at the last millisecond of that day.** `to=2026-03-15` means all of the 15th. Treating it as midnight drops the final day of every month, and a month-end total that is quietly one day short is the kind of error that surfaces at audit.
+- **Which date column a report filters is a property of the report, not of the filter.** `pm-compliance` keeps its own month window and *intersects* any `from`/`to` with it rather than replacing it, because its period is part of the report's contract. `material-consumption` filters through the parent work order. The others declare `createdDate`, `actualStart` or `actualFinish` at the call site. This is why `resolveReportScope` returns the filter and the scope separately instead of one merged `where`.
+
+**A pre-existing contract defect found while wiring this up.** Three endpoints — `cost-summary`, `downtime`, `material-consumption` — already documented `year` and `month` in their `@openapi` blocks while their handlers took `async (_req: Request, ...)` and never read them. The published contract promised a period filter the server silently ignored, which is the same failure mode as row 58 one layer up. Those three `parameters:` blocks were removed rather than left standing; `pm-compliance` keeps its `year`/`month` because that handler genuinely reads them. All 7 endpoints now document exactly the parameters they honour, and each `parameters:` block is single, so the generated spec matches the code.
+
+**A limit on the live evidence, stated rather than hidden.** All 4 open work orders were raised on 2026-09-24, so the live database cannot exercise a range that spans two days. The end-of-day inclusivity and month-boundary behaviour are therefore covered by unit tests, not by the differential. The differential proves the filter narrows and partitions; it cannot yet prove day-boundary behaviour against real spread-out data. R.7's fixture set should cover this.
+
 
 **R.1 evidence that is a finding, not a pass.** The differential prints the divergence between the stored columns and the derived figures every time it runs, because that is the fact the design rests on:
 

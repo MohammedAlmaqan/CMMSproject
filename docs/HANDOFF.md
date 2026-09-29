@@ -13,7 +13,7 @@
 
 **Open risks:** the one residual below (untested IIS `curl` verification) plus the SOW §4.1 200-user capacity test, which remains a **post-go-live** exercise (the 100-VU run now passes cleanly — see the Phase G section for the P2028 fix). The old mock-fallback risk is closed — `mockData.ts` was deleted at G6a and the fleet has been green since.
 
-**Next action for a fresh session:** read tracker + git log + this file. Current position is Phase G (rehearsals in progress); the "7.4 API reference / 24 files / 156 tests" notes below are historical Phase-7-era entries. Test floor today: **backend Vitest 867 tests across 66 test files (31 unit + 35 routes), `tsc -b` clean (backend + app), eslint at the 42-error baseline.** The per-phase suite sizes earlier in the tracker and the "55 files" in the E.13 block are that phase's own snapshots, not current totals.
+**Next action for a fresh session:** read tracker + git log + this file. Current position is Phase G (rehearsals in progress); the "7.4 API reference / 24 files / 156 tests" notes below are historical Phase-7-era entries. Test floor today: **backend Vitest 904 tests across 67 test files (32 unit + 35 routes), `tsc -b` clean (backend + app), eslint at the 42-error baseline.** The per-phase suite sizes earlier in the tracker and the "55 files" in the E.13 block are that phase's own snapshots, not current totals.
 
 ---
 

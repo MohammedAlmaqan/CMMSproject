@@ -1,11 +1,56 @@
-import { Router, Request, Response } from 'express';
+﻿import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
+import {
+  buildDateWhere,
+  buildScopeWhere,
+  descendantLocationIds,
+  parseReportFilter,
+} from '../utils/reportFilters.js';
+import type { ReportFilter } from '../utils/reportFilters.js';
 
 const router = Router();
 
 router.use(authenticate);
+
+/**
+ * Row 58: every report is filterable by date range, location, equipment and
+ * work centre. A bad filter is a 400 with the reasons, never a silently empty
+ * report - an empty result set reads as "nothing happened", which for a
+ * maintenance report is the most dangerous answer available.
+ *
+ * The scope and the date bounds are returned separately on purpose. Which date
+ * column a report filters on is a property of the report, and pm-compliance has
+ * to intersect the caller's range with its own month window rather than replace
+ * it, which a single merged `where` cannot express.
+ */
+async function resolveReportScope(
+  req: Request,
+  res: Response
+): Promise<{ filter: ReportFilter; scope: Record<string, unknown> } | null> {
+  const parsed = parseReportFilter(req.query as Record<string, unknown>);
+  if (!parsed.ok) {
+    res.status(400).json({ error: 'Invalid report filter', details: parsed.errors });
+    return null;
+  }
+  const { filter } = parsed;
+
+  let locationIds: string[] | null = null;
+  if (filter.functionalLocationId !== null) {
+    if (filter.includeDescendantLocations) {
+      const tree = await prisma.functionalLocation.findMany({
+        where: { isDeleted: false },
+        select: { functionalLocationId: true, parentLocationId: true },
+      });
+      locationIds = descendantLocationIds(filter.functionalLocationId, tree);
+    } else {
+      locationIds = [filter.functionalLocationId];
+    }
+  }
+
+  return { filter, scope: buildScopeWhere(filter, locationIds) };
+}
 
 
 /**
@@ -20,6 +65,29 @@ router.use(authenticate);
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: Start of a closed calendar-day range, YYYY-MM-DD
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: End of a closed calendar-day range, YYYY-MM-DD; inclusive of the whole day
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *         description: Restrict to this functional location
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         description: When true, a functionalLocationId filter also includes every location beneath it
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
  *     responses:
  *       '200':
  *         description: Backlog grouped by status
@@ -38,11 +106,20 @@ router.use(authenticate);
  *       '500':
  *         description: Internal server error
  */
-router.get('/backlog', async (_req: Request, res: Response) => {
+router.get('/backlog', async (req: Request, res: Response) => {
   try {
+    const resolved = await resolveReportScope(req, res);
+    if (!resolved) return;
+    const scoped = {
+      isDeleted: false,
+      status: { notIn: ['Completed', 'Closed', 'Cancelled'] },
+      ...resolved.scope,
+      ...(buildDateWhere(resolved.filter, 'createdDate') ?? {}),
+    };
+
     const backlog = await prisma.workOrder.groupBy({
       by: ['status'],
-      where: { isDeleted: false, status: { notIn: ['Completed', 'Closed', 'Cancelled'] } },
+      where: scoped,
       _count: { workOrderId: true },
       orderBy: { status: 'asc' },
     });
@@ -51,7 +128,7 @@ router.get('/backlog', async (_req: Request, res: Response) => {
       by: ['workOrderId'],
       where: {
         isDeleted: false,
-        workOrder: { isDeleted: false, status: { notIn: ['Completed', 'Closed', 'Cancelled'] } },
+        workOrder: scoped,
       },
       _sum: { plannedHours: true },
     });
@@ -62,7 +139,7 @@ router.get('/backlog', async (_req: Request, res: Response) => {
     }
 
     const workOrders = await prisma.workOrder.findMany({
-      where: { isDeleted: false, status: { notIn: ['Completed', 'Closed', 'Cancelled'] } },
+      where: scoped,
       select: { workOrderId: true, status: true },
     });
 
@@ -100,6 +177,28 @@ router.get('/backlog', async (_req: Request, res: Response) => {
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: Start of a closed calendar-day range, YYYY-MM-DD
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: End of a closed calendar-day range, YYYY-MM-DD; inclusive of the whole day
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *         description: Restrict to this functional location
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         description: When true, a functionalLocationId filter also includes every location beneath it
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
+ *       - in: query
  *         name: year
  *         schema: { type: integer }
  *         description: Four-digit year; defaults to the current year
@@ -126,6 +225,9 @@ router.get('/backlog', async (_req: Request, res: Response) => {
  */
 router.get('/pm-compliance', async (req: Request, res: Response) => {
   try {
+    const resolved = await resolveReportScope(req, res);
+    if (!resolved) return;
+    const { filter, scope } = resolved;
     const { year, month } = req.query;
     const now = new Date();
     const targetYear = year ? parseInt(year as string, 10) : now.getFullYear();
@@ -134,20 +236,33 @@ router.get('/pm-compliance', async (req: Request, res: Response) => {
     const startDate = new Date(targetYear, targetMonth - 1, 1);
     const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59);
 
+    // The month window is this report's own period, so it is intersected with
+    // any from/to the caller supplied rather than replaced by it. R.4
+    // redefines the denominator; the scoping added here survives that.
+    const requested = buildDateWhere(filter, 'createdDate') as { createdDate?: { gte?: Date; lte?: Date } } | null;
+    const window = {
+      createdDate: {
+        gte: requested?.createdDate?.gte !== undefined && requested.createdDate.gte > startDate ? requested.createdDate.gte : startDate,
+        lte: requested?.createdDate?.lte !== undefined && requested.createdDate.lte < endDate ? requested.createdDate.lte : endDate,
+      },
+    };
+
     const totalPM = await prisma.workOrder.count({
       where: {
+        ...scope,
         isDeleted: false,
         type: 'PM',
-        createdDate: { gte: startDate, lte: endDate },
+        ...window,
       },
     });
 
     const completedPM = await prisma.workOrder.count({
       where: {
+        ...scope,
         isDeleted: false,
         type: 'PM',
         status: { in: ['Completed', 'Closed'] },
-        createdDate: { gte: startDate, lte: endDate },
+        ...window,
       },
     });
 
@@ -178,6 +293,29 @@ router.get('/pm-compliance', async (req: Request, res: Response) => {
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: Start of a closed calendar-day range, YYYY-MM-DD
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: End of a closed calendar-day range, YYYY-MM-DD; inclusive of the whole day
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *         description: Restrict to this functional location
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         description: When true, a functionalLocationId filter also includes every location beneath it
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
  *     responses:
  *       '200':
  *         description: MTBF per equipment
@@ -197,8 +335,10 @@ router.get('/pm-compliance', async (req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/mtbf', async (_req: Request, res: Response) => {
+router.get('/mtbf', async (req: Request, res: Response) => {
   try {
+    const resolved = await resolveReportScope(req, res);
+    if (!resolved) return;
     const breakdowns = await prisma.workOrder.findMany({
       where: {
         isDeleted: false,
@@ -206,6 +346,8 @@ router.get('/mtbf', async (_req: Request, res: Response) => {
         equipmentId: { not: null },
         actualStart: { not: null },
         actualFinish: { not: null },
+        ...resolved.scope,
+        ...(buildDateWhere(resolved.filter, 'actualStart') ?? {}),
       },
       select: {
         equipmentId: true,
@@ -269,6 +411,29 @@ router.get('/mtbf', async (_req: Request, res: Response) => {
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: Start of a closed calendar-day range, YYYY-MM-DD
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: End of a closed calendar-day range, YYYY-MM-DD; inclusive of the whole day
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *         description: Restrict to this functional location
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         description: When true, a functionalLocationId filter also includes every location beneath it
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
  *     responses:
  *       '200':
  *         description: MTTR per equipment
@@ -288,8 +453,10 @@ router.get('/mtbf', async (_req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/mttr', async (_req: Request, res: Response) => {
+router.get('/mttr', async (req: Request, res: Response) => {
   try {
+    const resolved = await resolveReportScope(req, res);
+    if (!resolved) return;
     const breakdowns = await prisma.workOrder.findMany({
       where: {
         isDeleted: false,
@@ -297,6 +464,8 @@ router.get('/mttr', async (_req: Request, res: Response) => {
         equipmentId: { not: null },
         actualStart: { not: null },
         actualFinish: { not: null },
+        ...resolved.scope,
+        ...(buildDateWhere(resolved.filter, 'actualStart') ?? {}),
       },
       select: {
         equipmentId: true,
@@ -350,13 +519,27 @@ router.get('/mttr', async (_req: Request, res: Response) => {
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: year
- *         schema: { type: integer }
- *         description: Four-digit year; defaults to the current year
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: Start of a closed calendar-day range, YYYY-MM-DD
  *       - in: query
- *         name: month
- *         schema: { type: integer, minimum: 1, maximum: 12 }
- *         description: Month number 1-12; defaults to the current month
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: End of a closed calendar-day range, YYYY-MM-DD; inclusive of the whole day
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *         description: Restrict to this functional location
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         description: When true, a functionalLocationId filter also includes every location beneath it
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
  *     responses:
  *       '200':
  *         description: Cost summary for the period
@@ -368,10 +551,17 @@ router.get('/mttr', async (_req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/cost-summary', async (_req: Request, res: Response) => {
+router.get('/cost-summary', async (req: Request, res: Response) => {
   try {
+    const resolved = await resolveReportScope(req, res);
+    if (!resolved) return;
     const workOrders = await prisma.workOrder.findMany({
-      where: { isDeleted: false, costCenterCode: { not: '' } },
+      where: {
+        isDeleted: false,
+        costCenterCode: { not: '' },
+        ...resolved.scope,
+        ...(buildDateWhere(resolved.filter, 'createdDate') ?? {}),
+      },
       select: {
         costCenterCode: true,
         plannedCost: true,
@@ -418,13 +608,27 @@ router.get('/cost-summary', async (_req: Request, res: Response) => {
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: year
- *         schema: { type: integer }
- *         description: Four-digit year; defaults to the current year
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: Start of a closed calendar-day range, YYYY-MM-DD
  *       - in: query
- *         name: month
- *         schema: { type: integer, minimum: 1, maximum: 12 }
- *         description: Month number 1-12; defaults to the current month
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: End of a closed calendar-day range, YYYY-MM-DD; inclusive of the whole day
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *         description: Restrict to this functional location
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         description: When true, a functionalLocationId filter also includes every location beneath it
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
  *     responses:
  *       '200':
  *         description: Downtime per equipment
@@ -444,8 +648,10 @@ router.get('/cost-summary', async (_req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/downtime', async (_req: Request, res: Response) => {
+router.get('/downtime', async (req: Request, res: Response) => {
   try {
+    const resolved = await resolveReportScope(req, res);
+    if (!resolved) return;
     const workOrders = await prisma.workOrder.findMany({
       where: {
         isDeleted: false,
@@ -453,6 +659,8 @@ router.get('/downtime', async (_req: Request, res: Response) => {
         equipmentId: { not: null },
         actualStart: { not: null },
         actualFinish: { not: null },
+        ...resolved.scope,
+        ...(buildDateWhere(resolved.filter, 'actualFinish') ?? {}),
       },
       select: {
         equipmentId: true,
@@ -503,13 +711,27 @@ router.get('/downtime', async (_req: Request, res: Response) => {
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: year
- *         schema: { type: integer }
- *         description: Four-digit year; defaults to the current year
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: Start of a closed calendar-day range, YYYY-MM-DD
  *       - in: query
- *         name: month
- *         schema: { type: integer, minimum: 1, maximum: 12 }
- *         description: Month number 1-12; defaults to the current month
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: End of a closed calendar-day range, YYYY-MM-DD; inclusive of the whole day
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *         description: Restrict to this functional location
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         description: When true, a functionalLocationId filter also includes every location beneath it
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
  *     responses:
  *       '200':
  *         description: Consumption per material
@@ -530,14 +752,22 @@ router.get('/downtime', async (_req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/material-consumption', async (_req: Request, res: Response) => {
+router.get('/material-consumption', async (req: Request, res: Response) => {
   try {
+    const resolved = await resolveReportScope(req, res);
+    if (!resolved) return;
+    // Consumption is scoped through the parent work order, so the filter has to
+    // be applied to that relation rather than to the material line.
     const materials = await prisma.workOrderMaterial.groupBy({
       by: ['materialId'],
       where: {
         isDeleted: false,
-        workOrder: { isDeleted: false },
         actualQuantity: { gt: 0 },
+        workOrder: {
+          isDeleted: false,
+          ...resolved.scope,
+          ...(buildDateWhere(resolved.filter, 'createdDate') ?? {}),
+        },
       },
       _sum: { actualQuantity: true, unitCost: true },
       _count: { woMaterialId: true },

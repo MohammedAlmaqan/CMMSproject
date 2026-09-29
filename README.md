@@ -282,7 +282,7 @@ CMMSproject/
 │   │   ├── schema.prisma       # 38 models
 │   │   ├── migrations/         # 14 migrations
 │   │   └── seed.ts             # guarded demo seed
-│   └── tests/                  # 66 test files + 3 support = 69 tracked
+│   └── tests/                  # 67 test files + 3 support = 70 tracked
 ├── scripts/                    # Windows batch scripts, k6, verify scripts
 ├── docs/                        # all documentation; README.md is the only .md at the root
 │   ├── CMMS_FINALIZATION_TRACKER.md
