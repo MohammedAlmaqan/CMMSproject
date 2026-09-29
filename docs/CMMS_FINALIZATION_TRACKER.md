@@ -1047,14 +1047,18 @@ Row 68 (dashboard realtime/drilldown) is `Waive` in the same phase and is not wo
 - Export is CSV only, built in the browser (`ReportsPage.tsx:185` `exportCSV`). There is no server-side export and no `.xlsx` dependency in `backend/package.json`. Row 59 needs a real xlsx writer; the PDF limb is **waived** under D-9 and is not rebuilt.
 - There is **no SQL view layer** in the repository (`CREATE VIEW` returns nothing). D-13 committed the vendor to SQL views as SOW §5.2's stated alternative for the Client's BI tool. That is part of this phase, not a later one.
 - Row 63's budget limb is **waived** under D-13 — actual-vs-planned variance is the deliverable, because the SOW contains no budget source.
-- `backend/src/utils/costRules.ts` already computes per-WO planned and actual cost (`computeWorkOrderCosts`, `:97`, returning `plannedCost`/`actualCost` at `:140-141`). The rollups in rows 51-54 are aggregation over that, not new costing logic. `/cost-summary` (`:371`) today loads every work order and accumulates into a `Map` keyed on `costCenterCode` in application memory — the rollup replaces that with a grouped query, and the R.1 differential test is written against the existing per-WO figures so a total that moves is a total that moved for a stated reason. Row 54's period axis is the one that must not re-derive time from a string.
+- `backend/src/utils/costRules.ts` already computes per-WO planned and actual cost (`computeWorkOrderCosts`, `:97`, returning `plannedCost`/`actualCost` at `:140-141`). The rollups in rows 51-54 are aggregation over that, not new costing logic. `/cost-summary` (`:371`) today loads every work order and accumulates into a `Map` keyed on `costCenterCode` in application memory. Row 54's period axis is the one that must not re-derive time from a string.
+- **`WorkOrder.plannedCost` and `actualCost` cannot be the rollup's base.** R.1 measured this on the live database. The two columns are a cache, and the only thing that maintains them is `recomputeWorkOrderCosts` (`utils/costs.ts`), which is called from the labor, material and external-service write paths. Creating or editing a `WorkOrderOperation` does not trigger it, there is no bulk recompute, and no cron refreshes it. Live result: **4 work orders, 178 planned operation-hours, derived planned cost 135.00, and `plannedCost` reads 0 on 2 of the 4 rows** — 90.00 and 45.00 of real planned labour sitting in the operations table while the column says zero. Summing the columns would have produced a confidently wrong report. The rollup therefore derives from the base tables through `computeWorkOrderCosts`, the same function the work-order detail uses, so a rollup total and a work order's own figures cannot disagree. The stale column is a **separate defect, not fixed here**; it is recorded as such so that whoever fixes it does not have to rediscover that the report was compensating for it.
+- `/cost-summary` filters on `costCenterCode: { not: '' }` (`:374`) and **every one of the 4 live work orders has an empty cost centre**, so that endpoint returns zero rows today, not a wrong total. Row 63 is `Partial` for a shape reason and an empty-population reason at once, and both are named rather than discovered by a user.
+- Work orders sit at mixed depths in the live location tree: 3 of the 4 are on `PL-01 > AR-001`, an **area** that itself has three children, and 1 is on the root `PL-01`. A rollup that only walked up from a leaf, or that summed children, would disagree with these figures.
+- Nothing in the live data exercises actual cost: **0 of 178 operations carry `actualHours`, `WorkOrderMaterial` is empty, and only 1 external service cost exists.** The actual-cost half of every rollup axis is therefore correct by construction and **unexercised**. R.7's UAT pack must supply real actual-cost fixtures, and the matrices for rows 51-54 must not claim coverage they do not have.
 
 **Sequence, in dependency order.** Rollups first, because the new reports and the SQL views both read them; filters before exports, because an export of an unfiltered report is the wrong deliverable; the UAT pack last, because it reconciles the finished reports.
 
 | Step | Work | Rows |
 |---|---|---|
 | R.0 | This plan. Stops for review. | — |
-| R.1 | Cost rollup service: aggregate planned + actual cost by location (any hierarchy level), equipment, WO type, and period. One shared module, four axes, tested over the live DB. | 51, 52, 53, 54 |
+| R.1 | Cost rollup engine: aggregate planned + actual cost by location (any hierarchy level), equipment, WO type, and period. One shared module, four axes, derived from the base tables rather than the `plannedCost`/`actualCost` columns — see the finding above. | 51, 52, 53, 54 |
 | R.2 | Report filtering: a shared filter parser (date range, location incl. descendants, equipment, work center) applied to all 7 handlers. `pm-compliance` keeps its year/month and gains the rest. | 58 |
 | R.3 | New reports: Backlog Hours by Work Center; Top 10 Highest-Cost Equipment; Notifications Awaiting Conversion. Route + service + screen tab each, following the existing 7-report pattern. | 65, 66, 67 |
 | R.4 | Five existing reports fixed, each on its own clause — see the per-report table below. No lump pass. | 60, 61, 62, 63, 64 |
@@ -1103,11 +1107,24 @@ R.7 is where rows 51-54, 60-67 are finally promoted, and it is also the first pl
 
 **Promotion discipline.** A row moves to `Met` only on evidence from a suite that ran at a named SHA, with that run's CI ID cited. No row is promoted on the strength of a passing unit test alone — the E.9 finding was that a green suite is evidence about tests that exist, not about clauses no test touches. Where a row can only be partly delivered, the residual goes in the matrix Notes cell and the row stays where it is.
 
-**R.0 stops here for review.** R.1 is the next unit of work, and it is the one to scrutinise first: the rollup engine is the foundation the other six steps read, and a wrong total propagates into every report, the SQL views, and the UAT pack that is supposed to catch exactly that.
+**R.0 stopped here for review, and R.1 has since been built.** R.1 was chosen as the first unit of work precisely because the rollup engine is the foundation the other six steps read, and a wrong total would propagate into every report, the SQL views, and the UAT pack that is supposed to catch exactly that. Its live-DB run is what exposed the stale `plannedCost`/`actualCost` columns, which is a finding the plan did not anticipate and could not have without running against real data. R.2 is the next unit.
 
 | Step | Scope | Status | Verification | Evidence |
 |---|---|---|---|---|
-| R.0 | Phase R scope: 14 Build rows named, dependency order, §6.4 mapping, sequence R.1-R.8 | ? | Plan reviewed against the running app and the register; 14 rows reconciled with register Phase F | *this commit* |
+| R.0 | Phase R scope: 14 Build rows named, dependency order, §6.4 mapping, sequence R.1-R.8 | ✅ | Plan reviewed against the running app and the register; 14 rows reconciled with register Phase F. R.0 accepted with the R.4 rewrite, and the R.6/R.7 confirmations the plan carries. | `11ef241` / `2948602` |
+| R.1 | Cost rollup engine, four axes, derived from base tables | ✅ | `backend/src/utils/costRollup.ts` (Prisma-free, the arithmetic) and `costRollupData.ts` (the loader). 16 unit tests, each axis carrying its own cases and the location axis measured against an independent reference implementation. `backend/scripts/r1-differential.ts` runs 11 live-DB checks: every axis preserves the grand total, own-totals count each work order exactly once, each root carries the whole tree, and per-WO figures agree with a separate `computeWorkOrderCosts` recomputation. Gate 66 files / 867 tests. | *this commit* |
+
+**R.1 evidence that is a finding, not a pass.** The differential prints the divergence between the stored columns and the derived figures every time it runs, because that is the fact the design rests on:
+
+```
+derived from base tables : planned=135  actual=0
+stored WorkOrder columns : planned=0    actual=0
+stale stored plannedCost/actualCost rows: 2 of 4
+  765884b2-5ea1-45f3-82f0-bf18fbabc783 derived=90 stored=0
+  51b43878-2841-4222-9673-0a87c8fc0b08 derived=45 stored=0
+```
+
+**What R.1 deliberately did not do.** It did not add the route or the screen — that is R.2/R.3, and R.4 rebuilds `/cost-summary` on this engine. It did not fix the stale `plannedCost`/`actualCost` columns, which is a real defect with a wider blast radius than one report and deserves its own step rather than being absorbed silently into a reporting phase. It did not add indexes; the plan's own volume assumption should settle that before the Client's data arrives, and a premature index on a 4-row table measures nothing.
 
 ---
 
