@@ -1000,6 +1000,81 @@ Started 2026-09-29. Phase G has **no §3 build rows**. Its only §3 clause (OAut
 
 ---
 
+### Phase R - Reporting, BI layer and the UAT pack (register Phase F, §3.5.3 / §3.7 / §6.4)
+
+**Lettering.** These steps are `R.0`-`R.n`, not `F.0`-`F.n`. The tracker's `F.0`-`F.9` are taken: they were the DB-backed suites for the 19-hold residual rows, and that phase is complete. This phase is register **Phase F**, whose subject is reporting and the UAT pack. The two letters are unrelated work and reusing `F` would make every `F.n` citation ambiguous. "R" for reporting.
+
+**Why this phase, and why now.** Of the register's open Build rows, this is the one that blocks go-live. §6.4 has **four** `Not Met` rows, and this phase targets two of them:
+
+| §6.4 row | Criterion | In this phase? |
+|---|---|---|
+| 6.4 / a | All §3 functional requirements implemented **and pass UAT scripts** | **Yes** — this phase delivers the UAT pack. Stays `Not Met` regardless: the clause is a conjunction, and 14 §3 rows are still `Not Met` and 17 `Partial`. Closing it needs register Phase H as well. |
+| 6.4 / b | All standard reports produce correct data **verified against manual calculation** | **Yes** — this is the phase's acceptance criterion. Closes when the reconciliation pack exists and passes. |
+| 6.4 / c | No open Critical or Major defects at go-live | No. Downstream of a, b and Phase H. Not actionable as a build task. |
+| 6.4 / d | Data migration accuracy > 99.9% | No. No client legacy dataset exists (§1.3, §5.7). Nothing to build; blocked on data, not code. |
+| 6.4 / e | Performance at 100 concurrent users | Already `Met` (Phase G, 2026-09-29). Closed. |
+| 6.4 / f | Documentation delivered | `Partial`, carries two §6.2 gaps tracked in the Phase I documentation work, not here. |
+
+So this phase **closes one §6.4 row (b)**, **delivers the missing half of another (a)**, and leaves c and d untouched. The go-live-blocking set in the SOW matrix Summary is unchanged in count by this phase; row b is the only one of its members this work can move.
+
+**The 14 Build rows, by name.** All from `docs/DECISION_REGISTER.md` §5, all `Build`, all currently below `Met`:
+
+| Row | Clause | Requirement | Now |
+|---|---|---|---|
+| 51 | §3.5.3 | Costs summarisable by functional location hierarchy (rollup to any level) | Not Met |
+| 52 | §3.5.3 | Costs summarisable by equipment | Not Met |
+| 53 | §3.5.3 | Costs summarisable by work order type | Not Met |
+| 54 | §3.5.3 | Costs summarisable by time period (year, quarter, month) | Partial |
+| 58 | §3.7.1 | All reports filterable by date range, location, equipment, and work center | Not Met |
+| 59 | §3.7.1 | All reports exportable to PDF and Excel (raw data) | Not Met |
+| 60 | §3.7.1 | Work Order Backlog — count and total estimated hours by status, priority, work center | Partial |
+| 61 | §3.7.1 | PM Compliance — (Completed PMs / Scheduled PMs) × 100 for a period | Partial |
+| 62 | §3.7.1 | MTTR — average repair duration, per equipment/location | Partial |
+| 63 | §3.7.1 | Maintenance Cost Summary — actual vs budget by cost center/location | Partial |
+| 64 | §3.7.1 | Material Consumption Report — by material, work order, equipment | Partial |
+| 65 | §3.7.2 | Backlog Hours by Work Center | Not Met |
+| 66 | §3.7.2 | Top 10 Highest-Cost Equipment | Not Met |
+| 67 | §3.7.2 | Notifications Awaiting Conversion | Partial |
+
+Row 68 (dashboard realtime/drilldown) is `Waive` in the same phase and is not work.
+
+#### R.0 - the 14-row scope, stated as a build plan
+
+**What the code actually is today.** Measured 2026-09-29 against the running app, not from the matrix:
+
+- `backend/src/routes/reports.ts` has exactly 7 report handlers. Six take `async (_req: Request, ...)` and **ignore the request entirely** — `:41` backlog, `:200` mtbf, `:291` mttr, `:371` cost-summary, `:447` downtime, `:533` material-consumption. Only `:127` pm-compliance reads `req.query` (`:129`, `year`/`month`). So row 58 is not a partial gap; six of seven reports cannot filter at all.
+- Rows 65 and 66 have no handler and no screen. `app/src/pages/ReportsPage.tsx:212-218` lists exactly the seven that exist.
+- Export is CSV only, built in the browser (`ReportsPage.tsx:185` `exportCSV`). There is no server-side export and no `.xlsx` dependency in `backend/package.json`. Row 59 needs a real xlsx writer; the PDF limb is **waived** under D-9 and is not rebuilt.
+- There is **no SQL view layer** in the repository (`CREATE VIEW` returns nothing). D-13 committed the vendor to SQL views as SOW §5.2's stated alternative for the Client's BI tool. That is part of this phase, not a later one.
+- Row 63's budget limb is **waived** under D-13 — actual-vs-planned variance is the deliverable, because the SOW contains no budget source.
+- `backend/src/utils/costRules.ts` already computes per-WO planned and actual cost (`computeWorkOrderCosts`, `:97`, returning `plannedCost`/`actualCost` at `:140-141`). The rollups in rows 51-54 are aggregation over that, not new costing logic. `/cost-summary` (`:371`) today loads every work order and accumulates into a `Map` keyed on `costCenterCode` in application memory — the rollup replaces that with a grouped query, and the R.1 differential test is written against the existing per-WO figures so a total that moves is a total that moved for a stated reason. Row 54's period axis is the one that must not re-derive time from a string.
+
+**Sequence, in dependency order.** Rollups first, because the new reports and the SQL views both read them; filters before exports, because an export of an unfiltered report is the wrong deliverable; the UAT pack last, because it reconciles the finished reports.
+
+| Step | Work | Rows |
+|---|---|---|
+| R.0 | This plan. Stops for review. | — |
+| R.1 | Cost rollup service: aggregate planned + actual cost by location (any hierarchy level), equipment, WO type, and period. One shared module, four axes, tested over the live DB. | 51, 52, 53, 54 |
+| R.2 | Report filtering: a shared filter parser (date range, location incl. descendants, equipment, work center) applied to all 7 handlers. `pm-compliance` keeps its year/month and gains the rest. | 58 |
+| R.3 | New reports: Backlog Hours by Work Center; Top 10 Highest-Cost Equipment; Notifications Awaiting Conversion. Route + service + screen tab each, following the existing 7-report pattern. | 65, 66, 67 |
+| R.4 | Cost Summary rebuilt on the R.1 rollups; the four existing report rows promoted on their own merits, not as a side effect. | 54, 60, 61, 62, 63, 64 |
+| R.5 | Server-side Excel export (`.xlsx`) for all reports. PDF stays waived under D-9. | 59 |
+| R.6 | SQL view layer for the Client's BI tool, as D-13 committed. Views over the same aggregates, so a view total and a report total cannot drift. | 51-54 (D-13) |
+| R.7 | **UAT pack**: independently recompute each report's figures and compare against the API's, per L15. This is the artifact §6.4 row b names. | 6.4 / b |
+| R.8 | Matrix recount from the suites' outcomes, doc delta, green gate and CI on the exact SHA. | — |
+
+**What is deliberately not in scope.** Phase H's 10 rows, including the row-24 calibration scope gate that needs the SOW owner's answer. G.4 TLS and G.5 200-VU, both out of reach. §6.4 rows c and d, neither of which is a build task. The PDF export limb, waived. The budget limb of row 63, waived.
+
+**Promotion discipline.** A row moves to `Met` only on evidence from a suite that ran at a named SHA, with that run's CI ID cited. No row is promoted on the strength of a passing unit test alone — the E.9 finding was that a green suite is evidence about tests that exist, not about clauses no test touches. Where a row can only be partly delivered, the residual goes in the matrix Notes cell and the row stays where it is.
+
+**R.0 stops here for review.** R.1 is the next unit of work, and it is the one to scrutinise first: the rollup engine is the foundation the other six steps read, and a wrong total propagates into every report, the SQL views, and the UAT pack that is supposed to catch exactly that.
+
+| Step | Scope | Status | Verification | Evidence |
+|---|---|---|---|---|
+| R.0 | Phase R scope: 14 Build rows named, dependency order, §6.4 mapping, sequence R.1-R.8 | ? | Plan reviewed against the running app and the register; 14 rows reconciled with register Phase F | *this commit* |
+
+---
+
 ## Deferred to Post-Go-Live
 
 - ERP integration
