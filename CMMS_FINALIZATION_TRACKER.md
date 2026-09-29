@@ -973,9 +973,23 @@ The E.11 boundary note deferred **19 §3 rows** that E.9 restated as *clauses wh
 | F.6 | Work-order rules suites: prefix config, operation update (F0p, F0q) | ✅ | A route test proves the configured WO-number prefix; a `PUT` operation update survives the Zod parse. | *this commit* |
 | F.7 | Labour attribution suite (F0r) | ✅ | Session-derived technician is authoritative; client-supplied `userId` cannot override. | *this commit* |
 | F.8 | Cost-split suite (F0s) | ✅ | 100% validation and read-back over the route; the static source-reading unit test is superseded. | *this commit* |
-| F.9 | Phase F gate: matrix recount, docs delta, green CI for the exact SHA | ✅ | Status column re-derived from the suites' outcomes; §3 counts recounted; every promotion cites its suite; green CI both jobs; report carries the Docs delta. | *this commit* |
+| F.9 | Phase F gate: matrix recount, docs delta, green CI for the exact SHA | ✅ | Status column re-derived from the suites' outcomes; §3 counts recounted; every promotion cites its suite; green CI both jobs; report carries the Docs delta. Arithmetic reconciliation: 16 of the 19-hold set promoted, 3 held with residuals re-stated (89/97/175), plus row 103 outside the set = 17 Met moves; row 93 re-stated separately, never part of the 19. | *this commit* |
 
 **Phase F boundary (this stop point).** F.0 is recorded above; the F.1–F.9 suites are the work. Phase F stops here for review before the first suite is written, so the scope — especially the F0n split decision and the three `Not Met` rows (F0k, F0l, F0o) whose code may already implement the clause — is agreed before tests start dictating matrix moves.
+
+### Phase G — Non-functional and Operational Readiness (§6.4.3)
+
+Started 2026-09-29. Phase G has **no §3 build rows**. Its only §3 clause (OAuth2, row 76) was waived under D-5; the non-functional work §6.4.3 demands is three rehearsals tracked under **§7 / D-4**, not in the §3 register:
+
+1. **100-VU performance run** (§6.4.3)
+2. **200-VU §4.1 test** (SOW §4.1)
+3. **Backup/restore rehearsal under D-4** (WAL archiving + differential to meet RPO < 1 h; the restore proof needs a live PostgreSQL host and a second backup target)
+
+| # | Task | Status | Findings |
+|---|---|---|---|
+| G.0 | Phase G boundary: environment survey on this host | ✅ | Surveyed so the phase is planned around what actually exists. **Held:** live PostgreSQL 18 at `localhost:5432` with a password-authenticated `postgres` login (`PGPASSWORD` is set in this environment; the `cmms` and `cmms_gate` databases are present); `pg_dump`/`psql`/`pg_restore` exist but are **not on PATH** — they resolve under `C:\Program Files\PostgreSQL\18\bin`, which `backup.bat` and `restore-drill.bat` already expose as their fallback; `python` 3.14.7 present for `scripts/verify/*.py`. **Not held:** `k6.exe` — confirmed absent from PATH and the user profile (gitignored by design) — so the 100-VU and 200-VU runs **cannot** go; Windows Server / IIS / ARR — the `W3SVC` service is not present — so the §4.2 TLS rehearsal **cannot** go; a second backup target and a production-grade live host for the D-4 differential/WAL proof. The only one of the three rehearsals this environment actually supports is a **local** full backup/restore drill (dump `cmms` → restore into `cmms_restore_test`), which does not by itself satisfy D-4's RPO objective. Nothing was executed at this boundary. | *this commit* |
+
+**Phase G boundary (this stop point).** G.0 is the survey; per §7, "two of those three cannot be run at all until the dependencies in §7 are provided". This host genuinely holds the D-4 drill's toolchain but not its acceptance target, and holds neither k6 nor IIS/ARR. Phase G stops here for review before any rehearsal runs.
 
 ---
 
