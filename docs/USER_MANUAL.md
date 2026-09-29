@@ -6,7 +6,7 @@ This manual describes **what the software actually does today**. Where a task is
 
 Related documents:
 
-- [Installation & Deployment Guide](../INSTALLATION_GUIDE.md) - for the person installing or hosting the system
+- [Installation & Deployment Guide](INSTALLATION_GUIDE.md) - for the person installing or hosting the system
 - [Administrator Guide](ADMIN_GUIDE.md) - for IT, database, and system administration
 - [API Reference](API_REFERENCE.md) - every endpoint the backend exposes
 - [README](../README.md) - overview and demo accounts

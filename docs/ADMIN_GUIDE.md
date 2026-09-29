@@ -4,7 +4,7 @@ Audience: IT staff, database administrators, and operations staff responsible fo
 
 Scope: day-two operations of an **already installed** system - configuration, database administration, user administration, the preventive maintenance scheduler, backup and recovery, audit, and troubleshooting.
 
-For the initial installation itself, see the [Installation & Deployment Guide](../INSTALLATION_GUIDE.md). That document covers hardware sizing, Node.js and PostgreSQL installation, PM2 setup, the IIS reverse proxy, and HTTPS.
+For the initial installation itself, see the [Installation & Deployment Guide](INSTALLATION_GUIDE.md). That document covers hardware sizing, Node.js and PostgreSQL installation, PM2 setup, the IIS reverse proxy, and HTTPS.
 
 **This guide documents what the system does today.** Features that are not implemented are listed in [section 13](#13-deferred-and-not-implemented), not described as if they were available.
 
@@ -80,7 +80,7 @@ Consequences you must plan for:
 
 Configuration is mostly by environment variable. The backend reads `backend/.env`; the frontend is compiled with `app/.env.local`. The Administration screen's **Settings** tab edits the two runtime-configurable values (`wo_number_prefix`, `notif_number_prefix`) through `GET`/`PUT /api/system-config` (Administrator only); every other value here still requires an edit and a restart.
 
-> The configuration tables in this section and in the [Installation Guide](../INSTALLATION_GUIDE.md#3-configuration) match; both list every variable the API reads.
+> The configuration tables in this section and in the [Installation Guide](INSTALLATION_GUIDE.md#3-configuration) match; both list every variable the API reads.
 
 ### 3.1 Backend variables - `backend/.env`
 

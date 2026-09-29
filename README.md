@@ -284,13 +284,14 @@ CMMSproject/
 │   │   └── seed.ts             # guarded demo seed
 │   └── tests/                  # 65 test files + 3 support = 68 tracked
 ├── scripts/                    # Windows batch scripts, k6, verify scripts
-├── CMMS_FINALIZATION_TRACKER.md
-├── INSTALLATION_GUIDE.md
+├── docs/
+│   ├── CMMS_FINALIZATION_TRACKER.md
+│   ├── INSTALLATION_GUIDE.md
 ├── backend\ecosystem.config.cjs  # PM2 process definition
 └── .github/workflows/ci.yml
 ```
 
 ## Further reading
 
-- `INSTALLATION_GUIDE.md` — full Windows/IIS deployment, PM2, backup/restore, and k6 instructions.
-- `CMMS_FINALIZATION_TRACKER.md` — per-phase status, verification evidence, and deferred items.
+- `docs/INSTALLATION_GUIDE.md` — full Windows/IIS deployment, PM2, backup/restore, and k6 instructions.
+- `docs/CMMS_FINALIZATION_TRACKER.md` — per-phase status, verification evidence, and deferred items.
