@@ -441,10 +441,12 @@ It prints `PASS` only if all of that succeeded, and cleans up the scratch databa
 
 ### 7.6 Recovery objectives
 
-- **RPO - up to 24 hours.** The backup is daily, so a failure between runs can lose a day's work.
+- **RPO - up to 24 hours.** The backup is daily, so a failure between runs can lose a day's work. The D-4 WAL archiving configuration ([7.8](#78-wal-archiving-configuration-d-4)) is written to narrow this toward 1 hour; its proof is pending a second backup target.
 - **RTO - measured, not designed.** The installation guide records a 5.35 second restore measured on 2026-09-25 against a local dataset of 84 work orders and a 306,826-byte dump. That is a restore of the *database into a scratch database on the same host*; it excludes application rebuild time, IIS configuration, and the attachment restore. Re-measure after meaningful database growth or any infrastructure change, and record the new figure rather than quoting the old one.
 
 The two together mean a nightly backup gives you a working system again within minutes, but potentially a day of data loss. If the plant cannot accept a day of loss, the daily schedule is the thing to change - the tooling supports a more frequent run, because retention and naming are time-based.
+
+The drill was re-measured on 2026-09-29 against the `cmms` database at 189 work orders and a 730,878-byte dump (post-migration): restore completed in 5.75 seconds with 75/75 attachment files verified and the scratch database dropped. PITR via WAL replay ([7.8](#78-wal-archiving-configuration-d-4)) is not yet measured.
 
 ### 7.7 Full system recovery order
 
@@ -454,6 +456,25 @@ The two together mean a nightly backup gives you a working system again within m
 4. Re-apply the schema with `npx prisma migrate deploy` if the code has moved on from the dump.
 5. Rebuild the backend (`scripts\build.bat`) and the frontend, and restart via PM2.
 6. Verify `curl -s http://localhost:4000/api/health`, then sign in and confirm attachments resolve.
+
+### 7.8 WAL archiving configuration (D-4)
+
+The daily `pg_dump` in `scripts\backup.bat` sets a Recovery Point Objective of up to 24 hours. This section is the D-4 deliverable that narrows the RPO toward the 1-hour objective by switching on continuous WAL archiving; it is deliberately written here so the running configuration can be reproduced on a live PostgreSQL host.
+
+Set these in `postgresql.conf` (and extend `archive_command` to the site's real backup target):
+
+```
+wal_level = replica
+archive_mode = on
+archive_command = 'copy "%p" <SECOND-BACKUP-TARGET>\wal\%f'   # site-specific target
+archive_timeout = 300
+max_wal_senders = 10
+max_connections = 100          # see 14.3 connection-pool sizing
+```
+
+Apply by editing `postgresql.conf` and restarting PostgreSQL, or by `ALTER SYSTEM SET ... ; SELECT pg_reload_conf();` for the settings that allow it (`archive_mode` needs a restart). Point-in-time recovery is then a `pg_basebackup` (or the latest full `pg_dump`) plus replay of the archived WAL segment series up to the desired point.
+
+**Proof status - pending verification, not a scope reduction.** The configuration above is written and rehearsable against a live host (held since Phase G), but its RPO proof requires a **second backup target** that is not yet available to this host. The RPO < 1 hour row in `docs/SOW_COMPLIANCE.md` (§4.3) stays `Not Met` until that pending proof lands; the full backup/restore drill in 7.5 already passes on this host.
 
 ---
 

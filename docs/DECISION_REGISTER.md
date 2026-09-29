@@ -327,7 +327,12 @@ and the backup/restore scripts get written. The restore rehearsal needs a live
 PostgreSQL host (**held** since Phase G on this host) and a second backup target;
 the second target alone remains a **pending verification**, so the RPO proof is
 recorded as pending — explicitly **not** a scope reduction and not a waiver. The
-daily `pg_dump` mechanism already works and is rehearsable now.
+daily `pg_dump` mechanism already works and was rehearsed on 2026-09-29: the full
+`backup.bat` plus `restore-drill.bat` drill **passed** (newest dump of 189 work
+orders restored into `cmms_restore_test` in 5.75 s with 75/75 attachments
+verified and the drill database dropped). The WAL archiving configuration is
+written in `docs/ADMIN_GUIDE.md` §7.8 and its RPO proof remains pending the
+second backup target.
 
 **D-5 / row 76 - OAuth2 - waive confirmed, does not reopen.** Internal use only;
 no Azure AD and no on-premises AD. The 5.5 deviation stands as documented in
@@ -368,8 +373,8 @@ not.
 |---|---|---|
 | Client signature on §6 | Gate A | Not held |
 | Windows Server with IIS + ARR | §4.2 TLS rehearsal, Phase G | **Held on this host** (`W3SVC` running, ARR 3.0 + URL Rewrite 2.1 installed, `http://localhost` → 200) — rehearsal requires an elevated shell to configure the site binding, certificate and rules |
-| Live PostgreSQL target + `PGPASSWORD` | First real backup/restore drill, Phase G | **Held on this host** (PostgreSQL 18 at `localhost:5432`, `PGPASSWORD` set, `backup.bat`/`restore-drill.bat` with the PG-18 fallback path). The second backup target for the WAL/RPO proof remains **pending verification**, not a scope reduction |
-| `k6.exe` | §6.4.3 100-VU and §4.1 200-VU runs | **Held on this host** (`scripts\k6\k6.exe` v2.3.0). The 100-VU run can proceed; the 200-VU run stays **deferred** by the recorded P2028 decision |
+| Live PostgreSQL target + `PGPASSWORD` | First real backup/restore drill, Phase G | **Held and rehearsed** (PostgreSQL 18 at `localhost:5432`, `PGPASSWORD` set, `backup.bat`/`restore-drill.bat` with the PG-18 fallback path). The full drill **passed 2026-09-29** (189 work orders restored in 5.75 s, 75/75 attachments, drill DB dropped). The second backup target for the WAL/RPO proof remains **pending verification**, not a scope reduction |
+| `k6.exe` | §6.4.3 100-VU and §4.1 200-VU runs | **Held and run** (`scripts\k6\k6.exe` v2.3.0). The 100-VU run executed 2026-09-29: read path passed (steady p95 51.78 ms), login burst reproduced P2028 (55/200 logins); the 200-VU run stays **deferred** by the recorded P2028 decision |
 | Azure AD tenant + app registration | D-5(a), OAuth2/OIDC | Not held |
 | Client legacy data (Excel/paper) | §5.7 importers, §6.4.5 migration accuracy | Not held |
 | Dry-run migration window | §6.4.5 | Not scheduled |
