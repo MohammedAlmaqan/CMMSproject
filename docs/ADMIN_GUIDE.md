@@ -11,7 +11,7 @@ For the initial installation itself, see the [Installation & Deployment Guide](.
 Related documents:
 
 - [User Manual](USER_MANUAL.md) - the guide you give to plant users
-- [API Reference](API_REFERENCE.md) - all 114 endpoints across 71 paths
+- [API Reference](API_REFERENCE.md) - all 129 endpoints across 26 route groups
 - [Architecture](ARCHITECTURE.md) - design decisions and measured performance
 - [Handoff](HANDOFF.md) - known open risks carried into production
 
@@ -78,7 +78,7 @@ Consequences you must plan for:
 
 ## 3. Configuration
 
-Configuration is entirely by environment variable. The backend reads `backend/.env`; the frontend is compiled with `app/.env.local`. **There is no settings screen that writes configuration** - the Administration screen's Settings tab is read-only, and changing any value here requires an edit and a restart.
+Configuration is mostly by environment variable. The backend reads `backend/.env`; the frontend is compiled with `app/.env.local`. The Administration screen's **Settings** tab edits the two runtime-configurable values (`wo_number_prefix`, `notif_number_prefix`) through `GET`/`PUT /api/system-config` (Administrator only); every other value here still requires an edit and a restart.
 
 > The configuration tables in this section and in the [Installation Guide](../INSTALLATION_GUIDE.md#3-configuration) match; both list every variable the API reads.
 
@@ -135,7 +135,7 @@ npx prisma generate
 npx prisma migrate deploy
 ```
 
-The repository carries five migrations under `backend\prisma\migrations\`, from the baseline through the account-lockout change. `migrate deploy` applies only those not yet applied and never drops data.
+The repository carries fourteen migrations under `backend\prisma\migrations\`, from the baseline through the `float_to_decimal` change. `migrate deploy` applies only those not yet applied and never drops data.
 
 **The documented installation path - `migrate deploy`:**
 
@@ -507,9 +507,9 @@ The log has no automatic purge, so it grows indefinitely. Because it is the lock
 
 The backend logs through Pino, at the level set by `LOG_LEVEL`.
 
-- **Under PM2**, logs go to `backend\logs\out.log` and `backend\logs\err.log`.
+- **Under PM2**, logs go to `backend\logs\api-out.log` and `backend\logs\api-err.log` (per `ecosystem.config.cjs`).
 - Useful startup lines: `startup lock acquired (pid@host, run <id>)`, `[scheduler] started cron="<expression>"`, and `listening on <host>:<port>`.
-- Log rotation is configured in `ecosystem.config.cjs` and described in the [Installation Guide](../INSTALLATION_GUIDE.md#log-rotation-pm2-logrotate). Confirm rotation is actually active on a long-running host; an unrotated log will eventually fill the disk, and the failure then looks like an application fault.
+- `ecosystem.config.cjs` references `pm2-logrotate` only in a comment; rotation is **not** actually configured there. Confirm rotation is active on a long-running host; an unrotated log will eventually fill the disk, and the failure then looks like an application fault.
 - Stale-scheduler health conditions are logged with `[scheduler] stale health detected - SystemAlert created`.
 
 Do not paste raw logs into a shared channel. Log lines can contain usernames, IP addresses, and record identifiers.
@@ -580,7 +580,7 @@ If you change the topology - a second proxy, a load balancer in front of IIS, or
 
 Authorization is enforced by the server on every endpoint, with a role hierarchy: Administrator > Maintenance Planner > Maintenance Supervisor > Technician > Requester > View-Only. A higher role inherits the permissions of every role below it.
 
-The frontend is **not** consistently role-aware: all ten navigation items are shown to everyone, most screens render regardless of role, and only a few controls are hidden client-side. Enforcement is the server's job, and a refused write returns `403`. Treat the UI as a convenience, never as the security boundary. A user who can see a Save button is not thereby permitted to save.
+The frontend is **not** consistently role-aware: all eleven navigation items are shown to everyone, most screens render regardless of role, and only a few controls are hidden client-side. Enforcement is the server's job, and a refused write returns `403`. Treat the UI as a convenience, never as the security boundary. A user who can see a Save button is not thereby permitted to save.
 
 ### 12.5 Secrets
 
@@ -603,10 +603,10 @@ Recorded here so that nobody plans an operation around a feature that does not e
 | User create / delete API | Never implemented. Database procedure in [6.1](#61-create-a-user) and [6.7](#67-delete-or-decommission-a-user) |
 | User create audit trail | Not possible while creation bypasses the application. See [8](#8-audit-log) |
 | Lockout clear / user edit API | No endpoint exists; `lockedUntil` is not in the accepted update schema |
-| PM plan and task list screens | No UI. The Preventive Maintenance page is read-only plus a per-plan Generate action. API only (`/api/maintenance-plans`, `/api/task-lists`) |
+| PM plan and task list screens | Task Lists has a full UI (`/task-lists`). The Preventive Maintenance page is read-only plus a per-plan Generate action (`/api/maintenance-plans`) |
 | Notification create screen | No UI. The command palette entry navigates to the list and opens no form. `POST /api/notifications` only |
 | Manual scheduler trigger screen | No UI. `POST /api/maintenance-plans/run-scheduler` only |
-| System settings screen | Read-only. Configuration is environment-only |
+| System settings screen | Partly editable. Only `wo_number_prefix` and `notif_number_prefix` write via `PUT /api/system-config`; the other displayed values are environment-only |
 | Content-Security-Policy | Disabled. See [12.1](#121-network-exposure) |
 | Server-side session revocation | Not implemented. Disabling a user takes effect at their next sign-in only |
 | Multi-factor authentication | Not implemented |

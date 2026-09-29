@@ -20,11 +20,11 @@ A Vite 7 + TypeScript single-page app. In development the Vite dev server listen
 
 ### Express + TypeScript API (`backend/`)
 
-An ESM Node application (`"type": "module"` in `backend/package.json`) built with `tsc` to `backend/dist/` and run as plain Node. It listens on port 4000 (`process.env.PORT`, default `4000`). Data access goes through Prisma ORM against PostgreSQL. The API is stateless with respect to sessions: it validates a bearer JWT and holds no session store. It mounts 24 route groups plus a Swagger UI, and every router except `auth.ts` applies `router.use(authenticate)` so authentication is enforced per router rather than globally. Cross-cutting concerns are deliberately separated: `src/middleware/` (auth, RBAC, validation, audit), `src/services/` (domain logic and the scheduler), `src/utils/` (config, logger, CSV, sequencing).
+An ESM Node application (`"type": "module"` in `backend/package.json`) built with `tsc` to `backend/dist/` and run as plain Node. It listens on port 4000 (`process.env.PORT`, default `4000`). Data access goes through Prisma ORM against PostgreSQL. The API is stateless with respect to sessions: it validates a bearer JWT and holds no session store. It mounts 26 route groups plus a Swagger UI, and every router except `auth.ts` applies `router.use(authenticate)` so authentication is enforced per router rather than globally. Cross-cutting concerns are deliberately separated: `src/middleware/` (auth, RBAC, validation, audit), `src/services/` (domain logic and the scheduler), `src/utils/` (config, logger, CSV, sequencing).
 
 ### PostgreSQL 15+
 
-The system of record, database name `cmms`. The schema is **migration-managed** — 35 Prisma models across 5 migrations, applied with `prisma migrate deploy`. `prisma db push` is retired and must not be used. Integrity relies on a mix of Prisma-level constraints and hand-written partial unique indexes, notably `WorkOrder(sourcePlanId, sourcePlanCycle) WHERE isDeleted = false`, which is what makes PM generation idempotent.
+The system of record, database name `cmms`. The schema is **migration-managed** — 38 Prisma models across 14 migrations, applied with `prisma migrate deploy`. `prisma db push` is retired and must not be used. Integrity relies on a mix of Prisma-level constraints and hand-written partial unique indexes, notably `WorkOrder(sourcePlanId, sourcePlanCycle) WHERE isDeleted = false`, which is what makes PM generation idempotent.
 
 ### PM2 process manager (`backend/ecosystem.config.cjs`)
 
@@ -59,7 +59,7 @@ flowchart TB
         BK["backups/<br/>cmms-YYYY-MM-DD-HHmm.sql<br/>+ matching -uploads folder<br/>newest 14 of each kept"]
     end
 
-    DB[("PostgreSQL 15+ - database cmms<br/>35 models / 5 migrations")]
+    DB[("PostgreSQL 15+ - database cmms<br/>38 models / 14 migrations")]
     TASKSCHED["Windows Task Scheduler<br/>daily 02:00"]
 
     B -->|443| STATIC
@@ -113,7 +113,7 @@ pino-http access log (status + responseTime)         index.ts
 Browser
 ```
 
-Ordering is enforced by construction, not convention: `authenticate` is registered with `router.use()` before any route is declared, so it cannot be forgotten per-route, and `authorizeMinRole` independently rejects an absent `req.user` with 401 rather than trusting the caller. The same router-wide pattern holds in all 23 non-`auth` routers.
+Ordering is enforced by construction, not convention: `authenticate` is registered with `router.use()` before any route is declared, so it cannot be forgotten per-route, and `authorizeMinRole` independently rejects an absent `req.user` with 401 rather than trusting the caller. The same router-wide pattern holds in all 25 non-`auth` routers.
 
 ## Security boundaries
 

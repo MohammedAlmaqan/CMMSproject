@@ -6,7 +6,7 @@ Reference documentation for the CMMS REST API, version 1.0.0.
 - **Interactive UI:** `/api-docs` (Swagger UI)
 - **Machine-readable spec:** [`openapi.json`](./openapi.json) (OpenAPI 3.0.0, also served live at `/api-docs.json`)
 
-The spec is generated from `@openapi` annotations in the route source files, so it always matches the running code. Regenerate it with `npm run build && npm start` and re-export from `/api-docs.json`.
+The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The checked-in `docs/openapi.json` is an exported snapshot and may lag the newest routes (the routers currently expose 129 operations; the committed export was taken at 114 operations / 71 paths) — re-export it after a fresh build by saving `/api-docs.json`.
 
 ## Authentication
 
@@ -54,25 +54,26 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 
 ## Endpoint groups
 
-114 operations across 71 paths and 24 routers.
+129 operations across 78 paths and 26 routers.
 
 | Group | Base path | Operations |
 | --- | --- | --- |
 | Authentication | `/api/auth` | 2 |
 | Functional Locations | `/api/functional-locations` | 6 |
-| Equipment | `/api/equipment` | 7 |
+| Equipment | `/api/equipment` | 11 |
 | Equipment Meters | `/api/equipment-meters` | 6 |
-| Work Centers | `/api/work-centers` | 5 |
+| Work Centers | `/api/work-centers` | 6 |
 | Materials | `/api/materials` | 7 |
 | Failure Codes | `/api/failure-codes` | 6 |
 | Task Lists | `/api/task-lists` | 5 |
 | Notifications | `/api/notifications` | 6 |
-| Work Orders | `/api/work-orders` | 6 |
+| Work Orders | `/api/work-orders` | 7 |
 | Work Order Operations | `/api/work-order-operations` | 4 |
 | Work Order Materials | `/api/work-order-materials` | 4 |
+| Work Order Cost Splits | `/api/work-order-cost-splits` | 3 |
 | Labor | `/api/labor` | 4 |
 | External Services | `/api/external-services` | 4 |
-| Crafts | `/api/crafts` | 1 |
+| Crafts | `/api/crafts` | 5 |
 | Maintenance Plans | `/api/maintenance-plans` | 7 |
 | Safety Checklists | `/api/safety-checklists` | 7 |
 | Reports | `/api/reports` | 7 |
@@ -82,6 +83,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 | Audit Log | `/api/audit-log` | 1 |
 | Users | `/api/users` | 5 |
 | Dashboard | `/api/dashboard` | 3 |
+| System Config | `/api/system-config` | 2 |
 
 ### Authentication
 
@@ -107,11 +109,15 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 | --- | --- | --- |
 | GET | `/api/equipment` | List equipment |
 | GET | `/api/equipment/{id}` | Get one equipment record |
+| GET | `/api/equipment/{id}/history` | Status and attribute change history for an equipment record |
 | POST | `/api/equipment` | Create an equipment record |
 | PUT | `/api/equipment/{id}` | Update an equipment record |
 | DELETE | `/api/equipment/{id}` | Soft delete an equipment record |
 | GET | `/api/equipment/export.csv` | Export the equipment register as CSV |
 | POST | `/api/equipment/import.csv` | Bulk import equipment from CSV |
+| POST | `/api/equipment/{id}/bom` | Attach a BOM material to an equipment record |
+| PUT | `/api/equipment/{id}/bom/{bomId}` | Update a BOM material line |
+| DELETE | `/api/equipment/{id}/bom/{bomId}` | Remove a BOM material line |
 
 CSV import takes a `multipart/form-data` body with a single `file` part. Each row is validated by `equipmentImportRowSchema`; the response reports the outcome per row, so a partial import is still usable. Import requires the Maintenance Planner role.
 
@@ -131,6 +137,7 @@ CSV import takes a `multipart/form-data` body with a single `file` part. Each ro
 | Method | Path | Summary |
 | --- | --- | --- |
 | GET | `/api/work-centers` | List work centers |
+| GET | `/api/work-centers/capacity` | Work center capacity, craft by work order demand |
 | GET | `/api/work-centers/{id}` | Get one work center |
 | POST | `/api/work-centers` | Create a work center |
 | PUT | `/api/work-centers/{id}` | Update a work center |
@@ -188,6 +195,7 @@ Converting a notification creates a CM work order, copies the location, equipmen
 | --- | --- | --- |
 | GET | `/api/work-orders` | List work orders (paginated with filters) |
 | GET | `/api/work-orders/{id}` | Get a work order by id (full sub-domain detail) |
+| GET | `/api/work-orders/{id}/history` | Status-change snapshot history for a work order |
 | POST | `/api/work-orders` | Create a work order |
 | PUT | `/api/work-orders/{id}` | Update a work order |
 | DELETE | `/api/work-orders/{id}` | Soft-delete a work order |
@@ -217,6 +225,16 @@ The list endpoint is paginated with `skip` and `take`. Status changes go through
 
 `GET` requires `workOrderId`.
 
+### Work Order Cost Splits
+
+| Method | Path | Summary |
+| --- | --- | --- |
+| GET | `/api/work-order-cost-splits` | List cost split lines for a work order |
+| PUT | `/api/work-order-cost-splits` | Replace the cost split lines of a work order (Maintenance Planner and above) |
+| DELETE | `/api/work-order-cost-splits/{id}` | Delete a cost split line (Maintenance Supervisor and above) |
+
+The split is used to allocate a work order's cost across internal orders or cost centers. `GET` requires `workOrderId`; the replace endpoint validates against `costSplitReplaceSchema`.
+
 ### Labor
 
 | Method | Path | Summary |
@@ -244,8 +262,12 @@ The list endpoint is paginated with `skip` and `take`. Status changes go through
 | Method | Path | Summary |
 | --- | --- | --- |
 | GET | `/api/crafts` | List crafts |
+| GET | `/api/crafts/{id}` | Get one craft |
+| POST | `/api/crafts` | Create a craft |
+| PUT | `/api/crafts/{id}` | Update a craft |
+| DELETE | `/api/crafts/{id}` | Soft delete a craft |
 
-Crafts are seeded reference data and are read-only through the API in v1.0.0.
+Crafts are seeded reference data. They are CRUD through the API (write guards: Maintenance Planner for create/update, Maintenance Supervisor for delete).
 
 ### Maintenance Plans
 
@@ -345,11 +367,20 @@ Use `/api/users/options` for dropdown and assignee fields; it is available from 
 | GET | `/api/dashboard/alerts` | Alerts addressed to the current user |
 | GET | `/api/dashboard/cost-summary` | Monthly planned vs actual cost trend |
 
+### System Config
+
+| Method | Path | Summary |
+| --- | --- | --- |
+| GET | `/api/system-config` | List known system configuration values with their current or default values |
+| PUT | `/api/system-config` | Set one known system configuration value (Administrator only) |
+
+The writable key set is a fixed allowlist (`wo_number_prefix`, `notif_number_prefix`); anything else is rejected by validation.
+
 ## Known v1.0.0 limitations
 
 These are documented gaps, not bugs to work around silently. All are tracked as v1.1 items.
 
 - Monetary fields (`standardCost`, `cost`, `unitCost`, `costRatePerHour`, `hourlyRate`, `plannedCost`, `actualCost`, work order cost totals) are `DECIMAL(12,2)` since D-17/E.13 and are served to the API as JSON numbers. Quantity/duration columns (`currentStock`, hours, `percentage`) remain binary float.
-- `MaintenancePlan.functionalLocationId` is not enforced as a foreign key.
+- `MaintenancePlan.functionalLocationId` is a retained compatibility column with no `@relation` and is not enforced as a foreign key. Target-based planning moved to `MaintenancePlanTarget`, whose `functionalLocationId` (and `equipmentId`) **are** enforced foreign keys (schema.prisma, F3).
 - Failure codes and causes are not yet referenced by any work order column.
 - `WorkOrderOperation.status` and several other status and type columns are free text rather than constrained enums.

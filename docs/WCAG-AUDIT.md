@@ -1,6 +1,6 @@
 # WCAG 2.1 AA Light Pass — Audit & Remediation Record
 
-Scope: WCAG 2.1 AA-level "light pass" over all 14 authenticated routes of the
+Scope: WCAG 2.1 AA-level "light pass" over all 15 authenticated routes of the
 CommandPulse app plus the login flow, the Command Palette overlay and the global
 stylesheet. Verify: `python scripts/verify/verify_g3_5.py` (exit 0 on PASS).
 
@@ -42,6 +42,7 @@ Conformance targets applied (per WCAG 2.1):
 | `/locations` | — | tree toggle + search | — | toggle aria-label+aria-expanded; search aria-label |
 | `/materials` | sortable `<th>` mouse-only | search box | — | th keyboardable (role/tabIndex/Enter/Space); search aria-label |
 | `/work-centers` | clickable header div with nested toggle button (mouse-only) | — | — | header → single `<button>` with aria-expanded; inner button removed |
+| `/task-lists` | — | search box; per-operation material remove buttons | — | search aria-label; remove buttons given accessible names |
 | `/preventive-maintenance` | — | search + 2 filter selects; toast dismiss; error dismiss | — | aria-labels added |
 | `/reports` | none | none | chart axis tick text `#52525B` | chart stroke/tick → `#92929B` |
 | `/administration` | — | 2 search/filter inputs | — | aria-labels added (`Search users`, `Filter audit log`) |

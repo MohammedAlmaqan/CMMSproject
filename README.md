@@ -28,13 +28,13 @@ These counts are the actual current state, not aspirations:
 
 | Thing | Count |
 |-------|-------|
-| Prisma models | 35 |
-| Prisma migrations | 5 |
-| Backend API route files | 24 |
-| Backend route groups mounted | 24 |
-| Backend test files | 24 (159 tests) |
-| Frontend pages | 16 |
-| Frontend service modules | 22 |
+| Prisma models | 38 |
+| Prisma migrations | 14 |
+| Backend API route files | 26 |
+| Backend route groups mounted | 26 |
+| Backend test files | 65 `.test.ts` run by vitest (30 unit + 35 routes); 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 68 |
+| Frontend pages | 17 |
+| Frontend service modules | 23 |
 | Frontend test files | 6 |
 
 ## Implemented functionality
@@ -77,7 +77,7 @@ These counts are the actual current state, not aspirations:
 - Role-based access control across six roles: `Administrator`, `Maintenance Planner`, `Maintenance Supervisor`, `Technician`, `Requester`, `View-Only`.
 - User administration, including per-user password change.
 - System alerts and account lockout after repeated failed logins.
-- Read-only Administration screens for users, audit log, and RBAC. The **Settings** tab is a static display only — there is no configuration API and nothing in it can be edited.
+- Read-only Administration screens for users and audit log. The **Settings** tab edits runtime configuration through `GET`/`PUT /api/system-config`.
 - Rate limiting on the login route.
 - Structured JSON logging (pino) to `logs/api-out.log` and `logs/api-err.log` under PM2.
 
@@ -89,10 +89,8 @@ These are **not** present in the code. Do not plan around them:
 - **No ERP integration** of any kind.
 - **No internationalisation (i18n)**. The UI is English-only.
 - **No ad-hoc query builder or ad-hoc reporting.** Reports are seven fixed queries.
-- **No Kanban board view.** The work order list is a table.
 - **No refresh tokens and no logout endpoint.** Auth is a stateless JWT; there are only `POST /api/auth/login` and `GET /api/auth/me`. A `RefreshToken` model exists in the schema but is unused. Sessions simply expire.
 - **No SMTP/email sending.** Notifications are in-app records only.
-- **No editable system configuration.** The Administration → Settings screen is hardcoded markup. The backend reads a `wo_number_prefix` value from the `SystemConfig` table when generating work order numbers, but exposes no endpoint to change it.
 - **Meter-based and Combined PM plans are stored but not auto-generated.** The scheduler only selects `strategyType: 'Time'` plans.
 
 ## Prerequisites
@@ -190,6 +188,7 @@ All routes are under `/api`. Full request/response schemas are in Swagger at `/a
 | Work orders | `/api/work-orders` |
 | Work order operations | `/api/work-order-operations` |
 | Work order materials | `/api/work-order-materials` |
+| Work order cost splits | `/api/work-order-cost-splits` |
 | Labour | `/api/labor` |
 | External services | `/api/external-services` |
 | Maintenance plans | `/api/maintenance-plans` |
@@ -201,6 +200,7 @@ All routes are under `/api`. Full request/response schemas are in Swagger at `/a
 | Attachments | `/api/attachments` |
 | Audit log | `/api/audit-log` |
 | Users | `/api/users` |
+| System config | `/api/system-config` |
 
 ## Technology stack
 
@@ -216,7 +216,7 @@ All routes are under `/api`. Full request/response schemas are in Swagger at `/a
 | Auth | JWT + bcrypt, six-role RBAC |
 | Logging | pino, pino-http |
 | Process manager | PM2 (optional; `backend\ecosystem.config.cjs`) |
-| Load testing | k6 (`scripts/k6/smoke.js`) |
+| Load testing | k6 (`scripts/k6/smoke.js`, `scripts/k6/acceptance.js`) |
 | API docs | Swagger / OpenAPI 3 |
 
 ## Windows scripts
@@ -229,7 +229,8 @@ All routes are under `/api`. Full request/response schemas are in Swagger at `/a
 | `scripts\restore-drill.bat` | Verify a backup actually restores |
 | `scripts\seed-demo.bat` | **Destructive** demo reseed, fresh installs only |
 | `scripts\verify\` | One-off per-phase verification scripts left over from the finalization work (Python/TS) |
-| `scripts\k6\smoke.js` | k6 smoke test (the `k6.exe` binary is not committed) |
+| `scripts\k6\smoke.js` | k6 smoke test |
+| `scripts\k6\acceptance.js` | k6 100-VU acceptance (SOW 6.4.3) — the `k6.exe` binary is not committed |
 
 ## Development commands
 
@@ -238,7 +239,7 @@ All routes are under `/api`. Full request/response schemas are in Swagger at `/a
 cd backend
 npm run dev          :: watch mode via tsx
 npm run build        :: tsc -> dist/
-npm test             :: vitest (24 files, 159 tests)
+npm test             :: vitest
 npm run lint
 
 :: frontend
@@ -253,7 +254,7 @@ npm run lint
 
 - **Prisma connection-pool exhaustion under concurrent logins (resolved 2026-09-29).** The k6 smoke run showed a subset of ~140 simultaneous logins failing with Prisma `P2028` while the read path stayed healthy; the 100-VU acceptance run reproduced it at higher load (55/200 logins HTTP 500). Fixed by verifying the password outside the login transaction, sizing the Prisma pool (`connection_limit=20&pool_timeout=30000`) against `max_connections=100`, and raising the interactive-transaction ceilings (see ADMIN_GUIDE 14.3). The post-fix 100-VU run passes with 0 P2028. The SOW §4.1 200-user load test remains a **post-go-live** capacity exercise.
 - **The 30-minute idle timeout is client-side only.** It exists and works (`useIdleTimeout`, wired into the app layout, 60-second warning, 3 passing tests), but it only clears local state and redirects to the login page. There is no logout endpoint and no token revocation, so the JWT remains valid server-side for its full 8 hours. Do not rely on it as a session control.
-- **The Settings screen is hardcoded and partly aspirational.** Its 30-minute session timeout happens to match the client hook, but it is not read from any configuration, and other rows it shows (audit retention window, upload limit) are not enforced anywhere in code. Do not treat it as documentation of the running system.
+- **The Settings screen is partly live, partly static.** Only the two number-prefix rows load from `GET /api/system-config` and save through `PUT /api/system-config` (Administrator only), and the backend reads them when generating work order and notification numbers. The other rows shown (session timeout, PM scheduler time, audit retention, upload limit, password policy, language) are hardcoded display markup with no backing configuration, and nothing in the code enforces those values. Do not treat those labels as statements of what the backend enforces.
 - **`npm audit` is not clean.** Production dependencies currently report 9 advisories in `backend` (6 high, 3 moderate) and 4 in `app` (3 high, 1 moderate); no criticals. The high-severity items are transitive: `prisma`/`@prisma/config`, `js-yaml`, `fast-uri`, `deepmerge-ts`, and `brace-expansion` on the backend; `react-router-dom` and `lodash` on the frontend. None is fixed yet. Review them before any public exposure.
 - **Lint is not clean.** `npm run lint` reports a known baseline of errors in both packages (backend ~49, frontend ~32 + 2 warnings). Types and tests pass; the lint debt is tracked and unfixed.
 - **HTTPS/TLS termination is not configured.** The reference deployment assumes a reverse proxy in front of the app; `DATABASE_URL` uses `sslmode=disable` locally. Do not expose the API directly to the internet.
@@ -266,22 +267,22 @@ CMMSproject/
 ├── app/                        # React SPA
 │   └── src/
 │       ├── components/         # layout, dashboard (incl. the R3F canvas)
-│       ├── pages/              # 16 page components
-│       ├── services/           # 22 API service modules
+│       ├── pages/              # 17 page components
+│       ├── services/           # 23 API service modules
 │       ├── store/              # Zustand
 │       ├── types/              # TypeScript types
 │       └── __tests__/          # 6 test files
 ├── backend/                    # Express API
 │   ├── src/
-│   │   ├── routes/             # 24 route files
+│   │   ├── routes/             # 26 route files
 │   │   ├── middleware/         # auth, RBAC, audit, validation
 │   │   ├── services/           # scheduler and domain logic
 │   │   └── utils/              # logger, csv, prisma client
 │   ├── prisma/
-│   │   ├── schema.prisma       # 35 models
-│   │   ├── migrations/         # 5 migrations
+│   │   ├── schema.prisma       # 38 models
+│   │   ├── migrations/         # 14 migrations
 │   │   └── seed.ts             # guarded demo seed
-│   └── tests/                  # 24 test files
+│   └── tests/                  # 65 test files + 3 support = 68 tracked
 ├── scripts/                    # Windows batch scripts, k6, verify scripts
 ├── CMMS_FINALIZATION_TRACKER.md
 ├── INSTALLATION_GUIDE.md

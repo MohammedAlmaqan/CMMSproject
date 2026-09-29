@@ -42,7 +42,7 @@ Related documents:
 
 **Screenshots** point at images in the `screenshots/` folder of this repository. They are captured from development builds and may differ slightly in wording from your deployment, but the layout, tabs, and buttons are the same.
 
-**Where permissions are enforced.** The menus in this application are not filtered by role: every signed-in user sees all ten navigation items and can open every page. A small number of buttons are hidden based on your role, but most permissions are enforced by the server, not by the screen. If you perform an action your role is not allowed to perform, the server rejects it and you see an error rather than a successful change. This is the normal, expected behaviour, not a fault. It also means a screen that looks editable may still refuse your action.
+**Where permissions are enforced.** The menus in this application are not filtered by role: every signed-in user sees all eleven navigation items and can open every page. A small number of buttons are hidden based on your role, but most permissions are enforced by the server, not by the screen. If you perform an action your role is not allowed to perform, the server rejects it and you see an error rather than a successful change. This is the normal, expected behaviour, not a fault. It also means a screen that looks editable may still refuse your action.
 
 ---
 
@@ -82,20 +82,21 @@ This timeout runs in your browser only. It reduces the risk of an unattended lef
 
 ### 3.1 Navigation
 
-The left sidebar shows all ten sections to every signed-in user:
+The left sidebar shows all eleven sections to every signed-in user:
 
 | Section | What it is for |
 |---|---|
 | Dashboard | Plant-wide KPIs, system alerts, and work order status summary |
 | Work Orders | List, create, and execute work orders |
-| Notifications | Equipment problem reports, and conversion to a work order |
-| Equipment | Equipment register and per-equipment detail, including meters and BOM |
-| Locations | Functional location register |
-| Materials | Material register |
-| Work Centers | Work center register and craft capabilities |
 | Preventive Maintenance | Time, meter, and combined PM plans with due dates |
+| Notifications | Equipment problem reports, and conversion to a work order |
+| Locations | Functional location register |
+| Equipment | Equipment register and per-equipment detail, including meters and BOM |
+| Work Centers | Work center register and craft capabilities |
+| Task Lists | PM task list templates with operations |
+| Materials | Material register |
 | Reports | The seven standard reports, each with CSV export |
-| Administration | Users and roles, audit log, and settings summary |
+| Administration | Users and roles, audit log, and settings |
 
 ### 3.2 Command palette
 
@@ -182,7 +183,7 @@ Until a create screen exists, ask an administrator or your supervisor to raise t
 ### 5.4 Follow up the status of notifications
 
 1. Select **Notifications**.
-2. Filter by **Status** to narrow to `New`, `Acknowledged`, `Converted`, or `Closed`, or use the search box.
+2. Filter by **Status** to narrow to `Open`, `In Process`, `Completed`, or `Converted`, or use the search box.
 3. Select a row to open it. The detail screen shows the reporter, the equipment or location, and the full history.
 
 **Important:** the Notifications list is **not** limited to notifications you raised - every signed-in user sees all of them. To find your own reports, sort or search and then check the **Reported By** name on the detail screen. `[screenshot pending]`
@@ -332,9 +333,9 @@ Use this to test a plan or to bring forward work that the nightly run has not pr
 
 Ask an administrator to apply the change, and supply the plan code, description, equipment, strategy, interval, call horizon, and work center. See the [API Reference](API_REFERENCE.md#maintenance-plans).
 
-### 8.4 Edit a PM task list - `API only`
+### 8.4 Edit a PM task list
 
-**There is no screen for task lists at all.** There is no Task Lists item in the sidebar and no task list route in the application. A plan's task list column shows the task list name once one is attached, but it cannot be created or edited on screen. Changes are made through the `/api/task-lists` endpoints.
+**There is a Task Lists screen** (`/task-lists`, in the sidebar). Use it to create, edit, and delete task lists and their operations. The route behind it is `/api/task-lists`.
 
 ### 8.5 Run the scheduler manually - `API only`
 
@@ -358,7 +359,7 @@ Select **Administration**. The screen has three tabs:
 
 - **Users & Roles** - a read-only list of every user with username, full name, email, role, active flag, and last sign-in. There is no create, edit, or delete button on this screen.
 - **Audit Log** - every recorded change, filterable by table, action, and free text, and paginated. Only Administrators can read it; any other role selecting this tab receives an error.
-- **Settings** - a read-only summary of the current configuration values.
+- **Settings** - shows configuration. The two number-prefix rows (`wo_number_prefix`, `notif_number_prefix`) load from `GET /api/system-config` and are editable by an Administrator (saved via `PUT /api/system-config`); the remaining rows are a read-only display of static values.
 
 ### 9.2 Create a user - `API only`, and the API does not support it either
 
@@ -399,7 +400,7 @@ The audit log is append-only through the application: there is no API to edit or
 
 A View-Only user is a reader.
 
-- You see all ten navigation sections and can open every screen: Dashboard, all registers, all work orders and their detail tabs, notifications, the PM plan register, and all seven reports with CSV export.
+- You see all eleven navigation sections and can open every screen: Dashboard, all registers, all work orders and their detail tabs, notifications, the PM plan register, and all seven reports with CSV export.
 - **Every write is refused by the server.** Opening a form, selecting a tab, or seeing an upload or create control does not mean the action will succeed; the save will be rejected. This is expected, not a fault.
 - Only Administrators can read the audit log, so the **Audit Log** tab will return an error for you.
 - Do not use a View-Only account to test changes, even on a development system: nothing you attempt will take effect, which can waste troubleshooting time.
@@ -438,13 +439,13 @@ All seven are on the **Reports** screen, all are available to every signed-in ro
 
 | Report | What it answers |
 |---|---|
-| Work Order Backlog | What is outstanding, by status, priority, and age? |
-| Work Order Cost Analysis | What does each work order, equipment item, or period actually cost in labor, materials, and services? |
+| WO Backlog | What is outstanding, by status, priority, and age? |
 | PM Compliance | Are preventive maintenance plans being generated and completed on time? |
+| MTBF | Mean time between failures per equipment item |
+| MTTR | Mean time to repair per equipment item |
+| Cost Summary | Planned vs actual cost, per cost center |
+| Downtime | How long has each asset been down, and what drove it? |
 | Material Usage | Which materials are being consumed, and on which work orders? |
-| Labor Hours | Who worked how many hours, by craft, equipment, or period? |
-| Equipment Downtime | How long has each asset been down, and what drove it? |
-| Notification / Failure Analysis | What is failing, how often, and what is the failure pattern? |
 
 ![Reports screen](../screenshots/g5_01_reports_backlog.png)
 
@@ -475,14 +476,13 @@ These operations exist in the system but have no screen. This section exists so 
 |---|---|---|
 | Raise a notification | No | `POST /api/notifications` - Requester and above |
 | Create / edit / delete a PM plan | No | `/api/maintenance-plans` endpoints - Maintenance Planner and above |
-| Create or edit a PM task list | No | `/api/maintenance-plans/task-lists` endpoints |
 | Run the PM scheduler manually | No | `POST /api/maintenance-plans/run-scheduler` - Administrator |
 | Create a user | No | **No API exists.** Insert into the database - see the [Administrator Guide](ADMIN_GUIDE.md#61-create-a-user) |
 | Reset a user's password | No | `PUT /api/users/{userId}/password` - Administrator |
 | Disable a user | No | `PUT /api/users/{userId}` with `isActive: false` |
 | Delete a user | No | **No API exists.** Soft delete by database update - see the [Administrator Guide](ADMIN_GUIDE.md#67-delete-or-decommission-a-user) |
 | Clear a lockout early | No | **No API exists.** Database update - see the [Administrator Guide](ADMIN_GUIDE.md#64-clear-an-account-lockout) |
-| Edit system settings | No | Read-only screen; settings come from environment variables - see the [Administrator Guide](ADMIN_GUIDE.md#3-configuration) |
+| Edit a number-prefix setting | Yes (Administrator) | `PUT /api/system-config`; other settings come from environment variables - see the [Administrator Guide](ADMIN_GUIDE.md#3-configuration) |
 
 If a task you need is on this list and there is no screen for it, raise it with your administrator. It is a known gap, not user error.
 

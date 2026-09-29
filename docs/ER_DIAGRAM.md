@@ -2,7 +2,7 @@
 
 **Source of truth:** [`backend/prisma/schema.prisma`](../backend/prisma/schema.prisma)
 **Database:** PostgreSQL. Datasource `db`, Prisma client generator `prisma-client-js`.
-**Scope:** all 35 models, verified against the schema on 2026-09-25.
+**Scope:** all 38 models, verified against the schema on 2026-09-25; re-verified against 38 models on 2026-09-29 (additions: `TaskListMaterial`, `MaintenancePlanTarget`, `WorkOrderSnapshot`).
 
 ## How to read this
 
@@ -144,6 +144,13 @@ erDiagram
         int numberOfTechnicians
     }
 
+    TASK_LIST_MATERIAL {
+        string taskListMaterialId PK
+        string taskOperationId FK
+        string materialId FK
+        float quantity
+    }
+
     %% ============================================================
     %% Work management
     %% ============================================================
@@ -175,6 +182,16 @@ erDiagram
         string equipmentId FK
         string workCenterId FK
         string supervisorUserId FK
+        string reportedByUserId FK
+    }
+
+    WORK_ORDER_SNAPSHOT {
+        string snapshotId PK
+        string workOrderId FK
+        string status
+        json snapshot
+        string takenByUserId FK
+        datetime takenAt
     }
 
     WORK_ORDER_NOTIF_LINK {
@@ -286,6 +303,13 @@ erDiagram
         float meterInterval
     }
 
+    MAINTENANCE_PLAN_TARGET {
+        string planTargetId PK
+        string planId FK
+        string equipmentId FK
+        string functionalLocationId FK
+    }
+
     %% ============================================================
     %% System and supporting tables
     %% ============================================================
@@ -390,11 +414,14 @@ erDiagram
     CRAFT ||--o{ TASK_LIST_OPERATION : "requires"
     CRAFT ||--o{ WORK_ORDER_OPERATION : "requires"
     TASK_LIST ||--o{ TASK_LIST_OPERATION : "comprises"
+    TASK_LIST_OPERATION ||--o{ TASK_LIST_MATERIAL : "consumes"
+    MATERIAL ||--o{ TASK_LIST_MATERIAL : "sourced by"
     FAILURE_CODE o|--o{ FAILURE_CODE : "parent of"
     MATERIAL ||--o{ WORK_ORDER_MATERIAL : "consumed on"
 
     %% Work management
     USER ||--o{ WORK_ORDER : "supervises"
+    USER ||--o{ WORK_ORDER : "reports"
     USER ||--o{ NOTIFICATION : "reports"
     USER ||--o{ LABOR_ENTRY : "books"
     USER ||--o{ WORK_ORDER_CHECKLIST : "signs"
@@ -407,8 +434,10 @@ erDiagram
     WORK_ORDER ||--o{ COST_SPLIT : "charged to"
     WORK_ORDER ||--o{ WORK_ORDER_CHECKLIST : "gates"
     WORK_ORDER ||--o{ WORK_ORDER_NOTIF_LINK : "raised from"
+    WORK_ORDER ||--o{ WORK_ORDER_SNAPSHOT : "captures"
     NOTIFICATION ||--o{ WORK_ORDER_NOTIF_LINK : "converted to"
     WORK_ORDER_OPERATION ||--o{ LABOR_ENTRY : "charged by"
+    USER ||--o{ WORK_ORDER_SNAPSHOT : "takes"
 
     %% Safety
     SAFETY_CHECKLIST_TEMPLATE ||--o{ CHECKLIST_ITEM : "defines"
@@ -419,6 +448,9 @@ erDiagram
     %% Preventive maintenance
     MAINTENANCE_PLAN ||--o{ MAINTENANCE_PLAN_METER : "meter trigger"
     EQUIPMENT_METER ||--o{ MAINTENANCE_PLAN_METER : "triggers"
+    MAINTENANCE_PLAN ||--o{ MAINTENANCE_PLAN_TARGET : "targets"
+    EQUIPMENT o|--o{ MAINTENANCE_PLAN_TARGET : "targets"
+    FUNCTIONAL_LOCATION o|--o{ MAINTENANCE_PLAN_TARGET : "targets"
 ```
 
 ## Notes and caveats
@@ -434,7 +466,10 @@ promising more than the schema delivers.
 
 2. **`MAINTENANCE_PLAN.functionalLocationId` is not a foreign key.** The column exists
    (nullable) and is listed above without a `FK` marker, because the schema declares no
-   `@relation` for it. It is currently an unenforced reference.
+   `@relation` for it — it is a compatibility mirror of the first target. The
+   target-based form is `MAINTENANCE_PLAN_TARGET.functionalLocationId`, which **is** a
+   real `@relation`. The mirror column is currently an unenforced reference; the join
+   table is the enforced one.
 
 3. **`Attachment` and `Comment` are polymorphic, not relational to their target.**
    `entityType` + `entityId` pair with the target table at the application layer. There is
@@ -478,5 +513,5 @@ Select-String -Path backend\prisma\schema.prisma -Pattern '^model (\w+)' |
   ForEach-Object { $_.Matches[0].Groups[1].Value }
 ```
 
-Both must report 35. Note that Mermaid cannot be validated by `tsc`; if a renderer is
+Both must report 38. Note that Mermaid cannot be validated by `tsc`; if a renderer is
 available, render the block once after a schema change to confirm it parses.

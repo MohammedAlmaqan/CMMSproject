@@ -276,13 +276,18 @@ def main():
     total = len(s3)
     emit(f"  section 3 rows        : {total}   expected 126   "
          f"{'OK' if total == 126 else 'MISMATCH'}")
-    emit(f"  build set             : {build}   expected 67   "
-         f"{'OK' if build == 67 else 'MISMATCH'}")
+    emit(f"  build set             : {build}   expected 31   "
+         f"{'OK' if build == 31 else 'MISMATCH'}")
     emit(f"  waived                : {cnt['Waived']}   expected 10   "
          f"{'OK' if cnt['Waived'] == 10 else 'MISMATCH'}")
     check("section 3 still totals 126", total == 126)
-    check("build set still 67 (Phase B code does not move the matrix yet)",
-          build == 67)
+    # Phase A froze the build set at 67; phases C-H have since promoted 36
+    # rows to Met/closed, so the live build set is 31 (verify_a1 recomputes
+    # the same number under EXPECT_S3_BUILD = 67 as its freeze baseline). The
+    # matrix is the authority; this is a Phase B-era static expectation update,
+    # not a code behaviour change.
+    check("build set still 31 (Phase A froze 67; C-H promoted 36)",
+          build == 31)
     check("waived still 10", cnt["Waived"] == 10)
     recon = cnt["Met"] + build + cnt["Waived"] + cnt["Deferred"] + cnt["Excluded"]
     emit(f"  reconciliation        : {cnt['Met']} Met + {build} build + "

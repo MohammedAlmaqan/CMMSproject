@@ -2,8 +2,8 @@
 
 **Source of truth:** [`backend/prisma/schema.prisma`](../backend/prisma/schema.prisma)
 **Database:** PostgreSQL
-**Scope:** all 35 models, grouped into 7 domains, one row per model. Verified against the
-schema on 2026-09-25.
+**Scope:** all 38 models, grouped into 7 domains, one row per model. Verified against the
+schema on 2026-09-25; re-verified against 38 models on 2026-09-29 (additions: `TaskListMaterial`, `MaintenancePlanTarget`, `WorkOrderSnapshot`).
 **Companion:** [`ER_DIAGRAM.md`](./ER_DIAGRAM.md)
 
 ## Conventions
@@ -69,7 +69,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | Table | Purpose | Key fields | Foreign keys | Delete |
 | --- | --- | --- | --- | --- |
 | `Notification` | Breakdown/maintenance request raised against an asset. | `notificationId` PK; `notificationNumber` (partial unique); `type` M1/M2/M3; `priority` High/Medium/Low; `description`; `breakdownFlag` (default false); `status` Open/In Process/Completed/Converted, default Open | `functionalLocationId` → `FunctionalLocation`, required; `equipmentId` → `Equipment`, nullable; `reportedByUserId` → `User`, required | Soft |
-| `WorkOrder` | The central maintenance order. | `workOrderId` PK; `woNumber` (partial unique); `type` CM/PM/PdM/EM/CAL; `priority`; `status` default Draft across Draft, Planned, Scheduled, In Progress, Suspended, Completed, Closed, Cancelled; `description`; `costCenterCode` (default `""`); `internalOrder` (default `""`); `breakdownFlag`; `safetyCriticalFlag`; `plannedStart?`/`plannedFinish?`; `actualStart?`/`actualFinish?`; `plannedCost Decimal(12,2)`; `actualCost Decimal(12,2)`; `sourcePlanId?`; `sourcePlanCycle?` | `functionalLocationId` and `workCenterId` required; `equipmentId` nullable; `supervisorUserId` → `User`, required | Soft |
+| `WorkOrder` | The central maintenance order. | `workOrderId` PK; `woNumber` (partial unique); `type` CM/PM/PdM/EM/CAL; `priority`; `status` default Draft across Draft, Planned, Scheduled, In Progress, Suspended, Completed, Closed, Cancelled; `description`; `costCenterCode` (default `""`); `internalOrder` (default `""`); `breakdownFlag`; `safetyCriticalFlag`; `plannedStart?`/`plannedFinish?`; `actualStart?`/`actualFinish?`; `plannedCost Decimal(12,2)`; `actualCost Decimal(12,2)`; `sourcePlanId?`; `sourcePlanCycle?` | `functionalLocationId` and `workCenterId` required; `equipmentId` nullable; `supervisorUserId` → `User`, required; `reportedByUserId` → `User` (`@relation("ReportedBy")`), required (added `20260927120000_work_order_reported_by`) | Soft |
 | `WorkOrderNotifLink` | Many-to-many join: notification converted into a work order. | composite PK `(workOrderId, notificationId)` | both required → `WorkOrder`, `Notification` | Soft |
 | `WorkOrderOperation` | Ordered execution step on a work order. | `operationId` PK; `sequenceNumber Int`; `description`; `plannedHours Float`; `numberOfTechnicians Int` (default 1); `actualHours Float` (default 0); `status` Pending/In Progress/Completed, default Pending | `workOrderId` → `WorkOrder`; `craftId` → `Craft`, both required | Soft |
 | `WorkOrderMaterial` | Part consumed on a work order. | `woMaterialId` PK; `plannedQuantity Float`; `actualQuantity Float` (default 0); `unitCost Decimal(12,2)` (default 0); `reservationQuantity Float` (default 0) | `workOrderId` → `WorkOrder`; `materialId` → `Material`, both required | Soft |
@@ -84,7 +84,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | `SafetyChecklistTemplate` | Reusable safety checklist definition. | `checklistTemplateId` PK; `name`; `description`; `isMandatory` (default false) | none | Soft |
 | `ChecklistItem` | A question/step within a template. | `itemId` PK; `sequenceNumber Int`; `description` | `checklistTemplateId` → `SafetyChecklistTemplate`, required | Soft |
 | `WorkOrderChecklist` | A template instantiated onto a work order. | `woChecklistId` PK; `status` Pending/In Progress/Completed, default Pending; `signedBy?`; `signedDate?` | `workOrderId` → `WorkOrder`; `checklistTemplateId` → `SafetyChecklistTemplate`, both required; `signedBy` → `User`, **nullable** | Soft |
-| `WorkOrderChecklistItem` | Recorded response to one checklist item. | `woChecklistItemId` PK; `response` Yes/No/NA; `comment?` | `woChecklistId` → `WorkOrderChecklist`; `itemId` → `ChecklistItem`, both required | Soft |
+| `WorkOrderChecklistItem` | Recorded response to one checklist item. | `woChecklistItemId` PK; `response` Yes/No/NA, or null when unanswered (`String?`); `comment?` | `woChecklistId` → `WorkOrderChecklist`; `itemId` → `ChecklistItem`, both required | Soft |
 
 ## Preventive Maintenance
 

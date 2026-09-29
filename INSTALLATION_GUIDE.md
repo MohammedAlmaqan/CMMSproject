@@ -72,7 +72,7 @@ npm install
 npx prisma generate
 npx prisma migrate deploy
 npx tsc
-scripts\seed-demo.bat
+..\scripts\seed-demo.bat
 
 REM Frontend
 cd CMMSproject\app
@@ -431,7 +431,7 @@ Remove-Item "scripts\k6\k6-v2.3.0-windows-amd64" -Recurse -Force
 scripts\k6\k6.exe version
 ```
 
-`k6.exe` is about 67 MB and is deliberately listed in `.gitignore`; only `scripts\k6\smoke.js` is version-controlled.
+`k6.exe` is about 67 MB and is deliberately listed in `.gitignore`; `scripts\k6\smoke.js` and `scripts\k6\acceptance.js` are the version-controlled scripts.
 
 ### K6_MODE login rate-limit override
 
