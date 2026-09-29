@@ -323,10 +323,11 @@ multiplier in `backend/src/utils/costs.ts:19` is removed and
 lands with row 49 in Phase E.
 
 **D-4 - backup RPO - confirmed `Build`, proof pending.** The WAL archiving config
-and the backup/restore scripts get written. The restore rehearsal **cannot be
-run** without a live PostgreSQL host and a second backup target, so it is recorded
-as a **pending rehearsal** in §7 - a pending verification, explicitly **not** a
-scope reduction and not a waiver.
+and the backup/restore scripts get written. The restore rehearsal needs a live
+PostgreSQL host (**held** since Phase G on this host) and a second backup target;
+the second target alone remains a **pending verification**, so the RPO proof is
+recorded as pending — explicitly **not** a scope reduction and not a waiver. The
+daily `pg_dump` mechanism already works and is rehearsable now.
 
 **D-5 / row 76 - OAuth2 - waive confirmed, does not reopen.** Internal use only;
 no Azure AD and no on-premises AD. The 5.5 deviation stands as documented in
@@ -356,16 +357,19 @@ waived + 4 Deferred + 7 Excluded = 126.
 
 ---
 
-## 7. Dependencies the vendor does not hold
+## 7. Dependencies not held (corrected for Phase G, 2026-09-29)
 
-Recorded so that no phase is planned around access that does not exist.
+Recorded so that no phase is planned around access that does not exist. Most
+engineering dependencies are now **held on this host**; the environment-dependent
+rehearsals and the client-side gates below remain the only ones that still are
+not.
 
 | Dependency | Needed by | Status |
 |---|---|---|
 | Client signature on §6 | Gate A | Not held |
-| Windows Server with IIS + ARR | §4.2 TLS rehearsal, Phase G | Not held |
-| Live PostgreSQL target + `PGPASSWORD` | First real backup/restore drill, Phase G | Not held — `backup.bat` hardcodes the connection and has never run against a live instance |
-| `k6.exe` | §6.4.3 100-VU and §4.1 200-VU runs | Not held — gitignored, deliberately not in the repository |
+| Windows Server with IIS + ARR | §4.2 TLS rehearsal, Phase G | **Held on this host** (`W3SVC` running, ARR 3.0 + URL Rewrite 2.1 installed, `http://localhost` → 200) — rehearsal requires an elevated shell to configure the site binding, certificate and rules |
+| Live PostgreSQL target + `PGPASSWORD` | First real backup/restore drill, Phase G | **Held on this host** (PostgreSQL 18 at `localhost:5432`, `PGPASSWORD` set, `backup.bat`/`restore-drill.bat` with the PG-18 fallback path). The second backup target for the WAL/RPO proof remains **pending verification**, not a scope reduction |
+| `k6.exe` | §6.4.3 100-VU and §4.1 200-VU runs | **Held on this host** (`scripts\k6\k6.exe` v2.3.0). The 100-VU run can proceed; the 200-VU run stays **deferred** by the recorded P2028 decision |
 | Azure AD tenant + app registration | D-5(a), OAuth2/OIDC | Not held |
 | Client legacy data (Excel/paper) | §5.7 importers, §6.4.5 migration accuracy | Not held |
 | Dry-run migration window | §6.4.5 | Not scheduled |
