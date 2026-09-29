@@ -16,7 +16,7 @@
 | Software | Version | Required For |
 |----------|---------|--------------|
 | Windows Server | 2019 / 2022 | Hosting |
-| Node.js | 20 LTS | Backend + Frontend |
+| Node.js | 24 LTS | Backend + Frontend |
 | npm | 9+ | Package management |
 | PostgreSQL | 15+ | Database |
 | IIS (optional) | 10+ | Reverse proxy for production |
@@ -28,7 +28,7 @@
 
 ### Step 1: Install Node.js
 
-1. Download Node.js 20 LTS from https://nodejs.org/
+1. Download Node.js 24 LTS from https://nodejs.org/
 2. Run installer with default options
 3. Verify installation:
 ```cmd

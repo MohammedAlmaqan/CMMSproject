@@ -54,7 +54,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 
 ## Endpoint groups
 
-129 operations across 78 paths and 26 routers.
+129 operations across 80 paths and 26 routers. Counted live from a running server's `/api-docs.json` on 2026-09-29; the stale `docs/openapi.json` snapshot shows 114 across 71 paths.
 
 | Group | Base path | Operations |
 | --- | --- | --- |
