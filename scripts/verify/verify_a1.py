@@ -132,6 +132,7 @@ APPROVED_PROMOTIONS: list = [
     (49, "Partial", "Met", "722e1a3"),   # 3.5.1 planned cost
     (55, "Not Met", "Met", "be2b092"),   # 3.6 work order history
     (56, "Partial", "Met", "be2b092"),   # 3.6 equipment maintenance history
+    (58, "Not Met", "Met", "17c95fb"),   # 3.7.1 report filtering (Phase R / R.2)
 ]
 
 # One more row has moved since the freeze and it is NOT a section 3 clause, so
