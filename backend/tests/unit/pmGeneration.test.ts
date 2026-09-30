@@ -57,20 +57,39 @@ function plan(over: PlanOverrides = {}) {
   };
 }
 
-function stubDb(opts: { plan?: ReturnType<typeof plan>; existing?: { workOrderId: string; woNumber: string } | null; withTransaction?: boolean } = {}) {
+function stubDb(opts: { plan?: ReturnType<typeof plan>; existing?: { workOrderId: string; woNumber: string } | null; withTransaction?: boolean; craftRate?: number } = {}) {
   const created: Record<string, unknown>[] = [];
+  // The cost derivation needs to read back what this transaction just wrote, so
+  // the stub holds the created operations and hands them to findMany. That is
+  // the whole point of computing the cost inside the transaction: a global
+  // client would not see them.
+  const createdOps: Record<string, unknown>[] = [];
   const client = {
     maintenancePlan: {
       findFirst: vi.fn(async () => (opts.plan === null ? null : (opts.plan ?? plan()))),
     },
     workOrder: {
       findFirst: vi.fn(async () => opts.existing ?? null),
+      findUnique: vi.fn(async () => ({ plannedCost: 0, actualCost: 0 })),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         created.push(data);
         return { workOrderId: 'WO1', ...data };
       }),
+      update: vi.fn(async () => ({})),
     },
-    workOrderOperation: { create: vi.fn(async () => ({})) },
+    workOrderOperation: {
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        createdOps.push(data);
+        return { operationId: 'OP1', ...data };
+      }),
+      findMany: vi.fn(async () =>
+        createdOps.map((op) => ({ ...op, isDeleted: false, craft: { hourlyRate: opts.craftRate ?? 45 } })),
+      ),
+    },
+    workOrderMaterial: { findMany: vi.fn(async () => []) },
+    externalServiceCost: { findMany: vi.fn(async () => []) },
+    laborEntry: { findMany: vi.fn(async () => []) },
+    auditLogEntry: { create: vi.fn(async () => ({})) },
     notification: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ notificationId: 'N1', ...data })) },
     workOrderNotifLink: { create: vi.fn(async () => ({})) },
     equipment: { findUnique: vi.fn(async () => null) },
@@ -120,6 +139,78 @@ describe('transaction boundary', () => {
     const r = await generatePmWorkOrder(db, input);
     expect(r.created).toBe(true);
     expect(client.workOrder.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('derived cost on the generated work order', () => {
+  it('stores the cost derived from the operations it just created', async () => {
+    // The live defect: a generated work order carried $0.00 while its two
+    // operations were worth $90.00, because nothing recomputed after creation.
+    const { db, client } = stubDb();
+    await generatePmWorkOrder(db, input);
+    expect(client.workOrder.update).toHaveBeenCalledTimes(1);
+    expect(client.workOrder.update.mock.calls[0][0]).toMatchObject({
+      where: { workOrderId: 'WO1' },
+      data: { plannedCost: 45, actualCost: 0 },
+    });
+  });
+
+  it('derives the figure from the operation rows in the same transaction', async () => {
+    // If the read went through the global client it would not see the
+    // uncommitted operations and would store zero. The stub only returns the
+    // created rows to findMany, so a non-zero result proves the read ran here.
+    const { db, client } = stubDb({ craftRate: 30 });
+    await generatePmWorkOrder(db, input);
+    expect(client.workOrder.update.mock.calls[0][0].data.plannedCost).toBe(30);
+    expect(client.workOrderOperation.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('scales with the number of technicians-free hours and the craft rate', async () => {
+    const { db, client } = stubDb({ plan: plan({ taskList: { operations: [
+      { sequenceNumber: 10, description: 'a', craftId: 'C1', plannedHours: 1.5, numberOfTechnicians: 1 },
+      { sequenceNumber: 20, description: 'b', craftId: 'C1', plannedHours: 0.5, numberOfTechnicians: 1 },
+    ] } }) });
+    await generatePmWorkOrder(db, input);
+    expect(client.workOrder.update.mock.calls[0][0].data.plannedCost).toBe(90);
+  });
+
+  it('attributes the cost change to the supervisor, not the scheduler label', async () => {
+    // AuditLogEntry.userId is a foreign key to User. The scheduler passes the
+    // literal 'scheduler', which is a label on a plain string column and would
+    // not satisfy it. The supervisor is already an FK on this same work order,
+    // so it is proven to be a real user.
+    const { db, client } = stubDb({ plan: plan({ createdBy: 'U-SUPERVISOR' }) });
+    await generatePmWorkOrder(db, input);
+    expect(client.auditLogEntry.create).toHaveBeenCalled();
+    for (const call of client.auditLogEntry.create.mock.calls) {
+      expect(call[0].data.userId).toBe('U-SUPERVISOR');
+    }
+  });
+
+  it('records one audit row per figure that actually moved', async () => {
+    const { db, client } = stubDb();
+    await generatePmWorkOrder(db, input);
+    const fields = client.auditLogEntry.create.mock.calls.map((c) => (c[0].data as { fieldName: string }).fieldName);
+    expect(fields).toEqual(['plannedCost']);
+  });
+
+  it('does not recompute when the plan contributes no operations', async () => {
+    const { db, client } = stubDb({ plan: plan({ taskList: { operations: [] } }) });
+    await generatePmWorkOrder(db, input);
+    expect(client.workOrder.update).not.toHaveBeenCalled();
+  });
+
+  it('recomputes on the transaction it was handed, not the root client', async () => {
+    const { db, client } = stubDb();
+    await generatePmWorkOrder(db, input);
+    // Every cost read and write goes through the same stub, which is the
+    // transaction client in this test. A stray root-client call would be
+    // invisible to these assertions, so the call count carries the proof.
+    expect(client.workOrder.findUnique).toHaveBeenCalledTimes(1);
+    expect(client.workOrderOperation.findMany).toHaveBeenCalledTimes(1);
+    expect(client.workOrderMaterial.findMany).toHaveBeenCalledTimes(1);
+    expect(client.externalServiceCost.findMany).toHaveBeenCalledTimes(1);
+    expect(client.laborEntry.findMany).toHaveBeenCalledTimes(1);
   });
 });
 

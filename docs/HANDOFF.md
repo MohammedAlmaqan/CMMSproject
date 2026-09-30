@@ -56,6 +56,10 @@ Work orders are soft-deleted and **children are retained** under the parent row,
 1. **P2028 Prisma pool exhaustion — ✅ resolved (2026-09-29).** 15 of ~140 concurrent logins returned HTTP 500 under the 6.5 k6 run; the 100-VU acceptance run reproduced it (55/200). Fixed in G.6 (bcrypt outside the login transaction, `connection_limit=20&pool_timeout=30000`, `max_connections=100`, interactive-transaction `timeout`/`maxWait` 30 s; see ADMIN_GUIDE 14.3). Post-fix 100-VU run: 0 P2028, 0×500, 0×429. The SOW §4.1 200-user capacity test remains a separate **post-go-live** exercise.
 2. **IIS `curl` verification untested** — the 6.3/Item-4 IIS reverse-proxy steps (ARR `X-Forwarded-For` overwrite, `BIND_HOST=127.0.0.1`, firewall rule) are documented but have **never been executed against a real IIS deployment**. Needs a live Windows server with ARR installed.
 
+### The live database is not a clean oracle
+
+`WorkOrder.plannedCost` / `actualCost` are denormalised caches, and the live rows in them are **not all trustworthy**: as of 2026-09-30, 2 of 4 work orders had `plannedCost = 0` against real operation rows, and **only one of those is a production defect** (`WO-000097`, `createdBy = 'scheduler'`, $90.00). The other (`WO-T1790267575210`, $45.00) is **residue left by a route test** that writes operations straight to Prisma instead of through the API, so it bypassed the recompute that keeps the cache honest. **A future session must not treat a row-count differential as a production finding without checking provenance** — a PM work order has `createdBy = 'scheduler'` and a `sourcePlanId`; one without them was not made by the scheduler. Seven test files are the cause and R.9 D removes it, but until that lands, a discrepancy count from the live DB mixes defects with test debris and cannot tell you which is which. `verify_b1.py` still prints the raw count on purpose, so the number stays visible and gets explained rather than quietly filtered.
+
 ### Housekeeping
 
 - `*.tsbuildinfo` is now gitignored (`69af740`), so `tsc -b` no longer dirties the worktree.

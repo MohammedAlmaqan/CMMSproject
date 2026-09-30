@@ -2,6 +2,7 @@ import { prisma } from './prisma.js';
 import { computeWorkOrderCosts, roundMoney } from './costRules.js';
 import type { WorkOrderCostInput } from './costRules.js';
 import { logAuditFieldChange } from '../middleware/audit.js';
+import type { Prisma, PrismaClient } from '@prisma/client';
 
 /** Who caused a recompute. Required, so a cost change can never land in the
  *  database without someone attached to it. */
@@ -10,23 +11,60 @@ export interface CostActor {
   ipAddress: string | undefined;
 }
 
-export async function recomputeWorkOrderCosts(workOrderId: string, actor: CostActor) {
+/** The part of a Prisma client a recompute touches, including the audit table so
+ *  the same value can be handed to `logAuditFieldChange`. Both a `PrismaClient`
+ *  and a `Prisma.TransactionClient` satisfy it, which is what lets one helper
+ *  serve request-scoped and in-transaction callers alike. */
+type CostDb = Pick<
+  PrismaClient,
+  'workOrder' | 'workOrderOperation' | 'workOrderMaterial' | 'externalServiceCost' | 'laborEntry' | 'auditLogEntry'
+>;
+
+/**
+ * Recompute a work order's stored planned and actual cost from its base
+ * relations.
+ *
+ * `client` is optional and defaults to the global client, so the fourteen
+ * existing call sites are unchanged. Pass a transaction client to make the
+ * recompute part of the caller's transaction: the reads must then run on the
+ * same client, because a global client cannot see rows the open transaction has
+ * written but not yet committed, and would compute zero for work whose
+ * operations were created a moment earlier in the same transaction.
+ *
+ * The cost columns and their audit rows are written on the same client for the
+ * same reason: an audit row that outlived a rolled-back cost change, or a cost
+ * change that committed without its audit row, would each be a silent lie in
+ * the trail. Passing a transaction client therefore makes a *successful* audit
+ * write atomic with the cost it describes.
+ *
+ * It does not make a *failed* audit write fatal. `logAuditFieldChange` catches
+ * and logs its own errors (see `middleware/audit.ts`), by long-standing policy:
+ * a missing audit row must not fail the request that caused it. So the
+ * guarantee a transaction buys here is on the cost - derived figure and stored
+ * figure commit together, or neither does - not on the audit row. Making audit
+ * failures fatal is a separate policy question this module does not decide.
+ */
+export async function recomputeWorkOrderCosts(
+  workOrderId: string,
+  actor: CostActor,
+  client: CostDb | Prisma.TransactionClient = prisma,
+) {
   // Read the stored figures first: a recompute that lands on the same numbers
   // is not a change, and writing an audit row for it would pad the trail with
   // events an auditor has to read past to find the real ones.
-  const prior = await prisma.workOrder.findUnique({
+  const prior = await client.workOrder.findUnique({
     where: { workOrderId },
     select: { plannedCost: true, actualCost: true },
   });
 
   const [operations, woMaterials, externalServices, laborEntries] = await Promise.all([
-    prisma.workOrderOperation.findMany({
+    client.workOrderOperation.findMany({
       where: { workOrderId, isDeleted: false },
       include: { craft: true },
     }),
-    prisma.workOrderMaterial.findMany({ where: { workOrderId, isDeleted: false } }),
-    prisma.externalServiceCost.findMany({ where: { workOrderId, isDeleted: false } }),
-    prisma.laborEntry.findMany({
+    client.workOrderMaterial.findMany({ where: { workOrderId, isDeleted: false } }),
+    client.externalServiceCost.findMany({ where: { workOrderId, isDeleted: false } }),
+    client.laborEntry.findMany({
       where: { isDeleted: false, operation: { workOrderId, isDeleted: false } },
       include: { operation: { include: { craft: true } } },
     }),
@@ -48,7 +86,7 @@ export async function recomputeWorkOrderCosts(workOrderId: string, actor: CostAc
   const plannedCost = roundMoney(costs.plannedCost);
   const actualCost = roundMoney(costs.actualCost);
 
-  await prisma.workOrder.update({
+  await client.workOrder.update({
     where: { workOrderId },
     data: { plannedCost, actualCost },
   });
@@ -66,6 +104,7 @@ export async function recomputeWorkOrderCosts(workOrderId: string, actor: CostAc
       newValue: String(plannedCost),
       userId: actor.userId,
       ipAddress: actor.ipAddress,
+      db: client,
     });
   }
   if (prior && Number(prior.actualCost) !== actualCost) {
@@ -78,6 +117,7 @@ export async function recomputeWorkOrderCosts(workOrderId: string, actor: CostAc
       newValue: String(actualCost),
       userId: actor.userId,
       ipAddress: actor.ipAddress,
+      db: client,
     });
   }
 

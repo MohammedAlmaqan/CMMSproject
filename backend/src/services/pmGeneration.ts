@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma.js';
 import { generateWoNumber, generateNotifNumber } from '../utils/sequence.js';
+import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -304,6 +305,37 @@ async function generateOne(
         },
       });
       notificationId = notification.notificationId;
+    }
+
+    // SOW 3.5.1 / row 51: the generated work order's planned cost is derived
+    // from its operations, and the operations were created in this transaction,
+    // so the derivation has to run here on this client. Recomputing after the
+    // commit, as the manual create path does, cannot work from here: a global
+    // client cannot see the uncommitted operation rows and would store zero.
+    //
+    // The actor is the same supervisor the work order is already attributed to.
+    // `supervisorUserId` and `reportedByUserId` are foreign keys to User, so a
+    // value that satisfies them is already proven to be a real user, and it is
+    // the person accountable for the job. The scheduler itself has no user: it
+    // passes the literal 'scheduler', which is a label on a plain string column
+    // and would violate the audit row's foreign key.
+    //
+    // This puts the cost write on the same transaction as the work order and
+    // its operations, so a generated work order can never exist with a cost
+    // that disagrees with its own operations, and a failure to *derive or store*
+    // the cost fails the whole generation rather than leaving a work order
+    // nobody is watching for. That is the right trade at 02:00 with nobody
+    // reading the logs. The audit row rides the same transaction and so is
+    // atomic with the cost, but it is not what makes this safe:
+    // `logAuditFieldChange` swallows its own errors by policy, so a missing
+    // audit row would not roll this back. See `utils/costs.ts`.
+    const operationsCreated = (plan.taskList?.operations ?? []).length;
+    if (operationsCreated > 0) {
+      await recomputeWorkOrderCosts(
+        wo.workOrderId,
+        { userId: raisedByUserId, ipAddress: undefined },
+        tx,
+      );
     }
 
     return {

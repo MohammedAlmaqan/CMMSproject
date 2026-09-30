@@ -1049,16 +1049,17 @@ Row 68 (dashboard realtime/drilldown) is `Waive` in the same phase and is not wo
 - Row 63's budget limb is **waived** under D-13 — actual-vs-planned variance is the deliverable, because the SOW contains no budget source.
 - `backend/src/utils/costRules.ts` already computes per-WO planned and actual cost (`computeWorkOrderCosts`, `:97`, returning `plannedCost`/`actualCost` at `:140-141`). The rollups in rows 51-54 are aggregation over that, not new costing logic. `/cost-summary` (`:371`) today loads every work order and accumulates into a `Map` keyed on `costCenterCode` in application memory. Row 54's period axis is the one that must not re-derive time from a string.
 - **`WorkOrder.plannedCost` and `actualCost` cannot be the rollup's base.** R.1 measured this on the live database: 4 work orders, 178 planned operation-hours, derived planned cost 135.00, and `plannedCost` reads 0 on 2 of the 4 rows — 90.00 and 45.00 of real planned labour sitting in the operations table while the column says zero. Summing the columns would have produced a confidently wrong report that passes every test written against it. The rollup therefore derives from the base tables through `computeWorkOrderCosts`, the same function the work-order detail uses, so a rollup total and a work order's own figures cannot disagree. The stale column is the subject of **R.9**.
+> **R.9 revised this line.** The 90.00 row is a real defect; the 45.00 row is **test residue**, not a second defect. Seven route tests insert operations straight to Prisma, and one of them left `51b43878-...` behind. The honest figure is **1 of 4 rows stale in production**, and the measurement method — counting rows — cannot tell the two apart. R.9 D removes the cause so a future count is trustworthy. See `docs/HANDOFF.md`, environment facts.
 - **Correction to what R.1 first concluded.** R.1's commit message blamed the write path: *"Creating or editing a `WorkOrderOperation` does not trigger it."* That is **wrong**, and R.9's investigation corrects it. `workOrderOperations.ts` recomputes on all three verbs — create `:142`, update `:230`, delete `:303`. The real cause is narrower and worse: of the four paths that create a work order, **the two automated ones never recompute at all**, because they write the work order and its operations directly with Prisma inside a transaction and never call `recomputeWorkOrderCosts`:
 
   | Path | Recomputes? | |
   |---|---|---|
   | `workOrders.ts:355` `POST /api/work-orders` | yes, `:490` | manual path, correct |
   | `workOrders.ts:538` `PUT /api/work-orders/:id` | yes, `:579` | manual path, correct |
-  | `services/pmGeneration.ts:236` — PM scheduler | **no** | creates the WO, then one `workOrderOperation.create` per task-list step at `:265`, never recomputes |
-  | `routes/notifications.ts:594` — notification converted to a work order | **no** | same shape |
+    | `services/pmGeneration.ts:236` — PM scheduler | **no** | creates the WO, then one `workOrderOperation.create` per task-list step at `:265`, never recomputes. **This is the one real defect.** |
+    | `routes/notifications.ts:594` — notification converted to a work order | n/a | **Also corrected by R.9.** This path creates *no operations at all*, so `plannedCost = 0` is correct there rather than a bug. Listed only because R.1 wrongly counted it. |
 
-  So the manual route is sound and **the automation is broken**, which is the opposite of a cache that merely rots. The bulk of a Client's work orders arrives through the PM scheduler, so every generated work order carries $0.00 planned cost no matter what its task list says. `WO-000097` (`createdBy=scheduler`, `sourcePlanId` set) and `WO-T1790267575210` are both live instances.
+    So the manual route is sound, and of the automation **only the PM scheduler is broken**, which is the opposite of a cache that merely rots. The bulk of a Client's work orders arrives through the PM scheduler, so every generated work order carries $0.00 planned cost no matter what its task list says. `WO-000097` (`createdBy=scheduler`, `sourcePlanId` set) is the live instance.
 - `/cost-summary` filters on `costCenterCode: { not: '' }` (`:374`) and **every one of the 4 live work orders has an empty cost centre**, so that endpoint returns zero rows today, not a wrong total. Row 63 is `Partial` for a shape reason and an empty-population reason at once, and both are named rather than discovered by a user.
 - Work orders sit at mixed depths in the live location tree: 3 of the 4 are on `PL-01 > AR-001`, an **area** that itself has three children, and 1 is on the root `PL-01`. A rollup that only walked up from a leaf, or that summed children, would disagree with these figures.
 - Nothing in the live data exercises actual cost: **0 of 178 operations carry `actualHours`, `WorkOrderMaterial` is empty, and only 1 external service cost exists.** The actual-cost half of every rollup axis is therefore correct by construction and **unexercised**. R.7's UAT pack must supply real actual-cost fixtures, and the matrices for rows 51-54 must not claim coverage they do not have.
@@ -1076,7 +1077,8 @@ Row 68 (dashboard realtime/drilldown) is `Waive` in the same phase and is not wo
 | R.6 | SQL view layer for the Client's BI tool, as D-13 committed. Views over the same aggregates, so a view total and a report total cannot drift. | **§5.2 `Not Met` → `Met`** |
 | R.7 | **UAT pack**: independently recompute each report's figures and compare against the API's, per L15. This is the artifact §6.4 row b names. | 6.4 / b |
 | R.8 | Matrix recount from the suites' outcomes, doc delta, green gate and CI on the exact SHA. | — |
-| R.9 | **Cost-cache integrity.** Recompute in the two automated work-order creation paths, backfill the existing rows, and stop `WorkOrderSnapshot` freezing a wrong figure. **Numbered last but sequenced next** — see below. | 3.5.1 evidence, 51-54, 54, 63 |
+| R.9 | **Cost-cache integrity.** Recompute inside the PM-generation transaction, backfill the existing rows, and stop `WorkOrderSnapshot` freezing a wrong figure. **Numbered last but sequenced next** — see below. | 3.5.1 evidence, 51-54, 54, 63 |
+| R.10 | **`Craft.hourlyRate` fan-out.** A rate edit invalidates every work order carrying that craft and nothing recomputes them. Tracked, not started, scheduled before R.8. | 3.5.1 evidence, 63 |
 
 **Why R.9 exists and why it runs before R.3.** R.1 found a live user-facing defect that has nothing to do with reporting, and left it tracked rather than absorbed. It is not a v1.1 item: `WorkOrderDetailPage` renders the cached column directly, so a user opening a scheduler-generated work order today is shown **$0.00** against real planned labour. It also has to land before R.7, because the UAT pack reconciles reports against independently recomputed figures — and after R.4 the reports will be *right* while the detail page is still *wrong*, so the pack would flag a disagreement that is a cache bug rather than a report bug. Reconciling in that state tests the wrong thing. The number is last because R.0's plan was accepted with R.1–R.8 and matrix rows already cite those step IDs; renumbering would invalidate accepted references for no gain.
 
@@ -1084,16 +1086,44 @@ Row 68 (dashboard realtime/drilldown) is `Waive` in the same phase and is not wo
 
 | # | Consumer | What a stale value does | Live impact |
 |---|---|---|---|
-| 1 | `app/src/pages/WorkOrderDetailPage.tsx:924-925` — "Planned Cost" and "Actual Cost" info cards, straight off the API | The work order shows a false cost. `:925` also colours the card red when `actualCost > plannedCost`, so a stale pair drives a **budget-warning signal** as well as a number. | **`WO-000097` shows $0.00 against $90.00. `WO-T1790267575210` shows $0.00 against $45.00.** 2 of 4 live work orders. |
+| 1 | `app/src/pages/WorkOrderDetailPage.tsx:924-925` — "Planned Cost" and "Actual Cost" info cards, straight off the API | The work order shows a false cost. `:925` also colours the card red when `actualCost > plannedCost`, so a stale pair drives a **budget-warning signal** as well as a number. | 2 of 4 live work orders read wrong here — but see below: one is a real defect, one is test residue, so **1 of 4 is wrong in production.** |
 | 2 | `app/src/pages/WorkOrderDetailPage.tsx:1924-1925` — the cost-history table, reading `WorkOrderSnapshot.plannedCost` / `actualCost` | A snapshot freezes whatever the column said at the time. This is the one consumer where the wrong value becomes **permanent and looks authoritative**, because it is presented as a historical record. | Latent: no snapshot yet carries a bad pair, and the fix must not create one. |
 | 3 | `backend/src/routes/equipment.ts:609-610` — equipment detail `cost` and `plannedCost` | Per-asset cost understated; an asset's maintenance history reads as free. | 5 equipment rows exposed. |
 | 4 | `backend/src/routes/dashboard.ts:224-233` — the cost-by-month widget | The dashboard's headline cost trend understates. This is the figure **matrix row 54 currently cites as its evidence**; the citation is to a function that reads the stale column. | Live on every dashboard load. |
 | 5 | `backend/src/routes/reports.ts:388-395` — `/cost-summary` | Understated or empty. | R.4 rebuilds this on the rollup, so it self-heals — and it is the only consumer that does. |
 | 6 | `backend/src/routes/workOrderCostSplits.ts:82-94` — allocates split percentages against `actualCost` | **The sharpest edge.** A percentage allocation applied to a stale or zero base produces splits that are internally consistent and externally wrong: the parts still add up to the wrong total, so the usual "do the splits reconcile?" check passes. | 0 `CostSplit` rows today, so nothing is wrong yet. This is the first thing that breaks the moment a split is created against a generated PM work order. |
 
-**R.9's scope, in full.** (a) Call `recomputeWorkOrderCosts` at the end of the PM-generation transaction and the notification-conversion transaction. (b) A one-shot backfill over every work order whose stored figures disagree with the derived ones, reporting the rows it changed. (c) Decide what `WorkOrderSnapshot` records — it must snapshot the derived figure, not the cache, or it launders the defect into the audit trail. (d) A test per automated path asserting a generated work order's stored cost equals the derived cost. (e) Whether `Craft.hourlyRate` changes should invalidate every work order using that craft, which is a rate-level fan-out the current design has no answer for; that question is named here rather than answered silently.
+**R.9's scope, in full.** (a) Call `recomputeWorkOrderCosts` inside the PM-generation transaction. (b) A one-shot backfill over every work order whose stored figures disagree with the derived ones, reporting the rows it changed. (c) Make `WorkOrderSnapshot` record the derived figure, not the cache, or it launders the defect into the audit trail. (d) Fix the route tests that write operations straight to Prisma, because they are what made the live database lie about its own consistency. (e) `Craft.hourlyRate` fan-out, which R.9 does **not** address — see below.
 
-**Not in R.9:** anything about report shape, filtering or export. R.9 makes the numbers true; R.2 through R.7 make them reachable. Keeping them apart is what stops a reporting phase from being credited with a data-integrity repair.
+**Not in R.9:** anything about report shape, filtering or export. R.9 touches the cache, not the reports.
+
+##### R.9 A - the PM path recomputes its own cost (delivered)
+
+`recomputeWorkOrderCosts` takes an optional client, defaulting to the global one, so the fourteen existing call sites are unchanged. `pmGeneration.ts` calls it on the transaction client with the supervisor as actor, guarded by "the plan contributed operations". Live evidence, 11 checks from `backend/scripts/r9a-differential.ts`:
+
+```
+plan R9A-1790782086441: 2 operations at 50/h -> expected planned 100
+PASS  a work order was generated, not skipped
+PASS  stored plannedCost equals the figure derived from its own operations  [stored=100 derived=100]
+PASS  stored plannedCost equals the hand-computed 2 x rate  [stored=100 expected=100]
+PASS  the stored figure is not the default zero  [stored=100]
+PASS  createdBy keeps the scheduler label  [scheduler]
+PASS  the supervisor is what the foreign keys carry  [de5e0f3c-...-0655]
+PASS  the cost change wrote an audit row naming the field  [1 row(s)]
+PASS  the audit row names a real user, not the scheduler label  [de5e0f3c-...-0655]
+PASS  the audit row records the move from zero  [0 -> 100]
+PASS  the same cycle is skipped, not regenerated  [work order WO-000729 already exists for cycle ...]
+PASS  a skipped generation writes no second audit row  [1 row(s)]
+```
+
+Seven unit cases in `tests/unit/pmGeneration.test.ts` cover what the live run cannot: that the read runs on the transaction client rather than the root (the stub only returns rows it created in the same transaction, so a non-zero result proves it), that the actor is the supervisor, that a plan with no operations recomputes nothing, and that the audit row names only the figure that moved.
+
+**A limit stated rather than hidden.** The live database has **zero** maintenance plans — the gate's route tests delete them at teardown — so the differential builds the plan it needs and removes it. What that proves is the part only a real transaction can: the recompute sees uncommitted rows, and its audit row satisfies a real foreign key. It does not exercise plan-selection or scheduling logic, which the scheduler's own tests already cover.
+
+##### R.10 - `Craft.hourlyRate` fan-out (tracked, not started)
+
+A craft's `hourlyRate` change invalidates every work order carrying that craft, and `crafts.ts` has **zero** recompute calls, so nothing catches it. Open questions for whoever picks it up: whether a rate edit recomputes affected work orders in one transaction or defers to a batch; whether already-closed work orders are re-costed or left as historical record; and what happens when a craft is *deleted* while work orders still reference it, which today falls back to a default rate. The live data cannot demonstrate any of this — both affected work orders have no craft attached and fall back to 45 — so this needs constructed fixtures, and the decision on closed work orders is the one to settle first.
+makes the numbers true; R.2 through R.7 make them reachable. Keeping them apart is what stops a reporting phase from being credited with a data-integrity repair.
 
 ##### R.4 - each existing report, named
 
@@ -1175,15 +1205,17 @@ PASS  every live location is reachable from some node  [6 of 6]
 **A limit on the live evidence, stated rather than hidden.** All 4 open work orders were raised on 2026-09-24, so the live database cannot exercise a range that spans two days. The end-of-day inclusivity and month-boundary behaviour are therefore covered by unit tests, not by the differential. The differential proves the filter narrows and partitions; it cannot yet prove day-boundary behaviour against real spread-out data. R.7's fixture set should cover this.
 
 
-**R.1 evidence that is a finding, not a pass.** The differential prints the divergence between the stored columns and the derived figures every time it runs, because that is the fact the design rests on:
+  **R.1 evidence that is a finding, not a pass.** The differential prints the divergence between the stored columns and the derived figures every time it runs, because that is the fact the design rests on:
 
-```
-derived from base tables : planned=135  actual=0
-stored WorkOrder columns : planned=0    actual=0
-stale stored plannedCost/actualCost rows: 2 of 4
-  765884b2-5ea1-45f3-82f0-bf18fbabc783 derived=90 stored=0
-  51b43878-2841-4222-9673-0a87c8fc0b08 derived=45 stored=0
-```
+  ```
+  derived from base tables : planned=135  actual=0
+  stored WorkOrder columns : planned=0    actual=0
+  stale stored plannedCost/actualCost rows: 2 of 4
+    765884b2-5ea1-45f3-82f0-bf18fbabc783 derived=90 stored=0   <- real defect, R.9 A/C
+    51b43878-2841-4222-9673-0a87c8fc0b08 derived=45 stored=0   <- test residue, R.9 D
+  ```
+
+  **Read that count as "1 real + 1 artefact", not "2 real".** R.9 traced `51b43878-...` to a route test that inserts operations directly to Prisma, bypassing the recompute. The second line of defence is provenance, not arithmetic: a PM work order has `createdBy = 'scheduler'` and a `sourcePlanId`, and anything without them was not made by the scheduler. `scripts/verify/verify_b1.py` still prints the raw count, because a count that quietly excluded rows would be worse than one that is explained here.
 
 **What R.1 deliberately did not do.** It did not add the route or the screen — that is R.2/R.3, and R.4 rebuilds `/cost-summary` on this engine. It did not fix the stale `plannedCost`/`actualCost` columns, which is a real defect with a wider blast radius than one report and deserves its own step rather than being absorbed silently into a reporting phase. It did not add indexes; the plan's own volume assumption should settle that before the Client's data arrives, and a premature index on a 4-row table measures nothing.
 
