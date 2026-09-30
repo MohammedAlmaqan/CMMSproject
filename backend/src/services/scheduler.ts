@@ -74,7 +74,22 @@ async function completeRunRecord(result: SchedulerRunResult, status: 'success' |
 
 const BATCH_SIZE = 50;
 
-export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
+export interface SchedulerOnceOptions {
+  /**
+   * Restricts the run to these plan IDs. The background scheduler leaves this
+   * unset and evaluates every active plan, which is the production behaviour.
+   *
+   * This exists because `runSchedulerOnce` reaches for every active plan, and
+   * the route tests call it against the shared live database while Vitest runs
+   * files in parallel. A plan another file had in flight therefore got picked
+   * up, and the creating test only ever deleted work orders matching its own
+   * `sourcePlanId` - so one leaked plan became several work orders no test
+   * claimed. Naming the plans a test owns removes the possibility.
+   */
+  onlyPlanIds?: string[];
+}
+
+export async function runSchedulerOnce(options: SchedulerOnceOptions = {}): Promise<SchedulerRunResult> {
   const result: SchedulerRunResult = {
     ranAt: new Date().toISOString(),
     plansEvaluated: 0,
@@ -89,7 +104,15 @@ export async function runSchedulerOnce(): Promise<SchedulerRunResult> {
   // filtered to Time only and logged the rest as "not yet implemented", so a
   // meter-driven plan never generated a work order at all.
   const plans = await prisma.maintenancePlan.findMany({
-    where: { isDeleted: false, activeFlag: true, strategyType: { in: ['Time', 'Meter', 'Combined'] } },
+    where: {
+      isDeleted: false,
+      activeFlag: true,
+      strategyType: { in: ['Time', 'Meter', 'Combined'] },
+      // An empty list must mean "evaluate nothing", not "evaluate everything".
+      // `[]` is truthy, so the spread fires and Prisma matches no plan, which
+      // is what a test that owns no plans needs.
+      ...(options.onlyPlanIds ? { planId: { in: options.onlyPlanIds } } : {}),
+    },
     include: {
       equipment: { select: { functionalLocationId: true } },
       taskList: { include: { operations: { where: { isDeleted: false } } } },

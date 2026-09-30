@@ -249,11 +249,11 @@ describe('PM generation: SOW 3.4.3 idempotency', () => {
   it('does not duplicate work orders when the scheduler runs repeatedly (row 48)', async () => {
     const planId = await makePlan({ code: `PMG-48B-${stamp}` });
 
-    const first = await runSchedulerOnce();
+    const first = await runSchedulerOnce({ onlyPlanIds: [planId] });
     const after1 = await wosFor(planId);
     expect(after1).toHaveLength(1);
 
-    const second = await runSchedulerOnce();
+    const second = await runSchedulerOnce({ onlyPlanIds: [planId] });
     const after2 = await wosFor(planId);
     expect(after2).toHaveLength(1);
     expect(first.wosCreated).toBeGreaterThanOrEqual(1);
@@ -266,11 +266,43 @@ describe('PM generation: SOW 3.4.3 idempotency', () => {
 
   it('reuses the existing work order rather than burning a new number', async () => {
     const planId = await makePlan({ code: `PMG-48C-${stamp}` });
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     const [wo] = await wosFor(planId);
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     const [again] = await wosFor(planId);
     expect(again!.woNumber).toBe(wo.woNumber);
+  });
+
+  // R.9 D1. Before this, every call above was an unscoped `runSchedulerOnce()`,
+  // which evaluates every active plan. Vitest runs files in parallel against
+  // one shared live database, so a plan another file happened to have in
+  // flight was generated from too, and each test then deleted only work orders
+  // matching its own `sourcePlanId`. One leaked plan therefore produced work
+  // orders that no test owned and no teardown removed - observed live as
+  // WO-000774 and WO-000775, both raised from a plan this file never made.
+  it('generates only for the named plans and leaves other active plans alone', async () => {
+    const mine = await makePlan({ code: `PMG-SCOPE-A-${stamp}` });
+    // Deliberately not named in onlyPlanIds. It is active and due, so a run
+    // that reached for every plan would generate from it - which is what used
+    // to happen to other test files' plans. No unscoped run is issued here on
+    // purpose: proving the filter works must not itself cause the leak.
+    const foreign = await makePlan({ code: `PMG-SCOPE-B-${stamp}` });
+
+    const result = await runSchedulerOnce({ onlyPlanIds: [mine] });
+
+    expect(result.plansEvaluated).toBe(1);
+    expect(await wosFor(mine)).toHaveLength(1);
+    expect(await wosFor(foreign)).toHaveLength(0);
+  });
+
+  it('treats an empty plan list as "evaluate nothing" rather than "evaluate everything"', async () => {
+    const planId = await makePlan({ code: `PMG-SCOPE-EMPTY-${stamp}` });
+
+    const result = await runSchedulerOnce({ onlyPlanIds: [] });
+
+    expect(result.plansEvaluated).toBe(0);
+    expect(result.wosCreated).toBe(0);
+    expect(await wosFor(planId)).toHaveLength(0);
   });
 });
 
@@ -303,13 +335,13 @@ describe('PM generation: D-10 many assets per plan', () => {
     const targets = equipmentIds.slice(0, 2).map((equipmentId) => ({ equipmentId }));
     const planId = await makePlan({ code: `PMG-D10-${stamp}`, targets });
 
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     const wos = await wosFor(planId);
     expect(wos).toHaveLength(2);
     // Each work order is against its own asset, and the assets are distinct.
     expect(new Set(wos.map((w) => w.equipmentId)).size).toBe(2);
     // ...and each is independently idempotent.
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     expect(await wosFor(planId)).toHaveLength(2);
   });
 });
@@ -351,9 +383,9 @@ describe('PM generation: SOW 3.4.2 scheduling window', () => {
       callHorizonValue: 7,
       callHorizonUnit: 'Days',
     });
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     expect(await wosFor(planId)).toHaveLength(1);
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     expect(await wosFor(planId)).toHaveLength(1);
   });
 
@@ -364,13 +396,13 @@ describe('PM generation: SOW 3.4.2 scheduling window', () => {
       endDate: daysAgo(30),
       intervalValue: 30,
     });
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     expect(await wosFor(planId)).toHaveLength(0);
   });
 
   it('does not generate before the plan start date', async () => {
     const planId = await makePlan({ code: `PMG-41B-${stamp}`, startDate: daysAhead(10) });
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     expect(await wosFor(planId)).toHaveLength(0);
   });
 
@@ -383,7 +415,7 @@ describe('PM generation: SOW 3.4.2 scheduling window', () => {
       planMeters: [{ meterId, meterInterval: 100 }],
       targets: [{ equipmentId: (await prisma.equipmentMeter.findUnique({ where: { meterId } }))!.equipmentId }],
     });
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     const wos = await wosFor(planId);
     expect(wos).toHaveLength(1);
     // The meter cycle is recorded in a form that can be found again.
@@ -398,7 +430,7 @@ describe('PM generation: SOW 3.4.2 scheduling window', () => {
       planMeters: [{ meterId, meterInterval: 5000 }],
       targets: [{ equipmentId: (await prisma.equipmentMeter.findUnique({ where: { meterId } }))!.equipmentId }],
     });
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     expect(await wosFor(planId)).toHaveLength(0);
   });
 
@@ -413,7 +445,7 @@ describe('PM generation: SOW 3.4.2 scheduling window', () => {
       planMeters: [{ meterId, meterInterval: 100 }],
       targets: [{ equipmentId }],
     });
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     const wos = await wosFor(planId);
     expect(wos).toHaveLength(1);
     expect(wos[0].sourcePlanCycle).toMatch(/^M:/);
@@ -430,7 +462,7 @@ describe('PM generation: SOW 3.4.2 scheduling window', () => {
       planMeters: [{ meterId, meterInterval: 5000 }],
       targets: [{ equipmentId }],
     });
-    await runSchedulerOnce();
+    await runSchedulerOnce({ onlyPlanIds: [planId] });
     const wos = await wosFor(planId);
     expect(wos).toHaveLength(1);
     expect(wos[0].sourcePlanCycle).toMatch(/^\d{4}-\d{2}-\d{2}/);
