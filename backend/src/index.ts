@@ -85,9 +85,7 @@ app.use(express.json({ limit: '10mb' }));
 // Decimal as its string form. Normalise every Decimal back to a JSON number at
 // the response boundary so the API wire format is unchanged -- no caller sees a
 // string where a number used to be, and tests asserting numeric bodies stay
-// valid. This wraps the core res.json; per-route middleware that re-assigns
-// res.json (the audit trail) captures this wrapper as its "original", so it
-// composes inside out without duplicating the conversion.
+// valid. This wraps the core res.json at the app level, before any router runs.
 //
 // Detection is structural, not `instanceof Prisma.Decimal`: module duplication
 // makes class identity unreliable across the test runner and the app, while the

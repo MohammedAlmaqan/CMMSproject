@@ -1,4 +1,4 @@
-# CMMS Finalization Tracker
+﻿# CMMS Finalization Tracker
 
 **Project:** CommandPulse CMMS
 **Tracker created:** 2026-09-22
@@ -1144,6 +1144,8 @@ There was **no legitimate maintenance plan in the database at all.** That also r
 
 **Not cleared, and still on the Client's call:** 52 orphaned task lists (`TL-G34-*`, `TL-T*`, and the differential's own `R9A-1790782065261`). Two further task lists, `PM-PUMP-001` and `PM-MOTOR-001`, are **seed master data** - `createdBy=system`, real descriptions - and were referenced only by fixtures, so they are now unreferenced by any plan, which is a normal state for master data. Also untouched: 284 pre-existing soft-deleted work orders and 192 snapshots, which predate this work.
 
+*Superseded in part:* the 52 figure above was D's count at that moment, not a fixed set, and it excluded the two seed rows. All 63 rows are now classified with zero ambiguous — see **R.9 D3-task-lists**. The seed-data call above is confirmed, and the `createdBy=system` reasoning is retained only as a caution: the same field reads `system` for the differential's fixture too.
+
 **D1 — `runSchedulerOnce` takes the plans it is told to run.** `runSchedulerOnce(options?: { onlyPlanIds?: string[] })`; when the list is set it is added to the plan query, and when it is omitted the query is byte-for-byte what it was, so the startup run in `index.ts` and the Administrator `POST /run-scheduler` route still evaluate every active plan. An **empty** list means "evaluate nothing" rather than falling through to "evaluate everything" - `[]` is truthy, so the spread fires and Prisma matches no plan, which is the behaviour a test owning no plans needs. Both production callers are deliberately left unscoped; scoping them would be a silent behaviour change dressed as a test fix.
 
 All 14 `runSchedulerOnce()` calls in `tests/routes/pmGeneration.test.ts` now name their own plan. Two tests were added rather than trusting the edit: one creates a second active, due plan, leaves it out of `onlyPlanIds`, and asserts it produced nothing while the named plan produced exactly one (`plansEvaluated` must be 1, so a filter that was accepted but ignored would fail); the other asserts an empty list yields `plansEvaluated: 0` and no work orders. The first deliberately never issues an unscoped run - proving the filter works must not itself cause the leak.
@@ -1162,7 +1164,7 @@ The first is that the product's `DELETE` routes soft-delete, which is correct fo
 
 The second is audit. `AuditLogEntry` names the record it describes and holds no foreign key, so deleting the record leaves the row behind describing something that no longer exists. It is written for the child rows too, not just the parent: operations, checklists and their items, cost splits, external services and material lines each leave an entry under their own id. Purge the parent's audit id and the audit table still grows as fast as the tables that *were* cleaned. Two activities cannot be cleaned by record id at all, because they audit master data under the acting user: a login updates the account's login state, and "mark every alert read" is a bulk event. Those are handled by snapshotting the ids that already exist and deleting only what a file *added*, because a blanket sweep by actor or timestamp is worse than the leak - those rows exist in the baseline, since the suite mints its tokens by logging in before any file runs, so deleting them wholesale shows up as rows **disappearing**, which breaks the invariance check just as surely as leaving them behind.
 
-The third is a real defect in the product, not in the tests. `auditMiddleware` wrote the audit entry with `void logAuditAction(...)` - fired and forgotten. The response reached the caller first; the caller (a test, tearing down a fixture, which is exactly what this suite does) deleted the record; the audit write then landed naming a row that no longer existed, with nothing left to find and purge it by, because the only handle on it was the id of the deleted record. The middleware now awaits the write. `write()` still swallows its own errors, so an audit failure still cannot turn into a failed request; that policy is unchanged.
+The third mechanism as originally recorded here was **wrong, and is corrected in its own entry below** — it named `auditMiddleware`'s fire-and-forget write as the cause, when that middleware has never been mounted. The mechanism that is real is the missing foreign key described in the second paragraph above. See **R.9 D3-audit** for the correction and the evidence.
 
 **One more test was asserting on the database rather than on its own fixtures.** `capacityBoard.test.ts` asserted exact hour counts against the seeded `MECH`/`ELEC`/`INST` centres, so an unrelated undated work order left behind by an earlier run moved ELEC's `unscheduledHours` from 6 to 8 and failed a test that had nothing to do with it. It now creates its own three work centres and five crafts and asserts on those. That was not scope creep: D3's claim is that a gate run leaves the database as it found it, and a test whose result depends on data it does not own cannot be part of that claim. Its teardown also swallowed errors with `.catch(() => {})`, which is how the debris it was reading survived in the first place.
 
@@ -1172,11 +1174,102 @@ Result: full gate 67 files / 913 tests, unit suite 32 files / 575 tests, all fou
 
 **Two further cleanups, both authorised, both hard-deletes.** On 2026-10-01, four work orders left by `safetyChecklists.test.ts` runs made before that file's teardown was fixed - descriptions `gate test WO` and `test checklist WO`, which appear in no other file - along with their 2 operations, 4 checklists, 8 checklist items, 6 snapshots and 12 audit rows. And 5 work orders, 5 operations, 5 crafts and 3 work centres left by a `capacityBoard` run that failed while a helper branch was itself being corrected, identified by the stamp-suffixed `CAP*` codes that file generates. `WO-000063`, `WO-000064` and `WO-T1790267575210` remain, as decided.
 
-**Still open, and still on the Client's call:** the orphaned task lists. There are now **63** in the database. Two are seed master data, `PM-PUMP-001` and `PM-MOTOR-001`. Note that `createdBy` alone does not identify seed data: `R9A-1790782065261` reads `createdBy=system` purely because the differential script did not set the field and took the schema default, and it is the differential's own fixture. The other 60 are fixture candidates, and nothing in this step deletes them.
+**Still open, and still on the Client's call:** the orphaned task lists. Counted and classified in full since; see **R.9 D3-task-lists**, which supersedes the "63 rows, 60 fixture candidates" state left here.
+
+##### R.9 D3-audit - the fire-and-forget claim was wrong, and here is what the evidence actually shows
+
+D3 recorded a third residue mechanism as *"a real defect in the product, not in the tests"*: `auditMiddleware` wrote its audit entry with `void logAuditAction(...)`, the response reached the caller first, the caller deleted the record, and the audit row then landed naming a row that no longer existed. **That was not what happened, and the claim is withdrawn.**
+
+The claim was falsifiable and was not tested before it was written down. `auditMiddleware` **has never been mounted**:
+
+- `git log --all -S 'auditMiddleware' -- backend/src` returns exactly one commit, the initial implementation `6f6d944`. No commit adds a registration and no commit removes one.
+- In that one commit's tree, the only `middleware/audit.ts` match is the definition itself; `index.ts` mounts `auditLogRoutes` and nothing else from that file.
+- The current tree agrees: nothing imports `auditMiddleware` except the definition. Tests import only `changedFields` from that module.
+
+So no request has ever passed through it, and **no production write path ever used the void form.** Every mutating route calls `logAuditAction`/`logFieldChanges`/`logAuditFieldChange` directly and awaits it.
+
+The change made in `713bf16` (awaiting inside `auditMiddleware`) is therefore **latent hardening of dead code, not the fix for the measured residue, and it is recorded as such.** It is kept, because the fire-and-forget form is a real defect the moment anyone mounts the function, but it fixed nothing that was observed. The misleading comment inside the function has been rewritten to say so, and `index.ts:88` no longer claims a per-route audit middleware composes inside the Decimal wrapper — there is no such middleware.
+
+**The real cause of the audit residue is the missing foreign key, already described in the second mechanism above:** `AuditLogEntry` names the record it describes and holds no FK, so a hard-deleted fixture leaves its trail behind. These are *awaited* writes that landed while the row still existed; the row went away afterwards. A race was never required, and the fix is purging audit rows by the ids the test created — which is what `purgeAudit` and D3's helpers now do.
+
+Consequence for the D3 claim of "no residue": the fix and its evidence were unaffected. The residue was measured by row count in `AuditLogEntry`, the count dropped by the helper work, and no part of that depended on the middleware story.
+
+##### R.9 D3-cleanup-errors - scope of the ban on swallowed teardown errors
+
+D3 replaced teardown `.catch(() => {})` calls with hard-delete helpers that throw. A `.catch(() => {})` in `capacityBoard.test.ts` prompted the question of where the ban actually applies. **Stated explicitly, because it was implicit and that is the defect:**
+
+- **G6a is not this ban, and its scope is narrower than it looks.** `scripts/verify/verify_g6a.py` greps **`app/src`** (the frontend) for two exact shapes, and skips `__tests__/` and `*.test.*` by design: (1) any import from `data/mockData`, and (2) `.catch(() => get().` — a silent in-memory store fallback that hides an API error behind cached data. Its own header says test files may name identifiers freely. Ban 2 is *not* `.catch(() => {})`, and G6a never scanned the backend.
+- **Decision: the swallow ban covers backend test teardown.** Extending G6a itself would be the wrong instrument — G6a is a frontend trust-property check, and its production-only exclusion of `*.test.*` is a deliberate policy decision about *mock-data identifiers*, not about error handling. So the ban is recorded here as a separate backend-test rule.
+
+The rule, in one line: **a teardown that cannot finish must fail the test loudly rather than leave evidence behind quietly.**
+
+**Enforcement is not yet in place, and the current state is stated rather than implied: 68 occurrences remain across 13 backend test files**, all currently harmless because those files' delete order happens to be right — `r9d-db-invariance.ts` passes with them present. `locationCounts.test.ts` (11), `notifications.test.ts` (16), `equipment.test.ts` (6), `externalServiceCosts.test.ts` (6), `labor.test.ts` (5), `laborAttribution.test.ts` (5), `equipmentMeters.test.ts` (5), `locationPlacement.test.ts` (3), `safetyChecklists.test.ts` (3), `attachments.test.ts` (2), `comments.test.ts` (2), `functionalLocations.test.ts` (2), `templateCopy.test.ts` (2). Leaving a rule stated but unenforced while 68 violations exist is the same implicitness in a new place, so this row is **open**, not met.
+
+##### R.9 D3-task-lists - 63 counted, 63 classified, zero ambiguous
+
+Supersedes the D-section note at line 1145 (52 orphaned) and D3's own "63 rows, 60 fixture candidates". Method: `backend/scripts/r9d-tasklist-provenance.ts`, which maps each row's **code shape** to the single file in this repository that writes that shape, then reports references. `createdBy` is not used as evidence anywhere — it is unreliable in both directions: the differential's fixture reads `system` because it took the schema default, and `TL-G34-*` rows carry two different seeded user ids.
+
+| Count | Code shape | The one file that writes it | State |
+|---|---|---|---|
+| 1 | `PM-PUMP-001` | `backend/prisma/seed.ts:134` | **seed master data — keep** |
+| 1 | `PM-MOTOR-001` | `backend/prisma/seed.ts:135` | **seed master data — keep** |
+| 49 | `TL-T<stamp>` | `backend/tests/routes/taskLists.test.ts:6` | fixture, all soft-deleted |
+| 8 | `TL-G34-<stamp>` | `scripts/verify/verify_g3_4.py:290` | fixture, all soft-deleted |
+| 3 | `TL-CRF-<stamp>` | `backend/tests/routes/crafts.test.ts:147` | fixture, all **live** |
+| 1 | `R9A-<stamp>` | `backend/scripts/r9a-differential.ts:127` | fixture, live |
+
+**Zero rows are unmatched**, so nothing is ambiguous and nothing is left in place on a judgement call. All 61 fixtures are referenced by **zero** `MaintenancePlan` rows, so none is load-bearing.
+
+**Why the count moved between reports — the earlier figures were not wrong, they were different denominators at different times.** 52 counted orphaned rows before `crafts.test.ts` and the differential had been re-run; 63 is the total including both seed rows and everything the suite has produced since. `TL-T*` rows are the growth term: one per `taskLists.test.ts` run, dated 2026-09-24 to 2026-10-01. The last survivor, `TL-T20261001111418`, was created at 11:14 UTC, **before** the `713bf16` teardown landed at 15:46 local — which is what a leak that has since been fixed looks like.
+
+**The leak is verified fixed, not assumed fixed.** Running `tests/routes/taskLists.test.ts` alone after `713bf16`: 12 tests pass and the task-list count is unchanged at 63, with zero rows created in the preceding 15 minutes. `purgeTaskLists` hard-deletes child-first and its `afterAll` now fires; `rootIds` in that file is dead (declared and spread, never pushed) and is noted rather than relied on.
+
+**Nothing is deleted by this entry.** The classification is the decision the Client asked for; the purge of the 61 is a separate destructive action and is not taken here.
+
+##### R.9 B - the stale-cost scan (delivered: a scan, not a backfill)
+
+**This row was authored under a premise that turned out to be false, and it is rewritten to say what was actually found.** The tracker originally called for a one-shot backfill over every work order whose stored figures disagree with the derived ones, reporting the rows it changed. That presumed live rows had stale costs. **They do not.** The only disagreement found was in 78 soft-deleted test debris rows. No live defect exists. Therefore the deliverable is the evidence of that scan, not the application of a backfill.
+
+**The deliverable is the scan, and the headline is that there is nothing to repair in live data.** `backend/scripts/r9b-cost-backfill.ts` derives every work order's figures from its base relations with the same pure function the product uses (`computeWorkOrderCosts`, via `costs.ts`) and compares them to the stored columns. Dry run is the default; `--apply` would rewrite through `recomputeWorkOrderCosts`, so the repair path cannot diverge from the write path it repairs. **`--apply` was deliberately not run.**
+
+```
+MODE: DRY RUN (no writes)
+
+=== SCAN ===
+  work orders scanned        : 339
+    not soft-deleted         : 3
+    soft-deleted             : 336
+  disagreeing with derived   : 78
+    of which not deleted     : 0     <- the load-bearing line
+    of which soft-deleted    : 78
+
+=== MISMATCHES BY PROVENANCE ===
+    78  NON-SCHEDULER / soft-deleted
+```
+
+**0 of the 3 live work orders disagree.** All 78 carry `sourcePlanId=null` and a `createdBy` that is a test user, so on R.9 D's own rule - a scheduler-generated work order has `createdBy='scheduler'` *and* a `sourcePlanId`, and anything without both was not made by the scheduler - **none of the 78 is a production row.** The live database does not lie about its own cost consistency, which is the thing R.1 originally alleged.
+
+**The 78 are two families with different causes, and telling them apart is the result:**
+
+**Family A - 66 rows, `stored planned=0`, `derived=90`.** Descriptions `G4a verify` and `updated test plan`, all type `PM`, all 2 operations. These are R.1's own signature, repeated 66 times: the row was created and its operations were then inserted **straight to Prisma**, bypassing the API, so no recompute ever ran and the columns stayed at their create-time zero. This is R.9 D's finding at scale, and it is *already fixed* - the route tests that did it now go through the API. Rows: `WO-000065`, `-000066`, `-000067`, `-000068`, `-000072`, `-000073`, `-000079`, `-000082`, `-000084`, `-000086`, `-000088`, `-000090`, `-000100`, `-000101`, `-000102`, `-000106`, `-000107`, `-000110`, `-000111`, `-000112`, `-000113`, `-000117`, `-000118`, `-000119`, `-000120`, `-000121`, `-000124`, `-000125`, `-000126`, `-000127`, `-000128`, `-000129`, `-000133`, `-000134`, `-000138`, `-000139`, `-000142`, `-000143`, `-000144`, `-000145`, `-000146`, `-000148`, `-000151`, `-000153`, `-000155`, `-000157`, `-000159`, `-000161`, `-000163`, `-000164`, `-000166`, `-000168`, `-000170`, `-000172`, `-000175`, `-000176`, `-000179`, `-000183`, `-000210`, `-000216`, `-000222`, `-000228`, `-000234`, `-000240`, `-000246`, `-000252`.
+
+**Family B - 12 rows, `stored` *above* `derived`.** Description `copied from template`, type `CM`, from `templateCopy.test.ts`. `WO-001126`, `-001009`, `-000345`, `-000286`, `-000460`, `-000518`, `-001071`, `-000402`, `-000577`, `-000790`, `-000856`, `-000963`. The gap is not a missing recompute on this path - `workOrders.ts:490` **does** call `recomputeWorkOrderCosts` for a template copy, correctly, after the transaction commits. The gap is that the craft's rate moved afterwards and nothing recomputed the work order. **These 12 rows are live evidence of R.10, and they are why they were left alone:** correcting them would have erased the only proof in this database that the craft-rate fan-out is real.
+
+**Why nothing was written, stated as a decision rather than an omission.** All 78 targets are soft-deleted rows no report or screen can reach, so a repair has no product effect. Against that, `recomputeWorkOrderCosts` writes one audit row per figure that moves, so repairing them would have added 78 audit entries attributed to the `admin` user - permanently, about records nobody will ever see. That is the same permanent-trail-noise problem D3 was written to remove, reintroduced by a repair. **Decision: record the scan, write nothing, and carry all 78 forward as named evidence.** All 78 are listed above by number and family so the set is auditable rather than summarised as a count.
 
 ##### R.10 - `Craft.hourlyRate` fan-out (tracked, not started)
 
-A craft's `hourlyRate` change invalidates every work order carrying that craft, and `crafts.ts` has **zero** recompute calls, so nothing catches it. Open questions for whoever picks it up: whether a rate edit recomputes affected work orders in one transaction or defers to a batch; whether already-closed work orders are re-costed or left as historical record; and what happens when a craft is *deleted* while work orders still reference it, which today falls back to a default rate. The live data cannot demonstrate any of this — both affected work orders have no craft attached and fall back to 45 — so this needs constructed fixtures, and the decision on closed work orders is the one to settle first.
+A craft's `hourlyRate` change invalidates every work order carrying that craft, and `crafts.ts` has **zero** recompute calls, so nothing catches it. Open questions for whoever picks it up: whether a rate edit recomputes affected work orders in one transaction or defers to a batch; whether already-closed work orders are re-costed or left as historical record; and what happens when a craft is *deleted* while work orders still reference it, which today falls back to a default rate. The decision on closed work orders is the one to settle first.
+
+**Correction: the claim that "the live data cannot demonstrate any of this" was wrong.** It was written from R.1's four-row sample, where both rows had no craft attached and fell back to 45. **The live database holds 12 rows that demonstrate the fan-out directly**, found by R.9 B's scan as Family B:
+
+- **The work orders.** 12 soft-deleted type-`CM` work orders from `templateCopy.test.ts`, description `copied from template`, each with 2 operations totalling 3 planned hours: `WO-000286`, `-000345`, `-000402`, `-000460`, `-000518`, `-000577`, `-000790`, `-000856`, `-000963`, `-001009`, `-001071`, `-001126`. Eleven store `plannedCost=165` against a derived `127.5`; `WO-000286` stores `172.5` against `135`.
+- **The delta is exactly the craft rate.** 3 planned hours × the rate change, and nothing else: `165 ÷ 3 = 55`, `127.5 ÷ 3 = 42.5`; `172.5 ÷ 3 = 57.5`, `135 ÷ 3 = 45`. The operations carry attached crafts with no material or labour lines, so those inputs are zero and cannot account for the gap. The stored figure was computed at the old rate and the derived figure uses the current one.
+- **The rate edit is in the audit trail.** Three `Craft`/`hourlyRate` audit rows on 2026-09-30 at 20:50:34, 20:51:04 and 20:51:20, each `42.50 → 55`. So the edit is recorded, and the affected work orders were not recomputed. Those three crafts, `CRF-U-1790801434436`, `CRF-U-1790801463623` and `CRF-U-1790801479983`, still sit at rate `55` while their sibling test crafts sit at `42.5`.
+
+**This is why R.9 B wrote nothing.** Backfilling those 12 rows would have set the stored figure to the current derived one and erased the only in-database evidence that the fan-out exists - the defect would have become undemonstrable on live data, and R.10 would have fallen back on constructed fixtures for a defect the database was already showing. The rows are soft-deleted, so leaving them costs the product nothing.
+
+**What this does and does not change.** It is a fact correction, not a scope change: R.10 remains tracked and not started, and the three design questions above are still open and still need answering before it is built. What changed is that R.10 no longer needs constructed fixtures to be credible - it has a reproduction already sitting in the live database, and this entry is that reproduction's citation.
 makes the numbers true; R.2 through R.7 make them reachable. Keeping them apart is what stops a reporting phase from being credited with a data-integrity repair.
 
 ##### R.4 - each existing report, named

@@ -111,6 +111,11 @@ export async function logAuditAction(entry: ActionEntry) {
   );
 }
 
+/**
+ * A per-route `res.json` wrapper that records one audit row per successful
+ * write. Unused: kept for completeness, but nothing mounts it, so treat it as
+ * unverified code rather than as a path requests take. See the note inside.
+ */
 export function auditMiddleware(tableName: string) {
   return (req: Request, res: Response, next: NextFunction) => {
     const originalJson = res.json.bind(res);
@@ -124,14 +129,23 @@ export function auditMiddleware(tableName: string) {
         const recordId = req.params.id || payload?.id || payload?.recordId;
         const action = req.method === 'POST' ? 'Create' : req.method === 'PUT' || req.method === 'PATCH' ? 'Update' : 'Delete';
         if (typeof recordId === 'string' && recordId) {
-          // Awaited rather than fired and forgotten. Firing it off let the write
-          // resolve after the response reached the caller, so anything reacting to
-          // that response by deleting the record - a test tearing down a fixture,
-          // which is exactly what this suite does - could remove the row first and
-          // leave an audit entry describing a record that no longer existed, with
-          // nothing left to find and purge it by. `write` swallows its own errors,
-          // so awaiting it here cannot turn an audit failure into a failed request;
-          // that policy is unchanged.
+          // Awaited rather than fired and forgotten. Firing it off would let the
+          // write resolve after the response reached the caller, so anything
+          // reacting to that response by deleting the record could remove the row
+          // first and leave an audit entry describing a record that no longer
+          // existed, with nothing left to find and purge it by. `write` swallows
+          // its own errors, so awaiting it here cannot turn an audit failure into
+          // a failed request; that policy is unchanged.
+          //
+          // Note this is latent hardening, not a fix for observed residue: this
+          // middleware has never been registered. It was defined in the initial
+          // commit 6f6d944 and `git log -S` shows no commit ever mounting it, so
+          // no request has ever passed through it. Every mutating route calls
+          // logAuditAction/logFieldChanges directly and awaits. R.9 D3 recorded it
+          // as the cause of the audit residue; that was wrong, and the residue
+          // actually comes from the missing FK from audit rows to their parent
+          // table, which lets a hard-deleted test fixture leave its audit trail
+          // behind. See the R.9 D3 audit entry in the tracker.
           await logAuditAction({
             table: tableName,
             recordId,
