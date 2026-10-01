@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { api, authHeaders, ctx, purgeNotifications, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 // SOW 3.2.x (matrix :104, :106, :108, :115, :116): M3 completion confirmation,
@@ -141,18 +141,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.auditLogEntry
-    .deleteMany({ where: { recordId: { in: [...notifIds, ...woIds] } } })
-    .catch(() => {});
-  await prisma.workOrderNotifLink
-    .deleteMany({ where: { OR: [{ workOrderId: { in: woIds } }, { notificationId: { in: notifIds } }] } })
-    .catch(() => {});
-  await prisma.workOrderSnapshot
-    .deleteMany({ where: { workOrderId: { in: woIds } } })
-    .catch(() => {});
-  await prisma.workOrderOperation.deleteMany({ where: { workOrderId: { in: woIds } } }).catch(() => {});
-  await prisma.workOrder.deleteMany({ where: { workOrderId: { in: woIds } } }).catch(() => {});
-  await prisma.notification.deleteMany({ where: { notificationId: { in: notifIds } } }).catch(() => {});
+  // The orders go first, and they go through the helper so their snapshots and
+  // operations come with them. The previous teardown reached most of that by hand
+  // but not the cost splits or the material lines, and each step swallowed its
+  // own error, so the survivors were silent. The helper also finds the
+  // notifications the routes raised for these orders by their work-order number -
+  // rows this file never had an id for, which is why `notifIds` alone was not
+  // enough to clear them.
+  await purgeWorkOrders(woIds);
+  await purgeNotifications(notifIds);
 });
 
 describe('notification mandatory location/equipment pair (SOW 3.2.2, :108)', () => {

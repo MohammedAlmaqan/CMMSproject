@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, purgeCrafts, purgeTaskLists, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 // SOW 3.1.3: crafts are assigned to a work centre, each with its own hourly
@@ -29,19 +29,14 @@ describe('crafts routes', () => {
   });
 
   afterAll(async () => {
-    for (const id of createdIds) {
-      await prisma.craft.deleteMany({ where: { craftId: id } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
-    }
-    if (blockedWoId) {
-      await prisma.workOrderOperation.deleteMany({ where: { workOrderId: blockedWoId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: blockedWoId } }).catch(() => {});
-      await prisma.workOrder.deleteMany({ where: { workOrderId: blockedWoId } }).catch(() => {});
-    }
-    if (blockedTaskListId) {
-      await prisma.taskListOperation.deleteMany({ where: { taskListId: blockedTaskListId } }).catch(() => {});
-      await prisma.taskList.deleteMany({ where: { taskListId: blockedTaskListId } }).catch(() => {});
-    }
+    // The blocked-path fixtures are pruned before the crafts, because a craft is
+    // restricted by both operation tables: the work order and the task list
+    // created above to prove the guard rejects them both hold operations naming
+    // one of these crafts, and deleting the craft first fails with P2003 - which
+    // the `.catch` this replaces used to swallow, leaving both behind.
+    await purgeWorkOrders([blockedWoId]);
+    await purgeTaskLists([blockedTaskListId]);
+    await purgeCrafts(createdIds);
   });
 
   it('returns the craft list', async () => {

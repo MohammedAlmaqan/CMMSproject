@@ -1,14 +1,18 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import bcrypt from 'bcryptjs';
-import { api, ctx } from '../helpers.js';
+import { api, ctx, auditIdsMatching, purgeNewAudit } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 describe('auth routes', () => {
   const validPassword = 'LockoutTest123!';
   let tempUserId = '';
   let tempUsername = '';
+  // Taken in `beforeAll`, before the first login below, so the teardown can tell
+  // the logins this file performed from the ones already in the baseline.
+  let loginAuditBaseline: string[] = [];
 
   beforeAll(async () => {
+    loginAuditBaseline = await auditIdsMatching({ tableName: 'User', action: { in: ['Update', 'Run'] } });
     const passwordHash = await bcrypt.hash(validPassword, 10);
     const user = await prisma.user.create({
       data: {
@@ -35,6 +39,12 @@ describe('auth routes', () => {
 
   afterAll(async () => {
     await prisma.systemAlert.deleteMany({ where: { userId: tempUserId } });
+    // A successful login audits the account it logged into, not the actor, so the
+    // rows written while logging in as `admin` are keyed on that seed user and
+    // survived the temp-user sweep. Only the ones this file added are removed:
+    // the suite logged in once at startup to mint its tokens, and those rows are
+    // in the baseline and must stay.
+    await purgeNewAudit(loginAuditBaseline, { tableName: 'User', action: { in: ['Update', 'Run'] } });
     await prisma.auditLogEntry.deleteMany({ where: { userId: tempUserId } });
     await prisma.user.deleteMany({ where: { userId: tempUserId } });
   });

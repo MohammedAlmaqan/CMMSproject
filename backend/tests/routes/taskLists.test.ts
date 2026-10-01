@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, purgeTaskLists } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
@@ -13,10 +13,19 @@ async function auditCount(recordId: string, action: string) {
   });
 }
 
+// The list this file creates in its main body. Declared out here, with the other
+// teardown, because it was previously never deleted: it held no operations, so
+// nothing in the file had a reason to remember it after the assertions passed.
+const rootIds: string[] = [];
+
 describe('task lists routes', () => {
   beforeAll(async () => {
     const wcs = await api().get('/api/work-centers').set(authHeaders(ctx.adminToken));
     workCenterId = wcs.body[0].workCenterId;
+  });
+
+  afterAll(async () => {
+    await purgeTaskLists([createdId, ...rootIds]);
   });
 
   it('returns the task list list', async () => {
@@ -100,12 +109,12 @@ describe('task lists routes', () => {
     });
 
     afterAll(async () => {
-      for (const id of tmpIds) {
-        await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
-        await prisma.taskListMaterial.deleteMany({ where: { taskOperation: { taskListId: id } } }).catch(() => {});
-        await prisma.taskListOperation.deleteMany({ where: { taskListId: id } }).catch(() => {});
-        await prisma.taskList.deleteMany({ where: { taskListId: id } }).catch(() => {});
-      }
+      // One helper for the whole subtree: the steps, the per-step materials and
+      // the list itself. The previous teardown ran the four deletes separately
+      // with each error swallowed, so a single failure left the list in place -
+      // which is why 53 of the task lists in the database had a `TL-T` code and
+      // no owner.
+      await purgeTaskLists([...tmpIds, matTemplateId]);
     });
 
     it('persists and returns the materials each step requires', async () => {

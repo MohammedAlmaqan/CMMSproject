@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, purgeSafetyChecklistTemplates, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 let templateId = '';
 let woId = '';
 let woChecklistId = '';
 let itemIds: string[] = [];
+
+// The work order created directly in `beforeAll` below, and the template this file
+// posts for it. Declared out here so the teardown can see both: neither was
+// previously deleted at all.
+let gateTemplates: string[] = [];
+let outerWoId = '';
 
 describe('safety checklists routes', () => {
   beforeAll(async () => {
@@ -27,21 +33,23 @@ describe('safety checklists routes', () => {
       },
     });
     woId = wo.workOrderId;
+    outerWoId = wo.workOrderId;
   });
 
   afterAll(async () => {
-    if (woChecklistId) {
-      await prisma.workOrderChecklistItem.deleteMany({ where: { woChecklistId } }).catch(() => {});
-      await prisma.workOrderChecklist.deleteMany({ where: { woChecklistId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: woChecklistId } }).catch(() => {});
-    }
-    if (templateId) {
-      await prisma.checklistItem.deleteMany({ where: { checklistTemplateId: templateId } }).catch(() => {});
-      await prisma.safetyChecklistTemplate.deleteMany({ where: { checklistTemplateId: templateId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: templateId } }).catch(() => {});
-    }
-    await prisma.workOrderSnapshot.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
-    await prisma.workOrder.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
+    // Each fixture is cleared as a subtree through the matching helper, rather
+    // than by hand. The hand-written versions had to remember that a snapshot
+    // restricts a work order and that an item restricts a template; where they
+    // missed one, the resulting P2003 was swallowed and the fixture survived.
+    //
+    // The order and the template are separate calls on purpose, and the template
+    // goes second: the checklist attached to the order restricts the template, so
+    // removing the template first would have to reach across into an order that
+    // has not gone yet. The template helper does clear attached checklists, so
+    // either order terminates - but clearing the order first is the order that
+    // leaves nothing for the template step to have to notice.
+    await purgeWorkOrders([outerWoId]);
+    await purgeSafetyChecklistTemplates([templateId, ...gateTemplates]);
   });
 
   const templateBody = () => ({
@@ -144,26 +152,19 @@ describe('SOW 3.3.7 mandatory checklist gate on the work order status route', ()
     craftId = crafts.body[0].craftId;
   });
 
-  afterAll(async () => {
-    if (gateChecklistId) {
-      await prisma.workOrderChecklistItem.deleteMany({ where: { woChecklistId: gateChecklistId } });
-      await prisma.workOrderChecklist.deleteMany({ where: { woChecklistId: gateChecklistId } });
-    }
-    if (mandatoryTemplateId) {
-      await prisma.checklistItem.deleteMany({ where: { checklistTemplateId: mandatoryTemplateId } });
-      await prisma.safetyChecklistTemplate.deleteMany({ where: { checklistTemplateId: mandatoryTemplateId } });
-    }
-if (gateWoId) {
-      await prisma.workOrderOperation.deleteMany({ where: { workOrderId: gateWoId } });
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: gateWoId } });
-      await prisma.workOrderSnapshot.deleteMany({ where: { workOrderId: gateWoId } });
-      await prisma.workOrder.deleteMany({ where: { workOrderId: gateWoId } });
-    }
-    for (const id of ids) {
-      await prisma.checklistItem.deleteMany({ where: { itemId: id } });
-      await prisma.safetyChecklistTemplate.deleteMany({ where: { checklistTemplateId: id } });
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: id } });
-    }
+afterAll(async () => {
+    // Same reason as the teardown above, and this block had the opposite problem:
+    // it swallowed nothing, so a missed constraint failed the whole file - while
+    // the version that swallowed everything left rows behind instead. The helper
+    // gets the order right either way, and fails loudly when it cannot.
+    //
+    // The mandatory template is recorded as it is created rather than only in
+    // `ids`, because the list is pushed at the point the first assertion on it
+    // passes - so a run that failed before that point left the template behind
+    // with nothing tracking it. That is exactly the case where a teardown is
+    // needed most.
+    await purgeWorkOrders([gateWoId]);
+    await purgeSafetyChecklistTemplates([mandatoryTemplateId, ...ids]);
   });
 
   it('creates a mandatory template and a work order carrying an operation', async () => {
@@ -179,6 +180,9 @@ if (gateWoId) {
           { sequenceNumber: 20, description: 'Gate item B' },
         ],
       });
+    // Tracked before the assertions, not after them: a template that exists but
+    // whose test failed is precisely the one no teardown would otherwise find.
+    if (tpl.status === 201) gateTemplates.push(tpl.body.checklistTemplateId);
     expect(tpl.status).toBe(201);
     expect(tpl.body.isMandatory).toBe(true);
     mandatoryTemplateId = tpl.body.checklistTemplateId;

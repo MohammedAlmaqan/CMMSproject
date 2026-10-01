@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { api, authHeaders, ctx, purgeAudit, purgeBomMaterials } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 // SOW 3.1.2 / 3.1.5 (matrix :84, :96): spare parts from the material catalog
@@ -49,8 +49,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.equipmentBOMMaterial.deleteMany({ where: { equipmentId } }).catch(() => {});
-  await prisma.equipment.deleteMany({ where: { equipmentId } }).catch(() => {});
+  // The BOM lines go with the audit rows that describe them, keyed on both the
+  // line and the equipment: the previous teardown removed the rows but not the
+  // trail, so the audit table grew on every run even when the rest did not.
+  await purgeBomMaterials(bomIds);
+  await purgeAudit([equipmentId, ...bomIds]);
+  await prisma.equipment.deleteMany({ where: { equipmentId } });
 });
 
 describe('equipment BOM write path (SOW 3.1.2, :84)', () => {

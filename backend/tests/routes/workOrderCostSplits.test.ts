@@ -1,6 +1,6 @@
 ﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import jwt from 'jsonwebtoken';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 import { JWT_SECRET } from '../../src/utils/config.js';
 import { allocate } from '../../src/utils/costSplits.js';
@@ -41,13 +41,12 @@ let expectedActual = 0;
 const stamp = Date.now();
 
 afterAll(async () => {
-  await prisma.costSplit.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
-  await prisma.auditLogEntry.deleteMany({ where: { recordId: woId } }).catch(() => {});
-  await prisma.laborEntry.deleteMany({ where: { operationId: opId } }).catch(() => {});
-  await prisma.workOrderMaterial.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
-  await prisma.externalServiceCost.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
-  await prisma.workOrderOperation.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
-  await prisma.workOrder.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
+  // One helper for the whole subtree. The previous teardown worked through the
+  // children individually and then deleted the work order - which cannot
+  // succeed, because a snapshot restricts the work order and this file takes one
+  // whenever it changes a status. The P2003 that followed was swallowed by the
+  // `.catch` on each line, so the order and its audit rows stayed.
+  await purgeWorkOrders([woId]);
 });
 
 beforeAll(async () => {

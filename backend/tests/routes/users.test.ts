@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import bcrypt from 'bcryptjs';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, auditIdsMatching, purgeAudit, purgeNewAudit } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 let tempUserId = '';
+// Read before any request in this file, so the teardown can remove only the rows
+// this file caused and leave the baseline's alone.
+const seedUserAuditBaseline = await auditIdsMatching({ tableName: 'User', action: 'Blocked' });
 
 describe('users routes', () => {
   beforeAll(async () => {
@@ -23,8 +26,15 @@ describe('users routes', () => {
 
   afterAll(async () => {
     if (tempUserId) {
-      await prisma.auditLogEntry.deleteMany({ where: { userId: tempUserId } }).catch(() => {});
-      await prisma.user.deleteMany({ where: { userId: tempUserId } }).catch(() => {});
+      // By record id, not by actor: the routes audit the user being changed while
+      // the administrator performs the change, so filtering on the actor column
+      // matched the administrator's own history and left this user's rows behind.
+      await purgeAudit([tempUserId]);
+      // A refused password change audits the account it was aimed at, which is a
+      // seeded user and therefore not this file's to delete - only the row the
+      // refusal produced is.
+      await purgeNewAudit(seedUserAuditBaseline, { tableName: 'User', recordId: ctx.adminId, action: 'Blocked' });
+      await prisma.user.deleteMany({ where: { userId: tempUserId } });
     }
   });
 

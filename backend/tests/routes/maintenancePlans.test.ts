@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { api, authHeaders, ctx, auditIdsMatching, purgeMaintenancePlans, purgeNewAudit, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
@@ -9,6 +9,17 @@ let createdWoId = '';
 let workCenterId = '';
 let taskListId = '';
 let functionalLocationId = '';
+
+// POST /run-scheduler is a bulk event, so it audits with the *acting user's* id in
+// `recordId` rather than a plan id (see routes/maintenancePlans.ts). That leaves
+// the row with no handle a fixture teardown could use: it is not keyed by the plan
+// it acted on, and it is not keyed by a record this file created. The same
+// convention is used for "mark every alert read", and there the acting user *is*
+// the subject; here it is not. Whether a bulk run should be recorded against the
+// actor, against each plan, or not at all is a product question - raised against
+// SOW 3.5.1 rather than decided here - so for now the rows this file causes are
+// removed by diff against the ids that already existed.
+const schedulerRunBaseline = await auditIdsMatching({ tableName: 'MaintenancePlan', action: 'Run' });
 
 describe('maintenance plans routes', () => {
   beforeAll(async () => {
@@ -23,13 +34,15 @@ describe('maintenance plans routes', () => {
   });
 
   afterAll(async () => {
-    if (createdWoId) {
-      await api().delete(`/api/work-orders/${createdWoId}`).set(authHeaders(ctx.adminToken)).catch(() => {});
-    }
-    if (createdId) {
-      await prisma.maintenancePlan.deleteMany({ where: { planId: createdId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: createdId } }).catch(() => {});
-    }
+    // Two failures in one teardown. Deleting the plan cannot succeed while a meter
+    // is attached to it - the relation has no `onDelete`, so it RESTRICTs - and
+    // this file attaches one; the resulting P2003 was swallowed and the plan
+    // survived. The work order was removed through the route, which soft-deletes,
+    // so it stayed as a row too. Both are cleared as subtrees now, and neither
+    // helper swallows.
+    await purgeWorkOrders([createdWoId]);
+    await purgeMaintenancePlans([createdId]);
+    await purgeNewAudit(schedulerRunBaseline, { tableName: 'MaintenancePlan', action: 'Run' });
   });
 
   const planBody = () => ({

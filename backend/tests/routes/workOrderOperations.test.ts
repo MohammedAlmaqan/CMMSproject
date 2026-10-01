@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { api, authHeaders, ctx, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 let woId = '';
@@ -30,13 +30,13 @@ describe('work order operations routes', () => {
     craftId = c!.craftId;
   });
 
-  afterAll(async () => {
-    if (opId) {
-      await prisma.laborEntry.deleteMany({ where: { operationId: opId } }).catch(() => {});
-      await prisma.workOrderOperation.deleteMany({ where: { operationId: opId } }).catch(() => {});
-    }
-    await prisma.auditLogEntry.deleteMany({ where: { recordId: woId } }).catch(() => {});
-    await prisma.workOrder.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
+afterAll(async () => {
+    // The helper clears the operation and its labor entries along with the work
+    // order, and the audit rows for both. Deleting the operation and the order
+    // separately could not have worked: this file edits the order's status, which
+    // takes a snapshot, and a snapshot restricts the order. That P2003 was
+    // swallowed by the `.catch` below it and the order survived every run.
+    await purgeWorkOrders([woId]);
   });
 
   it('returns the operations for a work order', async () => {

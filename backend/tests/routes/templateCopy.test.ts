@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, purgeMaterials, purgeTaskLists, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 // SOW 3.1.4: work orders can copy operations from a reusable task list.
@@ -70,17 +70,13 @@ describe('copying operations from a task list into a work order (SOW 3.1.4)', ()
   });
 
 afterAll(async () => {
-    for (const id of createdIds) {
-      await api().delete(`/api/work-orders/${id}`).set(authHeaders(ctx.adminToken)).catch(() => {});
-    }
-    await prisma.workOrderMaterial.deleteMany({ where: { materialId: { in: [materialA, materialB] } } }).catch(() => {});
-    if (templateId) {
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: templateId } }).catch(() => {});
-      await prisma.taskListMaterial.deleteMany({ where: { taskOperation: { taskListId: templateId } } }).catch(() => {});
-      await prisma.taskListOperation.deleteMany({ where: { taskListId: templateId } }).catch(() => {});
-      await prisma.taskList.deleteMany({ where: { taskListId: templateId } }).catch(() => {});
-    }
-    await prisma.material.deleteMany({ where: { materialId: { in: [materialA, materialB] } } }).catch(() => {});
+    // The orders are hard-deleted with their children. Deleting them through the
+    // route soft-deleted instead, and the lines and template below were then
+    // removed with no reference to the orders that held them - leaving the
+    // soft-deleted orders, their operations and their audit rows behind.
+    await purgeWorkOrders(createdIds);
+    await purgeTaskLists([templateId]);
+    await purgeMaterials([materialA, materialB]);
   });
 
   it('copies the template operations and their per-step materials into the draft', async () => {

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+﻿import { describe, it, expect, afterAll } from 'vitest';
+import { api, authHeaders, ctx, purgeWorkCenters } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
@@ -71,5 +71,13 @@ describe('work centers routes', () => {
     const res = await api().delete(`/api/work-centers/${createdId}`).set(authHeaders(ctx.adminToken));
     expect(res.status).toBe(200);
     expect(await auditCount(createdId, 'Delete')).toBe(before + 1);
+  });
+  afterAll(async () => {
+    // This file had no teardown at all, so the row it created survived every run -
+    // and the delete case guarantees it, because that route marks the row rather
+    // than removing it. A work centre is also restricted by crafts, plans, task
+    // lists and work orders, so the helper clears whatever hung off this one
+    // before the centre itself.
+    await purgeWorkCenters([createdId]);
   });
 });

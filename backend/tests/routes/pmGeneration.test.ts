@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../../src/utils/prisma.js';
 import { runSchedulerOnce } from '../../src/services/scheduler.js';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, purgeMaintenancePlans, purgeNotificationsByPlanCode } from '../helpers.js';
 
 /**
  * SOW 3.4.1 to 3.4.3: what a maintenance plan generates, when, and exactly once.
@@ -26,6 +26,10 @@ let meterId = '';
 let userId = '';
 const planIds = new Set<string>();
 const notificationIds: string[] = [];
+// Every code `makePlan` is given. The generation route names its notification
+// after the plan code, so these are needed to find that row after the plan itself
+// has been removed.
+const planCodes: string[] = [];
 
 async function makePlan(data: {
   code: string;
@@ -92,6 +96,11 @@ async function makePlan(data: {
     });
     await prisma.maintenancePlan.update({ where: { planId }, data: { notificationId } });
   }
+  // Recorded here rather than derived at teardown: the notification names the
+  // plan *code* in its description, and the code is this function's argument.
+  // The plan is then deleted, so the code is no longer readable from anywhere
+  // else by the time the teardown runs.
+  planCodes.push(data.code);
   return planId;
 }
 
@@ -117,22 +126,17 @@ describe('PM generation: SOW 3.4.3 contents', () => {
   });
 
   afterAll(async () => {
+    // One purge for the whole subtree per plan. The hand-written version listed
+    // the children it knew about and deleted the work order directly, which
+    // cannot succeed once generation has taken a snapshot - and it matched
+    // notifications on a description fragment ('pm-gen') that the generation
+    // route does not write, so those rows were never reached at all. The helper
+    // finds the orders by `sourcePlanId`, the notifications and the alerts that
+    // announce them, and the audit rows for all of it.
     for (const planId of planIds) {
-      const wos = await prisma.workOrder.findMany({
-        where: { sourcePlanId: planId },
-        select: { workOrderId: true },
-      });
-      const woIds = wos.map((w) => w.workOrderId);
-      await prisma.workOrderNotifLink.deleteMany({ where: { workOrderId: { in: woIds } } });
-      await prisma.workOrderOperation.deleteMany({ where: { workOrderId: { in: woIds } } });
-      await prisma.notification.deleteMany({
-        where: { description: { contains: 'pm-gen' } },
-      });
-      await prisma.workOrder.deleteMany({ where: { sourcePlanId: planId } });
-      await prisma.maintenancePlanMeter.deleteMany({ where: { planId } });
-      await prisma.maintenancePlanTarget.deleteMany({ where: { planId } });
-      await prisma.maintenancePlan.deleteMany({ where: { planId } });
+      await purgeMaintenancePlans([planId]);
     }
+    await purgeNotificationsByPlanCode(planCodes);
   });
 
   it('copies the plan task list onto the generated work order (row 45)', async () => {
@@ -217,13 +221,9 @@ describe('PM generation: SOW 3.4.3 idempotency', () => {
 
   afterAll(async () => {
     for (const planId of planIds) {
-      const wos = await prisma.workOrder.findMany({ where: { sourcePlanId: planId }, select: { workOrderId: true } });
-      const woIds = wos.map((w) => w.workOrderId);
-      await prisma.workOrderOperation.deleteMany({ where: { workOrderId: { in: woIds } } });
-      await prisma.workOrder.deleteMany({ where: { sourcePlanId: planId } });
-      await prisma.maintenancePlanTarget.deleteMany({ where: { planId } });
-      await prisma.maintenancePlan.deleteMany({ where: { planId } });
+      await purgeMaintenancePlans([planId]);
     }
+    await purgeNotificationsByPlanCode(planCodes);
   });
 
   it('raises one work order per cycle however many times the route is called (row 48)', async () => {
@@ -322,13 +322,9 @@ describe('PM generation: D-10 many assets per plan', () => {
 
   afterAll(async () => {
     for (const planId of planIds) {
-      const wos = await prisma.workOrder.findMany({ where: { sourcePlanId: planId }, select: { workOrderId: true } });
-      const woIds = wos.map((w) => w.workOrderId);
-      await prisma.workOrderOperation.deleteMany({ where: { workOrderId: { in: woIds } } });
-      await prisma.workOrder.deleteMany({ where: { sourcePlanId: planId } });
-      await prisma.maintenancePlanTarget.deleteMany({ where: { planId } });
-      await prisma.maintenancePlan.deleteMany({ where: { planId } });
+      await purgeMaintenancePlans([planId]);
     }
+    await purgeNotificationsByPlanCode(planCodes);
   });
 
   it('raises one work order per covered asset for the cycle', async () => {
@@ -364,14 +360,9 @@ describe('PM generation: SOW 3.4.2 scheduling window', () => {
 
   afterAll(async () => {
     for (const planId of planIds) {
-      const wos = await prisma.workOrder.findMany({ where: { sourcePlanId: planId }, select: { workOrderId: true } });
-      const woIds = wos.map((w) => w.workOrderId);
-      await prisma.workOrderOperation.deleteMany({ where: { workOrderId: { in: woIds } } });
-      await prisma.workOrder.deleteMany({ where: { sourcePlanId: planId } });
-      await prisma.maintenancePlanMeter.deleteMany({ where: { planId } });
-      await prisma.maintenancePlanTarget.deleteMany({ where: { planId } });
-      await prisma.maintenancePlan.deleteMany({ where: { planId } });
+      await purgeMaintenancePlans([planId]);
     }
+    await purgeNotificationsByPlanCode(planCodes);
   });
 
   it('does not generate before the call horizon opens (row 43)', async () => {

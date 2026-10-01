@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, auditIdsMatching, purgeNewAudit, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 // SOW 3.4 (matrix :127): the configured work-order-number prefix reaches the
@@ -18,6 +18,9 @@ let techId = '';
 let supId = '';
 const woIds: string[] = [];
 const opIds: string[] = [];
+// Taken before this file changes the prefix, so the teardown removes only the
+// audit rows it caused and leaves the baseline's alone.
+const configAuditBaseline = await auditIdsMatching({ tableName: 'SystemConfig', recordId: 'wo_number_prefix' });
 
 const stamp = Date.now();
 let nseq = 0;
@@ -67,14 +70,17 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await restorePrefix();
-  await prisma.auditLogEntry
-    .deleteMany({ where: { recordId: { in: [...woIds, ...opIds] } } })
-    .catch(() => {});
-  await prisma.systemConfig
-    .updateMany({ where: { key: 'wo_number_prefix', isDeleted: false }, data: { value: 'WO' } })
-    .catch(() => {});
-  await prisma.workOrderOperation.deleteMany({ where: { operationId: { in: opIds } } }).catch(() => {});
-  await prisma.workOrder.deleteMany({ where: { workOrderId: { in: woIds } } }).catch(() => {});
+  // One helper for the whole subtree. The old teardown deleted operations and
+  // then work orders directly, in that order, which cannot succeed: a snapshot
+  // restricts the work order, and the resulting P2003 was swallowed by the
+  // `.catch` that surrounded it, so the orders and the audit rows describing
+  // them both stayed.
+  await purgeWorkOrders(woIds);
+  await prisma.systemConfig.updateMany({ where: { key: 'wo_number_prefix', isDeleted: false }, data: { value: 'WO' } });
+  // Changing the number prefix is a configuration change and is audited, but the
+  // config row is seed master data with no fixture id. Deleting every row for
+  // that key would also delete rows from the baseline; only this run's are gone.
+  await purgeNewAudit(configAuditBaseline, { tableName: 'SystemConfig', recordId: 'wo_number_prefix' });
 });
 
 describe('configured work-order number prefix (SOW 3.4, :127)', () => {

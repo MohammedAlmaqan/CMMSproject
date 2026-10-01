@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, purgeWorkOrders, purgeSafetyChecklistTemplates } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 let createdId = '';
@@ -49,16 +49,15 @@ describe('work orders routes', () => {
   };
 
   afterAll(async () => {
-    for (const id of [createdId, ...extraIds]) {
-      await api().delete(`/api/work-orders/${id}`).set(authHeaders(ctx.adminToken)).catch(() => {});
-    }
-    for (const id of checklistIds) {
-      await prisma.workOrderChecklistItem.deleteMany({ where: { woChecklistId: id } }).catch(() => {});
-      await prisma.workOrderChecklist.deleteMany({ where: { woChecklistId: id } }).catch(() => {});
-    }
+    // Hard-delete, and delete the whole subtree. Going through the DELETE route
+    // soft-deleted, which leaves a row that still occupies the table - and a
+    // snapshot, an operation, a checklist and a notification per order is how
+    // one file left 122 rows behind in a single run. The helper also finds the
+    // snapshots and children, so a work order created by a route that the test
+    // never saw an id for is still collected.
+    await purgeWorkOrders([createdId, ...extraIds]);
     if (gateTemplateId) {
-      await prisma.checklistItem.deleteMany({ where: { checklistTemplateId: gateTemplateId } }).catch(() => {});
-      await prisma.safetyChecklistTemplate.deleteMany({ where: { checklistTemplateId: gateTemplateId } }).catch(() => {});
+      await purgeSafetyChecklistTemplates([gateTemplateId]);
     }
   });
 

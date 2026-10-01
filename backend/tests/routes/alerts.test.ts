@@ -1,15 +1,27 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, auditIdsMatching, purgeAlerts, purgeNewAudit } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 let alertId = '';
+// Read before the first request in this file, so the teardown can drop only the
+// bulk-alert audit row this run produced.
+const bulkAuditBaseline = await auditIdsMatching({
+  tableName: 'SystemAlert',
+  recordId: ctx.operatorId,
+  action: 'Update',
+  fieldName: null,
+});
 
 describe('alerts routes', () => {
   afterAll(async () => {
-    if (alertId) {
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: alertId } }).catch(() => {});
-      await prisma.systemAlert.deleteMany({ where: { alertId } }).catch(() => {});
-    }
+    await purgeAlerts([alertId]);
+    // "Mark every alert read" is a bulk event, so it audits under the acting
+    // user rather than under an alert, and that row outlived this file. Deleting
+    // every row of that shape is not the fix, though: earlier runs left rows of
+    // exactly that shape, so they are in the baseline and a blanket delete
+    // destroys them - which the invariance check reports as lost rows, just as
+    // loudly. Only the row this run added goes.
+    await purgeNewAudit(bulkAuditBaseline, { tableName: 'SystemAlert', recordId: ctx.operatorId, action: 'Update', fieldName: null });
   });
 
   it('returns the current users alerts', async () => {

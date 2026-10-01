@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, purgeMaterials, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 let woId = '';
@@ -29,12 +29,8 @@ describe('work order materials routes', () => {
     materialId = (await prisma.material.findFirst({ where: { isDeleted: false } }))!.materialId;
   });
 
-  afterAll(async () => {
-    if (woMatId) {
-      await prisma.workOrderMaterial.deleteMany({ where: { woMaterialId: woMatId } }).catch(() => {});
-    }
-    await prisma.auditLogEntry.deleteMany({ where: { recordId: woId } }).catch(() => {});
-    await prisma.workOrder.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
+afterAll(async () => {
+    await purgeWorkOrders([woId]);
   });
 
   /**
@@ -107,13 +103,12 @@ describe('work order materials routes', () => {
     });
 
     afterAll(async () => {
-      for (const id of createdLineIds) {
-        await prisma.workOrderMaterial.deleteMany({ where: { woMaterialId: id } }).catch(() => {});
-      }
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: createdLineIds } } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: [reservationWoId, otherWoId] } } }).catch(() => {});
-      await prisma.workOrder.deleteMany({ where: { workOrderId: { in: [reservationWoId, otherWoId] } } }).catch(() => {});
-      await prisma.material.deleteMany({ where: { materialId: stockMaterialId } }).catch(() => {});
+      // Clears the lines, the two orders and the audit rows for all three
+      // together. Deleting the orders directly could not succeed once a status
+      // change had taken a snapshot, and the P2003 that followed was swallowed
+      // by the `.catch`, so both orders survived every run.
+      await purgeWorkOrders([reservationWoId, otherWoId]);
+      await purgeMaterials([stockMaterialId]);
     });
 
     async function reserve(workOrder: string, quantity: number) {

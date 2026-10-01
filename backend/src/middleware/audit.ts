@@ -114,12 +114,25 @@ export async function logAuditAction(entry: ActionEntry) {
 export function auditMiddleware(tableName: string) {
   return (req: Request, res: Response, next: NextFunction) => {
     const originalJson = res.json.bind(res);
-    res.json = function (body: any) {
+    // `res.json` is typed as synchronous, so an async replacement does not typecheck
+    // even though Express does not inspect the return value. The promise resolves
+    // to the response for callers that await it and is discarded by the ones that
+    // do not, which is why the cast is confined to this one line.
+    const respondAsync = async function (this: Response, body: unknown): Promise<void> {
       if (res.statusCode < 400 && req.user) {
-        const recordId = req.params.id || body?.id || body?.recordId;
+        const payload = body as { id?: unknown; recordId?: unknown } | null;
+        const recordId = req.params.id || payload?.id || payload?.recordId;
         const action = req.method === 'POST' ? 'Create' : req.method === 'PUT' || req.method === 'PATCH' ? 'Update' : 'Delete';
-        if (recordId) {
-          void logAuditAction({
+        if (typeof recordId === 'string' && recordId) {
+          // Awaited rather than fired and forgotten. Firing it off let the write
+          // resolve after the response reached the caller, so anything reacting to
+          // that response by deleting the record - a test tearing down a fixture,
+          // which is exactly what this suite does - could remove the row first and
+          // leave an audit entry describing a record that no longer existed, with
+          // nothing left to find and purge it by. `write` swallows its own errors,
+          // so awaiting it here cannot turn an audit failure into a failed request;
+          // that policy is unchanged.
+          await logAuditAction({
             table: tableName,
             recordId,
             action,
@@ -128,8 +141,9 @@ export function auditMiddleware(tableName: string) {
           });
         }
       }
-      return originalJson(body);
+      originalJson(body);
     };
+    res.json = respondAsync as unknown as Response['json'];
     next();
   };
 }

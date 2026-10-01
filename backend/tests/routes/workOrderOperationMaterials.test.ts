@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { api, authHeaders, ctx, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 // SOW 3.1.5 (matrix :97): a material requirement attaches to the operation
@@ -88,11 +88,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  for (const id of lineIds) {
-    await prisma.workOrderMaterial.deleteMany({ where: { woMaterialId: id } }).catch(() => {});
-  }
-  await prisma.workOrderOperation.deleteMany({ where: { workOrderId: { in: [woId, otherWoId] } } }).catch(() => {});
-  await prisma.workOrder.deleteMany({ where: { workOrderId: { in: [woId, otherWoId] } } }).catch(() => {});
+  // Clears the material lines, the operations and the orders together, plus the
+  // audit rows describing them. Deleting the orders on their own could not
+  // succeed once a status change had taken a snapshot, and the resulting P2003
+  // was swallowed, leaving both orders behind.
+  await purgeWorkOrders([woId, otherWoId]);
 });
 
 describe('work order operation materials (SOW 3.1.5, :97)', () => {

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { api, authHeaders, ctx, purgeMaterials } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
@@ -81,5 +81,12 @@ describe('materials routes', () => {
     const list = await api().get('/api/materials').set(authHeaders(ctx.adminToken));
     expect((list.body as any[]).some((m) => m.materialId === createdId)).toBe(false);
     expect(await auditCount(createdId, 'Delete')).toBe(before + 1);
+  });
+  afterAll(async () => {
+    // This file had no teardown at all, so the row it created survived every run -
+    // and soft-deletes a material guarantees it, because the delete route marks
+    // the row rather than removing it. Hard-delete it here, along with the audit
+    // rows describing it.
+    await purgeMaterials([createdId]);
   });
 });
