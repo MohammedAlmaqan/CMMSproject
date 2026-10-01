@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx, purgeWorkOrders, purgeNotifications, purgeAudit } from '../helpers.js';
+import { api, authHeaders, ctx, purgeWorkOrders, purgeNotifications, purgeAudit, purgeMaintenancePlans } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 describe('reports routes', () => {
@@ -23,9 +23,11 @@ describe('reports routes', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns report data as an array', async () => {
+  it('returns the backlog as three breakdowns of one set', async () => {
     const res = await api().get('/api/reports/backlog').set(authHeaders(ctx.adminToken));
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(Array.isArray(res.body.byStatus)).toBe(true);
+    expect(Array.isArray(res.body.byPriority)).toBe(true);
+    expect(Array.isArray(res.body.byWorkCenter)).toBe(true);
   });
 });
 
@@ -122,8 +124,8 @@ describe('report filters', () => {
     const narrow = await api().get('/api/reports/backlog').query({ from: '2000-01-01', to: '2000-01-02' }).set(authHeaders(ctx.adminToken));
     expect(wide.status).toBe(200);
     expect(narrow.status).toBe(200);
-    const wideCount = wide.body.reduce((sum: number, row: { count: number }) => sum + row.count, 0);
-    const narrowCount = narrow.body.reduce((sum: number, row: { count: number }) => sum + row.count, 0);
+    const wideCount = wide.body.byStatus.reduce((sum: number, row: { count: number }) => sum + row.count, 0);
+    const narrowCount = narrow.body.byStatus.reduce((sum: number, row: { count: number }) => sum + row.count, 0);
     expect(narrowCount).toBeLessThanOrEqual(wideCount);
   });
 
@@ -459,6 +461,400 @@ describe('report rows 65-67', () => {
       expect(res.body.total).toBe(0);
       expect(res.body.byPriority).toEqual([]);
       expect(res.body.oldestAgeDays).toBeNull();
+    });
+  });
+});
+
+/**
+ * SOW 3.7.1 rows 60-64. Each of the five reports changes what it answers, so
+ * each has its own case keyed to its clause rather than riding on the shared
+ * sweeps above. The row 61 case carries a negative proof in particular: a
+ * scheduled occurrence that raised no work order has to pull compliance down,
+ * because the defect the row exists to fix is a plan that fell behind reading
+ * as perfect compliance.
+ */
+describe('report rows 60-64', () => {
+  const stamp = Date.now().toString(36);
+
+  let leaf = '';
+  let wc = '';
+  let taskListId = '';
+  let materialId = '';
+
+  let eqBacklog = '';
+  let eqPm = '';
+  let eqMttr = '';
+  let eqCost = '';
+  let eqMat = '';
+
+  const workOrderIds: string[] = [];
+  const equipmentIds: string[] = [];
+  const planIds: string[] = [];
+
+  const createEquipment = async (code: string, name: string) => {
+    const res = await api()
+      .post('/api/equipment')
+      .set(authHeaders(ctx.adminToken))
+      .send({ equipmentCode: code, name, description: 'fixture for report rows 60-64', functionalLocationId: leaf, criticality: 'C' });
+    expect(res.status, `create equipment ${code}`).toBe(201);
+    equipmentIds.push(res.body.equipmentId);
+    return res.body.equipmentId as string;
+  };
+
+  const createWorkOrder = async (description: string, equipment: string, type = 'CM', priority = 'Medium') => {
+    const res = await api()
+      .post('/api/work-orders')
+      .set(authHeaders(ctx.adminToken))
+      .send({
+        type,
+        priority,
+        description,
+        functionalLocationId: leaf,
+        equipmentId: equipment,
+        workCenterId: wc,
+        supervisorUserId: ctx.adminId,
+      });
+    expect(res.status, `create work order "${description}"`).toBe(201);
+    workOrderIds.push(res.body.workOrderId);
+    return res.body.workOrderId as string;
+  };
+
+  beforeAll(async () => {
+    const [wcs, taskLists, materials] = await Promise.all([
+      api().get('/api/work-centers').set(authHeaders(ctx.adminToken)),
+      api().get('/api/task-lists').set(authHeaders(ctx.adminToken)),
+      api().get('/api/materials').set(authHeaders(ctx.adminToken)),
+    ]);
+    wc = wcs.body[0].workCenterId;
+    taskListId = taskLists.body[0].taskListId;
+    materialId = materials.body[0].materialId;
+
+    const leafRow = await prisma.functionalLocation.findFirst({
+      where: { isDeleted: false, children: { none: { isDeleted: false } } },
+      select: { functionalLocationId: true },
+      orderBy: { functionalLocationId: 'asc' },
+    });
+    if (!leafRow) throw new Error('no lowest-level functional location in the seed; report row tests cannot run');
+    leaf = leafRow.functionalLocationId;
+
+    eqBacklog = await createEquipment(`R4BL${stamp}`, 'R4 backlog probe');
+    eqPm = await createEquipment(`R4PM${stamp}`, 'R4 compliance probe');
+    eqMttr = await createEquipment(`R4MT${stamp}`, 'R4 mttr probe');
+    eqCost = await createEquipment(`R4CC${stamp}`, 'R4 cost probe');
+    eqMat = await createEquipment(`R4MA${stamp}`, 'R4 material probe');
+
+    // Row 60 fixture: one open work order with a priority that stands out.
+    await createWorkOrder(`r4 backlog priority probe ${stamp}`, eqBacklog, 'CM', 'High');
+
+    // Row 61 fixtures: one time-based monthly plan and one meter plan, both
+    // targeted at the same asset so a single equipmentId filter isolates them.
+    const timePlan = await prisma.maintenancePlan.create({
+      data: {
+        planCode: `R4TIME${stamp}`,
+        description: 'r4 compliance time plan',
+        equipmentId: eqPm,
+        functionalLocationId: leaf,
+        workCenterId: wc,
+        taskListId,
+        strategyType: 'Time',
+        intervalValue: 1,
+        intervalUnit: 'Months',
+        startDate: new Date('2026-01-15T00:00:00.000Z'),
+      },
+    });
+    planIds.push(timePlan.planId);
+    const meterPlan = await prisma.maintenancePlan.create({
+      data: {
+        planCode: `R4METER${stamp}`,
+        description: 'r4 compliance meter plan',
+        equipmentId: eqPm,
+        functionalLocationId: leaf,
+        workCenterId: wc,
+        taskListId,
+        strategyType: 'Meter',
+        intervalValue: 1,
+        intervalUnit: 'Days',
+        startDate: new Date('2026-01-15T00:00:00.000Z'),
+      },
+    });
+    planIds.push(meterPlan.planId);
+
+    // The January occurrence was raised, completed and closed against the
+    // plan's own cycle key. February's occurrence is deliberately left alone:
+    // it is the scheduled-but-unraised cycle the denominator has to include.
+    const pmWo = await createWorkOrder(`r4 compliance completed probe ${stamp}`, eqPm, 'PM');
+    await prisma.workOrder.update({
+      where: { workOrderId: pmWo },
+      data: { status: 'Completed', sourcePlanId: timePlan.planId, sourcePlanCycle: '2026-01-15' },
+    });
+
+    // Row 62 fixtures: two complete breakdowns on one asset (4h and 2h, so the
+    // mean is 3h and neither the sum nor a count), plus one with no finish
+    // timestamp, which must be counted as excluded rather than dropped.
+    const woMttr1 = await createWorkOrder(`r4 mttr probe one ${stamp}`, eqMttr, 'EM');
+    const woMttr2 = await createWorkOrder(`r4 mttr probe two ${stamp}`, eqMttr, 'EM');
+    const woMttrIncomplete = await createWorkOrder(`r4 mttr incomplete probe ${stamp}`, eqMttr, 'EM');
+    await prisma.workOrder.update({
+      where: { workOrderId: woMttr1 },
+      data: { actualStart: new Date('2026-05-10T00:00:00.000Z'), actualFinish: new Date('2026-05-10T04:00:00.000Z') },
+    });
+    await prisma.workOrder.update({
+      where: { workOrderId: woMttr2 },
+      data: { actualStart: new Date('2026-05-11T00:00:00.000Z'), actualFinish: new Date('2026-05-11T02:00:00.000Z') },
+    });
+    await prisma.workOrder.update({
+      where: { workOrderId: woMttrIncomplete },
+      data: { actualStart: new Date('2026-05-12T00:00:00.000Z') },
+    });
+
+    // Row 63 fixtures: two work orders in March 2026 in one cost centre. The
+    // cost summary is built on the R.1 rollups, which derive cost from the
+    // work order's relations rather than reading the stored columns, so the
+    // cost here is driven through material lines: 10x10 vs 15x10 planned and
+    // actual on the first, 5x10 vs 4x10 on the second. Totals: planned 150,
+    // actual 190, variance 40.
+    const woCost1 = await createWorkOrder(`r4 cost probe one ${stamp}`, eqCost);
+    const woCost2 = await createWorkOrder(`r4 cost probe two ${stamp}`, eqCost);
+    await prisma.workOrder.update({
+      where: { workOrderId: woCost1 },
+      data: { costCenterCode: 'R4CC', createdDate: new Date('2026-03-10T12:00:00.000Z') },
+    });
+    await prisma.workOrder.update({
+      where: { workOrderId: woCost2 },
+      data: { costCenterCode: 'R4CC', createdDate: new Date('2026-03-11T12:00:00.000Z') },
+    });
+    await prisma.workOrderMaterial.create({
+      data: { workOrderId: woCost1, materialId, plannedQuantity: 10, actualQuantity: 15, unitCost: 10 },
+    });
+    await prisma.workOrderMaterial.create({
+      data: { workOrderId: woCost2, materialId, plannedQuantity: 5, actualQuantity: 4, unitCost: 10 },
+    });
+
+    // Row 64 fixtures: two consumption lines of one material at different unit
+    // costs. The correct total is 2x10 + 3x20 = 80; summing quantity then
+    // multiplying by the summed unit cost would answer 5x30 = 150.
+    const woMat = await createWorkOrder(`r4 material probe ${stamp}`, eqMat);
+    await prisma.workOrderMaterial.create({
+      data: { workOrderId: woMat, materialId, plannedQuantity: 2, actualQuantity: 2, unitCost: 10 },
+    });
+    await prisma.workOrderMaterial.create({
+      data: { workOrderId: woMat, materialId, plannedQuantity: 3, actualQuantity: 3, unitCost: 20 },
+    });
+  });
+
+  afterAll(async () => {
+    await purgeWorkOrders(workOrderIds);
+    await purgeMaintenancePlans(planIds);
+    await purgeAudit(equipmentIds);
+    await prisma.equipment.deleteMany({ where: { equipmentId: { in: equipmentIds } } });
+  });
+
+  describe('row 60 - backlog by status, priority and work centre', () => {
+    const backlog = async () => {
+      const res = await api().get('/api/reports/backlog').set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      return res.body as {
+        byStatus: Array<{ status: string; count: number; totalPlannedHours: number }>;
+        byPriority: Array<{ priority: string; count: number; totalPlannedHours: number }>;
+        byWorkCenter: Array<{ workCenterId: string; workCenterCode: string; count: number; totalPlannedHours: number }>;
+      };
+    };
+
+    it('slices the same backlog three ways, so the breakdowns agree', async () => {
+      const body = await backlog();
+      const statusCount = body.byStatus.reduce((s, r) => s + r.count, 0);
+      const priorityCount = body.byPriority.reduce((s, r) => s + r.count, 0);
+      const centreCount = body.byWorkCenter.reduce((s, r) => s + r.count, 0);
+      expect(priorityCount).toBe(statusCount);
+      expect(centreCount).toBe(statusCount);
+
+      const statusHours = body.byStatus.reduce((s, r) => s + r.totalPlannedHours, 0);
+      const priorityHours = body.byPriority.reduce((s, r) => s + r.totalPlannedHours, 0);
+      const centreHours = body.byWorkCenter.reduce((s, r) => s + r.totalPlannedHours, 0);
+      expect(priorityHours).toBeCloseTo(statusHours, 5);
+      expect(centreHours).toBeCloseTo(statusHours, 5);
+    });
+
+    it('reports the priority dimension, not only status', async () => {
+      const body = await backlog();
+      const high = body.byPriority.find((r) => r.priority === 'High');
+      expect(high, 'the High-priority fixture appears in the priority breakdown').toBeDefined();
+      expect(high!.count).toBeGreaterThanOrEqual(1);
+    });
+
+    it('names each work centre it groups by', async () => {
+      const body = await backlog();
+      const row = body.byWorkCenter.find((r) => r.workCenterId === wc);
+      expect(row, 'the fixture work centre appears').toBeDefined();
+      expect(row!.workCenterCode).toBeTruthy();
+    });
+  });
+
+  describe('row 61 - PM compliance from scheduled occurrences', () => {
+    const compliance = async (year: number, month: number) => {
+      const res = await api()
+        .get('/api/reports/pm-compliance')
+        .query({ year, month, equipmentId: eqPm })
+        .set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      return res.body as {
+        scheduledPM: number;
+        completedPM: number;
+        complianceRate: number;
+        excludedMeterPlans: number;
+        exclusionNote: string;
+      };
+    };
+
+    it('counts completed PMs against scheduled occurrences, not raised work orders', async () => {
+      const body = await compliance(2026, 1);
+      expect(body.scheduledPM).toBe(1);
+      expect(body.completedPM).toBe(1);
+      expect(body.complianceRate).toBe(100);
+    });
+
+    it('counts a scheduled occurrence that raised nothing, so a backlog cannot read as compliance', async () => {
+      const body = await compliance(2026, 2);
+      // February's occurrence was due on the 15th. No work order was raised for
+      // it. A report that used raised work orders as its denominator would have
+      // nothing to divide and would answer 0/0, which rounds to a clean 0% or is
+      // silently skipped; this asserts the schedule, not the paperwork.
+      expect(body.scheduledPM).toBe(1);
+      expect(body.completedPM).toBe(0);
+      expect(body.complianceRate).toBe(0);
+    });
+
+    it('excludes meter-driven plans from the denominator and says so', async () => {
+      const body = await compliance(2026, 1);
+      expect(body.excludedMeterPlans).toBe(1);
+      expect(body.exclusionNote).toMatch(/Meter/i);
+    });
+
+    it('rejects an out-of-range month rather than answering about the wrong period', async () => {
+      const res = await api()
+        .get('/api/reports/pm-compliance')
+        .query({ year: 2026, month: 13, equipmentId: eqPm })
+        .set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('row 62 - MTTR by equipment and by location', () => {
+    const mttr = async () => {
+      const res = await api()
+        .get('/api/reports/mttr')
+        .query({ equipmentId: eqMttr })
+        .set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      return res.body as {
+        byEquipment: Array<{ equipmentId: string; mttrHours: number; breakdownCount: number }>;
+        byLocation: Array<{ functionalLocationId: string; locationCode: string; mttrHours: number; breakdownCount: number }>;
+        excludedIncomplete: number;
+      };
+    };
+
+    it('averages actualFinish - actualStart per equipment', async () => {
+      const body = await mttr();
+      const row = body.byEquipment.find((r) => r.equipmentId === eqMttr);
+      expect(row, 'the fixture asset appears in the equipment breakdown').toBeDefined();
+      // 4h and 2h complete; the mean is 3h, which is neither the sum (6) nor a count (2).
+      expect(row!.breakdownCount).toBe(2);
+      expect(row!.mttrHours).toBeCloseTo(3, 5);
+    });
+
+    it('also reports the location dimension', async () => {
+      const body = await mttr();
+      const row = body.byLocation.find((r) => r.functionalLocationId === leaf);
+      expect(row, 'the fixture location appears in the location breakdown').toBeDefined();
+      expect(row!.breakdownCount).toBe(2);
+      expect(row!.mttrHours).toBeCloseTo(3, 5);
+      expect(row!.locationCode).toBeTruthy();
+    });
+
+    it('reports incomplete breakdowns as excluded rather than dropping them', async () => {
+      const body = await mttr();
+      expect(body.excludedIncomplete).toBe(1);
+    });
+  });
+
+  describe('row 63 - cost summary by cost centre and by location', () => {
+    it('honours the year and month period', async () => {
+      const res = await api()
+        .get('/api/reports/cost-summary')
+        .query({ year: 2026, month: 3, equipmentId: eqCost })
+        .set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      expect(res.body.period).toBe('2026-03');
+      const centre = (res.body.byCostCenter as Array<Record<string, number | string>>).find((r) => r.costCenterCode === 'R4CC');
+      expect(centre, 'the fixture cost centre appears').toBeDefined();
+      expect(centre!.plannedCost).toBeCloseTo(150, 2);
+      expect(centre!.actualCost).toBeCloseTo(190, 2);
+      expect(centre!.variance).toBeCloseTo(40, 2);
+      expect(centre!.workOrderCount).toBe(2);
+    });
+
+    it('groups the same total by location alongside cost centre', async () => {
+      const res = await api()
+        .get('/api/reports/cost-summary')
+        .query({ year: 2026, month: 3, equipmentId: eqCost })
+        .set(authHeaders(ctx.adminToken));
+      const loc = (res.body.byLocation as Array<Record<string, number | string>>).find((r) => r.functionalLocationId === leaf);
+      expect(loc, 'the fixture location appears').toBeDefined();
+      expect(loc!.plannedCost).toBeCloseTo(150, 2);
+      expect(loc!.actualCost).toBeCloseTo(190, 2);
+    });
+
+    it('leaves a different month empty rather than reusing the March figures', async () => {
+      const res = await api()
+        .get('/api/reports/cost-summary')
+        .query({ year: 2026, month: 4, equipmentId: eqCost })
+        .set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      expect(res.body.byCostCenter).toEqual([]);
+    });
+
+    it('states the budget exclusion instead of inventing a budget figure', async () => {
+      const res = await api()
+        .get('/api/reports/cost-summary')
+        .query({ year: 2026, month: 3, equipmentId: eqCost })
+        .set(authHeaders(ctx.adminToken));
+      expect(res.body.budgetNote).toMatch(/D-13|waived/i);
+    });
+  });
+
+  describe('row 64 - material consumption by material, work order and equipment', () => {
+    const consumption = async () => {
+      const res = await api()
+        .get('/api/reports/material-consumption')
+        .query({ equipmentId: eqMat })
+        .set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      return res.body as {
+        byMaterial: Array<{ materialId: string; totalQuantityUsed: number; totalCost: number; usageCount: number }>;
+        byWorkOrder: Array<{ workOrderId: string; woNumber: string; totalQuantityUsed: number; totalCost: number; lineCount: number }>;
+        byEquipment: Array<{ equipmentId: string; totalCost: number; lineCount: number }>;
+      };
+    };
+
+    it('prices each line at its own unit cost rather than at a summed rate', async () => {
+      const body = await consumption();
+      const material = body.byMaterial.find((r) => r.materialId === materialId);
+      expect(material, 'the fixture material appears').toBeDefined();
+      // 2x10 + 3x20 = 80. Summing quantity then unit cost would answer 5x30 = 150.
+      expect(material!.totalCost).toBeCloseTo(80, 2);
+      expect(material!.totalCost).not.toBeCloseTo(150, 2);
+      expect(material!.totalQuantityUsed).toBeCloseTo(5, 5);
+      expect(material!.usageCount).toBe(2);
+    });
+
+    it('breaks the same lines down by work order and by equipment', async () => {
+      const body = await consumption();
+      expect(body.byWorkOrder).toHaveLength(1);
+      expect(body.byWorkOrder[0].totalCost).toBeCloseTo(80, 2);
+      expect(body.byWorkOrder[0].lineCount).toBe(2);
+      const equipment = body.byEquipment.find((r) => r.equipmentId === eqMat);
+      expect(equipment, 'the fixture asset appears in the equipment breakdown').toBeDefined();
+      expect(equipment!.totalCost).toBeCloseTo(80, 2);
     });
   });
 });

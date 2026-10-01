@@ -6,9 +6,15 @@ import {
   buildDateWhere,
   buildScopeWhere,
   descendantLocationIds,
+  parseDayStart,
   parseReportFilter,
 } from '../utils/reportFilters.js';
 import type { ReportFilter } from '../utils/reportFilters.js';
+import { cyclesInWindow } from '../utils/pmDueRules.js';
+import type { IntervalUnit } from '../utils/pmDueRules.js';
+import { baseCycleKey } from '../services/pmGeneration.js';
+import { loadCostRollup } from '../utils/costRollupData.js';
+import { rollupByLocation } from '../utils/costRollup.js';
 
 const router = Router();
 
@@ -57,11 +63,15 @@ async function resolveReportScope(
  * @openapi
  * /api/reports/backlog:
  *   get:
- *     summary: Work order backlog by status
+ *     summary: Work order backlog by status, by priority and by work centre
  *     description: >
- *       Counts open work orders per status, excluding Completed, Closed and Cancelled, and
- *       sums the planned hours of their operations into the same buckets. Read-only and
- *       available to any authenticated role.
+ *       Counts open work orders (excluding Completed, Closed and Cancelled) and sums the
+ *       planned hours of their operations, presented as three breakdowns of the same
+ *       backlog: by status, by priority and by work centre. The clause reads "by status,
+ *       priority, and work center" as three available slices rather than one status x
+ *       priority x work centre cube. Each breakdown partitions the backlog, so the three
+ *       counts are equal to each other and the three hour totals are equal to each other.
+ *       Read-only and available to any authenticated role.
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
@@ -90,17 +100,38 @@ async function resolveReportScope(
  *         schema: { type: string }
  *     responses:
  *       '200':
- *         description: Backlog grouped by status
+ *         description: The same backlog sliced three ways
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   status: { type: string }
- *                   count: { type: integer }
- *                   totalPlannedHours: { type: number, format: float }
+ *               type: object
+ *               properties:
+ *                 byStatus:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       status: { type: string }
+ *                       count: { type: integer }
+ *                       totalPlannedHours: { type: number, format: float }
+ *                 byPriority:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       priority: { type: string }
+ *                       count: { type: integer }
+ *                       totalPlannedHours: { type: number, format: float }
+ *                 byWorkCenter:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       workCenterId: { type: string }
+ *                       workCenterCode: { type: string }
+ *                       workCenterName: { type: string }
+ *                       count: { type: integer }
+ *                       totalPlannedHours: { type: number, format: float }
  *       '401':
  *         description: Missing or invalid bearer token
  *       '500':
@@ -117,45 +148,75 @@ router.get('/backlog', async (req: Request, res: Response) => {
       ...(buildDateWhere(resolved.filter, 'createdDate') ?? {}),
     };
 
-    const backlog = await prisma.workOrder.groupBy({
-      by: ['status'],
-      where: scoped,
-      _count: { workOrderId: true },
-      orderBy: { status: 'asc' },
-    });
-
-    const hoursByStatus = await prisma.workOrderOperation.groupBy({
-      by: ['workOrderId'],
-      where: {
-        isDeleted: false,
-        workOrder: scoped,
-      },
-      _sum: { plannedHours: true },
-    });
-
-    const woHoursMap = new Map<string, number>();
-    for (const entry of hoursByStatus) {
-      woHoursMap.set(entry.workOrderId, entry._sum.plannedHours || 0);
-    }
-
+    // One read of the backlog rows and one read of their operation hours, then
+    // three in-process groupings over the same rows. Querying three times would
+    // let the three breakdowns disagree at a row boundary, and the equality of
+    // their totals is the property a caller relies on to trust any one of them.
     const workOrders = await prisma.workOrder.findMany({
       where: scoped,
-      select: { workOrderId: true, status: true },
+      select: { workOrderId: true, status: true, priority: true, workCenterId: true },
     });
+    const workOrderIds = workOrders.map((w) => w.workOrderId);
 
-    const totalHoursByStatus: Record<string, number> = {};
-    for (const wo of workOrders) {
-      const hours = woHoursMap.get(wo.workOrderId) || 0;
-      totalHoursByStatus[wo.status] = (totalHoursByStatus[wo.status] || 0) + hours;
+    const hoursByWorkOrder = await prisma.workOrderOperation.groupBy({
+      by: ['workOrderId'],
+      where: { isDeleted: false, workOrderId: { in: workOrderIds } },
+      _sum: { plannedHours: true },
+    });
+    const hoursMap = new Map<string, number>();
+    for (const entry of hoursByWorkOrder) {
+      hoursMap.set(entry.workOrderId, entry._sum.plannedHours ?? 0);
     }
 
-    const result = backlog.map((entry) => ({
-      status: entry.status,
-      count: entry._count.workOrderId,
-      totalPlannedHours: totalHoursByStatus[entry.status] || 0,
-    }));
+    interface BacklogBucket {
+      count: number;
+      totalPlannedHours: number;
+    }
+    const accumulate = <T extends BacklogBucket>(
+      map: Map<string, T>,
+      key: string,
+      base: Omit<T, 'count' | 'totalPlannedHours'>,
+      hours: number
+    ): void => {
+      let entry = map.get(key);
+      if (!entry) {
+        entry = { ...base, count: 0, totalPlannedHours: 0 } as T;
+        map.set(key, entry);
+      }
+      entry.count += 1;
+      entry.totalPlannedHours += hours;
+    };
 
-    res.json(result);
+    const statuses = new Map<string, { status: string; count: number; totalPlannedHours: number }>();
+    const priorities = new Map<string, { priority: string; count: number; totalPlannedHours: number }>();
+    const centres = new Map<string, { workCenterId: string; count: number; totalPlannedHours: number }>();
+
+    for (const wo of workOrders) {
+      const hours = hoursMap.get(wo.workOrderId) ?? 0;
+      accumulate(statuses, wo.status, { status: wo.status }, hours);
+      accumulate(priorities, wo.priority, { priority: wo.priority }, hours);
+      accumulate(centres, wo.workCenterId, { workCenterId: wo.workCenterId }, hours);
+    }
+
+    const centreDetails = await prisma.workCenter.findMany({
+      where: { workCenterId: { in: [...centres.keys()] } },
+      select: { workCenterId: true, code: true, name: true },
+    });
+    const centreDetailMap = new Map(centreDetails.map((c) => [c.workCenterId, c]));
+
+    res.json({
+      byStatus: [...statuses.values()].sort((a, b) => a.status.localeCompare(b.status)),
+      byPriority: [...priorities.values()].sort((a, b) => a.priority.localeCompare(b.priority)),
+      byWorkCenter: [...centres.values()]
+        .map((c) => ({
+          workCenterId: c.workCenterId,
+          workCenterCode: centreDetailMap.get(c.workCenterId)?.code ?? '',
+          workCenterName: centreDetailMap.get(c.workCenterId)?.name ?? '',
+          count: c.count,
+          totalPlannedHours: c.totalPlannedHours,
+        }))
+        .sort((a, b) => a.workCenterCode.localeCompare(b.workCenterCode)),
+    });
   } catch (error) {
     logger.error({ err: error }, 'Error generating backlog report');
     res.status(500).json({ error: 'Internal server error' });
@@ -169,9 +230,15 @@ router.get('/backlog', async (req: Request, res: Response) => {
  *   get:
  *     summary: PM compliance rate for a month
  *     description: >
- *       For the given calendar month, reports how many PM work orders were raised and how
- *       many reached Completed or Closed, and the resulting compliance percentage. Defaults
- *       to the current month when year or month is omitted.
+ *       Compliance is the share of PMs *scheduled* for the month that were completed,
+ *       not the share of raised work orders. Scheduled PMs are the time-based occurrences
+ *       due in the period, derived from each MaintenancePlan's start date and interval, so a
+ *       plan that fell behind and never raised work is still counted against the rate. The
+ *       numerator counts PM work orders whose source plan cycle falls in the period and
+ *       whose status reached Completed or Closed. Meter-driven plans have no calendar due
+ *       date and are excluded from the denominator; their count is returned so the exclusion
+ *       is visible rather than silent. Defaults to the current month when year or month is
+ *       omitted.
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
@@ -215,9 +282,13 @@ router.get('/backlog', async (req: Request, res: Response) => {
  *               type: object
  *               properties:
  *                 period: { type: string, example: "2026-03" }
- *                 totalPM: { type: integer }
+ *                 scheduledPM: { type: integer, description: Time-based occurrences due in the period, across every target }
  *                 completedPM: { type: integer }
  *                 complianceRate: { type: number, format: float, description: Percentage rounded to two decimals }
+ *                 excludedMeterPlans: { type: integer, description: Meter-driven plans left out of the denominator }
+ *                 exclusionNote: { type: string }
+ *       '400':
+ *         description: Invalid year or month
  *       '401':
  *         description: Missing or invalid bearer token
  *       '500':
@@ -230,49 +301,104 @@ router.get('/pm-compliance', async (req: Request, res: Response) => {
     const { filter, scope } = resolved;
     const { year, month } = req.query;
     const now = new Date();
-    const targetYear = year ? parseInt(year as string, 10) : now.getFullYear();
-    const targetMonth = month ? parseInt(month as string, 10) : now.getMonth() + 1;
+    const targetYear = year ? parseInt(year as string, 10) : now.getUTCFullYear();
+    const targetMonth = month ? parseInt(month as string, 10) : now.getUTCMonth() + 1;
 
-    const startDate = new Date(targetYear, targetMonth - 1, 1);
-    const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59);
+    if (!Number.isInteger(targetYear) || targetYear < 1970 || targetYear > 9999) {
+      res.status(400).json({ error: 'Invalid report filter', details: [`year must be a four-digit year, got "${year}"`] });
+      return;
+    }
+    if (!Number.isInteger(targetMonth) || targetMonth < 1 || targetMonth > 12) {
+      res.status(400).json({ error: 'Invalid report filter', details: [`month must be 1-12, got "${month}"`] });
+      return;
+    }
+
+    // UTC throughout: the scheduler and the date-filter parser are both UTC, so
+    // a local-time month boundary here would shift cycles across the line.
+    const monthStart = new Date(Date.UTC(targetYear, targetMonth - 1, 1));
+    const monthEnd = new Date(Date.UTC(targetYear, targetMonth, 0));
 
     // The month window is this report's own period, so it is intersected with
-    // any from/to the caller supplied rather than replaced by it. R.4
-    // redefines the denominator; the scoping added here survives that.
+    // any from/to the caller supplied rather than replaced by it.
     const requested = buildDateWhere(filter, 'createdDate') as { createdDate?: { gte?: Date; lte?: Date } } | null;
-    const window = {
-      createdDate: {
-        gte: requested?.createdDate?.gte !== undefined && requested.createdDate.gte > startDate ? requested.createdDate.gte : startDate,
-        lte: requested?.createdDate?.lte !== undefined && requested.createdDate.lte < endDate ? requested.createdDate.lte : endDate,
-      },
-    };
+    const windowStart =
+      requested?.createdDate?.gte !== undefined && requested.createdDate.gte > monthStart
+        ? requested.createdDate.gte
+        : monthStart;
+    const windowEnd =
+      requested?.createdDate?.lte !== undefined && requested.createdDate.lte < new Date(monthEnd.getTime() + 86_400_000 - 1)
+        ? requested.createdDate.lte
+        : new Date(monthEnd.getTime() + 86_400_000 - 1);
 
-    const totalPM = await prisma.workOrder.count({
-      where: {
-        ...scope,
-        isDeleted: false,
-        type: 'PM',
-        ...window,
+    // Denominator from the schedule, not from raised work orders. A plan that
+    // fell behind raised nothing but still owed a PM, and counting only raised
+    // work orders would let that backlog read as perfect compliance.
+    const plans = await prisma.maintenancePlan.findMany({
+      where: { isDeleted: false, ...scope },
+      select: {
+        strategyType: true,
+        intervalValue: true,
+        intervalUnit: true,
+        startDate: true,
+        endDate: true,
+        targets: { where: { isDeleted: false }, select: { planTargetId: true } },
       },
     });
 
-    const completedPM = await prisma.workOrder.count({
+    let scheduledPM = 0;
+    let excludedMeterPlans = 0;
+    for (const plan of plans) {
+      if (plan.strategyType === 'Meter') {
+        excludedMeterPlans += 1;
+        continue;
+      }
+      const targetCount = plan.targets.length > 0 ? plan.targets.length : 1;
+      const cycles = cyclesInWindow(
+        {
+          startDate: plan.startDate,
+          endDate: plan.endDate,
+          intervalValue: plan.intervalValue,
+          intervalUnit: plan.intervalUnit as IntervalUnit,
+        },
+        windowStart,
+        windowEnd
+      );
+      scheduledPM += cycles.length * targetCount;
+    }
+
+    // Numerator: finished PM work orders whose cycle is dated to the period.
+    // The cycle key is the schedule's own YYYY-MM-DD, so this compares schedule
+    // to schedule rather than completion date to period.
+    const completed = await prisma.workOrder.findMany({
       where: {
-        ...scope,
         isDeleted: false,
         type: 'PM',
         status: { in: ['Completed', 'Closed'] },
-        ...window,
+        sourcePlanId: { not: null },
+        ...scope,
       },
+      select: { sourcePlanCycle: true },
     });
 
-    const complianceRate = totalPM > 0 ? (completedPM / totalPM) * 100 : 0;
+    let completedPM = 0;
+    for (const wo of completed) {
+      const day = baseCycleKey(wo.sourcePlanCycle);
+      if (!day) continue;
+      const due = parseDayStart(day);
+      if (!due) continue;
+      if (due.getTime() >= windowStart.getTime() && due.getTime() <= windowEnd.getTime()) completedPM += 1;
+    }
+
+    const complianceRate = scheduledPM > 0 ? (completedPM / scheduledPM) * 100 : 0;
 
     res.json({
       period: `${targetYear}-${String(targetMonth).padStart(2, '0')}`,
-      totalPM,
+      scheduledPM,
       completedPM,
       complianceRate: Math.round(complianceRate * 100) / 100,
+      excludedMeterPlans,
+      exclusionNote:
+        'Meter-driven plans are excluded from Scheduled PMs: a meter threshold has no calendar due date, so it cannot be placed in the period. They are counted by excludedMeterPlans instead.',
     });
   } catch (error) {
     logger.error({ err: error }, 'Error generating PM compliance report');
@@ -403,11 +529,13 @@ router.get('/mtbf', async (req: Request, res: Response) => {
  * @openapi
  * /api/reports/mttr:
  *   get:
- *     summary: Mean time to repair
+ *     summary: Mean time to repair by equipment and by location
  *     description: >
- *       Computes mean time to repair from completed work orders, measured between the
- *       reported failure and the completion date, reported per equipment. Read-only and
- *       available to any authenticated role.
+ *       Computes mean time to repair from breakdown work orders, with the duration measured
+ *       as actualFinish - actualStart, reported both per equipment and per functional
+ *       location. A work order missing either timestamp cannot contribute a duration: those
+ *       rows are excluded and counted in excludedIncomplete rather than dropped silently,
+ *       because an MTTR that quietly ignores its unfinished repairs flatters itself.
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
@@ -436,18 +564,31 @@ router.get('/mtbf', async (req: Request, res: Response) => {
  *         schema: { type: string }
  *     responses:
  *       '200':
- *         description: MTTR per equipment
+ *         description: MTTR per equipment and per location
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   equipmentId: { type: string }
- *                   equipmentName: { type: string }
- *                   completedCount: { type: integer }
- *                   mttrHours: { type: number, format: float }
+ *               type: object
+ *               properties:
+ *                 byEquipment:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       equipmentId: { type: string }
+ *                       mttrHours: { type: number, format: float }
+ *                       breakdownCount: { type: integer }
+ *                 byLocation:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       functionalLocationId: { type: string }
+ *                       locationCode: { type: string }
+ *                       description: { type: string }
+ *                       mttrHours: { type: number, format: float }
+ *                       breakdownCount: { type: integer }
+ *                 excludedIncomplete: { type: integer, description: Breakdowns missing actualStart or actualFinish }
  *       '401':
  *         description: Missing or invalid bearer token
  *       '500':
@@ -461,43 +602,66 @@ router.get('/mttr', async (req: Request, res: Response) => {
       where: {
         isDeleted: false,
         type: 'EM',
-        equipmentId: { not: null },
-        actualStart: { not: null },
-        actualFinish: { not: null },
         ...resolved.scope,
         ...(buildDateWhere(resolved.filter, 'actualStart') ?? {}),
       },
       select: {
         equipmentId: true,
+        functionalLocationId: true,
         actualStart: true,
         actualFinish: true,
       },
     });
 
     const equipmentMap = new Map<string, { totalDowntime: number; count: number }>();
+    const locationMap = new Map<string, { totalDowntime: number; count: number }>();
+    let excludedIncomplete = 0;
 
     for (const bd of breakdowns) {
-      if (!bd.equipmentId || !bd.actualStart || !bd.actualFinish) continue;
-      if (!equipmentMap.has(bd.equipmentId)) {
-        equipmentMap.set(bd.equipmentId, { totalDowntime: 0, count: 0 });
+      if (!bd.actualStart || !bd.actualFinish) {
+        excludedIncomplete += 1;
+        continue;
       }
-      const entry = equipmentMap.get(bd.equipmentId)!;
       const downtime = bd.actualFinish.getTime() - bd.actualStart.getTime();
-      entry.totalDowntime += downtime;
-      entry.count += 1;
+
+      if (bd.equipmentId) {
+        const entry = equipmentMap.get(bd.equipmentId) ?? { totalDowntime: 0, count: 0 };
+        entry.totalDowntime += downtime;
+        entry.count += 1;
+        equipmentMap.set(bd.equipmentId, entry);
+      }
+
+      const byLocationEntry = locationMap.get(bd.functionalLocationId) ?? { totalDowntime: 0, count: 0 };
+      byLocationEntry.totalDowntime += downtime;
+      byLocationEntry.count += 1;
+      locationMap.set(bd.functionalLocationId, byLocationEntry);
     }
 
-    const result: Array<{ equipmentId: string; mttrHours: number; breakdownCount: number }> = [];
-    for (const [equipmentId, data] of equipmentMap) {
-      const mttr = data.count > 0 ? data.totalDowntime / data.count / (1000 * 60 * 60) : 0;
-      result.push({
+    const byEquipment = [...equipmentMap.entries()]
+      .map(([equipmentId, data]) => ({
         equipmentId,
-        mttrHours: Math.round(mttr * 100) / 100,
+        mttrHours: Math.round((data.totalDowntime / data.count / (1000 * 60 * 60)) * 100) / 100,
         breakdownCount: data.count,
-      });
-    }
+      }))
+      .sort((a, b) => a.equipmentId.localeCompare(b.equipmentId));
 
-    res.json(result);
+    const locationDetails = await prisma.functionalLocation.findMany({
+      where: { functionalLocationId: { in: [...locationMap.keys()] } },
+      select: { functionalLocationId: true, locationCode: true, description: true },
+    });
+    const locationDetailMap = new Map(locationDetails.map((l) => [l.functionalLocationId, l]));
+
+    const byLocation = [...locationMap.entries()]
+      .map(([functionalLocationId, data]) => ({
+        functionalLocationId,
+        locationCode: locationDetailMap.get(functionalLocationId)?.locationCode ?? '',
+        description: locationDetailMap.get(functionalLocationId)?.description ?? '',
+        mttrHours: Math.round((data.totalDowntime / data.count / (1000 * 60 * 60)) * 100) / 100,
+        breakdownCount: data.count,
+      }))
+      .sort((a, b) => a.locationCode.localeCompare(b.locationCode));
+
+    res.json({ byEquipment, byLocation, excludedIncomplete });
   } catch (error) {
     logger.error({ err: error }, 'Error generating MTTR report');
     res.status(500).json({ error: 'Internal server error' });
@@ -509,11 +673,15 @@ router.get('/mttr', async (req: Request, res: Response) => {
  * @openapi
  * /api/reports/cost-summary:
  *   get:
- *     summary: Work order cost summary for a month
+ *     summary: Work order cost summary by cost centre and by location
  *     description: >
- *       For the given calendar month, totals estimated and actual cost across work orders
- *       and breaks the result down by priority and work center. Defaults to the current
- *       month when year or month is omitted. Monetary values are Float in v1.0.0.
+ *       For the given calendar month, totals estimated and actual cost across work orders and
+ *       presents the same total two ways: grouped by cost centre and grouped by functional
+ *       location. Defaults to the current month when year or month is omitted. Built on the
+ *       R.1 cost rollups, so a location row carries its own figures and the subtree total a
+ *       caller would see on the rollup report. Budget comparison remains waived (D-13):
+ *       no budget column exists in v1.0.0, so none is reported. Monetary values are Float in
+ *       v1.0.0.
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
@@ -540,12 +708,48 @@ router.get('/mttr', async (req: Request, res: Response) => {
  *       - in: query
  *         name: workCenterId
  *         schema: { type: string }
+ *       - in: query
+ *         name: year
+ *         schema: { type: integer }
+ *         description: Four-digit year; defaults to the current year
+ *       - in: query
+ *         name: month
+ *         schema: { type: integer, minimum: 1, maximum: 12 }
+ *         description: Month number 1-12; defaults to the current month
  *     responses:
  *       '200':
- *         description: Cost summary for the period
+ *         description: Cost summary for the period, by cost centre and by location
  *         content:
  *           application/json:
- *             schema: { type: object, additionalProperties: true }
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 period: { type: string, example: "2026-03" }
+ *                 budgetNote: { type: string }
+ *                 byCostCenter:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       costCenterCode: { type: string }
+ *                       plannedCost: { type: number, format: float }
+ *                       actualCost: { type: number, format: float }
+ *                       variance: { type: number, format: float, description: actualCost - plannedCost }
+ *                       workOrderCount: { type: integer }
+ *                 byLocation:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       functionalLocationId: { type: string }
+ *                       locationCode: { type: string }
+ *                       description: { type: string }
+ *                       plannedCost: { type: number, format: float }
+ *                       actualCost: { type: number, format: float }
+ *                       variance: { type: number, format: float }
+ *                       workOrderCount: { type: integer }
+ *       '400':
+ *         description: Invalid year or month
  *       '401':
  *         description: Missing or invalid bearer token
  *       '500':
@@ -555,38 +759,73 @@ router.get('/cost-summary', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
-    const workOrders = await prisma.workOrder.findMany({
-      where: {
-        isDeleted: false,
-        costCenterCode: { not: '' },
-        ...resolved.scope,
-        ...(buildDateWhere(resolved.filter, 'createdDate') ?? {}),
-      },
-      select: {
-        costCenterCode: true,
-        plannedCost: true,
-        actualCost: true,
-      },
-    });
+    const { filter } = resolved;
+    const { year, month } = req.query;
+    const now = new Date();
+    const targetYear = year ? parseInt(year as string, 10) : now.getUTCFullYear();
+    const targetMonth = month ? parseInt(month as string, 10) : now.getUTCMonth() + 1;
 
-    const costMap = new Map<string, { planned: number; actual: number }>();
-    for (const wo of workOrders) {
-      if (!costMap.has(wo.costCenterCode)) {
-        costMap.set(wo.costCenterCode, { planned: 0, actual: 0 });
-      }
-      const entry = costMap.get(wo.costCenterCode)!;
-      entry.planned += Number(wo.plannedCost);
-      entry.actual += Number(wo.actualCost);
+    if (!Number.isInteger(targetYear) || targetYear < 1970 || targetYear > 9999) {
+      res.status(400).json({ error: 'Invalid report filter', details: [`year must be a four-digit year, got "${year}"`] });
+      return;
+    }
+    if (!Number.isInteger(targetMonth) || targetMonth < 1 || targetMonth > 12) {
+      res.status(400).json({ error: 'Invalid report filter', details: [`month must be 1-12, got "${month}"`] });
+      return;
     }
 
-    const result = Array.from(costMap.entries()).map(([costCenterCode, data]) => ({
-      costCenterCode,
-      plannedCost: Math.round(data.planned * 100) / 100,
-      actualCost: Math.round(data.actual * 100) / 100,
-      variance: Math.round((data.actual - data.planned) * 100) / 100,
-    }));
+    const monthStart = Date.UTC(targetYear, targetMonth - 1, 1);
+    const monthEnd = Date.UTC(targetYear, targetMonth, 0, 23, 59, 59, 999);
+    const from = filter.from !== null && filter.from.getTime() > monthStart ? filter.from : new Date(monthStart);
+    const to = filter.to !== null && filter.to.getTime() < monthEnd ? filter.to : new Date(monthEnd);
 
-    res.json(result);
+    const { workOrders, locations } = await loadCostRollup({
+      from,
+      to,
+      functionalLocationId: filter.functionalLocationId ?? undefined,
+      includeDescendants: filter.includeDescendantLocations,
+      equipmentId: filter.equipmentId ?? undefined,
+      workCenterId: filter.workCenterId ?? undefined,
+    });
+
+    const centreMap = new Map<string, { plannedCost: number; actualCost: number; workOrderCount: number }>();
+    for (const wo of workOrders) {
+      const entry = centreMap.get(wo.costCenterCode) ?? { plannedCost: 0, actualCost: 0, workOrderCount: 0 };
+      entry.plannedCost += wo.plannedCost;
+      entry.actualCost += wo.actualCost;
+      entry.workOrderCount += 1;
+      centreMap.set(wo.costCenterCode, entry);
+    }
+
+    const money = (v: number): number => Math.round(v * 100) / 100;
+    const byCostCenter = [...centreMap.entries()]
+      .map(([costCenterCode, t]) => ({
+        costCenterCode,
+        plannedCost: money(t.plannedCost),
+        actualCost: money(t.actualCost),
+        variance: money(t.actualCost - t.plannedCost),
+        workOrderCount: t.workOrderCount,
+      }))
+      .sort((a, b) => a.costCenterCode.localeCompare(b.costCenterCode));
+
+    const byLocation = rollupByLocation(workOrders, locations)
+      .map((l) => ({
+        functionalLocationId: l.functionalLocationId,
+        locationCode: l.locationCode,
+        description: l.description,
+        plannedCost: l.plannedCost,
+        actualCost: l.actualCost,
+        variance: money(l.actualCost - l.plannedCost),
+        workOrderCount: l.workOrderCount,
+      }))
+      .sort((a, b) => a.locationCode.localeCompare(b.locationCode));
+
+    res.json({
+      period: `${targetYear}-${String(targetMonth).padStart(2, '0')}`,
+      budgetNote: 'Budget comparison is waived (D-13): v1.0.0 has no budget column, so no budget figure is reported.',
+      byCostCenter,
+      byLocation,
+    });
   } catch (error) {
     logger.error({ err: error }, 'Error generating cost summary');
     res.status(500).json({ error: 'Internal server error' });
@@ -701,11 +940,13 @@ router.get('/downtime', async (req: Request, res: Response) => {
  * @openapi
  * /api/reports/material-consumption:
  *   get:
- *     summary: Material consumption for a month
+ *     summary: Material consumption by material, by work order and by equipment
  *     description: >
- *       For the given calendar month, totals actual material quantities and cost consumed
- *       on work orders, grouped by material. Defaults to the current month when year or
- *       month is omitted.
+ *       For the given calendar month, totals actual material quantities and cost consumed on
+ *       work orders, presented three ways: by material, by work order and by equipment.
+ *       Defaults to the current month when year or month is omitted. Cost is the sum of
+ *       quantity x unit cost over the consumption lines, so a line whose unit cost changed
+ *       is priced at the cost recorded on that line rather than at an averaged rate.
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
@@ -734,19 +975,45 @@ router.get('/downtime', async (req: Request, res: Response) => {
  *         schema: { type: string }
  *     responses:
  *       '200':
- *         description: Consumption per material
+ *         description: Consumption per material, per work order and per equipment
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   materialId: { type: string }
- *                   materialCode: { type: string }
- *                   materialName: { type: string }
- *                   quantityConsumed: { type: number, format: float }
- *                   totalCost: { type: number, format: float }
+ *               type: object
+ *               properties:
+ *                 byMaterial:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       materialId: { type: string }
+ *                       materialCode: { type: string }
+ *                       description: { type: string }
+ *                       unitOfMeasure: { type: string }
+ *                       totalQuantityUsed: { type: number, format: float }
+ *                       totalCost: { type: number, format: float }
+ *                       usageCount: { type: integer }
+ *                 byWorkOrder:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       workOrderId: { type: string }
+ *                       woNumber: { type: string }
+ *                       totalQuantityUsed: { type: number, format: float }
+ *                       totalCost: { type: number, format: float }
+ *                       lineCount: { type: integer }
+ *                 byEquipment:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       equipmentId: { type: string }
+ *                       equipmentCode: { type: string }
+ *                       equipmentName: { type: string }
+ *                       totalQuantityUsed: { type: number, format: float }
+ *                       totalCost: { type: number, format: float }
+ *                       lineCount: { type: integer }
  *       '401':
  *         description: Missing or invalid bearer token
  *       '500':
@@ -757,9 +1024,11 @@ router.get('/material-consumption', async (req: Request, res: Response) => {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
     // Consumption is scoped through the parent work order, so the filter has to
-    // be applied to that relation rather than to the material line.
-    const materials = await prisma.workOrderMaterial.groupBy({
-      by: ['materialId'],
+    // be applied to that relation rather than to the material line. The lines
+    // are read one by one rather than SUM(quantity) x SUM(unitCost), because
+    // that product prices the whole month at whichever unit cost happens to be
+    // on the last row; the cost belongs to each line.
+    const lines = await prisma.workOrderMaterial.findMany({
       where: {
         isDeleted: false,
         actualQuantity: { gt: 0 },
@@ -769,32 +1038,109 @@ router.get('/material-consumption', async (req: Request, res: Response) => {
           ...(buildDateWhere(resolved.filter, 'createdDate') ?? {}),
         },
       },
-      _sum: { actualQuantity: true, unitCost: true },
-      _count: { woMaterialId: true },
+      select: {
+        materialId: true,
+        actualQuantity: true,
+        unitCost: true,
+        workOrderId: true,
+        workOrder: {
+          select: {
+            woNumber: true,
+            equipmentId: true,
+            equipment: { select: { equipmentCode: true, name: true } },
+          },
+        },
+      },
     });
 
-    const materialIds = materials.map((m) => m.materialId);
+    const money = (v: number): number => Math.round(v * 100) / 100;
+    const costOf = (line: (typeof lines)[number]): number =>
+      (Number(line.actualQuantity) || 0) * (Number(line.unitCost) || 0);
+
+    interface ConsumptionBucket {
+      totalQuantityUsed: number;
+      totalCost: number;
+      lineCount: number;
+    }
+    const accumulate = <T extends ConsumptionBucket>(
+      map: Map<string, T>,
+      key: string,
+      base: Omit<T, 'totalQuantityUsed' | 'totalCost' | 'lineCount'>,
+      line: (typeof lines)[number]
+    ): void => {
+      let entry = map.get(key);
+      if (!entry) {
+        entry = { ...base, totalQuantityUsed: 0, totalCost: 0, lineCount: 0 } as T;
+        map.set(key, entry);
+      }
+      entry.totalQuantityUsed += Number(line.actualQuantity) || 0;
+      entry.totalCost += costOf(line);
+      entry.lineCount += 1;
+    };
+
+    const materialMap = new Map<string, { materialId: string; totalQuantityUsed: number; totalCost: number; lineCount: number }>();
+    const orderMap = new Map<string, { workOrderId: string; woNumber: string; totalQuantityUsed: number; totalCost: number; lineCount: number }>();
+    const equipmentMap = new Map<string, { equipmentId: string; equipmentCode: string; equipmentName: string; totalQuantityUsed: number; totalCost: number; lineCount: number }>();
+
+    for (const line of lines) {
+      accumulate(materialMap, line.materialId, { materialId: line.materialId }, line);
+      accumulate(
+        orderMap,
+        line.workOrderId,
+        { workOrderId: line.workOrderId, woNumber: line.workOrder.woNumber },
+        line
+      );
+      const equipmentId = line.workOrder.equipmentId ?? 'NO_EQUIPMENT';
+      accumulate(
+        equipmentMap,
+        equipmentId,
+        {
+          equipmentId,
+          equipmentCode: line.workOrder.equipment?.equipmentCode ?? '',
+          equipmentName: line.workOrder.equipment?.name ?? '',
+        },
+        line
+      );
+    }
+
     const materialDetails = await prisma.material.findMany({
-      where: { materialId: { in: materialIds } },
+      where: { materialId: { in: [...materialMap.keys()] } },
       select: { materialId: true, materialCode: true, description: true, unitOfMeasure: true },
     });
-
     const detailMap = new Map(materialDetails.map((m) => [m.materialId, m]));
 
-    const result = materials.map((m) => {
-      const detail = detailMap.get(m.materialId);
-      return {
-        materialId: m.materialId,
-        materialCode: detail?.materialCode || '',
-        description: detail?.description || '',
-        unitOfMeasure: detail?.unitOfMeasure || '',
-        totalQuantityUsed: m._sum.actualQuantity || 0,
-        totalCost: Math.round((Number(m._sum.actualQuantity) || 0) * (Number(m._sum.unitCost) || 0) * 100) / 100,
-        usageCount: m._count.woMaterialId,
-      };
+    res.json({
+      byMaterial: [...materialMap.values()]
+        .map((m) => ({
+          materialId: m.materialId,
+          materialCode: detailMap.get(m.materialId)?.materialCode ?? '',
+          description: detailMap.get(m.materialId)?.description ?? '',
+          unitOfMeasure: detailMap.get(m.materialId)?.unitOfMeasure ?? '',
+          totalQuantityUsed: Math.round(m.totalQuantityUsed * 100) / 100,
+          totalCost: money(m.totalCost),
+          usageCount: m.lineCount,
+        }))
+        .sort((a, b) => a.materialCode.localeCompare(b.materialCode)),
+      byWorkOrder: [...orderMap.values()]
+        .map((o) => ({
+          workOrderId: o.workOrderId,
+          woNumber: o.woNumber,
+          totalQuantityUsed: Math.round(o.totalQuantityUsed * 100) / 100,
+          totalCost: money(o.totalCost),
+          lineCount: o.lineCount,
+        }))
+        .sort((a, b) => a.woNumber.localeCompare(b.woNumber)),
+      byEquipment: [...equipmentMap.values()]
+        .map((e) => ({
+          equipmentId: e.equipmentId,
+          equipmentCode: e.equipmentCode,
+          equipmentName: e.equipmentName,
+          totalQuantityUsed: Math.round(e.totalQuantityUsed * 100) / 100,
+          totalCost: money(e.totalCost),
+          lineCount: e.lineCount,
+        }))
+        .sort((a, b) => a.equipmentCode.localeCompare(b.equipmentCode)),
     });
-
-    res.json(result);
   } catch (error) {
     logger.error({ err: error }, 'Error generating material consumption report');
     res.status(500).json({ error: 'Internal server error' });

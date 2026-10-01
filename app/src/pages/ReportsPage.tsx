@@ -17,6 +17,13 @@ import {
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { reportService } from '@/services/reportService';
+import type {
+  BacklogReport,
+  PMComplianceReport,
+  MTTRReport,
+  CostSummaryReport,
+  MaterialConsumptionReport,
+} from '@/services/reportService';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
@@ -80,23 +87,28 @@ export default function ReportsPage() {
     };
   }, [activeReport, reportData]);
 
-  // Report 1: Work Order Backlog
-  const backlogData = useMemo(() => {
-    return Array.isArray(reportData.backlog)
-      ? (reportData.backlog as Array<{ status: string; count: number; totalPlannedHours: number }>).map((r) => ({
-          status: r.status,
-          count: r.count,
-          hours: r.totalPlannedHours,
-        }))
-      : [];
-  }, [reportData]);
+  // Report 1: Work Order Backlog (row 60) — one backlog, sliced three ways.
+  const backlog = (reportData.backlog ?? {}) as Partial<BacklogReport>;
+  const backlogData = useMemo(
+    () => (backlog.byStatus ?? []).map((r) => ({ status: r.status, count: r.count, hours: r.totalPlannedHours })),
+    [backlog.byStatus]
+  );
+  const backlogPriorityData = useMemo(
+    () => (backlog.byPriority ?? []).map((r) => ({ priority: r.priority, count: r.count, hours: r.totalPlannedHours })),
+    [backlog.byPriority]
+  );
+  const backlogCentreData = useMemo(
+    () =>
+      (backlog.byWorkCenter ?? []).map((r) => ({
+        centre: r.workCenterCode || r.workCenterId,
+        count: r.count,
+        hours: r.totalPlannedHours,
+      })),
+    [backlog.byWorkCenter]
+  );
 
-  const pmCompliance = (reportData['pm-compliance'] ?? {}) as {
-    period?: string;
-    totalPM?: number;
-    completedPM?: number;
-    complianceRate?: number;
-  };
+  // Report 2: PM compliance (row 61) — scheduled occurrences, not raised orders.
+  const pmCompliance = (reportData['pm-compliance'] ?? {}) as Partial<PMComplianceReport>;
 
   // Report 3: MTBF
   const mtbfData = useMemo(() => {
@@ -108,29 +120,39 @@ export default function ReportsPage() {
       : [];
   }, [reportData]);
 
-  // Report 4: MTTR
-  const mttrData = useMemo(() => {
-    return Array.isArray(reportData.mttr)
-      ? (reportData.mttr as Array<{ equipmentId: string; mttrHours: number }>).map((r) => ({
-          equipment: r.equipmentId,
-          mttr: r.mttrHours,
-        }))
-      : [];
-  }, [reportData]);
+  // Report 4: MTTR (row 62) — per equipment and per location.
+  const mttr = (reportData.mttr ?? {}) as Partial<MTTRReport>;
+  const mttrData = useMemo(
+    () => (mttr.byEquipment ?? []).map((r) => ({ equipment: r.equipmentId, mttr: r.mttrHours })),
+    [mttr.byEquipment]
+  );
+  const mttrLocationData = useMemo(
+    () => (mttr.byLocation ?? []).map((r) => ({ location: r.locationCode || r.functionalLocationId, mttr: r.mttrHours })),
+    [mttr.byLocation]
+  );
 
-  // Report 5: Cost Summary
-  const costData = useMemo(() => {
-    return Array.isArray(reportData['cost-summary'])
-      ? (reportData['cost-summary'] as Array<{ costCenterCode: string; plannedCost: number; actualCost: number; variance: number }>).map(
-          (r) => ({
-            costCenter: r.costCenterCode,
-            planned: r.plannedCost,
-            actual: r.actualCost,
-            variance: r.variance,
-          })
-        )
-      : [];
-  }, [reportData]);
+  // Report 5: Cost Summary (row 63) — by cost centre and by location.
+  const costSummary = (reportData['cost-summary'] ?? {}) as Partial<CostSummaryReport>;
+  const costData = useMemo(
+    () =>
+      (costSummary.byCostCenter ?? []).map((r) => ({
+        costCenter: r.costCenterCode,
+        planned: r.plannedCost,
+        actual: r.actualCost,
+        variance: r.variance,
+      })),
+    [costSummary.byCostCenter]
+  );
+  const costLocationData = useMemo(
+    () =>
+      (costSummary.byLocation ?? []).map((r) => ({
+        location: r.locationCode || r.functionalLocationId,
+        planned: r.plannedCost,
+        actual: r.actualCost,
+        variance: r.variance,
+      })),
+    [costSummary.byLocation]
+  );
 
   // Report 6: Downtime
   const downtimeData = useMemo(() => {
@@ -142,19 +164,36 @@ export default function ReportsPage() {
       : [];
   }, [reportData]);
 
-  // Report 7: Material Consumption
-  const materialConsumption = useMemo(() => {
-    return Array.isArray(reportData['material-consumption'])
-      ? (reportData['material-consumption'] as Array<{ materialCode: string; description: string; totalQuantityUsed: number; totalCost: number }>).map(
-          (r) => ({
-            code: r.materialCode,
-            description: r.description,
-            totalQty: r.totalQuantityUsed,
-            totalCost: r.totalCost,
-          })
-        )
-      : [];
-  }, [reportData]);
+  // Report 7: Material Consumption (row 64) — by material, work order, equipment.
+  const material = (reportData['material-consumption'] ?? {}) as Partial<MaterialConsumptionReport>;
+  const materialConsumption = useMemo(
+    () =>
+      (material.byMaterial ?? []).map((r) => ({
+        code: r.materialCode,
+        description: r.description,
+        totalQty: r.totalQuantityUsed,
+        totalCost: r.totalCost,
+      })),
+    [material.byMaterial]
+  );
+  const materialByOrder = useMemo(
+    () =>
+      (material.byWorkOrder ?? []).map((r) => ({
+        workOrder: r.woNumber,
+        totalQty: r.totalQuantityUsed,
+        totalCost: r.totalCost,
+      })),
+    [material.byWorkOrder]
+  );
+  const materialByEquipment = useMemo(
+    () =>
+      (material.byEquipment ?? []).map((r) => ({
+        equipment: r.equipmentCode || r.equipmentId,
+        totalQty: r.totalQuantityUsed,
+        totalCost: r.totalCost,
+      })),
+    [material.byEquipment]
+  );
 
   const currentRows = useMemo(() => {
     switch (activeReport) {
@@ -164,7 +203,7 @@ export default function ReportsPage() {
         return [
           {
             period: pmCompliance.period ?? '',
-            totalPM: pmCompliance.totalPM ?? 0,
+            scheduledPM: pmCompliance.scheduledPM ?? 0,
             completedPM: pmCompliance.completedPM ?? 0,
             complianceRate: pmCompliance.complianceRate ?? 0,
           },
@@ -202,11 +241,7 @@ export default function ReportsPage() {
 
   const isLoading = reportLoading;
   const hasError = reportError[activeReport] != null;
-  const current = reportData[activeReport];
-  const isEmpty =
-    !reportLoading &&
-    reportError[activeReport] == null &&
-    (Array.isArray(current) ? current.length === 0 : current === undefined);
+  const isEmpty = !reportLoading && reportError[activeReport] == null && (currentRows?.length ?? 0) === 0;
 
   const reportConfig = [
     { id: 'backlog' as ReportType, label: 'WO Backlog', icon: ClipboardList },
@@ -248,7 +283,8 @@ export default function ReportsPage() {
           {activeReport === 'backlog' && (
             <ReportContainer title="Work Order Backlog" icon={<ClipboardList className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'backlog-report')}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
-              <div className="grid grid-cols-2 gap-4">
+              <>
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <h4 className="text-secondary text-xs font-medium mb-2">Count by Status</h4>
                   <div className="h-56">
@@ -264,6 +300,20 @@ export default function ReportsPage() {
                   </div>
                 </div>
                 <div>
+                  <h4 className="text-secondary text-xs font-medium mb-2">Count by Priority</h4>
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={backlogPriorityData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
+                        <XAxis dataKey="priority" stroke="#92929B" fontSize={11} />
+                        <YAxis stroke="#92929B" fontSize={11} />
+                        <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                        <Bar dataKey="count" fill="#2563EB" radius={[2, 2, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div>
                   <h4 className="text-secondary text-xs font-medium mb-2">Planned Hours by Status</h4>
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
@@ -272,12 +322,36 @@ export default function ReportsPage() {
                         <XAxis dataKey="status" stroke="#92929B" fontSize={11} />
                         <YAxis stroke="#92929B" fontSize={11} />
                         <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
-                        <Bar dataKey="hours" fill="#2563EB" radius={[2, 2, 0, 0]} />
+                        <Bar dataKey="hours" fill="#059669" radius={[2, 2, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
               </div>
+              <div className="mt-4">
+                <h4 className="text-secondary text-xs font-medium mb-2">Backlog by Work Centre</h4>
+                <div className="industrial-card rounded overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr style={{ backgroundColor: '#27272A' }}>
+                        {['Work Centre', 'Count', 'Planned Hours'].map((h) => (
+                          <th key={h} className="text-left px-4 py-2 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {backlogCentreData.map((c, idx) => (
+                        <tr key={c.centre} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                          <td className="px-4 py-2 font-mono text-xs text-primary">{c.centre}</td>
+                          <td className="px-4 py-2 font-mono text-xs text-secondary">{c.count}</td>
+                          <td className="px-4 py-2 font-mono text-xs text-secondary">{c.hours.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              </>
               )}
             </ReportContainer>
           )}
@@ -292,8 +366,8 @@ export default function ReportsPage() {
                     <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.period}</div>
                   </div>
                   <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
-                    <div className="text-tertiary" style={{ fontSize: '10px' }}>PMs Created</div>
-                    <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.totalPM ?? 0}</div>
+                    <div className="text-tertiary" style={{ fontSize: '10px' }}>PMs Scheduled</div>
+                    <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.scheduledPM ?? 0}</div>
                   </div>
                   <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
                     <div className="text-tertiary" style={{ fontSize: '10px' }}>PMs Completed</div>
@@ -306,6 +380,9 @@ export default function ReportsPage() {
                     <div className="text-tertiary mt-2" style={{ fontSize: '11px' }}>Compliance rate ({pmCompliance.period})</div>
                   </div>
                 </div>
+                {pmCompliance.exclusionNote && (
+                  <p className="text-tertiary mt-4" style={{ fontSize: '11px' }}>{pmCompliance.exclusionNote}</p>
+                )}
               </>
               )}
             </ReportContainer>
@@ -332,17 +409,43 @@ export default function ReportsPage() {
           {activeReport === 'mttr' && (
             <ReportContainer title="Mean Time To Repair (MTTR)" icon={<Timer className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'mttr-report')}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={mttrData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                    <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} />
-                    <YAxis stroke="#92929B" fontSize={11} />
-                    <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
-                    <Bar dataKey="mttr" fill="#D97706" radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
-                  </BarChart>
-                </ResponsiveContainer>
+              <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-secondary text-xs font-medium mb-2">MTTR by Equipment</h4>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={mttrData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
+                        <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} />
+                        <YAxis stroke="#92929B" fontSize={11} />
+                        <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                        <Bar dataKey="mttr" fill="#D97706" radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-secondary text-xs font-medium mb-2">MTTR by Location</h4>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={mttrLocationData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
+                        <XAxis dataKey="location" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} />
+                        <YAxis stroke="#92929B" fontSize={11} />
+                        <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                        <Bar dataKey="mttr" fill="#2563EB" radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               </div>
+              {(mttr.excludedIncomplete ?? 0) > 0 && (
+                <p className="text-tertiary mt-4" style={{ fontSize: '11px' }}>
+                  {mttr.excludedIncomplete} work order(s) excluded: missing an actual start or finish timestamp.
+                </p>
+              )}
+              </>
               )}
             </ReportContainer>
           )}
@@ -351,6 +454,9 @@ export default function ReportsPage() {
             <ReportContainer title="Maintenance Cost Summary" icon={<DollarSign className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'cost-summary-report')}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <>
+              {costSummary.budgetNote && (
+                <p className="text-tertiary mb-3" style={{ fontSize: '11px' }}>{costSummary.budgetNote}</p>
+              )}
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={costData}>
@@ -386,6 +492,32 @@ export default function ReportsPage() {
                   </tbody>
                 </table>
               </div>
+              <div className="mt-4">
+                <h4 className="text-secondary text-xs font-medium mb-2">Cost by Location</h4>
+                <div className="industrial-card rounded overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr style={{ backgroundColor: '#27272A' }}>
+                        {['Location', 'Planned', 'Actual', 'Variance'].map((h) => (
+                          <th key={h} className="text-left px-4 py-2 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {costLocationData.map((c, idx) => (
+                        <tr key={c.location} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                          <td className="px-4 py-2 font-mono text-xs text-primary">{c.location}</td>
+                          <td className="px-4 py-2 font-mono text-xs text-secondary">${c.planned.toLocaleString()}</td>
+                          <td className="px-4 py-2 font-mono text-xs text-secondary">${c.actual.toLocaleString()}</td>
+                          <td className={`px-4 py-2 font-mono text-xs ${c.variance > 0 ? 'text-red-status' : 'text-green-status'}`}>
+                            {c.variance > 0 ? '+' : ''}${c.variance.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
               </>
               )}
             </ReportContainer>
@@ -412,6 +544,8 @@ export default function ReportsPage() {
           {activeReport === 'material-consumption' && (
             <ReportContainer title="Material Consumption Report" icon={<Package className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'material-consumption-report')}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
+              <>
+              <h4 className="text-secondary text-xs font-medium mb-2">By Material</h4>
               <div className="industrial-card rounded overflow-hidden">
                 <table className="w-full">
                   <thead>
@@ -433,6 +567,49 @@ export default function ReportsPage() {
                   </tbody>
                 </table>
               </div>
+              <h4 className="text-secondary text-xs font-medium mb-2 mt-4">By Work Order</h4>
+              <div className="industrial-card rounded overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr style={{ backgroundColor: '#27272A' }}>
+                      {['Work Order', 'Total Qty', 'Total Cost'].map((h) => (
+                        <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {materialByOrder.map((m, idx) => (
+                      <tr key={m.workOrder} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                        <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.workOrder}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.totalQty}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-amber">${m.totalCost.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <h4 className="text-secondary text-xs font-medium mb-2 mt-4">By Equipment</h4>
+              <div className="industrial-card rounded overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr style={{ backgroundColor: '#27272A' }}>
+                      {['Equipment', 'Total Qty', 'Total Cost'].map((h) => (
+                        <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {materialByEquipment.map((m, idx) => (
+                      <tr key={m.equipment} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                        <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.equipment}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.totalQty}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-amber">${m.totalCost.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              </>
               )}
             </ReportContainer>
           )}

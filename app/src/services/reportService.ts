@@ -27,21 +27,112 @@ export interface NotificationsAwaitingConversion {
   oldestAgeDays: number | null;
 }
 
+/** SOW 3.7.1 row 60. The same open backlog sliced three ways. */
+export interface BacklogReport {
+  byStatus: Array<{ status: string; count: number; totalPlannedHours: number }>;
+  byPriority: Array<{ priority: string; count: number; totalPlannedHours: number }>;
+  byWorkCenter: Array<{
+    workCenterId: string;
+    workCenterCode: string;
+    workCenterName: string;
+    count: number;
+    totalPlannedHours: number;
+  }>;
+}
+
+/** SOW 3.7.1 row 61. `scheduledPM` is from the plan schedule, not raised orders. */
+export interface PMComplianceReport {
+  period: string;
+  scheduledPM: number;
+  completedPM: number;
+  complianceRate: number;
+  excludedMeterPlans: number;
+  exclusionNote: string;
+}
+
+/** SOW 3.7.1 row 62. `excludedIncomplete` counts breakdowns with no duration. */
+export interface MTTRReport {
+  byEquipment: Array<{ equipmentId: string; mttrHours: number; breakdownCount: number }>;
+  byLocation: Array<{
+    functionalLocationId: string;
+    locationCode: string;
+    description: string;
+    mttrHours: number;
+    breakdownCount: number;
+  }>;
+  excludedIncomplete: number;
+}
+
+/** SOW 3.7.1 row 63. Budget comparison is waived (D-13). */
+export interface CostSummaryReport {
+  period: string;
+  budgetNote: string;
+  byCostCenter: Array<{
+    costCenterCode: string;
+    plannedCost: number;
+    actualCost: number;
+    variance: number;
+    workOrderCount: number;
+  }>;
+  byLocation: Array<{
+    functionalLocationId: string;
+    locationCode: string;
+    description: string;
+    plannedCost: number;
+    actualCost: number;
+    variance: number;
+    workOrderCount: number;
+  }>;
+}
+
+/** SOW 3.7.1 row 64. Cost is sum of quantity x unit cost over the lines. */
+export interface MaterialConsumptionReport {
+  byMaterial: Array<{
+    materialId: string;
+    materialCode: string;
+    description: string;
+    unitOfMeasure: string;
+    totalQuantityUsed: number;
+    totalCost: number;
+    usageCount: number;
+  }>;
+  byWorkOrder: Array<{
+    workOrderId: string;
+    woNumber: string;
+    totalQuantityUsed: number;
+    totalCost: number;
+    lineCount: number;
+  }>;
+  byEquipment: Array<{
+    equipmentId: string;
+    equipmentCode: string;
+    equipmentName: string;
+    totalQuantityUsed: number;
+    totalCost: number;
+    lineCount: number;
+  }>;
+}
+
 export const reportService = {
+  /** SOW 3.7.1 row 60: by status, by priority and by work centre. */
   getBacklog: (params?: Record<string, string>) =>
-    api.get<any[]>('/reports/backlog', params),
+    api.get<BacklogReport>('/reports/backlog', params),
+  /** SOW 3.7.1 row 61: scheduled occurrences, not raised work orders. */
   getPMCompliance: (params?: Record<string, string>) =>
-    api.get<any[]>('/reports/pm-compliance', params),
+    api.get<PMComplianceReport>('/reports/pm-compliance', params),
   getMTBF: (params?: Record<string, string>) =>
     api.get<any[]>('/reports/mtbf', params),
+  /** SOW 3.7.1 row 62: per equipment and per location. */
   getMTTR: (params?: Record<string, string>) =>
-    api.get<any[]>('/reports/mttr', params),
+    api.get<MTTRReport>('/reports/mttr', params),
+  /** SOW 3.7.1 row 63: by cost centre and by location. */
   getCostSummary: (params?: Record<string, string>) =>
-    api.get<any[]>('/reports/cost-summary', params),
+    api.get<CostSummaryReport>('/reports/cost-summary', params),
   getDowntime: (params?: Record<string, string>) =>
     api.get<any[]>('/reports/downtime', params),
+  /** SOW 3.7.1 row 64: by material, by work order and by equipment. */
   getMaterialConsumption: (params?: Record<string, string>) =>
-    api.get<any[]>('/reports/material-consumption', params),
+    api.get<MaterialConsumptionReport>('/reports/material-consumption', params),
   /**
    * SOW 3.7.2 row 65. Hours, not a count of work orders: see
    * `GET /reports/backlog-hours-by-work-center`.

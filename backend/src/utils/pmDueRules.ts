@@ -170,6 +170,55 @@ export function nextTimeCycle(schedule: TimeSchedule, cycle: TimeCycle): TimeCyc
 }
 
 /**
+ * Every cycle whose due date falls inside the closed window [from, to].
+ *
+ * This is the compliance report's denominator: the occurrences a plan
+ * *scheduled* for a calendar period, as opposed to the ones the scheduler found
+ * open to generate (`evaluateTimeSchedule`). The report needs the former, and
+ * the difference is the whole point of row 61 - a cycle due on the 20th is
+ * scheduled for the month whether or not its work order was ever raised, so a
+ * backlogged plan must count against compliance.
+ *
+ * It is deliberately not horizon-gated: the call horizon decides when work is
+ * *raised*, not what was due. Reusing `evaluateTimeSchedule` here would import
+ * the generation window into a question about the schedule and quietly shrink
+ * the denominator to the cycles a planner could already see.
+ *
+ * The loop starts from a cycle at or before the window and walks forward using
+ * the same calendar arithmetic as the scheduler, so a monthly plan starting on
+ * the 31st has its month-end cycles counted exactly where generation would put
+ * them. An end date stops the chain, matching SOW 3.4.2.
+ */
+export function cyclesInWindow(schedule: TimeSchedule, from: Date, to: Date): TimeCycle[] {
+  const { startDate, intervalValue, intervalUnit } = schedule;
+  if (!(intervalValue > 0)) return [];
+  const windowStart = startOfUtcDay(from);
+  const windowEnd = startOfUtcDay(to);
+  if (windowEnd < windowStart) return [];
+  if (windowEnd < startOfUtcDay(startDate)) return [];
+
+  const lastAllowed = schedule.endDate ? startOfUtcDay(schedule.endDate) : null;
+  if (lastAllowed && windowStart > lastAllowed) return [];
+
+  const stepDays = approximateIntervalDays(intervalValue, intervalUnit);
+  let index = Math.max(0, Math.floor(daysBetweenUtc(startDate, windowStart) / stepDays));
+  for (let guard = 0; guard < 4000 && index > 0; guard += 1) {
+    if (addInterval(startDate, index * intervalValue, intervalUnit) <= windowStart) break;
+    index -= 1;
+  }
+
+  const cycles: TimeCycle[] = [];
+  for (let guard = 0; guard < 4000; guard += 1) {
+    const dueDate = addInterval(startDate, index * intervalValue, intervalUnit);
+    if (lastAllowed && dueDate > lastAllowed) break;
+    if (dueDate > windowEnd) break;
+    if (dueDate >= windowStart) cycles.push({ cycleKey: isoDay(dueDate), dueDate, index });
+    index += 1;
+  }
+  return cycles;
+}
+
+/**
  * Every cycle whose generation window has opened by `now` and which has not
  * already been generated, oldest first.
  *
