@@ -42,4 +42,30 @@ describe('serializeWorkOrderSnapshot', () => {
     expect(out).toEqual({ actualCost: 0, plannedCost: 45.5 });
     expect(typeof out.actualCost).toBe('number');
   });
+
+  // R.9: the cost columns are a cache of the base relations. A snapshot is the
+  // one record a later reader trusts absolutely, so freezing the cache into it
+  // would make a stale figure indistinguishable from a real historical fact.
+  it('substitutes the derived cost over a stale cached one', () => {
+    const out = serializeWorkOrderSnapshot(
+      { woNumber: 'WO-1', plannedCost: 0, actualCost: 0 },
+      { plannedCost: 127.5, actualCost: 42 }
+    );
+    expect(out.plannedCost).toBe(127.5);
+    expect(out.actualCost).toBe(42);
+    expect(out.woNumber).toBe('WO-1');
+  });
+
+  it('leaves the cache untouched when no derived figures are supplied', () => {
+    // The old behaviour, kept so the substitution is provably what changed rather
+    // than the serializer always recomputing something.
+    const out = serializeWorkOrderSnapshot({ plannedCost: 0, actualCost: 0 });
+    expect(out).toEqual({ actualCost: 0, plannedCost: 0 });
+  });
+
+  it('creates the cost keys when the row had none, rather than leaving them absent', () => {
+    const out = serializeWorkOrderSnapshot({ woNumber: 'WO-1' }, { plannedCost: 90, actualCost: 0 });
+    expect(out.plannedCost).toBe(90);
+    expect(out.actualCost).toBe(0);
+  });
 });

@@ -477,6 +477,56 @@ describe('work orders routes', () => {
       expect(res.body.data[3].snapshot.status).toBe('Completed');
     });
 
+    it('records the derived cost in the snapshot, not the stale cached one (R.9)', async () => {
+      // The cost columns are a cache of the base relations. A snapshot is the one
+      // record a later reader trusts absolutely, so if it froze the cache it would
+      // turn a stale figure into something indistinguishable from a historical
+      // fact. The cache is corrupted here by writing straight to Prisma -- exactly
+      // what the route tests used to do -- and the snapshot must not inherit it.
+      const made = await api()
+        .post('/api/work-orders')
+        .set(authHeaders(ctx.operatorToken))
+        .send(body({ description: 'snapshot cost' }));
+      expect(made.status).toBe(201);
+      const id = made.body.workOrderId;
+      extraIds.push(id);
+
+      await addOperation(id);
+
+      // Derived from the operation added above, read back rather than assumed.
+      const expected = await prisma.workOrder.findUniqueOrThrow({
+        where: { workOrderId: id },
+        select: { plannedCost: true },
+      });
+      expect(Number(expected.plannedCost)).toBeGreaterThan(0);
+
+      // Corrupt the cache only. The base relations are untouched, so the derived
+      // figure is unchanged and any snapshot recording zero is recording the cache.
+      await prisma.workOrder.update({
+        where: { workOrderId: id },
+        data: { plannedCost: 0, actualCost: 0 },
+      });
+
+      const moved = await api()
+        .put(`/api/work-orders/${id}/status`)
+        .set(authHeaders(ctx.technicianToken))
+        .send({ status: 'Planned' });
+      expect(moved.status).toBe(200);
+
+      const snap = await prisma.workOrderSnapshot.findFirstOrThrow({ where: { workOrderId: id } });
+      const json = snap.snapshot as Record<string, unknown>;
+
+      // The snapshot carries the derived figure...
+      expect(json.plannedCost).toBe(Number(expected.plannedCost));
+      // ...and the cache has been repaired to match it, so the two cannot diverge.
+      const after = await prisma.workOrder.findUniqueOrThrow({
+        where: { workOrderId: id },
+        select: { plannedCost: true, actualCost: true },
+      });
+      expect(Number(after.plannedCost)).toBe(Number(expected.plannedCost));
+      expect(json.plannedCost).toBe(Number(after.plannedCost));
+    });
+
     it('does not write a snapshot for a plain edit, and a deleted work order stops serving history from the API', async () => {
       const made = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body({ description: 'edit no snapshot' }));
       expect(made.status).toBe(201);

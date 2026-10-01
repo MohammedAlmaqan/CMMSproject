@@ -869,12 +869,26 @@ router.put(
       // history entry; the copied row is the state it now holds, which is what
       // each snapshot means. There is no update or delete surface for these
       // rows anywhere in the API.
+      //
+      // R.9: a snapshot must record the *derived* cost, not the cache. The
+      // recompute runs first, on this transaction's client, so it reads the
+      // rows this transaction has just written; a global client could not see
+      // them and would compute zero. Its return value is the figure it stored,
+      // so the snapshot and the columns cannot disagree. Both the recompute and
+      // its audit rows commit or roll back with the status change.
+      const derived = await recomputeWorkOrderCosts(
+        wo.workOrderId,
+        { userId: req.user!.userId, ipAddress: req.ip },
+        tx
+      );
+
       await tx.workOrderSnapshot.create({
         data: {
           workOrderId: wo.workOrderId,
           status: wo.status,
           snapshot: serializeWorkOrderSnapshot(
-            wo as unknown as Record<string, unknown>
+            wo as unknown as Record<string, unknown>,
+            derived
           ),
           takenByUserId: req.user!.userId,
         },

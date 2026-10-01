@@ -121,5 +121,11 @@ export async function recomputeWorkOrderCosts(
     });
   }
 
-  return { plannedCost: costs.plannedCost, actualCost: costs.actualCost };
+  // Returns the figures as written, not the raw ones from `computeWorkOrderCosts`.
+  // The rounded values are what the columns now hold, so a caller that goes on to
+  // record this work order's cost somewhere else -- a WorkOrderSnapshot, say --
+  // records the same number the database holds. Handing back the unrounded pair
+  // would let the two disagree by a fraction of a cent, which is precisely the
+  // kind of drift the derived figure exists to prevent.
+  return { plannedCost, actualCost };
 }
