@@ -16,6 +16,7 @@ import {
 import Header from '@/components/layout/Header';
 import { useAppStore } from '@/store/appStore';
 import { dashboardService } from '@/services/dashboardService';
+import { reportService } from '@/services/reportService';
 import type { SystemAlert } from '@/types';
 import type { WorkOrderStatus, WorkOrderType } from '@/types';
 import {
@@ -53,6 +54,14 @@ export default function DashboardPage() {
   const storeError = useAppStore((s) => s.error);
   const [trendData, setTrendData] = useState<Array<{ month: string; planned: number; actual: number }>>([]);
   const [dashAlerts, setDashAlerts] = useState<SystemAlert[]>([]);
+  // SOW 3.7.2 rows 65-67. Each is fed by its own report route rather than by
+  // arithmetic over the store's work orders: the store holds the work orders the
+  // user has loaded, not the whole estate, and a dashboard figure that silently
+  // depends on which page was visited last is not a figure anybody can reconcile.
+  const [backlogByCenter, setBacklogByCenter] = useState<Array<{ name: string; backlogHours: number; openWorkOrderCount: number }>>([]);
+  const [topCostEquipment, setTopCostEquipment] = useState<Array<{ equipmentId: string; equipmentCode: string; equipmentName: string; totalCost: number }>>([]);
+  const [awaitingConversion, setAwaitingConversion] = useState<{ total: number; byPriority: Array<{ priority: string; count: number }>; oldestAgeDays: number | null }>({ total: 0, byPriority: [], oldestAgeDays: null });
+  const [reportError, setReportError] = useState<string | null>(null);
 
   useEffect(() => {
     dashboardService
@@ -72,6 +81,29 @@ export default function DashboardPage() {
       })
       .catch((err) => setTrendData([]));
     dashboardService.getAlerts().then(setDashAlerts).catch((err) => setDashAlerts([]));
+
+    // A failed report must not read as a zero. "No backlog" and "the backlog
+    // query failed" are different facts, and a maintenance manager acting on the
+    // second one would believe the plant is clear.
+    const loadReport = <T,>(label: string, load: () => Promise<T>, set: (value: T) => void) => {
+      load()
+        .then(set)
+        .catch((err) => {
+          console.error(`dashboard report failed: ${label}`, err);
+          setReportError(label);
+        });
+    };
+    loadReport('backlog hours by work center', () => reportService.getBacklogHoursByWorkCenter(), (rows) =>
+      setBacklogByCenter(
+        rows.map((r: { workCenterCode: string; backlogHours: number; openWorkOrderCount: number }) => ({
+          name: r.workCenterCode,
+          backlogHours: r.backlogHours,
+          openWorkOrderCount: r.openWorkOrderCount,
+        })),
+      ),
+    );
+    loadReport('top cost equipment', () => reportService.getTopCostEquipment(), setTopCostEquipment);
+    loadReport('notifications awaiting conversion', () => reportService.getNotificationsAwaitingConversion(), setAwaitingConversion);
   }, []);
 
   const statusData = useMemo(() => {
@@ -96,20 +128,6 @@ export default function DashboardPage() {
       value,
       color: TYPE_COLORS[name as WorkOrderType] || '#92929B',
     }));
-  }, [workOrders]);
-
-  const backlogByCenter = useMemo(() => {
-    const centerMap: Record<string, number> = {};
-    workOrders
-      .filter((w) => !['Closed', 'Cancelled', 'Completed'].includes(w.status))
-      .forEach((w) => {
-        const wc = w.workCenterId;
-        centerMap[wc] = (centerMap[wc] || 0) + 1;
-      });
-    return Object.entries(centerMap).map(([id, count]) => {
-      const wc = useAppStore.getState().workCenters.find((w) => w.workCenterId === id);
-      return { name: wc?.code || id, count };
-    });
   }, [workOrders]);
 
   const unreadAlerts = dashAlerts.filter((a) => !a.isRead);
@@ -280,9 +298,14 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Backlog by Work Center */}
+          {/* Backlog Hours by Work Center — SOW 3.7.2 row 65 */}
           <div className="col-span-4 industrial-card rounded p-4">
-            <h3 className="text-primary text-sm font-semibold mb-4">Backlog by Work Center</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-primary text-sm font-semibold">Backlog Hours by Work Center</h3>
+              {reportError === 'backlog hours by work center' && (
+                <span className="text-red-100" style={{ fontSize: '10px' }}>unavailable</span>
+              )}
+            </div>
             <div className="h-44">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={backlogByCenter}>
@@ -297,11 +320,92 @@ export default function DashboardPage() {
                       fontSize: '12px',
                     }}
                     itemStyle={{ color: '#FAFAFA' }}
+                    formatter={(value: number, _name: string, item) => [
+                      `${value.toFixed(1)} h across ${item?.payload?.openWorkOrderCount ?? 0} open WOs`,
+                      'Backlog',
+                    ]}
                   />
-                  <Bar dataKey="count" fill="#D97706" radius={[2, 2, 0, 0]} />
+                  {/* Hours, not work-order count. The bar length is planned
+                      labour queued, which is what the row asks for and what a
+                      capacity conversation actually needs. */}
+                  <Bar dataKey="backlogHours" fill="#D97706" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
+          </div>
+
+          {/* Top 10 Highest-Cost Equipment — SOW 3.7.2 row 66 */}
+          <div className="col-span-4 industrial-card rounded p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-primary text-sm font-semibold">Top 10 Highest-Cost Equipment</h3>
+              {reportError === 'top cost equipment' && (
+                <span className="text-red-100" style={{ fontSize: '10px' }}>unavailable</span>
+              )}
+            </div>
+            <div className="space-y-1.5 max-h-44 overflow-y-auto">
+              {topCostEquipment.length === 0 ? (
+                <p className="text-tertiary" style={{ fontSize: '11px' }}>No equipment cost recorded yet</p>
+              ) : (
+                topCostEquipment.map((row, index) => (
+                  <div key={row.equipmentId} className="flex items-baseline gap-2">
+                    <span className="text-tertiary" style={{ fontSize: '10px', width: '14px' }}>
+                      {index + 1}
+                    </span>
+                    <span className="text-primary text-xs truncate flex-1" title={row.equipmentName}>
+                      {row.equipmentCode}
+                    </span>
+                    <span className="text-secondary" style={{ fontSize: '11px' }}>
+                      {row.totalCost.toLocaleString(undefined, {
+                        style: 'currency',
+                        currency: 'USD',
+                        maximumFractionDigits: 0,
+                      })}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Notifications Awaiting Conversion — SOW 3.7.2 row 67 */}
+          <div className="col-span-4 industrial-card rounded p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-primary text-sm font-semibold">Awaiting Conversion</h3>
+              {reportError === 'notifications awaiting conversion' && (
+                <span className="text-red-100" style={{ fontSize: '10px' }}>unavailable</span>
+              )}
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-primary text-3xl font-bold">{awaitingConversion.total}</span>
+              <span className="text-tertiary" style={{ fontSize: '10px' }}>
+                NOTIFICATIONS NOT YET RAISED AS WORK
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-3 mt-3">
+              {awaitingConversion.byPriority.map((row) => (
+                <div key={row.priority} className="flex items-center gap-1">
+                  <span className="text-secondary" style={{ fontSize: '11px' }}>
+                    {row.priority}
+                  </span>
+                  <span className="text-primary text-xs font-semibold">{row.count}</span>
+                </div>
+              ))}
+            </div>
+            {awaitingConversion.oldestAgeDays !== null && (
+              <div className="flex items-center gap-2 mt-3">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber" />
+                <span className="text-secondary text-xs">
+                  Oldest waiting {awaitingConversion.oldestAgeDays} day
+                  {awaitingConversion.oldestAgeDays === 1 ? '' : 's'}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => navigate('/notifications')}
+              className="flex items-center gap-1 mt-3 text-amber text-xs hover:underline"
+            >
+              Review notifications <ArrowRight className="w-3 h-3" />
+            </button>
           </div>
 
           {/* Recent Alerts */}

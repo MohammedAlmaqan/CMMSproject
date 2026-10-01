@@ -801,4 +801,392 @@ router.get('/material-consumption', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/reports/backlog-hours-by-work-center:
+ *   get:
+ *     summary: Open backlog hours grouped by work centre
+ *     description: >
+ *       SOW 3.7.2 row 65 asks for backlog *hours* by work centre. The dashboard
+ *       widget that used to answer this question counted work orders instead,
+ *       which is a different question: one work order carrying forty hours of
+ *       planned labour and one carrying forty minutes both counted as 1. The
+ *       figure below sums planned hours across the operations of every open
+ *       work order, so it moves with the work actually queued rather than with
+ *       the paperwork raised against it.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: Start of a closed calendar-day range, YYYY-MM-DD
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: End of a closed calendar-day range, YYYY-MM-DD; inclusive of the whole day
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *         description: Restrict to this functional location
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         description: When true, a functionalLocationId filter also includes every location beneath it
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Backlog hours per work centre, every active centre included
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   workCenterId: { type: string }
+ *                   workCenterCode: { type: string }
+ *                   workCenterName: { type: string }
+ *                   openWorkOrderCount: { type: integer, description: Open work orders in this centre, for contrast with backlogHours }
+ *                   backlogHours: { type: number, format: float, description: Sum of planned hours on the operations of those work orders }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get('/backlog-hours-by-work-center', async (req: Request, res: Response) => {
+  try {
+    const resolved = await resolveReportScope(req, res);
+    if (!resolved) return;
+    const scoped = {
+      isDeleted: false,
+      status: { notIn: ['Completed', 'Closed', 'Cancelled'] },
+      ...resolved.scope,
+      ...(buildDateWhere(resolved.filter, 'createdDate') ?? {}),
+    };
+
+    // Operations carry the hours; the work order carries the work centre. There
+    // is no single row holding both, so the hours are grouped by work order
+    // first and folded onto the centre second. `plannedHours` is summed per work
+    // order because a work order's contribution to a centre's backlog is the
+    // whole of its planned labour, not its average operation.
+    const hoursByWorkOrder = await prisma.workOrderOperation.groupBy({
+      by: ['workOrderId'],
+      where: { isDeleted: false, workOrder: scoped },
+      _sum: { plannedHours: true },
+    });
+    const hoursMap = new Map(hoursByWorkOrder.map((e) => [e.workOrderId, e._sum.plannedHours || 0]));
+
+    const workOrders = await prisma.workOrder.findMany({
+      where: scoped,
+      select: { workOrderId: true, workCenterId: true },
+    });
+
+    const totals = new Map<string, { hours: number; count: number }>();
+    for (const wo of workOrders) {
+      const entry = totals.get(wo.workCenterId) ?? { hours: 0, count: 0 };
+      entry.hours += hoursMap.get(wo.workOrderId) ?? 0;
+      entry.count += 1;
+      totals.set(wo.workCenterId, entry);
+    }
+
+    // Every non-deleted work centre is listed, including ones with nothing open.
+    // A centre absent from the report and a centre with an empty backlog are
+    // different facts, and a capacity plan that cannot tell them apart will read
+    // a missing row as spare capacity. The centre filter still narrows the list,
+    // so asking about one centre answers about that centre and nothing else.
+    const workCenters = await prisma.workCenter.findMany({
+      where: {
+        isDeleted: false,
+        ...(resolved.filter.workCenterId !== null ? { workCenterId: resolved.filter.workCenterId } : {}),
+      },
+      select: { workCenterId: true, code: true, name: true },
+      orderBy: { code: 'asc' },
+    });
+
+    const result = workCenters.map((wc) => {
+      const entry = totals.get(wc.workCenterId);
+      return {
+        workCenterId: wc.workCenterId,
+        workCenterCode: wc.code,
+        workCenterName: wc.name,
+        openWorkOrderCount: entry?.count ?? 0,
+        backlogHours: Math.round((entry?.hours ?? 0) * 100) / 100,
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    logger.error({ err: error }, 'Error generating backlog hours report');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/reports/top-cost-equipment:
+ *   get:
+ *     summary: The ten costliest pieces of equipment
+ *     description: >
+ *       SOW 3.7.2 row 66. Equipment is ranked by what the work has actually
+ *       committed: a work order contributes its actual cost once it has any, and
+ *       its planned cost until then. Ranking on planned cost alone would put
+ *       every unstarted job above the finished ones that already cost money,
+ *       and ranking on actual cost alone would drop the planned backlog out of a
+ *       report meant to inform planning. Ties break on equipmentId so the order
+ *       is stable between calls.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: Start of a closed calendar-day range, YYYY-MM-DD
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: End of a closed calendar-day range, YYYY-MM-DD; inclusive of the whole day
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *         description: Restrict to this functional location
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         description: When true, a functionalLocationId filter also includes every location beneath it
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Up to ten equipment rows, most expensive first
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   equipmentId: { type: string }
+ *                   equipmentCode: { type: string }
+ *                   equipmentName: { type: string }
+ *                   workOrderCount: { type: integer }
+ *                   plannedCost: { type: number, format: float }
+ *                   actualCost: { type: number, format: float }
+ *                   totalCost: { type: number, format: float, description: Actual cost where present, planned cost otherwise, summed per work order }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get('/top-cost-equipment', async (req: Request, res: Response) => {
+  try {
+    const resolved = await resolveReportScope(req, res);
+    if (!resolved) return;
+
+    // Work orders with no equipment are excluded rather than filed under a null
+    // key: this report is a ranking of assets, and an unattributed cost is not
+    // an asset a planner can act on.
+    const workOrders = await prisma.workOrder.findMany({
+      where: {
+        isDeleted: false,
+        equipmentId: { not: null },
+        ...resolved.scope,
+        ...(buildDateWhere(resolved.filter, 'createdDate') ?? {}),
+      },
+      select: { equipmentId: true, plannedCost: true, actualCost: true },
+    });
+
+    const totals = new Map<string, { total: number; planned: number; actual: number; count: number }>();
+    for (const wo of workOrders) {
+      if (wo.equipmentId === null) continue;
+      const planned = Number(wo.plannedCost);
+      const actual = Number(wo.actualCost);
+      // One work order contributes one figure: its actual cost where it has one,
+      // its planned cost otherwise. Summing planned and actual together would
+      // count the same job twice, once as the money reserved and once as the
+      // money spent.
+      const contribution = actual > 0 ? actual : planned;
+      const entry = totals.get(wo.equipmentId) ?? { total: 0, planned: 0, actual: 0, count: 0 };
+      entry.total += contribution;
+      entry.planned += planned;
+      entry.actual += actual;
+      entry.count += 1;
+      totals.set(wo.equipmentId, entry);
+    }
+
+    const equipmentIds = [...totals.keys()];
+    const equipment = await prisma.equipment.findMany({
+      where: { equipmentId: { in: equipmentIds }, isDeleted: false },
+      select: { equipmentId: true, equipmentCode: true, name: true },
+    });
+    const nameById = new Map(equipment.map((e) => [e.equipmentId, e]));
+
+    const result = [...totals.entries()]
+      .map(([equipmentId, entry]) => {
+        const detail = nameById.get(equipmentId);
+        return {
+          equipmentId,
+          // A deleted asset still carries cost, so its identity falls back to the
+          // id rather than to an empty string that two rows could share.
+          equipmentCode: detail?.equipmentCode ?? equipmentId,
+          equipmentName: detail?.name ?? equipmentId,
+          workOrderCount: entry.count,
+          plannedCost: Math.round(entry.planned * 100) / 100,
+          actualCost: Math.round(entry.actual * 100) / 100,
+          totalCost: Math.round(entry.total * 100) / 100,
+        };
+      })
+      // EquipmentId as the tie-break: two assets can cost the same to the cent,
+      // and an unstable order would make the top ten flicker between calls with
+      // no change in the underlying data.
+      .sort((a, b) => b.totalCost - a.totalCost || a.equipmentId.localeCompare(b.equipmentId))
+      .slice(0, 10);
+
+    res.json(result);
+  } catch (error) {
+    logger.error({ err: error }, 'Error generating top cost equipment report');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/reports/notifications-awaiting-conversion:
+ *   get:
+ *     summary: Notifications raised but not yet turned into work
+ *     description: >
+ *       SOW 3.7.2 row 67. "Awaiting conversion" is narrower than "open": it means
+ *       the notification has not yet become a work order, so Converted is
+ *       excluded even though a converted notification's issue stays open until
+ *       the work order it became is completed. The two questions are answered by
+ *       two different reports on purpose - this one counts work not yet raised.
+ *
+ *       This report rejects `workCenterId` with a 400 rather than ignoring it. A
+ *       notification names a location and, when there is one, an asset; it does
+ *       not name a work centre, because work centres are assigned per work order
+ *       rather than per asset. Accepting the filter and quietly returning the
+ *       unfiltered answer would hand the caller a number they believe they
+ *       narrowed, which is the same class of wrong as an empty report.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *         description: Start of a closed calendar-day range, YYYY-MM-DD
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *         description: End of a closed calendar-day range, YYYY-MM-DD; inclusive of the whole day
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *         description: Restrict to this functional location
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         description: When true, a functionalLocationId filter also includes every location beneath it
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
+ *         description: Not supported by this report; supplying it is a 400 with the reason
+ *     responses:
+ *       '200':
+ *         description: Count of notifications awaiting conversion, with a priority breakdown
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total: { type: integer }
+ *                 byPriority:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       priority: { type: string }
+ *                       count: { type: integer }
+ *                 oldestAgeDays: { type: number, format: float, nullable: true, description: Whole days since the oldest awaiting notification was raised; null when there are none }
+ *       '400':
+ *         description: Invalid report filter
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get('/notifications-awaiting-conversion', async (req: Request, res: Response) => {
+  try {
+    const resolved = await resolveReportScope(req, res);
+    if (!resolved) return;
+    const { filter, scope } = resolved;
+
+    if (filter.workCenterId !== null) {
+      res.status(400).json({
+        error: 'Invalid report filter',
+        details: ['workCenterId is not supported by this report; a notification is not assigned to a work centre'],
+      });
+      return;
+    }
+
+    const notifications = await prisma.notification.findMany({
+      where: {
+        isDeleted: false,
+        status: { in: ['Open', 'In Process'] },
+        ...scope,
+        ...(buildDateWhere(filter, 'createdDate') ?? {}),
+      },
+      select: { priority: true, createdDate: true },
+      orderBy: { createdDate: 'asc' },
+    });
+
+    const byPriority = new Map<string, number>();
+    for (const n of notifications) {
+      byPriority.set(n.priority, (byPriority.get(n.priority) ?? 0) + 1);
+    }
+
+    // High first, then Medium, then Low, then anything else the database happens
+    // to hold. An unrecognised priority is still counted and still shown rather
+    // than dropped: a priority nobody has seen before is a data question, and
+    // hiding it from the report would make the report look complete.
+    const PRIORITY_ORDER = ['High', 'Medium', 'Low'];
+    const priorityRows = [...byPriority.entries()]
+      .map(([priority, count]) => ({ priority, count }))
+      .sort((a, b) => {
+        const ai = PRIORITY_ORDER.indexOf(a.priority);
+        const bi = PRIORITY_ORDER.indexOf(b.priority);
+        return (ai === -1 ? PRIORITY_ORDER.length : ai) - (bi === -1 ? PRIORITY_ORDER.length : bi)
+          || a.priority.localeCompare(b.priority);
+      });
+
+    const oldest = notifications.length > 0 ? notifications[0].createdDate : null;
+    const oldestAgeDays = oldest === null
+      ? null
+      : Math.floor((Date.now() - oldest.getTime()) / 86_400_000);
+
+    res.json({
+      total: notifications.length,
+      byPriority: priorityRows,
+      oldestAgeDays,
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Error generating notifications awaiting conversion report');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
