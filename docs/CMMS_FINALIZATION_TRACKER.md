@@ -1226,6 +1226,31 @@ Supersedes the D-section note at line 1145 (52 orphaned) and D3's own "63 rows, 
 
 **Nothing is deleted by this entry.** The classification is the decision the Client asked for; the purge of the 61 is a separate destructive action and is not taken here.
 
+##### R.9 D3-task-lists-audit - the other half of the same leak, which was an audit trail asserting something untrue
+
+The purge of the 61 removed the rows and left the **audit half** of the identical leak: 156 `AuditLogEntry` rows naming `tableName = 'TaskList'`, all 156 orphaned because the record each one describes is gone. This entry reconciles them. Method: `backend/scripts/r9d-tasklist-audit-clean.ts`, read-only unless `--apply`, scoped to orphaned `TaskList` rows only.
+
+**Why they are not harmless debris.** `GET /api/audit-log` (`src/routes/auditLog.ts:86`, Administrator-only) renders this table to a person. 156 rows in it claim that `admin` and `operator` created, edited and deleted 52 task lists **that do not exist**. That is not untidy history, it is the audit trail stating something untrue, and an audit trail that does that is worth less than no audit trail. R.9 B refused to *write* 78 audit rows for exactly this reason - permanent trail noise attributed to `admin` - so leaving 156 in place by hand would reintroduce through the back door what that entry declined to create at the front.
+
+**Every row classified as fixture, on four independent signals, none of them `createdBy`:**
+
+| Signal | Evidence |
+|---|---|
+| The values themselves | All 15 field-carrying rows hold the literal strings `old="test task list"` → `new="updated task list"`, copied from `tests/routes/taskLists.test.ts:54,74` |
+| The authors | `operator <operator@cmms.local>` (98 rows) and `admin <admin@cmms.local>` (58 rows), both seeded demo accounts created 2026-09-24 11:56:46 |
+| The lifecycle | 52 recordIds × exactly Create+Update+Delete, each triple completing in **50–233 ms**. No PM task list is created, edited and destroyed inside an eighth of a second. |
+| The reach | Zero rows have a surviving `TaskList` behind them, so none can be joined to a record by any reader |
+
+**Composition, recorded rather than summarised:** 52 Create, 52 Update, 52 Delete; 141 with `fieldName` null and 15 on `description`; spanning 2026-09-24T16:33:14Z .. 2026-10-01T11:14:20Z.
+
+**The count is 52 and not 61, and the difference is the point.** Nine of the purged fixtures were written straight to the database by producers that bypass the API - `crafts.test.ts:147` and `r9a-differential.ts:127` use Prisma directly - and audit logging lives in the API service layer, so those rows never minted audit entries at all. The audit table was never a complete record of the leak, which is exactly why deleting by `tableName` alone would have been wrong and deleting by an audited-id list would have been luck.
+
+**Already fixed, and this is what makes the deletion final rather than a pause.** `purgeTaskLists` has called `purgeAudit(ids)` since `713bf16`, so the leak is closed at the source and nothing regenerates these. The newest row is 2026-10-01T11:14:20Z, the same fixture run as the last leaked task list `TL-T20261001111418` that D3-task-lists names as surviving the old teardown. Four subsequent full-suite runs produced zero new `TaskList` audit rows.
+
+**Applied, with the deletion itself under check.** `auditLogEntry` 4398 → 4242, `deleted=156`, matching the dry-run candidate count exactly or the script exits non-zero. The DB-invariance check was run across the deletion and reported `FAIL 156 pre-existing row(s) the run destroyed: AuditLogEntry -156` with every other table absent from the report - which is the correct reading here: the tool named precisely the authorised rows and nothing else. Re-baselined afterwards, a further full suite run (67 files / 933 tests) ended at `PASS the database holds exactly the same rows it did before the run`. Both seed task lists, their 3 and 2 operations, and their zero audit rows are untouched; the orphan test would have retained any row whose record existed.
+
+**What this does not claim.** The same measurement finds orphaned audit rows on other tables - `WorkOrder` 173, `WorkOrderOperation` 126, `MaintenancePlan` 59, out of 4398 total. Those are **not** touched here: they were not part of the authorised purge, they have not been classified the way these 156 have been, and `WorkOrder` is the table R.9 B and R.10 both cite as live evidence. Reconciling them is its own piece of work with its own authorisation, and guessing at that scope from inside a task-list cleanup is how a cleanup stops being one.
+
 ##### R.9 B - the stale-cost scan (delivered: a scan, not a backfill)
 
 **This row was authored under a premise that turned out to be false, and it is rewritten to say what was actually found.** The tracker originally called for a one-shot backfill over every work order whose stored figures disagree with the derived ones, reporting the rows it changed. That presumed live rows had stale costs. **They do not.** The only disagreement found was in 78 soft-deleted test debris rows. No live defect exists. Therefore the deliverable is the evidence of that scan, not the application of a backfill.
