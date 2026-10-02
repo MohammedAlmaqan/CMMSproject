@@ -358,6 +358,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
       type, priority, functionalLocationId, equipmentId, description,
       workCenterId, supervisorUserId, reportedByUserId, plannedStart, plannedFinish,
       costCenterCode, internalOrder, breakdownFlag, safetyCriticalFlag,
+      safetyNotes, completionRemarks,
       taskListId,
     } = req.body;
 
@@ -437,6 +438,8 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
           internalOrder: internalOrder || '',
           breakdownFlag: breakdownFlag || false,
           safetyCriticalFlag: safetyCriticalFlag || false,
+          safetyNotes: safetyNotes ?? null,
+          completionRemarks: completionRemarks ?? null,
           status: 'Draft',
           createdBy: req.user!.userId,
           modifiedBy: req.user!.userId,
@@ -555,6 +558,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
       workCenterId, supervisorUserId, reportedByUserId, plannedStart, plannedFinish,
       actualStart, actualFinish, costCenterCode, internalOrder,
       breakdownFlag, safetyCriticalFlag, status,
+      safetyNotes, completionRemarks,
     } = req.body;
 
     // SOW 3.3.1: if this edit leaves the work order an emergency — whether by
@@ -581,6 +585,8 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
         ...(internalOrder !== undefined && { internalOrder }),
         ...(breakdownFlag !== undefined && { breakdownFlag }),
         ...(safetyCriticalFlag !== undefined && { safetyCriticalFlag }),
+        ...(safetyNotes !== undefined && { safetyNotes }),
+        ...(completionRemarks !== undefined && { completionRemarks }),
         ...(status !== undefined && { status }),
         modifiedBy: req.user!.userId,
       },

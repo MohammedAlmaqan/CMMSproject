@@ -39,6 +39,7 @@ export default function WorkOrderCreatePage() {
   const [internalOrder, setInternalOrder] = useState('');
   const [breakdownFlag, setBreakdownFlag] = useState(false);
   const [safetyCriticalFlag, setSafetyCriticalFlag] = useState(false);
+  const [safetyNotes, setSafetyNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -117,6 +118,7 @@ export default function WorkOrderCreatePage() {
         internalOrder: internalOrder || '',
         breakdownFlag,
         safetyCriticalFlag,
+        safetyNotes: safetyNotes.trim() ? safetyNotes : null,
       });
       navigate(`/work-orders/${created.workOrderId}`);
     } catch (err) {
@@ -193,6 +195,19 @@ export default function WorkOrderCreatePage() {
                 style={{ backgroundColor: '#27272A' }}
                 rows={3}
                 required
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className={labelClass}>Safety Notes</label>
+              <textarea
+                value={safetyNotes}
+                onChange={(e) => setSafetyNotes(e.target.value)}
+                className={inputClass}
+                style={{ backgroundColor: '#27272A' }}
+                rows={3}
+                placeholder="Hazards, isolations and precautions for this job"
+                aria-label="Safety notes"
               />
             </div>
 

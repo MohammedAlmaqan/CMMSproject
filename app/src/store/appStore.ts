@@ -249,6 +249,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
       internalOrder: '',
       breakdownFlag: notif.breakdownFlag,
       safetyCriticalFlag: false,
+      safetyNotes: null,
+      completionRemarks: null,
       plannedCost: 0,
       actualCost: 0,
       createdBy: '',

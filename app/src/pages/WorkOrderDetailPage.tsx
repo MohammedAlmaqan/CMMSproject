@@ -63,7 +63,7 @@ import type {
 } from '@/types';
 import { serviceCostCategories } from '@/types';
 
-type DetailTab = 'operations' | 'materials' | 'labor' | 'services' | 'checklists' | 'notifications' | 'comments' | 'attachments' | 'history';
+type DetailTab = 'operations' | 'materials' | 'labor' | 'services' | 'checklists' | 'notifications' | 'comments' | 'attachments' | 'history' | 'notes';
 
 interface CraftRef { craftId: string; craftCode: string; craftName?: string; hourlyRate?: number }
 
@@ -232,6 +232,10 @@ export default function WorkOrderDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
+  const [notesForm, setNotesForm] = useState<{ safetyNotes: string; completionRemarks: string }>({
+    safetyNotes: '',
+    completionRemarks: '',
+  });
 
   const [opAdding, setOpAdding] = useState(false);
   const [opForm, setOpForm] = useState<OpFormState>(emptyOpForm);
@@ -284,6 +288,10 @@ const isAdmin = hasPermission(['Administrator']);
         attachmentService.getByEntity('WorkOrder', id!),
       ]);
       setWo(woData as WorkOrderDetail);
+      setNotesForm({
+        safetyNotes: (woData as WorkOrderDetail).safetyNotes ?? '',
+        completionRemarks: (woData as WorkOrderDetail).completionRemarks ?? '',
+      });
       setLabor(laborData as LaborEntryDetail[]);
       setHistory(historyData?.data || []);
       setUsers(usersData);
@@ -431,6 +439,27 @@ const isAdmin = hasPermission(['Administrator']);
     },
     []
   );
+
+  const handleSaveNotes = useCallback(async () => {
+    if (!wo) return;
+    setActionError(null);
+    setBusy('notes:save');
+    try {
+      const updated = await workOrderService.update(wo.workOrderId, {
+        safetyNotes: notesForm.safetyNotes.trim() ? notesForm.safetyNotes : null,
+        completionRemarks: notesForm.completionRemarks.trim() ? notesForm.completionRemarks : null,
+      });
+      setWo((prev) =>
+        prev
+          ? { ...prev, safetyNotes: updated.safetyNotes, completionRemarks: updated.completionRemarks }
+          : prev
+      );
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Failed to save notes');
+    } finally {
+      setBusy(null);
+    }
+  }, [wo, notesForm]);
 
   // ---- Operations CRUD ----
   const startAddOperation = useCallback(() => {
@@ -765,6 +794,7 @@ const isAdmin = hasPermission(['Administrator']);
       { id: 'notifications', label: 'Notifications', icon: Bell, count: wo.notifications?.length || 0 },
       { id: 'comments', label: 'Comments', icon: MessageSquare, count: wo.comments?.length || 0 },
       { id: 'attachments', label: 'Attachments', icon: Paperclip, count: attachments.length },
+      { id: 'notes', label: 'Notes', icon: ClipboardList },
       { id: 'history', label: 'History', icon: FileText, count: history.length },
     ];
   }, [wo, labor, history, attachments]);
@@ -1807,6 +1837,49 @@ const isAdmin = hasPermission(['Administrator']);
                   </div>
                 );
               })
+            )}
+          </div>
+        )}
+
+        {activeTab === 'notes' && (
+          <div className="industrial-card rounded p-4 space-y-4">
+            <div>
+              <label className="block text-tertiary text-xs uppercase tracking-wide mb-2">Safety Notes</label>
+              <textarea
+                value={notesForm.safetyNotes}
+                onChange={(e) => setNotesForm((f) => ({ ...f, safetyNotes: e.target.value }))}
+                rows={5}
+                disabled={!canEdit}
+                aria-label="Safety notes"
+                placeholder="Hazards, isolations and precautions for this job"
+                className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
+                style={{ backgroundColor: '#27272A' }}
+              />
+            </div>
+            <div>
+              <label className="block text-tertiary text-xs uppercase tracking-wide mb-2">Completion Remarks</label>
+              <textarea
+                value={notesForm.completionRemarks}
+                onChange={(e) => setNotesForm((f) => ({ ...f, completionRemarks: e.target.value }))}
+                rows={5}
+                disabled={!canEdit}
+                aria-label="Completion remarks"
+                placeholder="What was done, what was found, and what was left outstanding"
+                className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
+                style={{ backgroundColor: '#27272A' }}
+              />
+            </div>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={handleSaveNotes}
+                disabled={busy === 'notes:save'}
+                className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                style={{ backgroundColor: '#D97706', color: '#111113' }}
+              >
+                {busy === 'notes:save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Save Notes
+              </button>
             )}
           </div>
         )}

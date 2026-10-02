@@ -84,6 +84,8 @@ const baseWo: WorkOrder = {
   internalOrder: '',
   breakdownFlag: false,
   safetyCriticalFlag: false,
+  safetyNotes: null,
+  completionRemarks: null,
   plannedCost: 0,
   actualCost: 0,
   createdBy: 'seed',

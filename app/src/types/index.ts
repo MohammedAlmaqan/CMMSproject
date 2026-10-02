@@ -286,6 +286,10 @@ export interface WorkOrder extends Auditable {
   internalOrder: string;
   breakdownFlag: boolean;
   safetyCriticalFlag: boolean;
+  /** SOW 3.3.3 long-text field: multi-line plain text, not WYSIWYG. */
+  safetyNotes: string | null;
+  /** SOW 3.3.3 long-text field: multi-line plain text, not WYSIWYG. */
+  completionRemarks: string | null;
   plannedCost: number;
   actualCost: number;
 }

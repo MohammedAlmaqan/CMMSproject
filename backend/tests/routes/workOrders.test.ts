@@ -414,6 +414,80 @@ describe('work orders routes', () => {
     });
   });
 
+  describe('long-text notes (SOW 3.3.3)', () => {
+    const base = (overrides: Record<string, unknown> = {}) => ({
+      type: 'CM',
+      priority: 'Medium',
+      description: 'notes case',
+      functionalLocationId: flat,
+      workCenterId: wc,
+      supervisorUserId: sup,
+      ...overrides,
+    });
+
+    it('persists multi-line safety notes and completion remarks on create', async () => {
+      const safetyNotes = 'Isolate the 11 kV feeder.\nWear arc-flash PPE.\nLock out / tag out.';
+      const completionRemarks = 'Replaced the bearing.\nVibration back within limits.';
+      const res = await api()
+        .post('/api/work-orders')
+        .set(authHeaders(ctx.adminToken))
+        .send(base({ safetyNotes, completionRemarks }));
+      expect(res.status).toBe(201);
+      extraIds.push(res.body.workOrderId);
+
+      const row = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: res.body.workOrderId } });
+      expect(row.safetyNotes).toBe(safetyNotes);
+      expect(row.completionRemarks).toBe(completionRemarks);
+    });
+
+    it('leaves both notes null when they are not supplied', async () => {
+      const res = await api().post('/api/work-orders').set(authHeaders(ctx.adminToken)).send(base());
+      expect(res.status).toBe(201);
+      extraIds.push(res.body.workOrderId);
+
+      const row = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: res.body.workOrderId } });
+      expect(row.safetyNotes).toBeNull();
+      expect(row.completionRemarks).toBeNull();
+    });
+
+    it('sets the notes on update and clears one without touching the other', async () => {
+      const made = await api().post('/api/work-orders').set(authHeaders(ctx.adminToken)).send(base());
+      expect(made.status).toBe(201);
+      const id = made.body.workOrderId;
+      extraIds.push(id);
+
+      const set = await api()
+        .put(`/api/work-orders/${id}`)
+        .set(authHeaders(ctx.operatorToken))
+        .send({ safetyNotes: 'Line 1\nLine 2', completionRemarks: 'Done' });
+      expect(set.status).toBe(200);
+
+      let row = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });
+      expect(row.safetyNotes).toBe('Line 1\nLine 2');
+      expect(row.completionRemarks).toBe('Done');
+      expect(row.description).toBe('notes case');
+
+      const clear = await api()
+        .put(`/api/work-orders/${id}`)
+        .set(authHeaders(ctx.operatorToken))
+        .send({ completionRemarks: null });
+      expect(clear.status).toBe(200);
+
+      row = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });
+      expect(row.completionRemarks).toBeNull();
+      // A partial update must not wipe the field it did not mention.
+      expect(row.safetyNotes).toBe('Line 1\nLine 2');
+    });
+
+    it('rejects a note longer than the sanity bound with a zod-derived 400', async () => {
+      const res = await api()
+        .post('/api/work-orders')
+        .set(authHeaders(ctx.adminToken))
+        .send(base({ safetyNotes: 'x'.repeat(20001) }));
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('work order history (SOW 3.6)', () => {
     it('writes one immutable snapshot per successful transition and none for a rejected one, then serves them oldest first', async () => {
       // The snapshot is the state the work order holds AFTER the change, so a

@@ -1550,7 +1550,7 @@ With those four recorded, Phase R is closed. Test floor at close: **70 files / 9
 | 20 | §3.2.2 | Multiple notifications aggregated into one work order | Not Met | — | uses row 23's priority rule |
 | 23 | §3.3.1 | Emergency automatically sets highest priority | Not Met | — | H.1 below — implemented, not verified |
 | 24 | §3.3.1 | Calibration work orders with pass/fail tracking | Not Met | — | **Build, depth (ii) — approved 2026-10-02; see below** |
-| 29 | §3.3.3 | Rich-text long-text field (job instructions, safety notes, completion remarks) | Not Met | — | schema + UI |
+| 29 | §3.3.3 | Rich-text long-text field (job instructions, safety notes, completion remarks) | Not Met | — | H.3 below — implemented, not verified |
 | 36 | §3.3.8 | Any file type ≤10 MB | Partial | D-11 | H.2 below — widened allowlist implemented, not verified |
 | 69 | §3.8 | In-app alert: work-order assignment | Not Met | — | alert emitter |
 | 70 | §3.8 | In-app alert: overdue work orders | Not Met | — | emitter + scheduled sweep |
@@ -1579,6 +1579,12 @@ With those four recorded, Phase R is closed. Test floor at close: **70 files / 9
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
 | H.2 | Row 36 — widen the attachment allowlist under D-11, keep the 10 MB cap, block executables and scripts | IMPLEMENTED, NOT VERIFIED | `backend/src/utils/uploadRules.ts` accepts images, PDF, text, CSV, office documents and CAD drawings by filename extension (case-insensitive), blocks a denylist of executable and script extensions whatever MIME is declared, and falls back to the MIME allowlist only for unrecognised extensions. The 10 MB cap is unchanged. `backend/tests/unit/uploadRules.test.ts` (DB-free) covers accept/block/fallback; `backend/tests/routes/attachments.test.ts` drives a `.dwg` upload (201), a `.exe` and `.ps1` refusal (400, nothing written) and a >10 MB refusal against live PostgreSQL. Archive formats are deliberately excluded (a container can carry an executable past a filename check). Negative injection: disabling the executable/script block failed exactly the 2 route cases and 1 unit case (18 passed); reverted. Promotion to `Met` waits on green CI at this commit's SHA. | *this commit* |
+
+**H.3 — Row 29 (§3.3.3): a long-text field for safety notes and completion remarks.** Delivered *this commit*; held at `IMPLEMENTED, NOT VERIFIED` under the same rule as H.1.
+
+| # | Task | Status | Acceptance Criteria | Commit |
+|---|---|---|---|---|
+| H.3 | Row 29 — multi-line `safetyNotes` and `completionRemarks` on a work order, with create-page and detail-page capture | IMPLEMENTED, NOT VERIFIED | Two nullable `text` columns (`WorkOrder.safetyNotes`, `WorkOrder.completionRemarks`) added by migration `20261002180000_work_order_long_text`, which deploys clean from scratch on a fresh database (16 migrations). `workOrderCreateSchema` accepts both as nullable strings bounded at 20000 chars; `POST /api/work-orders` and `PUT /api/work-orders/:id` persist them, and a partial update leaves the field it did not name untouched. `WorkOrderCreatePage` gains a Safety Notes textarea; `WorkOrderDetailPage` gains a Notes tab that loads, edits and saves both fields via `workOrderService.update`. `backend/tests/routes/workOrders.test.ts` adds 4 live-PostgreSQL cases (create multi-line, null default, set-then-clear one of two, over-bound 400). Negative injections, all reverted: (a) create ignoring the inputs failed exactly the create case; (b) the update block dropping the fields failed exactly the set/clear case; (c) removing the 20000-char bound failed exactly the bound case. Promotion to `Met` waits on green CI at this commit's SHA and its run id. | *this commit* |
 
 ---
 

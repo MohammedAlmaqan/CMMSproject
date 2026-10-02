@@ -201,7 +201,7 @@ Converting a notification creates a corrective work order — type `EM` when the
 | DELETE | `/api/work-orders/{id}` | Soft-delete a work order |
 | PUT | `/api/work-orders/{id}/status` | Transition work order status |
 
-The list endpoint is paginated with `skip` and `take`. Status changes go through the dedicated status endpoint rather than a general update, so the transition is validated. An `EM` (emergency) work order is always the highest priority: `POST` and `PUT` force `High` whatever the request contains, so an emergency cannot be raised or demoted below the top of the scale.
+The list endpoint is paginated with `skip` and `take`. Status changes go through the dedicated status endpoint rather than a general update, so the transition is validated. An `EM` (emergency) work order is always the highest priority: `POST` and `PUT` force `High` whatever the request contains, so an emergency cannot be raised or demoted below the top of the scale. A work order also carries two nullable long-text fields, `safetyNotes` and `completionRemarks` (SOW 3.3.3), accepted on `POST` and `PUT`: multi-line plain text up to 20000 characters each, and send `null` to clear one.
 
 ### Work Order Operations
 

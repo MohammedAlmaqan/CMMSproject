@@ -353,6 +353,12 @@ model WorkOrder {
   internalOrder       String   @default("")
   breakdownFlag       Boolean  @default(false)
   safetyCriticalFlag  Boolean  @default(false)
+  // SOW 3.3.3: a long-text field for safety notes and completion remarks.
+  // Delivered as multi-line plain text rather than WYSIWYG (the approved
+  // default); job instructions remain the free-text `description` column. Both
+  // are nullable: neither is required to raise or complete a work order.
+  safetyNotes         String?
+  completionRemarks   String?
   plannedCost         Decimal @db.Decimal(12, 2) @default(0)
   actualCost          Decimal @db.Decimal(12, 2) @default(0)
   createdBy           String   @default("system")

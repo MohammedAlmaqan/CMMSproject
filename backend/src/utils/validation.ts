@@ -42,6 +42,11 @@ export const workOrderCreateSchema = z.object({
   internalOrder: z.string().optional(),
   breakdownFlag: z.boolean().optional(),
   safetyCriticalFlag: z.boolean().optional(),
+  // SOW 3.3.3: the long-text field for safety notes and completion remarks.
+  // Multi-line plain text; nullable because neither is required. The cap is a
+  // sanity bound, not the column's limit (PostgreSQL text is unbounded).
+  safetyNotes: z.string().max(20000).nullable().optional(),
+  completionRemarks: z.string().max(20000).nullable().optional(),
   // SOW 3.1.4: a manually created work order copies its operations from a
   // reusable task list. Before this existed the only route to a task list's
   // operations was preventive-maintenance generation, so the reusable-template
