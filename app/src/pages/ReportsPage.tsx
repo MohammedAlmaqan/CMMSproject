@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { reportService } from '@/services/reportService';
+import { api } from '@/lib/api';
 import type {
   BacklogReport,
   PMComplianceReport,
@@ -221,22 +222,8 @@ export default function ReportsPage() {
     }
   }, [activeReport, backlogData, pmCompliance, mtbfData, mttrData, costData, downtimeData, materialConsumption]);
 
-  const exportCSV = (rows: Array<Record<string, unknown>>, filename: string) => {
-    if (!rows || rows.length === 0) return;
-    const headers = Object.keys(rows[0]);
-    const lines = [
-      headers.join(','),
-      ...rows.map((row) => headers.map((h) => `"${String(row[h] ?? '').replaceAll('"', '""')}"`).join(',')),
-    ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const exportXlsx = () => {
+    void api.download(`/reports/${activeReport}/export.xlsx`, undefined, `${activeReport}-report.xlsx`);
   };
 
   const isLoading = reportLoading;
@@ -281,7 +268,7 @@ export default function ReportsPage() {
         {/* Report Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {activeReport === 'backlog' && (
-            <ReportContainer title="Work Order Backlog" icon={<ClipboardList className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'backlog-report')}>
+            <ReportContainer title="Work Order Backlog" icon={<ClipboardList className="w-5 h-5" />} onExport={exportXlsx}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <>
               <div className="grid grid-cols-3 gap-4">
@@ -357,7 +344,7 @@ export default function ReportsPage() {
           )}
 
           {activeReport === 'pm-compliance' && (
-            <ReportContainer title="PM Compliance" icon={<ClipboardCheck className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'pm-compliance-report')}>
+            <ReportContainer title="PM Compliance" icon={<ClipboardCheck className="w-5 h-5" />} onExport={exportXlsx}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <>
                 <div className="grid grid-cols-3 gap-3 mb-4">
@@ -389,7 +376,7 @@ export default function ReportsPage() {
           )}
 
           {activeReport === 'mtbf' && (
-            <ReportContainer title="Mean Time Between Failures (MTBF)" icon={<Clock className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'mtbf-report')}>
+            <ReportContainer title="Mean Time Between Failures (MTBF)" icon={<Clock className="w-5 h-5" />} onExport={exportXlsx}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -407,7 +394,7 @@ export default function ReportsPage() {
           )}
 
           {activeReport === 'mttr' && (
-            <ReportContainer title="Mean Time To Repair (MTTR)" icon={<Timer className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'mttr-report')}>
+            <ReportContainer title="Mean Time To Repair (MTTR)" icon={<Timer className="w-5 h-5" />} onExport={exportXlsx}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <>
               <div className="grid grid-cols-2 gap-4">
@@ -451,7 +438,7 @@ export default function ReportsPage() {
           )}
 
           {activeReport === 'cost-summary' && (
-            <ReportContainer title="Maintenance Cost Summary" icon={<DollarSign className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'cost-summary-report')}>
+            <ReportContainer title="Maintenance Cost Summary" icon={<DollarSign className="w-5 h-5" />} onExport={exportXlsx}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <>
               {costSummary.budgetNote && (
@@ -524,7 +511,7 @@ export default function ReportsPage() {
           )}
 
           {activeReport === 'downtime' && (
-            <ReportContainer title="Equipment Downtime Report" icon={<AlertTriangle className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'downtime-report')}>
+            <ReportContainer title="Equipment Downtime Report" icon={<AlertTriangle className="w-5 h-5" />} onExport={exportXlsx}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -542,7 +529,7 @@ export default function ReportsPage() {
           )}
 
           {activeReport === 'material-consumption' && (
-            <ReportContainer title="Material Consumption Report" icon={<Package className="w-5 h-5" />} onExport={() => exportCSV(currentRows as Array<Record<string, unknown>>, 'material-consumption-report')}>
+            <ReportContainer title="Material Consumption Report" icon={<Package className="w-5 h-5" />} onExport={exportXlsx}>
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <>
               <h4 className="text-secondary text-xs font-medium mb-2">By Material</h4>

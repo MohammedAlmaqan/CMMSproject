@@ -88,6 +88,37 @@ export const api = {
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  /**
+   * Row 59. Fetch a binary export with the bearer token, then hand it to the
+   * browser as a download. A plain link cannot carry the Authorization header,
+   * so the file is fetched and turned into a blob URL instead.
+   */
+  download: async (
+    path: string,
+    params?: Record<string, string | number | boolean | undefined>,
+    fallbackFilename = 'download'
+  ): Promise<void> => {
+    const headers: Record<string, string> = {};
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const res = await fetch(buildUrl(`${API_BASE}${path}`, params), { headers });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(res.status, body.error || res.statusText);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const match = /filename="?([^";]+)"?/.exec(disposition);
+    const filename = match ? match[1] : fallbackFilename;
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    notifyApiActivity();
+  },
 };
 
 export interface PaginatedResponse<T> {

@@ -15,10 +15,28 @@ import type { IntervalUnit } from '../utils/pmDueRules.js';
 import { baseCycleKey } from '../services/pmGeneration.js';
 import { loadCostRollup } from '../utils/costRollupData.js';
 import { rollupByLocation } from '../utils/costRollup.js';
+import { createCaptureResponse } from '../utils/captureJsonResponse.js';
+import { reportToWorkbook } from '../utils/reportWorkbook.js';
+import { buildXlsx, XLSX_MIME } from '../utils/xlsx.js';
 
 const router = Router();
 
 router.use(authenticate);
+
+/**
+ * Row 59. Every report route is registered through `register`, which keeps a
+ * reference keyed by the report's own path segment. The export route below uses
+ * that reference to run the *same handler* the screen calls, so a workbook and
+ * a report cannot disagree: there is one implementation of each figure, and the
+ * export is a serialisation of the JSON the handler already produced.
+ */
+type ReportHandler = (req: Request, res: Response) => Promise<void>;
+export const reportHandlers: Record<string, ReportHandler> = {};
+
+function register(name: string, handler: ReportHandler): void {
+  reportHandlers[name] = handler;
+  router.get(`/${name}`, handler);
+}
 
 /**
  * Row 58: every report is filterable by date range, location, equipment and
@@ -137,7 +155,7 @@ async function resolveReportScope(
  *       '500':
  *         description: Internal server error
  */
-router.get('/backlog', async (req: Request, res: Response) => {
+register('backlog', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
@@ -294,7 +312,7 @@ router.get('/backlog', async (req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/pm-compliance', async (req: Request, res: Response) => {
+register('pm-compliance', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
@@ -461,7 +479,7 @@ router.get('/pm-compliance', async (req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/mtbf', async (req: Request, res: Response) => {
+register('mtbf', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
@@ -594,7 +612,7 @@ router.get('/mtbf', async (req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/mttr', async (req: Request, res: Response) => {
+register('mttr', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
@@ -755,7 +773,7 @@ router.get('/mttr', async (req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/cost-summary', async (req: Request, res: Response) => {
+register('cost-summary', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
@@ -887,7 +905,7 @@ router.get('/cost-summary', async (req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/downtime', async (req: Request, res: Response) => {
+register('downtime', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
@@ -1019,7 +1037,7 @@ router.get('/downtime', async (req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/material-consumption', async (req: Request, res: Response) => {
+register('material-consumption', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
@@ -1206,7 +1224,7 @@ router.get('/material-consumption', async (req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/backlog-hours-by-work-center', async (req: Request, res: Response) => {
+register('backlog-hours-by-work-center', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
@@ -1335,7 +1353,7 @@ router.get('/backlog-hours-by-work-center', async (req: Request, res: Response) 
  *       '500':
  *         description: Internal server error
  */
-router.get('/top-cost-equipment', async (req: Request, res: Response) => {
+register('top-cost-equipment', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
@@ -1475,7 +1493,7 @@ router.get('/top-cost-equipment', async (req: Request, res: Response) => {
  *       '500':
  *         description: Internal server error
  */
-router.get('/notifications-awaiting-conversion', async (req: Request, res: Response) => {
+register('notifications-awaiting-conversion', async (req: Request, res: Response) => {
   try {
     const resolved = await resolveReportScope(req, res);
     if (!resolved) return;
@@ -1533,6 +1551,88 @@ router.get('/notifications-awaiting-conversion', async (req: Request, res: Respo
     logger.error({ err: error }, 'Error generating notifications awaiting conversion report');
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+/**
+ * @openapi
+ * /api/reports/{report}/export.xlsx:
+ *   get:
+ *     summary: Export a report as an Excel (.xlsx) workbook
+ *     description: >
+ *       Runs the named report with the same filters the JSON route accepts and
+ *       returns its data as an .xlsx workbook, one sheet per breakdown plus a
+ *       Summary sheet for the report's scalar figures. The report key is the
+ *       route segment of the report, e.g. `backlog` or `cost-summary`. PDF is
+ *       waived under decision D-9; this is the Excel limb of SOW 3.7.1.
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: report
+ *         required: true
+ *         schema: { type: string }
+ *         description: The report key, e.g. `backlog`
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: functionalLocationId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: includeDescendantLocations
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *       - in: query
+ *         name: equipmentId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: workCenterId
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: An Excel workbook
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema: { type: string, format: binary }
+ *       '400':
+ *         description: An invalid report filter, with the same reasons the JSON route returns
+ *       '404':
+ *         description: No report with that key
+ *       '401':
+ *         description: Missing or invalid bearer token
+ */
+router.get('/:report/export.xlsx', async (req: Request, res: Response) => {
+  const reportKey = (req.params as { report: string }).report;
+  const handler = reportHandlers[reportKey];
+  if (!handler) {
+    res.status(404).json({ error: `Unknown report "${reportKey}"`, available: Object.keys(reportHandlers) });
+    return;
+  }
+
+  const capture = createCaptureResponse();
+  try {
+    await handler(req, capture.res);
+  } catch (error) {
+    logger.error({ err: error, report: reportKey }, 'Error exporting report');
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  }
+
+  const captured = capture.captured();
+  if (captured.statusCode >= 400) {
+    res.status(captured.statusCode).json(captured.body);
+    return;
+  }
+
+  const workbook = reportToWorkbook(reportKey, captured.body);
+  const buffer = buildXlsx(workbook.sheets);
+  res.setHeader('Content-Type', XLSX_MIME);
+  res.setHeader('Content-Disposition', `attachment; filename="${workbook.filename}"`);
+  res.setHeader('Content-Length', String(buffer.length));
+  res.send(buffer);
 });
 
 export default router;
