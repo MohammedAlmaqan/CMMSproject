@@ -1000,7 +1000,7 @@ Started 2026-09-29. Phase G has **no §3 build rows**. Its only §3 clause (OAut
 
 ---
 
-### Phase R - Reporting, BI layer and the UAT pack (register Phase F, §3.5.3 / §3.7 / §6.4)
+### Phase R - Reporting, BI layer and the UAT pack (register Phase F, §3.5.3 / §3.7 / §6.4) - closed 2026-10-02
 
 **Lettering.** These steps are `R.0`-`R.n`, not `F.0`-`F.n`. The tracker's `F.0`-`F.9` are taken: they were the DB-backed suites for the 19-hold residual rows, and that phase is complete. This phase is register **Phase F**, whose subject is reporting and the UAT pack. The two letters are unrelated work and reusing `F` would make every `F.n` citation ambiguous. "R" for reporting.
 
@@ -1124,7 +1124,7 @@ Seven unit cases in `tests/unit/pmGeneration.test.ts` cover what the live run ca
 
 **Fact, recorded so the debris can be traced.** An early run of `r9a-differential.ts` failed on a foreign-key error *after* it had created its plan, and its cleanup was not in a `finally`, so plan `R9A-1790782065395` survived into the live database. A later gate run then generated three work orders from it (`WO-000728`, `WO-000774`, `WO-000775`), none of which any test cleaned up. A fixture leak is not a cosmetic problem here: a leaked plan is picked up by every subsequent scheduler run, so one stray row becomes several orphan work orders. R.9 D2 and D1 close both halves of that.
 
-##### R.9 D - stop the test suite from writing to the live database (in progress)
+##### R.9 D - stop the test suite from writing to the live database (delivered)
 
 **D's premise was wrong, and checking it is what found the real defect.** D was written as "seven route test files insert operations directly to Prisma, so a backfill gets undone by the next gate run." Tested, that is false: all seven clean up on success, and the work orders the recent gate runs created carried **correct** costs, because R.9 A already covers the PM path. What was actually happening is worse and quieter.
 
@@ -1203,7 +1203,7 @@ D3 replaced teardown `.catch(() => {})` calls with hard-delete helpers that thro
 
 The rule, in one line: **a teardown that cannot finish must fail the test loudly rather than leave evidence behind quietly.**
 
-**Enforcement is not yet in place, and the current state is stated rather than implied: 68 occurrences remain across 13 backend test files**, all currently harmless because those files' delete order happens to be right — `r9d-db-invariance.ts` passes with them present. `locationCounts.test.ts` (11), `notifications.test.ts` (16), `equipment.test.ts` (6), `externalServiceCosts.test.ts` (6), `labor.test.ts` (5), `laborAttribution.test.ts` (5), `equipmentMeters.test.ts` (5), `locationPlacement.test.ts` (3), `safetyChecklists.test.ts` (3), `attachments.test.ts` (2), `comments.test.ts` (2), `functionalLocations.test.ts` (2), `templateCopy.test.ts` (2). Leaving a rule stated but unenforced while 68 violations exist is the same implicitness in a new place, so this row is **open**, not met.
+**Enforcement is not yet in place, and the current state is stated rather than implied: 68 occurrences remain across 13 backend test files**, all currently harmless because those files' delete order happens to be right — `r9d-db-invariance.ts` passes with them present. `locationCounts.test.ts` (11), `notifications.test.ts` (16), `equipment.test.ts` (6), `externalServiceCosts.test.ts` (6), `labor.test.ts` (5), `laborAttribution.test.ts` (5), `equipmentMeters.test.ts` (5), `locationPlacement.test.ts` (3), `safetyChecklists.test.ts` (3), `attachments.test.ts` (2), `comments.test.ts` (2), `functionalLocations.test.ts` (2), `templateCopy.test.ts` (2). **Decision 2026-10-02: deferred to v1.1 as `v1.1-7`, not left open.** All 68 are verified harmless today - the delete order in each file is correct and `r9d-db-invariance.ts` passes with them present, so the debt is regretted risk, not a live leak. The enforcement instrument is itself undecided (an ESLint `no-restricted-syntax` rule versus a gate grep), and choosing it is a lint-cleanup design decision that belongs with the v1.1 lint work rather than a phase-close edit; editing 68 teardowns across 13 files for zero current product effect is churn that can introduce `RESTRICT`-ordering failures of its own. The ban still binds going forward: no new or edited teardown may swallow an error, so this count cannot grow silently. See **v1.1-7**.
 
 ##### R.9 D3-task-lists - 63 counted, 63 classified, zero ambiguous
 
@@ -1525,6 +1525,17 @@ PASS  every live location is reachable from some node  [6 of 6]
 
 **What R.1 deliberately did not do.** It did not add the route or the screen — that is R.2/R.3, and R.4 rebuilds `/cost-summary` on this engine. It did not fix the stale `plannedCost`/`actualCost` columns, which is a real defect with a wider blast radius than one report and deserves its own step rather than being absorbed silently into a reporting phase. It did not add indexes; the plan's own volume assumption should settle that before the Client's data arrives, and a premature index on a 4-row table measures nothing.
 
+#### Phase R close-out (closed 2026-10-02)
+
+Phase R's numbered scope is R.0-R.10 and all ten are delivered. R.9 and R.10 were appended to the accepted R.1-R.8 plan precisely so nothing had to be renumbered; R.10 is the last item the plan names, and **there is no R.11**. Closing the phase carries four items, recorded here as decisions rather than left implicitly open:
+
+1. **R.9 D is delivered, not in progress.** D1-D3 (scoping `runSchedulerOnce` to the plans it is told to run, a differential that cannot leak even on failure, and a gate run that leaves the database as it found it) landed in `949af23`, `713bf16` and `493bf10`; the heading was stale and is corrected above.
+2. **The swallowed-teardown ban is deferred to v1.1, explicitly.** 68 harmless `.catch(() => {})` teardowns remain across 13 backend test files. All are verified harmless (`r9d-db-invariance.ts` passes with them present) and the enforcement instrument is undecided, so the cleanup is recorded as **v1.1-7** rather than left as an open R.9 row. The ban still binds new and edited teardowns.
+3. **The 61 orphan fixture task lists are held on the Client's call.** Classified with zero ambiguity in R.9 D3-task-lists; the destructive purge is not taken.
+4. **The other orphaned audit-row families are held for separate authorisation.** `WorkOrder` 173, `WorkOrderOperation` 126, `MaintenancePlan` 59 - not touched by the authorised task-list purge, not classified the way those 156 were, and `WorkOrder` is live evidence for both R.9 B and R.10. Reconciling them is its own piece of work with its own authorisation.
+
+With those four recorded, Phase R is closed. Test floor at close: **70 files / 980 tests, `ESLINT_ERRORS=41`**, CI green on `ba7ed3e`.
+
 ---
 
 ## Deferred to Post-Go-Live
@@ -1546,6 +1557,7 @@ Schema findings raised during Phase 7 documentation (7.3). Triaged 2026-09-25: *
 | v1.1-4 | Status and type columns are unenforced free text; permitted values exist only in schema comments. | Low — values are validated in the zod request schemas at the API boundary. | Deferred to v1.1 |
 | v1.1-5 | ~~**`WorkOrderChecklistItem.response` cannot express "unanswered".** The column is a non-nullable `String` restricted by `checklistItemUpdateSchema` to `Yes`/`No`/`NA`, and the attach route pre-fills every item with `'NA'` — so a freshly attached checklist is indistinguishable from a fully answered one at the item level.~~ | **CLOSED — no residual.** This was the stated fix: "make `response` nullable, drop the `'NA'` pre-fill at attach time, and require an explicit response per template item." Phase D did exactly that. `response` is `String?`; attach creates every item with `response: null`; `checklistItemUpdateSchema` still restricts answers to `Yes`/`No`/`NA`, so an answer cannot be invented, but `null` is now accepted and means unanswered. The §3.3.7 gate enforces item-level acknowledgement and names the unanswered count in its 409, and clearing an answer re-arms the sign-off. Commits `9b2e9bd`, `369ff13`, `7b3a17a`; matrix row 35 moves `Partial` → `Met`. | **Closed in Phase D** |
 | v1.1-6 | **`'Blocked'` is missing from the audit-log action filter dropdown** in the Administration screen. | Cosmetic. Entries display and search correctly today; the filter simply cannot isolate them. Triggered by R1 (`e049238`), which introduced the new `Blocked` action value. `AuditEntry.action` in `backend/src/middleware/audit.ts` already permits it and the DB column is free text, so this is a frontend list only. | Deferred to v1.1 |
+| v1.1-7 | **68 swallowed teardown errors** - `.catch(() => {})` in 13 backend test files, banned by the rule stated in R.9 D3-cleanup-errors but not yet enforced. | Low - every occurrence is verified harmless today (the delete order in each file is correct and `r9d-db-invariance.ts` passes with them present), so this is regretted risk rather than a live leak; the danger is a future edit silently reintroducing one. The enforcement instrument (an ESLint rule versus a gate grep) is still to be chosen. | Deferred to v1.1 |
 
 **Verified, not deferred:** work orders are soft-deleted and their children are retained, per rule 3.4. Confirmed empirically against the database on 2026-09-25 for every populated child table — `WorkOrderOperation` (122 rows), `ExternalServiceCost` (1) and `WorkOrderNotifLink` (4) all retained their rows across `UPDATE "WorkOrder" SET "isDeleted"=true` with the parent row still present. `WorkOrderMaterial`, `CostSplit` and `WorkOrderChecklist` are currently empty, so they hold by the same mechanism but were not exercised. No action.
 
