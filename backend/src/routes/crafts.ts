@@ -4,9 +4,16 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, craftCreateSchema, craftUpdateSchema } from '../utils/validation.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
+import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
+
+// R.10: a rate edit fans out to every live work order carrying the craft, and the
+// recomputes run inside one interactive transaction. The default 5 s ceiling can
+// be reached by a large fan-out, so it is raised the same way the login fix
+// raised it (see routes/auth.ts) rather than left to fail partway.
+const TX_OPTIONS = { maxWait: 30000, timeout: 30000 };
 
 router.use(authenticate);
 
@@ -211,7 +218,11 @@ router.get('/:id', async (req: Request, res: Response) => {
  *       Partial update. Only fields present in the body are written, so a caller
  *       correcting one rate does not blank the description. A craft code that
  *       already exists elsewhere in the same work centre is refused. Retired
- *       crafts are not editable.
+ *       crafts are not editable. The hourly rate is the basis every work order
+ *       operation on this craft is priced from (SOW 3.5.1), so a rate change
+ *       re-costs every non-deleted work order carrying the craft in the same
+ *       transaction; the response reports how many with `recomputedWorkOrders`.
+ *       Soft-deleted work orders are deliberately left alone.
  *     tags: [Crafts]
  *     security:
  *       - bearerAuth: []
@@ -233,7 +244,22 @@ router.get('/:id', async (req: Request, res: Response) => {
  *               hourlyRate: { type: number, minimum: 0 }
  *     responses:
  *       '200':
- *         description: Craft updated
+ *         description: >
+ *           Craft updated. `hourlyRate` carries the stored value; the rest of the
+ *           craft row is unchanged. `recomputedWorkOrders` is the number of live
+ *           work orders whose stored cost was rewritten because their operations
+ *           use this craft (0 when the rate did not move).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 craftId: { type: string }
+ *                 workCenterId: { type: string }
+ *                 craftCode: { type: string }
+ *                 description: { type: string }
+ *                 hourlyRate: { type: number }
+ *                 recomputedWorkOrders: { type: integer }
  *       '400':
  *         description: Validation failed
  *       '401':
@@ -272,30 +298,66 @@ router.put('/:id', authorizeMinRole('Maintenance Planner'), validate(craftUpdate
       }
     }
 
-    const craft = await prisma.craft.update({
-      where: { craftId },
-      data: {
-        ...(req.body.craftCode !== undefined && { craftCode: req.body.craftCode }),
-        ...(req.body.description !== undefined && { description: req.body.description }),
-        ...(req.body.hourlyRate !== undefined && { hourlyRate: req.body.hourlyRate }),
-        modifiedBy: req.user!.userId,
-      },
-    });
+    // R.10: only a rate move changes cost. A description or code edit leaves
+    // every derived figure where it was, so the fan-out is scoped to the one
+    // column that feeds SOW 3.5.1's planned-labour term.
+    const rateChanged =
+      req.body.hourlyRate !== undefined &&
+      Number(req.body.hourlyRate) !== Number(existing.hourlyRate);
 
-    // Field diffs rather than one generic "Update" row: the trail should
-    // say which column moved and from what to what. A PUT that changes
-    // nothing records nothing, which is the honest outcome.
-    await logFieldChanges({
-      table: 'Craft',
-      recordId: craftId,
-      before: existing,
-      after: craft,
-      fields: AUDITED_FIELDS.Craft,
-      userId: req.user!.userId,
-      ipAddress: req.ip,
-    });
+    const actor = { userId: req.user!.userId, ipAddress: req.ip };
 
-    res.json(craft);
+    const { craft, recomputedWorkOrders } = await prisma.$transaction(async (tx) => {
+      const craft = await tx.craft.update({
+        where: { craftId },
+        data: {
+          ...(req.body.craftCode !== undefined && { craftCode: req.body.craftCode }),
+          ...(req.body.description !== undefined && { description: req.body.description }),
+          ...(req.body.hourlyRate !== undefined && { hourlyRate: req.body.hourlyRate }),
+          modifiedBy: req.user!.userId,
+        },
+      });
+
+      // Field diffs rather than one generic "Update" row: the trail should
+      // say which column moved and from what to what. A PUT that changes
+      // nothing records nothing, which is the honest outcome. Written on the
+      // transaction's client so the rate change and its audit row commit
+      // together.
+      await logFieldChanges({
+        table: 'Craft',
+        recordId: craftId,
+        before: existing,
+        after: craft,
+        fields: AUDITED_FIELDS.Craft,
+        userId: req.user!.userId,
+        ipAddress: req.ip,
+        db: tx,
+      });
+
+      let recomputedWorkOrders = 0;
+      if (rateChanged) {
+        // The affected set is every non-deleted work order with at least one
+        // non-deleted operation on this craft. Re-costing a soft-deleted work
+        // order would erase the R.9 B reproduction and serves no reader, so
+        // `isDeleted: false` is load-bearing on both hops.
+        const affected = await tx.workOrderOperation.findMany({
+          where: { craftId, isDeleted: false, workOrder: { isDeleted: false } },
+          select: { workOrderId: true },
+          distinct: ['workOrderId'],
+        });
+        for (const { workOrderId } of affected) {
+          // Same transaction, so the recompute reads the rate this edit just
+          // wrote (a global client could not see it) and cannot commit apart
+          // from the edit that invalidated it.
+          await recomputeWorkOrderCosts(workOrderId, actor, tx);
+          recomputedWorkOrders += 1;
+        }
+      }
+
+      return { craft, recomputedWorkOrders };
+    }, TX_OPTIONS);
+
+    res.json({ ...craft, recomputedWorkOrders });
   } catch (error) {
     logger.error({ err: error }, 'Error updating craft');
     res.status(500).json({ error: 'Internal server error' });

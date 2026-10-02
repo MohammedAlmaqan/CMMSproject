@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** **Phase 8 — Production Readiness: A ✅ | B ✅ | C ✅ | D ✅ | E ✅ | F ✅ (F.1-F.9, all 19-hold rows closed) | G: D-4 drill PASS, 100-VU acceptance PASS after the P2028 fix; G.4 (live IIS curl/firewall check) and G.5 (SOW §4.1 200-VU) remain.** Phases 0-7 complete (7.1-7.7 shipped, tag `v1.0.0`). **Phase R — Reporting, BI layer and the UAT pack (register Phase F) — is the current work: R.1-R.9 delivered, R.10 (`Craft.hourlyRate` fan-out) next.** Earlier in-progress notes below are history — see the tracker for the authoritative state. **B.2 and B.3 accepted by client.** Do NOT start a new phase section without explicit go.
+**State:** **Phase 8 — Production Readiness: A ✅ | B ✅ | C ✅ | D ✅ | E ✅ | F ✅ (F.1-F.9, all 19-hold rows closed) | G: D-4 drill PASS, 100-VU acceptance PASS after the P2028 fix; G.4 (live IIS curl/firewall check) and G.5 (SOW §4.1 200-VU) remain.** Phases 0-7 complete (7.1-7.7 shipped, tag `v1.0.0`). **Phase R — Reporting, BI layer and the UAT pack (register Phase F) — is the current work: R.1-R.10 delivered.** Earlier in-progress notes below are history — see the tracker for the authoritative state. **B.2 and B.3 accepted by client.** Do NOT start a new phase section without explicit go.
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -13,7 +13,7 @@
 
 **Open risks:** the one residual below (untested IIS `curl` verification) plus the SOW §4.1 200-user capacity test, which remains a **post-go-live** exercise (the 100-VU run now passes cleanly — see the Phase G section for the P2028 fix). The old mock-fallback risk is closed — `mockData.ts` was deleted at G6a and the fleet has been green since.
 
-**Next action for a fresh session:** read tracker + git log + this file. Current position is Phase R (reporting); the "7.4 API reference / 24 files / 156 tests" notes below are historical Phase-7-era entries. Test floor today: **backend Vitest 977 tests across 70 test files (33 unit + 37 routes), `tsc -b` clean (backend + app), eslint at the 41-error baseline.** The per-phase suite sizes earlier in the tracker and the "55 files" in the E.13 block are that phase's own snapshots, not current totals.
+**Next action for a fresh session:** read tracker + git log + this file. Current position is Phase R (reporting); the "7.4 API reference / 24 files / 156 tests" notes below are historical Phase-7-era entries. Test floor today: **backend Vitest 980 tests across 70 test files (33 unit + 37 routes), `tsc -b` clean (backend + app), eslint at the 41-error baseline.** The per-phase suite sizes earlier in the tracker and the "55 files" in the E.13 block are that phase's own snapshots, not current totals.
 
 ---
 

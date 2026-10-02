@@ -182,4 +182,85 @@ describe('crafts routes', () => {
       expect((await prisma.craft.findUniqueOrThrow({ where: { craftId: id } })).isDeleted).toBe(true);
     });
   });
+
+  // R.10: a craft's hourlyRate is the basis SOW 3.5.1 planned labour is priced
+  // from, so editing it invalidates the cached cost of every work order carrying
+  // the craft. The write path re-costs them in the same transaction; these tests
+  // pin that, the scoping (rate-only), and the soft-delete exclusion.
+  describe('craft rate fan-out (R.10)', () => {
+    async function makeCraftAndWorkOrder(code: string, rate: number, plannedHours: number, isDeleted = false) {
+      const made = await createCraft(code, { hourlyRate: rate });
+      expect(made.status).toBe(201);
+      createdIds.push(made.body.craftId);
+      const fl = (await prisma.functionalLocation.findFirst({ where: { isDeleted: false } }))!;
+      const wo = await prisma.workOrder.create({
+        data: {
+          woNumber: `WO-${code}`,
+          type: 'CM',
+          priority: 'Medium',
+          status: 'Draft',
+          description: 'craft rate fan-out fixture',
+          functionalLocationId: fl.functionalLocationId,
+          workCenterId,
+          supervisorUserId: ctx.adminId,
+          reportedByUserId: ctx.adminId,
+          createdBy: ctx.adminId,
+          modifiedBy: ctx.adminId,
+          isDeleted,
+        },
+      });
+      await prisma.workOrderOperation.create({
+        data: {
+          workOrderId: wo.workOrderId,
+          sequenceNumber: 10,
+          description: 'operation on the craft',
+          craftId: made.body.craftId,
+          plannedHours,
+          createdBy: ctx.adminId,
+          modifiedBy: ctx.adminId,
+        },
+      });
+      return { craftId: made.body.craftId as string, workOrderId: wo.workOrderId };
+    }
+
+    it('re-costs every live work order carrying the craft when its rate moves', async () => {
+      const { craftId, workOrderId } = await makeCraftAndWorkOrder(`CRF-FAN-${stamp}`, 40, 2);
+
+      // Written straight through Prisma, the cache starts at 0, so a move to 110
+      // can only be the fan-out recompute.
+      expect(Number((await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId } })).plannedCost)).toBe(0);
+
+      const res = await api().put(`/api/crafts/${craftId}`).set(authHeaders(ctx.adminToken)).send({ hourlyRate: 55 });
+      expect(res.status).toBe(200);
+      expect(res.body.recomputedWorkOrders).toBe(1);
+
+      const after = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId } });
+      expect(Number(after.plannedCost)).toBe(110); // 2 h x 55
+      const audit = await prisma.auditLogEntry.findFirst({
+        where: { tableName: 'WorkOrder', recordId: workOrderId, action: 'Update', fieldName: 'plannedCost' },
+      });
+      expect(audit?.newValue).toBe('110');
+    });
+
+    it('does not re-cost on a non-rate edit', async () => {
+      const { craftId, workOrderId } = await makeCraftAndWorkOrder(`CRF-NORATE-${stamp}`, 40, 2);
+      // Corrupt only the cache, so a stray recompute shows up as 110 rather than 999.
+      await prisma.workOrder.update({ where: { workOrderId }, data: { plannedCost: 999 } });
+
+      const res = await api().put(`/api/crafts/${craftId}`).set(authHeaders(ctx.adminToken)).send({ description: 'renamed' });
+      expect(res.status).toBe(200);
+      expect(res.body.recomputedWorkOrders).toBe(0);
+      expect(Number((await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId } })).plannedCost)).toBe(999);
+    });
+
+    it("leaves a soft-deleted work order's stored cost untouched when the rate moves", async () => {
+      const { craftId, workOrderId } = await makeCraftAndWorkOrder(`CRF-SDEL-${stamp}`, 40, 2, true);
+      await prisma.workOrder.update({ where: { workOrderId }, data: { plannedCost: 7 } });
+
+      const res = await api().put(`/api/crafts/${craftId}`).set(authHeaders(ctx.adminToken)).send({ hourlyRate: 80 });
+      expect(res.status).toBe(200);
+      expect(res.body.recomputedWorkOrders).toBe(0);
+      expect(Number((await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId } })).plannedCost)).toBe(7);
+    });
+  });
 });
