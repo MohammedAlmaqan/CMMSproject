@@ -1549,7 +1549,7 @@ With those four recorded, Phase R is closed. Test floor at close: **70 files / 9
 | 8 | §3.1.4 | Cause codes as root-cause categories | Partial | deferred D5 | feeds MTTR-by-cause (row 62) |
 | 20 | §3.2.2 | Multiple notifications aggregated into one work order | Not Met | — | uses row 23's priority rule |
 | 23 | §3.3.1 | Emergency automatically sets highest priority | Not Met | — | H.1 below — implemented, not verified |
-| 24 | §3.3.1 | Calibration work orders with pass/fail tracking | Not Met | — | **§6.4 scope gate — see below** |
+| 24 | §3.3.1 | Calibration work orders with pass/fail tracking | Not Met | — | **Build, depth (ii) — approved 2026-10-02; see below** |
 | 29 | §3.3.3 | Rich-text long-text field (job instructions, safety notes, completion remarks) | Not Met | — | schema + UI |
 | 36 | §3.3.8 | Any file type ≤10 MB | Partial | D-11 | H.2 below — widened allowlist implemented, not verified |
 | 69 | §3.8 | In-app alert: work-order assignment | Not Met | — | alert emitter |
@@ -1560,13 +1560,13 @@ With those four recorded, Phase R is closed. Test floor at close: **70 files / 9
 **Execution order (dependency depth).**
 - **Layer A — independent, no shared piece:** 8, 23, 29, 36.
 - **Layer B — two independent tracks:** (B1) alerts **71, 72** on one shared in-app alert model + emitter; (B2) notifications **20**, after row 23.
-- **Layer C — deepest:** **69, 70** reuse the B1 emitter (70 additionally needs a scheduled sweep); **24** is last and scope-gated.
+- **Layer C — deepest:** **69, 70** reuse the B1 emitter (70 additionally needs a scheduled sweep); **24** is last, its depth now confirmed (see below).
 
-**Row-24 gate (§6.4).** The SOW owner confirmed 2026-09-26 that the plant runs a calibration programme, so the clause applies. The real deliverable is larger than the register's "pass/fail label"; **the label-only version must not be built**, and the required depth is a scope clarification **the owner must close, not a decision the vendor may make**. The written question is on record at `docs/ROW24_CALIBRATION_DEPTH_QUESTION.md`, dated **2026-10-02**, offering the register's two options — (i) pass/fail only, or (ii) full: as-found/as-left readings plus reference standard plus calibration due-date/interval. No vendor default applies and silence is not an answer; **row 24 stays unbuilt until the owner replies in writing.**
+**Row-24 gate (§6.4) — closed 2026-10-02.** The SOW owner confirmed 2026-09-26 that the plant runs a calibration programme, so the clause applies. The real deliverable is larger than the register's "pass/fail label"; **the label-only version must not be built**, and the required depth was a scope clarification **the owner had to close, not a decision the vendor may make**. The written question is on record at `docs/ROW24_CALIBRATION_DEPTH_QUESTION.md`, dated **2026-10-02**, offering the register's two options — (i) pass/fail only, or (ii) full: as-found/as-left readings plus reference standard plus calibration due-date/interval. **The owner answered 2026-10-02, selecting (ii) full.** Row 24 is approved to build at that depth; the label-only version stays out.
 
 **Approved defaults for the remaining rows.** Row 29: a multi-line long-text field (not WYSIWYG) unless the owner asks for bold/lists; row 8: seeded `CauseCode` master data, required when `breakdown = true`; row 69: alert to the assignee plus the work-centre supervisor; row 20: a link table so N notifications convert to one work order, which takes the highest of their priorities; row 70: a daily overdue sweep (cadence/timezone to be confirmed); in-app only (email waived, row 73) and no per-role opt-out matrix (row 74 waived); additive migrations per layer.
 
-**H.0 boundary.** H.0 is recorded and the row-24 question is on record, so Layer A may start. Layers B and C follow in the order above; row 24 waits. No Phase H row is promoted to `Met` until its suite passes at a named SHA.
+**H.0 boundary.** H.0 is recorded and the row-24 question is on record, so Layer A may start. Layers B and C follow in the order above; row 24 is now unblocked for Layer C at depth (ii). No Phase H row is promoted to `Met` until its suite passes at a named SHA.
 
 **H.1 — Row 23 (§3.3.1): an emergency work order is forced to the highest priority.** Delivered *this commit* and held at `IMPLEMENTED, NOT VERIFIED` under the promotion rule stated above: the suite ran against live PostgreSQL in the local gate, but no named-SHA CI run exists yet, so the matrix row does not move.
 

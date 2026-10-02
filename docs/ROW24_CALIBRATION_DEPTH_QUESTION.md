@@ -26,4 +26,4 @@ A written reply selecting **(i)** or **(ii)** (or a described alternative). On r
 
 ## Status
 
-Prepared and placed on record 2026-10-02. Response pending.
+Prepared and placed on record 2026-10-02. **Answered 2026-10-02: the SOW owner selected (ii) full** — pass/fail plus as-found/as-left readings, the reference standard used, and the calibration due date/interval, as defined above. Recorded against `DECISION_REGISTER` §6.4 and worksheet row 24. Row 24 is approved to build at that depth; the label-only version is not to be built.

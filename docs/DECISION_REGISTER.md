@@ -168,7 +168,7 @@ Evidence for each row — the exact code path, endpoint or absence that justifie
 | 21 | §3.2.3 | System shows the relationship and allows navigation between notification and work order | Partial | C | - | **Build** | Notification-to-work-order traceability is the core audit path. |
 | 22 | §3.2.3 | After work order completion, notification status can be set to Completed manually or automatically | Not Met | B | - | **Build** | A converted notification never reaches Completed, so the conversion queue never clears. |
 | 23 | §3.3.1 | Emergency automatically sets highest priority | Not Met | H | - | **Build** | Emergency work must outrank planned work without relying on the operator to remember. |
-| 24 | §3.3.1 | Calibration work orders with pass/fail tracking | Not Met | H | - | **Build** | SOW owner confirmed 2026-09-26 that the plant DOES run a calibration programme, so the clause applies. SCOPE GATE: the deliverable is larger than a pass/fail label. Do NOT build the label-only version. Depth (pass/fail vs full as-found/as-left plus reference standard plus due-date tracking) must be confirmed with the SOW owner before Phase H work starts. |
+| 24 | §3.3.1 | Calibration work orders with pass/fail tracking | Not Met | H | - | **Build** | SOW owner confirmed 2026-09-26 that the plant DOES run a calibration programme, so the clause applies. SCOPE GATE: the deliverable is larger than a pass/fail label. Do NOT build the label-only version. SCOPE GATE CLOSED 2026-10-02: the owner selected **(ii) full** — pass/fail plus as-found/as-left readings, the reference standard used, and the calibration due date/interval. Build at that depth. |
 | 25 | §3.3.3 | WO Number auto-generated with a configurable prefix | Partial | C | - | **Build** | Trivial change, and auditors expect a configurable, recognisable work-order prefix. |
 | 26 | §3.3.3 | Header fields: Type, Priority, Status, Equipment/Functional Location (mandatory), Description, Reported By, Responsible Work Center, Assigned Supervisor, planned & actual start/finish, Breakdown flag, Safety critical flag | Partial | E | - | **Build** | The register previously said "Assigned Supervisor and Safety critical are absent from the work-order header". That was WRONG and was checked before building anything: supervisorUserId and safetyCriticalFlag both already exist. The genuinely missing field was Reported By, which is now added as WorkOrder.reportedByUserId (migration 20260927120000_work_order_reported_by) and carries the notification reporter across a conversion, so it is not createdBy. |
 | 27 | §3.3.3 | Each work order must contain at least one operation | Not Met | C | - | **Build** | An operation-less work order has no cost, no labour and no plan lineage. |
@@ -297,7 +297,10 @@ for the required depth - pass/fail only, or full as-found/as-left plus reference
 standard plus due-date tracking. **The label-only version must not be built.** The
 clause wording itself ("with pass/fail tracking") is narrower than a real
 calibration programme, so this is recorded as a scope clarification the owner must
-close, not a decision the vendor may make.
+close, not a decision the vendor may make. **Closed 2026-10-02:** the SOW owner
+selected **(ii) full** - pass/fail plus as-found/as-left readings, the reference
+standard used, and the calibration due date/interval. Row 24 is now approved to
+build at that depth; the label-only version stays out.
 
 **Row 30 - stock deduction on material issue - `Waive` (was `Build`).** The
 warehouse team controls inventory, so the SOW's own conditional - "if inventory is
