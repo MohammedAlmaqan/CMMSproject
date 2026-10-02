@@ -135,7 +135,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const admin = await prisma.user.findUnique({ where: { username: ADMIN_USERNAME }, select: { userId: true } });
+  const admin = await prisma.user.findFirst({ where: { username: ADMIN_USERNAME }, select: { userId: true } });
   if (!admin) throw new Error(`no ${ADMIN_USERNAME} user to attribute the repair to`);
   console.log(`\n=== APPLY ===\naudit actor: ${ADMIN_USERNAME} (${admin.userId})`);
 
