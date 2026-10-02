@@ -8,6 +8,7 @@ import {
   invalidTransitionMessage,
   transitionTargets,
 } from '../utils/transitions.js';
+import { resolveWorkOrderPriority } from '../utils/workOrderRules.js';
 import { logger } from '../utils/logger.js';
 import {
   validate,
@@ -590,12 +591,17 @@ router.post('/:id/convert-to-wo', authorizeMinRole('Maintenance Planner'), valid
       return res.status(400).json({ error: 'No active work center available' });
     }
 
+    // SOW 3.3.1: a breakdown notification becomes an EM work order, and an EM
+    // work order is the highest priority. The notification's own priority is
+    // kept for non-breakdown conversions, where it is the reporter's judgement.
+    const workOrderType = notification.breakdownFlag ? 'EM' : 'CM';
+
     const workOrder = await prisma.$transaction(async (tx) => {
       const wo = await tx.workOrder.create({
         data: {
           woNumber,
-          type: notification.breakdownFlag ? 'EM' : 'CM',
-          priority: notification.priority,
+          type: workOrderType,
+          priority: resolveWorkOrderPriority(workOrderType, notification.priority),
           status: 'Draft',
           functionalLocation: { connect: { functionalLocationId: notification.functionalLocationId } },
           equipment: notification.equipmentId ? { connect: { equipmentId: notification.equipmentId } } : undefined,

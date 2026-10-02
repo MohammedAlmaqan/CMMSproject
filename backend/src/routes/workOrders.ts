@@ -6,7 +6,7 @@ import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber, generateNotifNumber } from '../utils/sequence.js';
 import { canTransition } from '../utils/transitions.js';
 import { serializeWorkOrderSnapshot } from '../utils/workOrderSnapshots.js';
-import { requiresAtLeastOneOperation, missingOperationMessage } from '../utils/workOrderRules.js';
+import { requiresAtLeastOneOperation, missingOperationMessage, resolveWorkOrderPriority } from '../utils/workOrderRules.js';
 import { findBlockingChecklist, describeBlockedChecklist } from '../utils/checklistRules.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -368,6 +368,11 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
     // transaction and rolling back would silently reuse a number.
     const woNumber = await generateWoNumber();
 
+    // SOW 3.3.1: an emergency work order is forced to the highest priority
+    // whatever the caller sends, so a busy planner cannot raise an emergency at
+    // Medium. The override is visible in the 201 body rather than silent.
+    const effectivePriority = resolveWorkOrderPriority(type, priority);
+
     // SOW 3.1.4: copy the reusable task list's operations onto the new work
     // order. Validated before the write so a bad template cannot leave a
     // half-built work order behind.
@@ -419,7 +424,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
         data: {
           woNumber,
           type,
-          priority,
+          priority: effectivePriority,
           functionalLocationId,
           equipmentId: equipmentId || null,
           description,
@@ -552,11 +557,16 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
       breakdownFlag, safetyCriticalFlag, status,
     } = req.body;
 
+    // SOW 3.3.1: if this edit leaves the work order an emergency — whether by
+    // changing its type to EM or by editing an existing emergency — the highest
+    // priority is enforced, not merely suggested.
+    const effectivePriority = resolveWorkOrderPriority(type ?? existing.type, priority ?? existing.priority);
+
     await prisma.workOrder.update({
       where: { workOrderId: id },
       data: {
         ...(type !== undefined && { type }),
-        ...(priority !== undefined && { priority }),
+        priority: effectivePriority,
         ...(functionalLocationId !== undefined && { functionalLocationId }),
         ...(equipmentId !== undefined && { equipmentId: equipmentId || null }),
         ...(description !== undefined && { description }),

@@ -1548,7 +1548,7 @@ With those four recorded, Phase R is closed. Test floor at close: **70 files / 9
 |---|---|---|---|---|---|
 | 8 | §3.1.4 | Cause codes as root-cause categories | Partial | deferred D5 | feeds MTTR-by-cause (row 62) |
 | 20 | §3.2.2 | Multiple notifications aggregated into one work order | Not Met | — | uses row 23's priority rule |
-| 23 | §3.3.1 | Emergency automatically sets highest priority | Not Met | — | work-order create/update rule |
+| 23 | §3.3.1 | Emergency automatically sets highest priority | Not Met | — | H.1 below — implemented, not verified |
 | 24 | §3.3.1 | Calibration work orders with pass/fail tracking | Not Met | — | **§6.4 scope gate — see below** |
 | 29 | §3.3.3 | Rich-text long-text field (job instructions, safety notes, completion remarks) | Not Met | — | schema + UI |
 | 36 | §3.3.8 | Any file type ≤10 MB | Partial | D-11 | allowlist widened under D-11; 10 MB already met; executables blocked |
@@ -1567,6 +1567,12 @@ With those four recorded, Phase R is closed. Test floor at close: **70 files / 9
 **Approved defaults for the remaining rows.** Row 29: a multi-line long-text field (not WYSIWYG) unless the owner asks for bold/lists; row 8: seeded `CauseCode` master data, required when `breakdown = true`; row 69: alert to the assignee plus the work-centre supervisor; row 20: a link table so N notifications convert to one work order, which takes the highest of their priorities; row 70: a daily overdue sweep (cadence/timezone to be confirmed); in-app only (email waived, row 73) and no per-role opt-out matrix (row 74 waived); additive migrations per layer.
 
 **H.0 boundary.** H.0 is recorded and the row-24 question is on record, so Layer A may start. Layers B and C follow in the order above; row 24 waits. No Phase H row is promoted to `Met` until its suite passes at a named SHA.
+
+**H.1 — Row 23 (§3.3.1): an emergency work order is forced to the highest priority.** Delivered *this commit* and held at `IMPLEMENTED, NOT VERIFIED` under the promotion rule stated above: the suite ran against live PostgreSQL in the local gate, but no named-SHA CI run exists yet, so the matrix row does not move.
+
+| # | Task | Status | Acceptance Criteria | Commit |
+|---|---|---|---|---|
+| H.1 | Row 23 — `EM` forces highest priority on every work-order write path | IMPLEMENTED, NOT VERIFIED | `resolveWorkOrderPriority(type, requested)` (`backend/src/utils/workOrderRules.ts`) returns `High` for an `EM` type and the requested priority for every other type, and is applied on `POST /api/work-orders`, `PUT /api/work-orders/:id` and `POST /api/notifications/:id/convert-to-wo` (a breakdown notification becomes `EM`). `backend/tests/routes/emergencyPriority.test.ts` (7 cases, live PostgreSQL) drives all three paths. Negative injection: stubbing the rule to pass the requested priority through failed exactly the 4 `EM`-enforcement cases and left the 3 inverse cases green; reverted. Promotion to `Met` waits on green CI at this commit's SHA and its run id. | *this commit* |
 
 ---
 

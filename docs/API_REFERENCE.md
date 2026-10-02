@@ -187,7 +187,7 @@ CSV import takes a `multipart/form-data` body with a single `file` part. Each ro
 | DELETE | `/api/notifications/{id}` | Soft delete a notification |
 | POST | `/api/notifications/{id}/convert-to-wo` | Convert a notification into a corrective work order |
 
-Converting a notification creates a CM work order, copies the location, equipment, priority and breakdown flag, links the notification to the new work order and sets the notification status to `Converted`.
+Converting a notification creates a corrective work order — type `EM` when the notification's breakdown flag is set, otherwise `CM` — copies the location and equipment, links the notification to the new work order and sets the notification status to `Converted`. A breakdown conversion is an emergency order, so its priority is raised to `High` regardless of the notification's own priority; a non-breakdown conversion keeps the notification's priority.
 
 ### Work Orders
 
@@ -201,7 +201,7 @@ Converting a notification creates a CM work order, copies the location, equipmen
 | DELETE | `/api/work-orders/{id}` | Soft-delete a work order |
 | PUT | `/api/work-orders/{id}/status` | Transition work order status |
 
-The list endpoint is paginated with `skip` and `take`. Status changes go through the dedicated status endpoint rather than a general update, so the transition is validated.
+The list endpoint is paginated with `skip` and `take`. Status changes go through the dedicated status endpoint rather than a general update, so the transition is validated. An `EM` (emergency) work order is always the highest priority: `POST` and `PUT` force `High` whatever the request contains, so an emergency cannot be raised or demoted below the top of the scale.
 
 ### Work Order Operations
 

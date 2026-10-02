@@ -38,3 +38,25 @@ export function requiresAtLeastOneOperation(from: string, to: string): boolean {
 export function missingOperationMessage(): string {
   return 'A work order must contain at least one operation before it can be planned';
 }
+
+/**
+ * SOW 3.3.1: an emergency work order must outrank everything else.
+ *
+ * `EM` is the emergency type in `workOrderTypeSchema`; `High` is the top of
+ * `prioritySchema`. Both are named here rather than inlined so the rule reads
+ * as the clause does.
+ */
+export const EMERGENCY_WORK_ORDER_TYPE = 'EM';
+export const HIGHEST_PRIORITY = 'High';
+
+/**
+ * SOW 3.3.1: "Emergency automatically sets highest priority."
+ *
+ * Applied at every write path that can set a work order's type or priority, so
+ * an emergency cannot be raised — or demoted on a later edit — below the top of
+ * the scale. Non-emergency types pass the requested priority through untouched:
+ * this rule only exists to protect the emergency case, not to police priority.
+ */
+export function resolveWorkOrderPriority(type: string, requestedPriority: string): string {
+  return type === EMERGENCY_WORK_ORDER_TYPE ? HIGHEST_PRIORITY : requestedPriority;
+}
