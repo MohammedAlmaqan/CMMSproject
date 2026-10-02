@@ -29,13 +29,13 @@ These counts are the actual current state, not aspirations:
 | Thing | Count |
 |-------|-------|
 | Prisma models | 38 |
-| Prisma migrations | 14 |
+| Prisma migrations | 15 |
 | Backend API route files | 26 |
 | Backend route groups mounted | 26 |
-| Backend test files | 65 `.test.ts` run by vitest (30 unit + 35 routes); 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 68 |
+| Backend test files | 70 `.test.ts` run by vitest (33 unit + 37 routes); 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 73 |
 | Frontend pages | 17 |
 | Frontend service modules | 23 |
-| Frontend test files | 6 |
+| Frontend test files | 7 |
 
 ## Implemented functionality
 
@@ -69,7 +69,7 @@ These counts are the actual current state, not aspirations:
 - The scheduler auto-generates work orders for **Time**-based plans only.
 
 ### Reporting & dashboard
-- Seven standard reports: `backlog`, `pm-compliance`, `mtbf`, `mttr`, `cost-summary`, `downtime`, `material-consumption`. **All return JSON.** `material-consumption` aggregates work order material issues, not meter readings.
+- Ten report endpoints. Seven are on the **Reports** screen (`backlog`, `pm-compliance`, `mtbf`, `mttr`, `cost-summary`, `downtime`, `material-consumption`); three back dashboard widgets (`backlog-hours-by-work-center`, `top-cost-equipment`, `notifications-awaiting-conversion`). Every report returns JSON **and** exports a server-built `.xlsx` workbook (`GET /api/reports/{report}/export.xlsx`), so the API is not JSON-only. `material-consumption` aggregates work order material issues, not meter readings.
 - Dashboard KPIs, system alerts, and cost summary.
 - CSV export exists for the **equipment** and **materials** master lists (`/export.csv`), with matching validated import.
 
@@ -85,10 +85,10 @@ These counts are the actual current state, not aspirations:
 
 These are **not** present in the code. Do not plan around them:
 
-- **No PDF export** of any kind. Reports are JSON only; the only export format is CSV, and only for equipment and materials.
+- **No PDF export** of any kind; the PDF limb of SOW §3.7.1 is waived under D-9. Reports return JSON and export server-built `.xlsx` workbooks; CSV export exists only for the equipment and materials master lists.
 - **No ERP integration** of any kind.
 - **No internationalisation (i18n)**. The UI is English-only.
-- **No ad-hoc query builder or ad-hoc reporting.** Reports are seven fixed queries.
+- **No interactive ad-hoc query builder.** Reports are ten fixed queries; the SOW §3.7.3 "documented view layer for the Client's BI tool" limb is delivered as 23 read-only `report_*` SQL views (`backend/prisma/migrations/20261002160000_reporting_views`).
 - **No refresh tokens and no logout endpoint.** Auth is a stateless JWT; there are only `POST /api/auth/login` and `GET /api/auth/me`. A `RefreshToken` model exists in the schema but is unused. Sessions simply expire.
 - **No SMTP/email sending.** Notifications are in-app records only.
 - **Meter-based and Combined PM plans are stored but not auto-generated.** The scheduler only selects `strategyType: 'Time'` plans.
@@ -256,7 +256,7 @@ npm run lint
 - **The 30-minute idle timeout is client-side only.** It exists and works (`useIdleTimeout`, wired into the app layout, 60-second warning, 3 passing tests), but it only clears local state and redirects to the login page. There is no logout endpoint and no token revocation, so the JWT remains valid server-side for its full 8 hours. Do not rely on it as a session control.
 - **The Settings screen is partly live, partly static.** Only the two number-prefix rows load from `GET /api/system-config` and save through `PUT /api/system-config` (Administrator only), and the backend reads them when generating work order and notification numbers. The other rows shown (session timeout, PM scheduler time, audit retention, upload limit, password policy, language) are hardcoded display markup with no backing configuration, and nothing in the code enforces those values. Do not treat those labels as statements of what the backend enforces.
 - **`npm audit` is not clean.** Production dependencies currently report 9 advisories in `backend` (6 high, 3 moderate) and 4 in `app` (3 high, 1 moderate); no criticals. The high-severity items are transitive: `prisma`/`@prisma/config`, `js-yaml`, `fast-uri`, `deepmerge-ts`, and `brace-expansion` on the backend; `react-router-dom` and `lodash` on the frontend. None is fixed yet. Review them before any public exposure.
-- **Lint is not clean.** `npm run lint` reports a known baseline of errors in both packages (backend 42; frontend 33 + 2 warnings, all measured 2026-09-29). Types and tests pass; the lint debt is tracked and unfixed.
+- **Lint is not clean.** `npm run lint` reports a known baseline of errors in both packages (backend 41; frontend 28 + 2 warnings, all measured 2026-10-02). Types and tests pass; the lint debt is tracked and unfixed.
 - **HTTPS/TLS termination is not configured.** The reference deployment assumes a reverse proxy in front of the app; `DATABASE_URL` uses `sslmode=disable` locally. Do not expose the API directly to the internet.
 - **The IIS reverse-proxy deployment has not been executed end to end.** Treat it as untested.
 
@@ -271,7 +271,7 @@ CMMSproject/
 │       ├── services/           # 23 API service modules
 │       ├── store/              # Zustand
 │       ├── types/              # TypeScript types
-│       └── __tests__/          # 6 test files
+│       └── __tests__/          # 7 test files
 ├── backend/                    # Express API
 │   ├── src/
 │   │   ├── routes/             # 26 route files
@@ -280,9 +280,9 @@ CMMSproject/
 │   │   └── utils/              # logger, csv, prisma client
 │   ├── prisma/
 │   │   ├── schema.prisma       # 38 models
-│   │   ├── migrations/         # 14 migrations
+│   │   ├── migrations/         # 15 migrations
 │   │   └── seed.ts             # guarded demo seed
-│   └── tests/                  # 67 test files + 3 support = 70 tracked
+│   └── tests/                  # 70 test files + 3 support = 73 tracked
 ├── scripts/                    # Windows batch scripts, k6, verify scripts
 ├── docs/                        # all documentation; README.md is the only .md at the root
 │   ├── CMMS_FINALIZATION_TRACKER.md

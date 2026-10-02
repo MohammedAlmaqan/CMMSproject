@@ -95,7 +95,7 @@ The left sidebar shows all eleven sections to every signed-in user:
 | Work Centers | Work center register and craft capabilities |
 | Task Lists | PM task list templates with operations |
 | Materials | Material register |
-| Reports | The seven standard reports, each with CSV export |
+| Reports | The seven standard reports, each with Excel (.xlsx) export |
 | Administration | Users and roles, audit log, and settings |
 
 ### 3.2 Command palette
@@ -192,7 +192,7 @@ Until a create screen exists, ask an administrator or your supervisor to raise t
 
 - Read the Dashboard for plant-wide status and any system alerts.
 - Read the Equipment, Locations, Materials, and Work Centers registers.
-- Open any of the seven reports and export them to CSV. Reports are available to every signed-in role, including Requester and View-Only.
+- Open any of the seven reports and export them to Excel (.xlsx). Reports are available to every signed-in role, including Requester and View-Only.
 - Add a comment to a work order and attach a document to a work order you raised.
 
 ---
@@ -290,7 +290,7 @@ The new work order appears in the work orders list with a link back to the sourc
 1. Select **Reports**.
 2. Choose one of the seven reports from the tabs.
 3. Set any date range and filters offered on that report.
-4. Read the results, then select **Export CSV** to download them for Excel or further analysis.
+4. Read the results, then select **Export** to download a server-built Excel (.xlsx) workbook for Excel or further analysis.
 
 ![Backlog report](../screenshots/g5_01_reports_backlog.png)
 ![PM compliance report](../screenshots/g5_02_reports_pm_compliance.png)
@@ -400,7 +400,7 @@ The audit log is append-only through the application: there is no API to edit or
 
 A View-Only user is a reader.
 
-- You see all eleven navigation sections and can open every screen: Dashboard, all registers, all work orders and their detail tabs, notifications, the PM plan register, and all seven reports with CSV export.
+- You see all eleven navigation sections and can open every screen: Dashboard, all registers, all work orders and their detail tabs, notifications, the PM plan register, and all seven reports with Excel (.xlsx) export.
 - **Every write is refused by the server.** Opening a form, selecting a tab, or seeing an upload or create control does not mean the action will succeed; the save will be rejected. This is expected, not a fault.
 - Only Administrators can read the audit log, so the **Audit Log** tab will return an error for you.
 - Do not use a View-Only account to test changes, even on a development system: nothing you attempt will take effect, which can waste troubleshooting time.
@@ -435,7 +435,7 @@ Notes that matter day to day:
 
 ## 12. Reference: the seven reports
 
-All seven are on the **Reports** screen, all are available to every signed-in role, and all export to CSV.
+All seven are on the **Reports** screen, all are available to every signed-in role, and all export to Excel (.xlsx).
 
 | Report | What it answers |
 |---|---|

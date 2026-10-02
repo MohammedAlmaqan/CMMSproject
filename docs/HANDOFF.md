@@ -2,7 +2,7 @@
 
 **Project:** CommandPulse CMMS, on-prem Windows, Node/Express/Prisma/Postgres + React/Vite
 
-**State:** **Phase 8 — Production Readiness: A ✅ gate passed | B ✅ | C ✅ | D ✅ | E ✅ | F ✅ (F.1-F.9, all 19-hold rows closed) | G in progress (G.0 environment survey done; D-4 drill PASS; 100-VU acceptance PASS after the P2028 fix).** Phases 0-7 complete. Phase 7 documentation shipped (7.1-7.7, tag `v1.0.0`); the earlier in-progress notes below are history — see the tracker for the authoritative state. **B.2 and B.3 accepted by client.** NEXT = Phase G rehearsals (in progress) then Phase H; do NOT start a new phase section without explicit go.
+**State:** **Phase 8 — Production Readiness: A ✅ | B ✅ | C ✅ | D ✅ | E ✅ | F ✅ (F.1-F.9, all 19-hold rows closed) | G: D-4 drill PASS, 100-VU acceptance PASS after the P2028 fix; G.4 (live IIS curl/firewall check) and G.5 (SOW §4.1 200-VU) remain.** Phases 0-7 complete (7.1-7.7 shipped, tag `v1.0.0`). **Phase R — Reporting, BI layer and the UAT pack (register Phase F) — is the current work: R.1-R.9 delivered, R.10 (`Craft.hourlyRate` fan-out) next.** Earlier in-progress notes below are history — see the tracker for the authoritative state. **B.2 and B.3 accepted by client.** Do NOT start a new phase section without explicit go.
 
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
@@ -13,7 +13,7 @@
 
 **Open risks:** the one residual below (untested IIS `curl` verification) plus the SOW §4.1 200-user capacity test, which remains a **post-go-live** exercise (the 100-VU run now passes cleanly — see the Phase G section for the P2028 fix). The old mock-fallback risk is closed — `mockData.ts` was deleted at G6a and the fleet has been green since.
 
-**Next action for a fresh session:** read tracker + git log + this file. Current position is Phase G (rehearsals in progress); the "7.4 API reference / 24 files / 156 tests" notes below are historical Phase-7-era entries. Test floor today: **backend Vitest 904 tests across 67 test files (32 unit + 35 routes), `tsc -b` clean (backend + app), eslint at the 42-error baseline.** The per-phase suite sizes earlier in the tracker and the "55 files" in the E.13 block are that phase's own snapshots, not current totals.
+**Next action for a fresh session:** read tracker + git log + this file. Current position is Phase R (reporting); the "7.4 API reference / 24 files / 156 tests" notes below are historical Phase-7-era entries. Test floor today: **backend Vitest 977 tests across 70 test files (33 unit + 37 routes), `tsc -b` clean (backend + app), eslint at the 41-error baseline.** The per-phase suite sizes earlier in the tracker and the "55 files" in the E.13 block are that phase's own snapshots, not current totals.
 
 ---
 
@@ -36,7 +36,7 @@
 - **7.2 System Architecture** `2643cb8` — `docs/ARCHITECTURE.md`. Accepted as B.2.
 - **7.3 ER diagram + data dictionary** `7c093d8` — `docs/ER_DIAGRAM.md` (hand-authored Mermaid, no new deps) + `docs/DATA_DICTIONARY.md` (35 models then; 38 models today, 7 domains). Accepted as B.3.
   - Verification method worth reusing: the diagram was **cross-checked programmatically against `schema.prisma`** — entity count, braces, cardinality tokens, 45 FK columns matched per table and per column, and 45 relationship edges matched 45 `@relation`s with none invented and none missing. That check caught a genuinely dropped `MAINTENANCE_PLAN → TASK_LIST` edge. **This is the standard for future generated docs.**
-- **7.4 API reference** — `docs/API_REFERENCE.md` written; at the time only `workOrders.ts` was annotated and 23 routers / 108 endpoints lacked `@openapi` blocks. Today every router carries `@openapi` annotations (26 routers, 129 ops).
+- **7.4 API reference** — `docs/API_REFERENCE.md` written; at the time only `workOrders.ts` was annotated and 23 routers / 108 endpoints lacked `@openapi` blocks. Today every router carries `@openapi` annotations (26 routers, 133 ops).
 
 ### Deferred to v1.1 (triaged 2026-09-25, no v1.0.0 scope change)
 

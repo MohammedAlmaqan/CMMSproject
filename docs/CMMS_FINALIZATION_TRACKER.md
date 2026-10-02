@@ -1008,7 +1008,7 @@ Started 2026-09-29. Phase G has **no §3 build rows**. Its only §3 clause (OAut
 
 | §6.4 row | Criterion | In this phase? |
 |---|---|---|
-| 6.4 / a | All §3 functional requirements implemented **and pass UAT scripts** | **Yes** — this phase delivers the UAT pack. Stays `Not Met` regardless: the clause is a conjunction, and 14 §3 rows are still `Not Met` and 17 `Partial`. Closing it needs register Phase H as well. |
+| 6.4 / a | All §3 functional requirements implemented **and pass UAT scripts** | **Yes** — this phase delivers the UAT pack. Stays `Not Met` regardless: the clause is a conjunction, and 14 §3 rows are still `Not Met` and 17 `Partial` at the time of this plan (R.8 recount: **7 `Not Met`, 10 `Partial`**). Closing it needs register Phase H as well. |
 | 6.4 / b | All standard reports produce correct data **verified against manual calculation** | **Yes** — this is the phase's acceptance criterion. Closes when the reconciliation pack exists and passes. |
 | 6.4 / c | No open Critical or Major defects at go-live | No. Downstream of a, b and Phase H. Not actionable as a build task. |
 | 6.4 / d | Data migration accuracy > 99.9% | No. No client legacy dataset exists (§1.3, §5.7). Nothing to build; blocked on data, not code. |

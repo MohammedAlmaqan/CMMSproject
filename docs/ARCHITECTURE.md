@@ -16,7 +16,7 @@ This document describes how CommandPulse CMMS is assembled: its runtime componen
 
 ### React 19 SPA (`app/`)
 
-A Vite 7 + TypeScript single-page app. In development the Vite dev server listens on port 3000 and proxies `/api` to the backend, so the browser issues same-origin requests and no CORS preflight is needed locally (`app/vite.config.ts`). For production the app is type-checked and bundled to static assets under `app/dist/`, which the reverse proxy serves directly; the API only ever returns JSON. Client state uses Zustand, charts use Recharts, and the dashboard includes a React Three Fiber canvas for an animated KPI visualisation (`app/src/components/dashboard/TacticalDashboardGrid.tsx`). The SPA holds no secrets and no long-lived credentials — see [Security boundaries](#security-boundaries).
+A Vite 7 + TypeScript single-page app. In development the Vite dev server listens on port 3000 and proxies `/api` to the backend, so the browser issues same-origin requests and no CORS preflight is needed locally (`app/vite.config.ts`). For production the app is type-checked and bundled to static assets under `app/dist/`, which the reverse proxy serves directly; the API otherwise returns JSON — the only non-JSON responses are the report `.xlsx` exports (`/api/reports/{report}/export.xlsx`) and attachment downloads. Client state uses Zustand, charts use Recharts, and the dashboard includes a React Three Fiber canvas for an animated KPI visualisation (`app/src/components/dashboard/TacticalDashboardGrid.tsx`). The SPA holds no secrets and no long-lived credentials — see [Security boundaries](#security-boundaries).
 
 ### Express + TypeScript API (`backend/`)
 
@@ -24,7 +24,7 @@ An ESM Node application (`"type": "module"` in `backend/package.json`) built wit
 
 ### PostgreSQL 15+
 
-The system of record, database name `cmms`. The schema is **migration-managed** — 38 Prisma models across 14 migrations, applied with `prisma migrate deploy`. `prisma db push` is retired and must not be used. Integrity relies on a mix of Prisma-level constraints and hand-written partial unique indexes, notably `WorkOrder(sourcePlanId, sourcePlanCycle) WHERE isDeleted = false`, which is what makes PM generation idempotent.
+The system of record, database name `cmms`. The schema is **migration-managed** — 38 Prisma models across 15 migrations, applied with `prisma migrate deploy`. `prisma db push` is retired and must not be used. Integrity relies on a mix of Prisma-level constraints and hand-written partial unique indexes, notably `WorkOrder(sourcePlanId, sourcePlanCycle) WHERE isDeleted = false`, which is what makes PM generation idempotent.
 
 ### PM2 process manager (`backend/ecosystem.config.cjs`)
 
@@ -59,7 +59,7 @@ flowchart TB
         BK["backups/<br/>cmms-YYYY-MM-DD-HHmm.sql<br/>+ matching -uploads folder<br/>newest 14 of each kept"]
     end
 
-    DB[("PostgreSQL 15+ - database cmms<br/>38 models / 14 migrations")]
+    DB[("PostgreSQL 15+ - database cmms<br/>38 models / 15 migrations")]
     TASKSCHED["Windows Task Scheduler<br/>daily 02:00"]
 
     B -->|443| STATIC
@@ -264,10 +264,10 @@ The batch scripts use a separate set of PostgreSQL client variables — `PGHOST`
 
 ## Known limitations & deferrals
 
-- **P2028 connection-pool exhaustion under concurrency.** In the 6.5 k6 run — 50 VUs, 2 min ramp / 5 min steady / 1 min ramp-down, 18,540 iterations and 37,265 requests at 77.6 req/s — **both configured thresholds passed** (`p(95)` 36.19 ms against a 2000 ms budget; `http_req_failed` 0.04%, 15/37,265). Separately, **15 of 140 logins returned HTTP 500** from `PrismaClientKnownRequestError` P2028, "Unable to start a transaction in the given time", i.e. connection-pool exhaustion when many logins start a transaction at once. The read path was unaffected, which is why the failure rate stayed inside budget and the issue would be missed by threshold-only monitoring. Needs Prisma pool sizing plus PostgreSQL `max_connections` tuning. Recorded as a **post-go-live blocker for the SOW §4.1 200-user load test; not a v1.0.0 blocker**.
-- **200-user load test deferred.** The SOW §4.1 200-VU test is not performed and cannot be signed off until the pool issue above is resolved. The k6 smoke test that found it is `scripts/k6/smoke.js`.
+- **P2028 connection-pool exhaustion under concurrency.** In the 6.5 k6 run — 50 VUs, 2 min ramp / 5 min steady / 1 min ramp-down, 18,540 iterations and 37,265 requests at 77.6 req/s — **both configured thresholds passed** (`p(95)` 36.19 ms against a 2000 ms budget; `http_req_failed` 0.04%, 15/37,265). Separately, **15 of 140 logins returned HTTP 500** from `PrismaClientKnownRequestError` P2028, "Unable to start a transaction in the given time", i.e. connection-pool exhaustion when many logins start a transaction at once. The read path was unaffected, which is why the failure rate stayed inside budget and the issue would be missed by threshold-only monitoring. **Resolved 2026-09-29 (G.6):** bcrypt verification moved outside the login transaction, the Prisma pool sized as `connection_limit=20&pool_timeout=30000` against `max_connections=100`, and the interactive-transaction ceilings raised to 30 s (ADMIN_GUIDE 14.3). The post-fix 100-VU acceptance run passes with 0 P2028 / 0×500 / 0×429. The SOW §4.1 200-VU test remains a separate **post-go-live** capacity exercise.
+- **200-user load test deferred.** The SOW §4.1 200-VU test is not performed. The connection-pool blocker that previously gated it is resolved (above); what remains is a straight post-go-live capacity exercise. The k6 smoke test that found the issue is `scripts/k6/smoke.js`.
 - **2.10 Zod validation gaps — still open.** The `validate()` middleware validates `req.body` only; path parameters are not validated. A pre-flight audit counted **45 gaps**, covering parameterized `PUT`/`DELETE` mutations across functional locations, equipment, meters, work centers, materials, failure codes, task lists, notifications, work orders and their child collections, labour, external services, maintenance plans, safety checklists, alerts, comments, attachments, and users. Additionally `workOrderUpdateSchema` and `operationUpdateSchema` omit fields their handlers accept. Unvalidated identifiers reach Prisma directly.
-- **ESLint baselines are not clean.** Backend reports 42 errors, frontend 33 errors and 2 warnings (all measured 2026-09-29). Types and tests pass; the debt is tracked and unfixed. Do not read a green type-check as a clean lint.
+- **ESLint baselines are not clean.** Backend reports 41 errors, frontend 28 errors and 2 warnings (all measured 2026-10-02). Types and tests pass; the debt is tracked and unfixed. Do not read a green type-check as a clean lint.
 - **IIS HTTPS documented but not executed.** The reverse-proxy path, including the ARR rewrite and the TLS binding, has never been run end to end. `trust proxy = 1` is already set in code, so what remains unverified is the deployment around it: that ARR overwrites rather than appends `X-Forwarded-For`, and that port 4000 is unreachable except through the proxy. Until that is exercised, treat the path as untested.
 - **Attachment backup is paired, and the pair is only as good as the restore.** `backup.bat` snapshots `backend/uploads/` next to every dump and `restore-drill.bat` asserts the pair, so attachment durability is no longer unprotected. The remaining risk is procedural: restoring only the SQL half leaves every attachment 404ing. See [Attachments are backed up as a paired snapshot](#attachments-are-backed-up-as-a-paired-snapshot).
 - **Meter and Combined PM strategies are unimplemented.** Such plans are stored, counted, and logged as deferred on every run, but never generate work orders.

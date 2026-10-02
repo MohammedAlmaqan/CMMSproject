@@ -6,7 +6,7 @@ Reference documentation for the CMMS REST API, version 1.0.0.
 - **Interactive UI:** `/api-docs` (Swagger UI)
 - **Machine-readable spec:** [`openapi.json`](./openapi.json) (OpenAPI 3.0.0, also served live at `/api-docs.json`)
 
-The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The checked-in `docs/openapi.json` is an exported snapshot and may lag the newest routes (the routers currently expose 129 operations; the committed export was taken at 114 operations / 71 paths) — re-export it after a fresh build by saving `/api-docs.json`.
+The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The checked-in `docs/openapi.json` is an exported snapshot and may lag the newest routes (the routers currently expose 133 operations; the committed export was taken at 114 operations / 71 paths) — re-export it after a fresh build by saving `/api-docs.json`.
 
 ## Authentication
 
@@ -54,7 +54,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 
 ## Endpoint groups
 
-129 operations across 80 paths and 26 routers. Counted live from a running server's `/api-docs.json` on 2026-09-29; the stale `docs/openapi.json` snapshot shows 114 across 71 paths.
+133 operations across 84 paths and 26 routers. Counted live from a running server's `/api-docs.json` on 2026-10-02; the stale `docs/openapi.json` snapshot shows 114 across 71 paths.
 
 | Group | Base path | Operations |
 | --- | --- | --- |
@@ -76,7 +76,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 | Crafts | `/api/crafts` | 5 |
 | Maintenance Plans | `/api/maintenance-plans` | 7 |
 | Safety Checklists | `/api/safety-checklists` | 7 |
-| Reports | `/api/reports` | 7 |
+| Reports | `/api/reports` | 11 |
 | Alerts | `/api/alerts` | 4 |
 | Comments | `/api/comments` | 3 |
 | Attachments | `/api/attachments` | 4 |
@@ -299,15 +299,19 @@ Attaching a template instantiates it as a `Pending` checklist and copies each te
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| GET | `/api/reports/backlog` | Work order backlog by status |
+| GET | `/api/reports/backlog` | Work order backlog by status, priority and work centre |
 | GET | `/api/reports/pm-compliance` | PM compliance rate for a month |
 | GET | `/api/reports/mtbf` | Mean time between failures |
-| GET | `/api/reports/mttr` | Mean time to repair |
-| GET | `/api/reports/cost-summary` | Work order cost summary for a month |
+| GET | `/api/reports/mttr` | Mean time to repair, by equipment and location |
+| GET | `/api/reports/cost-summary` | Work order cost summary for a month, by cost centre and location |
 | GET | `/api/reports/downtime` | Equipment downtime for a month |
-| GET | `/api/reports/material-consumption` | Material consumption for a month |
+| GET | `/api/reports/material-consumption` | Material consumption by material, work order and equipment |
+| GET | `/api/reports/backlog-hours-by-work-center` | Open backlog hours per work centre (dashboard widget) |
+| GET | `/api/reports/top-cost-equipment` | Highest-cost equipment by committed cost (dashboard widget) |
+| GET | `/api/reports/notifications-awaiting-conversion` | Notifications awaiting work-order conversion (dashboard widget) |
+| GET | `/api/reports/{report}/export.xlsx` | Export any of the ten reports above as a server-built `.xlsx` workbook |
 
-The month-scoped reports accept `year` and `month` and default to the current month. All reports are read-only and available to any authenticated role.
+The month-scoped reports accept `year` and `month` and default to the current month. Every report accepts the shared report filters it supports (date range, functional location with `includeDescendantLocations`, equipment, work centre) and rejects an unsupported or malformed filter with `400`; `notifications-awaiting-conversion` rejects `workCenterId` because a notification carries no work centre. The `.xlsx` route accepts the same filters as its JSON sibling. All reports are read-only and available to any authenticated role.
 
 ### Alerts
 
