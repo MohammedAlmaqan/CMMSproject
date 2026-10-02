@@ -8,21 +8,12 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction } from '../middleware/audit.js';
 import { validate, attachmentCreateSchema } from '../utils/validation.js';
+import { uploadRejectionReason } from '../utils/uploadRules.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
 
 const UPLOADS_ROOT = fileURLToPath(new URL('../../uploads/', import.meta.url));
-
-const ALLOWED_MIMES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'application/pdf',
-  'text/plain',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-excel',
-]);
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -36,8 +27,9 @@ const upload = multer({
   storage,
   limits: { fileSize: MAX_BYTES },
   fileFilter: (_req, file, cb) => {
-    if (!ALLOWED_MIMES.has(file.mimetype)) {
-      return cb(new Error(`Unsupported file type: ${file.mimetype}`));
+    const reason = uploadRejectionReason(file.mimetype, file.originalname);
+    if (reason) {
+      return cb(new Error(reason));
     }
     cb(null, true);
   },
@@ -111,10 +103,11 @@ router.use(authenticate);
  *     summary: Upload a file and attach it to an entity
  *     description: >
  *       Multipart upload with a single `file` part. Validated by the zod schema
- *       `attachmentCreateSchema` (see utils/validation.ts). Size limit 10 MB; allowed MIME
- *       types are image/jpeg, image/png, image/webp, application/pdf, text/plain,
- *       application/vnd.openxmlformats-officedocument.spreadsheetml.sheet and
- *       application/vnd.ms-excel. The stored filename is a fresh UUID plus a sanitised
+ *       `attachmentCreateSchema` (see utils/validation.ts). Size limit 10 MB; the accepted
+ *       types are a widened document and drawing allowlist (see `utils/uploadRules.ts` for
+ *       the exact sets) - images, PDF, text, CSV, office documents and CAD formats such as
+ *       .dwg/.dxf/.step. Executables and scripts are refused by extension regardless of
+ *       the declared MIME type. The stored filename is a fresh UUID plus a sanitised
  *       original name, written under uploads/<entityType>/<entityId>/. Because the file is
  *       buffered in memory, keep the limit in mind for large batches.
  *     tags: [Attachments]
@@ -155,7 +148,7 @@ router.use(authenticate);
  *                 uploadedByUserId: { type: string }
  *                 createdDate: { type: string, format: date-time }
  *       '400':
- *         description: No file, file too large (10 MB), unsupported MIME type, or zod validation failed
+ *         description: No file, file too large (10 MB), an unsupported or executable/script type, or zod validation failed
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':

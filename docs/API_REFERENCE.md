@@ -343,7 +343,7 @@ Comments and attachments attach to an entity by `entityType` and `entityId`. Sup
 | GET | `/api/attachments/{id}/download` | Download an attachment |
 | DELETE | `/api/attachments/{id}` | Soft delete an attachment |
 
-Upload takes a `multipart/form-data` body with a single `file` part.
+Upload takes a `multipart/form-data` body with a single `file` part. Files are capped at 10 MB. The accepted types are a widened document and drawing allowlist (images, PDF, text, CSV, office documents, CAD formats such as `.dwg`/`.dxf`/`.step`); executables and scripts are refused by filename extension regardless of the declared MIME type. The exact sets live in `backend/src/utils/uploadRules.ts`.
 
 ### Audit Log
 

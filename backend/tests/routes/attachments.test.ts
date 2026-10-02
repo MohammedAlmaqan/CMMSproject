@@ -149,3 +149,68 @@ describe('attachment missing-parent refusals (SOW 3.1.2, :85)', () => {
     expect(res.status).toBe(400);
   });
 })
+
+describe('attachment type and size rules (SOW 3.3.8 / D-11, row 36)', () => {
+  let dwgId = '';
+  let dwgStoragePath = '';
+
+  afterAll(async () => {
+    if (dwgId) {
+      if (dwgStoragePath) {
+        try {
+          fs.rmSync(path.join(UPLOADS_ROOT, dwgStoragePath), { force: true });
+        } catch { /* ok */ }
+      }
+      await prisma.attachment.deleteMany({ where: { attachmentId: dwgId } }).catch(() => {});
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: dwgId } }).catch(() => {});
+    }
+  });
+
+  it('accepts a widened document type (a CAD drawing)', async () => {
+    const res = await api()
+      .post('/api/attachments')
+      .set(authHeaders(ctx.operatorToken))
+      .field('entityType', 'Equipment')
+      .field('entityId', entityId)
+      .attach('file', fileBuffer, 'drawing.dwg');
+    expect(res.status).toBe(201);
+    expect(res.body.mimeType).toBeTruthy();
+    dwgId = res.body.attachmentId;
+    dwgStoragePath = res.body.storagePath;
+  });
+
+  it('refuses an executable by extension, with nothing written', async () => {
+    const before = await prisma.attachment.count({ where: { entityType: 'Equipment', entityId, isDeleted: false } });
+    const res = await api()
+      .post('/api/attachments')
+      .set(authHeaders(ctx.operatorToken))
+      .field('entityType', 'Equipment')
+      .field('entityId', entityId)
+      .attach('file', fileBuffer, 'payload.exe');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Executable and script files are not allowed/);
+    expect(await prisma.attachment.count({ where: { entityType: 'Equipment', entityId, isDeleted: false } })).toBe(before);
+  });
+
+  it('refuses a script by extension', async () => {
+    const res = await api()
+      .post('/api/attachments')
+      .set(authHeaders(ctx.operatorToken))
+      .field('entityType', 'Equipment')
+      .field('entityId', entityId)
+      .attach('file', fileBuffer, 'deploy.ps1');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Executable and script files are not allowed/);
+  });
+
+  it('refuses a file over the 10 MB cap', async () => {
+    const res = await api()
+      .post('/api/attachments')
+      .set(authHeaders(ctx.operatorToken))
+      .field('entityType', 'Equipment')
+      .field('entityId', entityId)
+      .attach('file', Buffer.alloc(10 * 1024 * 1024 + 1), 'big.pdf');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/too large/i);
+  });
+})

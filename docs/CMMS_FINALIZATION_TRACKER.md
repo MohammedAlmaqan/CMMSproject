@@ -1551,7 +1551,7 @@ With those four recorded, Phase R is closed. Test floor at close: **70 files / 9
 | 23 | §3.3.1 | Emergency automatically sets highest priority | Not Met | — | H.1 below — implemented, not verified |
 | 24 | §3.3.1 | Calibration work orders with pass/fail tracking | Not Met | — | **§6.4 scope gate — see below** |
 | 29 | §3.3.3 | Rich-text long-text field (job instructions, safety notes, completion remarks) | Not Met | — | schema + UI |
-| 36 | §3.3.8 | Any file type ≤10 MB | Partial | D-11 | allowlist widened under D-11; 10 MB already met; executables blocked |
+| 36 | §3.3.8 | Any file type ≤10 MB | Partial | D-11 | H.2 below — widened allowlist implemented, not verified |
 | 69 | §3.8 | In-app alert: work-order assignment | Not Met | — | alert emitter |
 | 70 | §3.8 | In-app alert: overdue work orders | Not Met | — | emitter + scheduled sweep |
 | 71 | §3.8 | In-app alert: PM generation failure | Partial | — | silent today; emitter |
@@ -1573,6 +1573,12 @@ With those four recorded, Phase R is closed. Test floor at close: **70 files / 9
 | # | Task | Status | Acceptance Criteria | Commit |
 |---|---|---|---|---|
 | H.1 | Row 23 — `EM` forces highest priority on every work-order write path | IMPLEMENTED, NOT VERIFIED | `resolveWorkOrderPriority(type, requested)` (`backend/src/utils/workOrderRules.ts`) returns `High` for an `EM` type and the requested priority for every other type, and is applied on `POST /api/work-orders`, `PUT /api/work-orders/:id` and `POST /api/notifications/:id/convert-to-wo` (a breakdown notification becomes `EM`). `backend/tests/routes/emergencyPriority.test.ts` (7 cases, live PostgreSQL) drives all three paths. Negative injection: stubbing the rule to pass the requested priority through failed exactly the 4 `EM`-enforcement cases and left the 3 inverse cases green; reverted. Promotion to `Met` waits on green CI at this commit's SHA and its run id. | *this commit* |
+
+**H.2 — Row 36 (§3.3.8): a widened document allowlist with executables and scripts blocked.** Delivered *this commit*; held at `IMPLEMENTED, NOT VERIFIED` under the same rule as H.1.
+
+| # | Task | Status | Acceptance Criteria | Commit |
+|---|---|---|---|---|
+| H.2 | Row 36 — widen the attachment allowlist under D-11, keep the 10 MB cap, block executables and scripts | IMPLEMENTED, NOT VERIFIED | `backend/src/utils/uploadRules.ts` accepts images, PDF, text, CSV, office documents and CAD drawings by filename extension (case-insensitive), blocks a denylist of executable and script extensions whatever MIME is declared, and falls back to the MIME allowlist only for unrecognised extensions. The 10 MB cap is unchanged. `backend/tests/unit/uploadRules.test.ts` (DB-free) covers accept/block/fallback; `backend/tests/routes/attachments.test.ts` drives a `.dwg` upload (201), a `.exe` and `.ps1` refusal (400, nothing written) and a >10 MB refusal against live PostgreSQL. Archive formats are deliberately excluded (a container can carry an executable past a filename check). Negative injection: disabling the executable/script block failed exactly the 2 route cases and 1 unit case (18 passed); reverted. Promotion to `Met` waits on green CI at this commit's SHA. | *this commit* |
 
 ---
 
