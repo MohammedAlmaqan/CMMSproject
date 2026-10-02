@@ -1439,6 +1439,29 @@ R.1-R.5 promoted rows 51-54 and 60-67 on their own suites. R.7 is the first plac
 
 **Promotion discipline.** A row moves to `Met` only on evidence from a suite that ran at a named SHA, with that run's CI ID cited. No row is promoted on the strength of a passing unit test alone — the E.9 finding was that a green suite is evidence about tests that exist, not about clauses no test touches. Where a row can only be partly delivered, the residual goes in the matrix Notes cell and the row stays where it is.
 
+##### R.8 - delivered: a full recount, and the four rows the per-step promotions never revisited
+
+Phase R's last planned step. The deliverable is a **recount**: the matrix's totals re-derived from the `Status` cell of every row, and the documents brought into line with what the rows have actually said since R.1-R.7. It found four rows still carrying their Phase F status, and the drift is the point of the step rather than a surprise.
+
+**The finding: rows 51-54, the §3.5.3 cost-rollup axes, were still `Not Met`/`Partial`.** R.1 built the rollup engine — all four axes, 16 unit tests and 11 live differential checks — and its own commit (`2071189`) explicitly left rows 51-54 at `Not Met` because "no report calls it yet". R.4 then rebuilt `/cost-summary` on `rollupByLocation` and promoted its scope as **rows 60-64**; R.3 had promoted **65-67**. Neither named 51-54, and R.1's deliberate hold was never lifted. So the engine existed and was tested, the location axis reached a real report, and the four rows that own the clause still read as gaps. **This is a recount miss, not a missing feature** — the register's own framing is that 51-54 are one engine, and R.1 built that engine.
+
+**The exact matrix effect.** All four rows move `→ Met`: three from `Not Met`, one (period) from `Partial`.
+
+| Scope | Met | Partial | Not Met | Deferred | Excluded | Waived | Total |
+|---|---|---|---|---|---|---|---|
+| Sections 1-6 before R.8 | 114 | 44 | 24 | 7 | 15 | 10 | 214 |
+| Sections 1-6 after R.8 | **118** | **43** | **21** | 7 | 15 | 10 | 214 |
+| §3 before R.8 | 85 | 11 | 10 | 3 | 7 | 10 | 126 |
+| §3 after R.8 | **89** | **10** | **7** | 3 | 7 | 10 | 126 |
+
+Fully Met rises from 114/214 (53.3%) to **118/214 (55.1%)**; §3 is **89 of 126 (70.6%)**. The delta is exactly `+4 Met, −1 Partial, −3 Not Met`, and it is confined to §3.5.3 — no other row's status changed, and no count moved for any other reason.
+
+**The doc delta is larger than the four rows, because the summaries had been frozen at Phase F.** The live rows had drifted to 114/44/24 through the per-step promotions while the Summary table still read 101/50/30 and its derived paragraph 102/50/29; §6.4 / a's note still read "14 are Not Met and 17 are Partial"; and the go-live section still said no UAT pack existed and no report had been reconciled. R.8 corrects all of it: the four row status cells in `SOW_COMPLIANCE.md`, the Summary table, the derived paragraph and its themes, the §6.4 / a note, and the go-live item list item 2. `DECISION_REGISTER.md` rows **51-54 and 58-67** are reconciled in the same pass, so the register's Phase F triage columns no longer contradict the matrix on any of the 14 Build rows.
+
+**The residual the promotion keeps honest.** Only `rollupByLocation` reaches a report route (`/cost-summary`); `rollupByEquipment`, `rollupByWorkOrderType` and `rollupByPeriod` are exercised by R.1's unit tests and its live `r1-differential.ts`, not by a dedicated endpoint. The four row notes say so in as many words, so `Met` rests on the engine-and-tests evidence for all axes plus the surfaced report for the location axis, not on the pretence that four routes exist.
+
+**Gate: 70 files / 977 tests, `ESLINT_ERRORS=41`** (CI threshold 50), unchanged from R.7 because R.8 is documentation plus the recount. CI runs on the exact commit SHA before this step is called done.
+
 **R.0 stopped here for review, and R.1 has since been built.** R.1 was chosen as the first unit of work precisely because the rollup engine is the foundation the other six steps read, and a wrong total would propagate into every report, the SQL views, and the UAT pack that is supposed to catch exactly that. Its live-DB run is what exposed the stale `plannedCost`/`actualCost` columns, which is a finding the plan did not anticipate and could not have without running against real data. R.2 is the next unit.
 
 | Step | Scope | Status | Verification | Evidence |
