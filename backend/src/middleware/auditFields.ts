@@ -1,5 +1,6 @@
 import type {
   Craft,
+  CauseCode,
   Equipment,
   EquipmentMeter,
   FailureCode,
@@ -57,6 +58,10 @@ export const AUDITED_FIELDS = {
   FailureCode: [
     'parentCodeId', 'code', 'description',
   ] satisfies AuditedColumns<FailureCode>,
+
+  CauseCode: [
+    'code', 'description',
+  ] satisfies AuditedColumns<CauseCode>,
 
   TaskList: [
     'code', 'description', 'equipmentClass', 'equipmentId', 'workCenterId',

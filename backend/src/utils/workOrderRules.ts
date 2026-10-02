@@ -60,3 +60,27 @@ export const HIGHEST_PRIORITY = 'High';
 export function resolveWorkOrderPriority(type: string, requestedPriority: string): string {
   return type === EMERGENCY_WORK_ORDER_TYPE ? HIGHEST_PRIORITY : requestedPriority;
 }
+
+/**
+ * SOW 3.1.4 (deferred item D5): "Cause codes as root-cause categories".
+ *
+ * A breakdown may be raised before anyone knows why the machine stopped, so the
+ * cause is not required at creation. It is required at the other end: a
+ * breakdown cannot be recorded as Completed until it names a cause. Without this
+ * the CauseCode column would be optional everywhere and the MTTR-by-cause
+ * report (row 62) would rest on data nobody was ever asked for.
+ *
+ * The check is written against the *effective* values, not the submitted body:
+ * an edit that completes a work order whose cause was set earlier, or that
+ * saves the cause and completes in one call, must both pass.
+ */
+export const BREAKDOWN_CAUSE_REQUIRED_MESSAGE =
+  'A breakdown work order cannot be completed without a cause code';
+
+export function isCompletionBlockedForMissingCause(input: {
+  nextStatus: string;
+  breakdownFlag: boolean;
+  causeCodeId: string | null | undefined;
+}): boolean {
+  return input.nextStatus === 'Completed' && input.breakdownFlag && !input.causeCodeId;
+}

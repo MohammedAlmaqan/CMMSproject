@@ -42,6 +42,11 @@ export const workOrderCreateSchema = z.object({
   internalOrder: z.string().optional(),
   breakdownFlag: z.boolean().optional(),
   safetyCriticalFlag: z.boolean().optional(),
+  // SOW 3.1.4 (D5): the root cause of a breakdown, chosen from CauseCode. Not
+  // required to raise the work order - a breakdown is often logged before the
+  // cause is known - but a breakdown cannot be completed without one, so the
+  // picker on the work-order screen is the caller for this field.
+  causeCodeId: z.string().min(1).nullable().optional(),
   // SOW 3.3.3: the long-text field for safety notes and completion remarks.
   // Multi-line plain text; nullable because neither is required. The cap is a
   // sanity bound, not the column's limit (PostgreSQL text is unbounded).
@@ -416,6 +421,15 @@ export const failureCodeCreateSchema = z.object({
 });
 
 export const failureCodeUpdateSchema = failureCodeCreateSchema.partial();
+
+// SOW 3.1.4 (D5): cause codes are a flat root-cause list, unlike the
+// self-referencing FailureCode hierarchy, so there is no parent field.
+export const causeCodeCreateSchema = z.object({
+  code: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+});
+
+export const causeCodeUpdateSchema = causeCodeCreateSchema.partial();
 
 /**
  * A plan target names exactly one asset (D-10 / SOW 3.4.1). The database CHECK

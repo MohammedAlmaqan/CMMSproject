@@ -43,6 +43,7 @@ import { externalServiceService } from '@/services/externalServiceService';
 import { safetyChecklistService } from '@/services/safetyChecklistService';
 import { commentService } from '@/services/commentService';
 import { attachmentService } from '@/services/attachmentService';
+import { causeCodeService } from '@/services/causeCodeService';
 import { userService } from '@/services/userService';
 import { craftService } from '@/services/craftService';
 import { materialService } from '@/services/materialService';
@@ -60,6 +61,7 @@ import type {
   SafetyChecklistTemplate,
   Attachment,
   ServiceCostCategory,
+  CauseCode,
 } from '@/types';
 import { serviceCostCategories } from '@/types';
 
@@ -226,15 +228,17 @@ export default function WorkOrderDetailPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [crafts, setCrafts] = useState<Craft[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [causeCodes, setCauseCodes] = useState<CauseCode[]>([]);
   const [templates, setTemplates] = useState<SafetyChecklistTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
-  const [notesForm, setNotesForm] = useState<{ safetyNotes: string; completionRemarks: string }>({
+  const [notesForm, setNotesForm] = useState<{ safetyNotes: string; completionRemarks: string; causeCodeId: string }>({
     safetyNotes: '',
     completionRemarks: '',
+    causeCodeId: '',
   });
 
   const [opAdding, setOpAdding] = useState(false);
@@ -277,7 +281,7 @@ export default function WorkOrderDetailPage() {
     setLoadError(null);
     try {
 const isAdmin = hasPermission(['Administrator']);
-      const [woData, laborData, historyData, usersData, craftsData, materialsData, templatesData, attachmentsData] = await Promise.all([
+      const [woData, laborData, historyData, usersData, craftsData, materialsData, templatesData, attachmentsData, causeCodesData] = await Promise.all([
         workOrderService.getById(id!),
         laborService.getByWorkOrder(id!),
         workOrderService.getHistory(id!),
@@ -286,11 +290,13 @@ const isAdmin = hasPermission(['Administrator']);
         materialService.getAll(),
         safetyChecklistService.getTemplates(),
         attachmentService.getByEntity('WorkOrder', id!),
+        causeCodeService.getAll().catch(() => [] as CauseCode[]),
       ]);
       setWo(woData as WorkOrderDetail);
       setNotesForm({
         safetyNotes: (woData as WorkOrderDetail).safetyNotes ?? '',
         completionRemarks: (woData as WorkOrderDetail).completionRemarks ?? '',
+        causeCodeId: (woData as WorkOrderDetail).causeCodeId ?? '',
       });
       setLabor(laborData as LaborEntryDetail[]);
       setHistory(historyData?.data || []);
@@ -299,6 +305,7 @@ const isAdmin = hasPermission(['Administrator']);
       setMaterials(materialsData);
       setTemplates(templatesData);
       setAttachments(attachmentsData);
+      setCauseCodes(causeCodesData as CauseCode[]);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Failed to load work order');
     } finally {
@@ -448,10 +455,11 @@ const isAdmin = hasPermission(['Administrator']);
       const updated = await workOrderService.update(wo.workOrderId, {
         safetyNotes: notesForm.safetyNotes.trim() ? notesForm.safetyNotes : null,
         completionRemarks: notesForm.completionRemarks.trim() ? notesForm.completionRemarks : null,
+        causeCodeId: notesForm.causeCodeId || null,
       });
       setWo((prev) =>
         prev
-          ? { ...prev, safetyNotes: updated.safetyNotes, completionRemarks: updated.completionRemarks }
+          ? { ...prev, safetyNotes: updated.safetyNotes, completionRemarks: updated.completionRemarks, causeCodeId: updated.causeCodeId }
           : prev
       );
     } catch (err) {
@@ -794,7 +802,7 @@ const isAdmin = hasPermission(['Administrator']);
       { id: 'notifications', label: 'Notifications', icon: Bell, count: wo.notifications?.length || 0 },
       { id: 'comments', label: 'Comments', icon: MessageSquare, count: wo.comments?.length || 0 },
       { id: 'attachments', label: 'Attachments', icon: Paperclip, count: attachments.length },
-      { id: 'notes', label: 'Notes', icon: ClipboardList },
+      { id: 'notes', label: 'Cause & Notes', icon: ClipboardList },
       { id: 'history', label: 'History', icon: FileText, count: history.length },
     ];
   }, [wo, labor, history, attachments]);
@@ -1844,6 +1852,27 @@ const isAdmin = hasPermission(['Administrator']);
         {activeTab === 'notes' && (
           <div className="industrial-card rounded p-4 space-y-4">
             <div>
+              <label className="block text-tertiary text-xs uppercase tracking-wide mb-2">Root Cause</label>
+              <select
+                value={notesForm.causeCodeId}
+                onChange={(e) => setNotesForm((f) => ({ ...f, causeCodeId: e.target.value }))}
+                disabled={!canEdit}
+                aria-label="Root cause"
+                className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
+                style={{ backgroundColor: '#27272A' }}
+              >
+                <option value="">None</option>
+                {causeCodes.map((c) => (
+                  <option key={c.causeCodeId} value={c.causeCodeId}>{c.code} - {c.description}</option>
+                ))}
+              </select>
+              {wo.breakdownFlag && !notesForm.causeCodeId && (
+                <p className="mt-1 text-[11px] text-amber">
+                  This is a breakdown. A cause code is required before it can be completed.
+                </p>
+              )}
+            </div>
+            <div>
               <label className="block text-tertiary text-xs uppercase tracking-wide mb-2">Safety Notes</label>
               <textarea
                 value={notesForm.safetyNotes}
@@ -1878,7 +1907,7 @@ const isAdmin = hasPermission(['Administrator']);
                 style={{ backgroundColor: '#D97706', color: '#111113' }}
               >
                 {busy === 'notes:save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                Save Notes
+                Save Cause & Notes
               </button>
             )}
           </div>

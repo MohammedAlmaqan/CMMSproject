@@ -250,6 +250,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       breakdownFlag: notif.breakdownFlag,
       safetyCriticalFlag: false,
       safetyNotes: null,
+    causeCodeId: null,
       completionRemarks: null,
       plannedCost: 0,
       actualCost: 0,

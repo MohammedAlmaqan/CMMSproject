@@ -313,6 +313,15 @@ export async function purgeFailureCodes(ids: (string | null | undefined)[]): Pro
   await purgeAudit(cleanIds);
 }
 
+export async function purgeCauseCodes(ids: (string | null | undefined)[]): Promise<void> {
+  const cleanIds = clean(ids);
+  if (cleanIds.length === 0) return;
+  // The WorkOrder FK is ON DELETE SET NULL, so work orders that named a cause
+  // being purged are unlinked rather than left dangling.
+  await prisma.causeCode.deleteMany({ where: { causeCodeId: { in: cleanIds } } });
+  await purgeAudit(cleanIds);
+}
+
 export async function purgeSafetyChecklistTemplates(ids: (string | null | undefined)[]): Promise<void> {
   const cleanIds = clean(ids);
   if (cleanIds.length === 0) return;

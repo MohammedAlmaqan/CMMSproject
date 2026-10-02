@@ -6,7 +6,7 @@ import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber, generateNotifNumber } from '../utils/sequence.js';
 import { canTransition } from '../utils/transitions.js';
 import { serializeWorkOrderSnapshot } from '../utils/workOrderSnapshots.js';
-import { requiresAtLeastOneOperation, missingOperationMessage, resolveWorkOrderPriority } from '../utils/workOrderRules.js';
+import { requiresAtLeastOneOperation, missingOperationMessage, resolveWorkOrderPriority, isCompletionBlockedForMissingCause, BREAKDOWN_CAUSE_REQUIRED_MESSAGE } from '../utils/workOrderRules.js';
 import { findBlockingChecklist, describeBlockedChecklist } from '../utils/checklistRules.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -119,6 +119,7 @@ router.get('/', async (req: Request, res: Response) => {
           functionalLocation: { select: { functionalLocationId: true, locationCode: true, description: true } },
           equipment: { select: { equipmentId: true, equipmentCode: true, name: true } },
           workCenter: { select: { workCenterId: true, code: true, name: true } },
+          causeCode: { select: { causeCodeId: true, code: true, description: true } },
         },
         orderBy: { createdDate: 'desc' },
         skip: skipNum,
@@ -168,6 +169,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         functionalLocation: true,
         equipment: true,
         workCenter: true,
+        causeCode: true,
         supervisor: { select: { userId: true, fullName: true, username: true } },
     reportedBy: { select: { userId: true, fullName: true, username: true } },
         operations: { where: { isDeleted: false }, include: { craft: true }, orderBy: { sequenceNumber: 'asc' } },
@@ -358,6 +360,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
       type, priority, functionalLocationId, equipmentId, description,
       workCenterId, supervisorUserId, reportedByUserId, plannedStart, plannedFinish,
       costCenterCode, internalOrder, breakdownFlag, safetyCriticalFlag,
+      causeCodeId,
       safetyNotes, completionRemarks,
       taskListId,
     } = req.body;
@@ -438,6 +441,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
           internalOrder: internalOrder || '',
           breakdownFlag: breakdownFlag || false,
           safetyCriticalFlag: safetyCriticalFlag || false,
+          causeCodeId: causeCodeId ?? null,
           safetyNotes: safetyNotes ?? null,
           completionRemarks: completionRemarks ?? null,
           status: 'Draft',
@@ -558,6 +562,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
       workCenterId, supervisorUserId, reportedByUserId, plannedStart, plannedFinish,
       actualStart, actualFinish, costCenterCode, internalOrder,
       breakdownFlag, safetyCriticalFlag, status,
+      causeCodeId,
       safetyNotes, completionRemarks,
     } = req.body;
 
@@ -585,6 +590,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
         ...(internalOrder !== undefined && { internalOrder }),
         ...(breakdownFlag !== undefined && { breakdownFlag }),
         ...(safetyCriticalFlag !== undefined && { safetyCriticalFlag }),
+        ...(causeCodeId !== undefined && { causeCodeId }),
         ...(safetyNotes !== undefined && { safetyNotes }),
         ...(completionRemarks !== undefined && { completionRemarks }),
         ...(status !== undefined && { status }),
@@ -824,6 +830,30 @@ router.put(
           checklistStatus: blockingChecklist.status,
         });
       }
+    }
+
+    // SOW 3.1.4 (D5): a breakdown cannot be completed until it names a cause.
+    // Blocked and audited like the other transition guards, so the trail says
+    // who tried and what was missing.
+    if (
+      isCompletionBlockedForMissingCause({
+        nextStatus: newStatus,
+        breakdownFlag: workOrder.breakdownFlag,
+        causeCodeId: workOrder.causeCodeId,
+      })
+    ) {
+      await logAuditFieldChange({
+
+          table: 'WorkOrder',
+          recordId: id,
+          action: 'Blocked',
+          field: 'status',
+          oldValue: workOrder.status,
+          newValue: newStatus,
+          userId: req.user!.userId,
+          ipAddress: req.ip,
+        });
+      return res.status(409).json({ error: BREAKDOWN_CAUSE_REQUIRED_MESSAGE });
     }
 
     const updateData: any = {

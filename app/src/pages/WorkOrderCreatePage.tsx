@@ -7,9 +7,10 @@ import { functionalLocationService } from '@/services/functionalLocationService'
 import { equipmentService } from '@/services/equipmentService';
 import { workCenterService } from '@/services/workCenterService';
 import { taskListService } from '@/services/taskListService';
+import { causeCodeService } from '@/services/causeCodeService';
 import { userService } from '@/services/userService';
 import { ApiError } from '@/lib/api';
-import type { FunctionalLocation, Equipment, WorkCenter, UserOption, Priority, WorkOrderType, TaskList } from '@/types';
+import type { FunctionalLocation, Equipment, WorkCenter, UserOption, Priority, WorkOrderType, TaskList, CauseCode } from '@/types';
 
 const inputClass =
   'w-full px-3 py-2 rounded text-primary text-sm outline-none border border-subtle focus:border-highlight transition-colors';
@@ -21,6 +22,7 @@ export default function WorkOrderCreatePage() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
   const [taskLists, setTaskLists] = useState<TaskList[]>([]);
+  const [causeCodes, setCauseCodes] = useState<CauseCode[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -39,6 +41,7 @@ export default function WorkOrderCreatePage() {
   const [internalOrder, setInternalOrder] = useState('');
   const [breakdownFlag, setBreakdownFlag] = useState(false);
   const [safetyCriticalFlag, setSafetyCriticalFlag] = useState(false);
+  const [causeCodeId, setCauseCodeId] = useState('');
   const [safetyNotes, setSafetyNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -72,7 +75,7 @@ export default function WorkOrderCreatePage() {
     let cancelled = false;
     (async () => {
       try {
-        const [locData, eqData, wcData, userData, tlData] = await Promise.all([
+        const [locData, eqData, wcData, userData, tlData, ccData] = await Promise.all([
           functionalLocationService.getAll(),
           equipmentService.getAll(),
           workCenterService.getAll(),
@@ -80,6 +83,9 @@ export default function WorkOrderCreatePage() {
           // A failure to load templates must not block creating a work order
           // without one, so this settles separately from the required options.
           taskListService.getAll().catch(() => [] as TaskList[]),
+          // Likewise: a cause code is optional at creation, so a failure to load
+          // the list must not block raising the work order.
+          causeCodeService.getAll().catch(() => [] as CauseCode[]),
         ]);
         if (cancelled) return;
         setLocations(locData);
@@ -87,6 +93,7 @@ export default function WorkOrderCreatePage() {
         setWorkCenters(wcData);
         setUsers(userData);
         setTaskLists(tlData);
+        setCauseCodes(ccData);
       } catch (err) {
         if (!cancelled) setLoadError(err instanceof ApiError ? err.message : 'Failed to load form options');
       } finally {
@@ -118,6 +125,7 @@ export default function WorkOrderCreatePage() {
         internalOrder: internalOrder || '',
         breakdownFlag,
         safetyCriticalFlag,
+        causeCodeId: causeCodeId || null,
         safetyNotes: safetyNotes.trim() ? safetyNotes : null,
       });
       navigate(`/work-orders/${created.workOrderId}`);
@@ -332,6 +340,24 @@ export default function WorkOrderCreatePage() {
             <div>
               <label className={labelClass}>Internal Order</label>
               <input type="text" value={internalOrder} onChange={(e) => setInternalOrder(e.target.value)} className={inputClass} style={{ backgroundColor: '#27272A' }} />
+            </div>
+
+            <div>
+              <label className={labelClass}>Cause Code</label>
+              <select
+                value={causeCodeId}
+                onChange={(e) => setCauseCodeId(e.target.value)}
+                className={inputClass}
+                style={{ backgroundColor: '#27272A' }}
+              >
+                <option value="">None</option>
+                {causeCodes.map((c) => (
+                  <option key={c.causeCodeId} value={c.causeCodeId}>{c.code} - {c.description}</option>
+                ))}
+              </select>
+              {breakdownFlag && (
+                <p className="mt-1 text-[11px] text-tertiary">A cause code is required before this breakdown can be completed.</p>
+              )}
             </div>
 
             <div className="col-span-2 flex items-center gap-6 pt-1">

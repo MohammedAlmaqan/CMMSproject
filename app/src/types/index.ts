@@ -286,6 +286,9 @@ export interface WorkOrder extends Auditable {
   internalOrder: string;
   breakdownFlag: boolean;
   safetyCriticalFlag: boolean;
+  /** SOW 3.1.4 (D5): root cause of a breakdown, chosen from CauseCode. Required before a breakdown can be completed. */
+  causeCodeId: string | null;
+  causeCode?: CauseCode | null;
   /** SOW 3.3.3 long-text field: multi-line plain text, not WYSIWYG. */
   safetyNotes: string | null;
   /** SOW 3.3.3 long-text field: multi-line plain text, not WYSIWYG. */

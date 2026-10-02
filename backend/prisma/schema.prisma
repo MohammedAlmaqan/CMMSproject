@@ -231,6 +231,8 @@ model CauseCode {
   modifiedBy   String   @default("system")
   modifiedDate DateTime @updatedAt
   isDeleted    Boolean  @default(false)
+
+  workOrders WorkOrder[]
 }
 
 model TaskList {
@@ -353,6 +355,11 @@ model WorkOrder {
   internalOrder       String   @default("")
   breakdownFlag       Boolean  @default(false)
   safetyCriticalFlag  Boolean  @default(false)
+  // SOW 3.1.4 (deferred item D5): the root cause of a breakdown, chosen from
+  // the CauseCode master data. Nullable at rest so existing work orders and
+  // notification-converted breakdowns stay valid; the rule that a breakdown
+  // must name a cause is enforced when it is completed, not when it is raised.
+  causeCodeId         String?
   // SOW 3.3.3: a long-text field for safety notes and completion remarks.
   // Delivered as multi-line plain text rather than WYSIWYG (the approved
   // default); job instructions remain the free-text `description` column. Both
@@ -376,6 +383,7 @@ model WorkOrder {
   workCenter         WorkCenter         @relation(fields: [workCenterId], references: [workCenterId])
   supervisor         User     @relation("Supervisor", fields: [supervisorUserId], references: [userId])
   reportedBy         User     @relation("ReportedBy", fields: [reportedByUserId], references: [userId])
+  causeCode          CauseCode? @relation(fields: [causeCodeId], references: [causeCodeId])
   operations         WorkOrderOperation[]
   woMaterials        WorkOrderMaterial[]
   externalServices   ExternalServiceCost[]

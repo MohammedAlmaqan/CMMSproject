@@ -166,6 +166,18 @@ CSV import takes a `multipart/form-data` body with a single `file` part. Each ro
 | PUT | `/api/failure-codes/{id}` | Update a failure code |
 | DELETE | `/api/failure-codes/{id}` | Soft delete a failure code |
 
+### Cause Codes
+
+| Method | Path | Summary |
+| --- | --- | --- |
+| GET | `/api/cause-codes` | List cause codes |
+| GET | `/api/cause-codes/{id}` | Get one cause code |
+| POST | `/api/cause-codes` | Create a cause code |
+| PUT | `/api/cause-codes/{id}` | Update a cause code |
+| DELETE | `/api/cause-codes/{id}` | Soft delete a cause code |
+
+Cause codes are the root-cause categories (SOW 3.1.4) a work order can name. The list accepts a `search` filter over code and description.
+
 ### Task Lists
 
 | Method | Path | Summary |
@@ -201,7 +213,7 @@ Converting a notification creates a corrective work order — type `EM` when the
 | DELETE | `/api/work-orders/{id}` | Soft-delete a work order |
 | PUT | `/api/work-orders/{id}/status` | Transition work order status |
 
-The list endpoint is paginated with `skip` and `take`. Status changes go through the dedicated status endpoint rather than a general update, so the transition is validated. An `EM` (emergency) work order is always the highest priority: `POST` and `PUT` force `High` whatever the request contains, so an emergency cannot be raised or demoted below the top of the scale. A work order also carries two nullable long-text fields, `safetyNotes` and `completionRemarks` (SOW 3.3.3), accepted on `POST` and `PUT`: multi-line plain text up to 20000 characters each, and send `null` to clear one.
+The list endpoint is paginated with `skip` and `take`. Status changes go through the dedicated status endpoint rather than a general update, so the transition is validated. An `EM` (emergency) work order is always the highest priority: `POST` and `PUT` force `High` whatever the request contains, so an emergency cannot be raised or demoted below the top of the scale. A work order also carries two nullable long-text fields, `safetyNotes` and `completionRemarks` (SOW 3.3.3), accepted on `POST` and `PUT`: multi-line plain text up to 20000 characters each, and send `null` to clear one. A work order may also name a root-cause `causeCodeId` (nullable), accepted on `POST` and `PUT` and returned on the list and detail reads; a breakdown work order cannot move to `Completed` until it names one.
 
 ### Work Order Operations
 

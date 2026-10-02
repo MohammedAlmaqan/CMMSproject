@@ -134,6 +134,7 @@ describe('AUDITED_FIELDS', () => {
       WorkCenter: 'workCenterId',
       Craft: 'craftId',
       FailureCode: 'failureCodeId',
+      CauseCode: 'causeCodeId',
       TaskList: 'taskListId',
       EquipmentMeter: 'meterId',
       MaintenancePlan: 'planId',
