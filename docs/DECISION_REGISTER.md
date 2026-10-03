@@ -6,7 +6,7 @@
 | **Baseline** | `v1.0.0` — tag object `386fe3c`, commit `0d941df`. Shipped and immutable. |
 | **Source of record** | `docs/SOW_COMPLIANCE.md` (214 clause rows) |
 | **Machine check** | `python scripts/verify/verify_a1.py` — re-derives every count in this document from the matrix. |
-| **Status** | ✅ **DECIDED.** All 77 rows dispositioned and all 16 decisions answered, under the delegated authority recorded in §6. |
+| **Status** | ✅ **DECIDED.** All 77 rows dispositioned and all 18 decisions answered, under the delegated authority recorded in §6. D-18 and D-19 were added after the Phase A freeze, on 2026-10-03. |
 | **Decision authority** | Delegated to the vendor by the SOW owner on 2026-09-26 (see §6). |
 
 ---
@@ -48,7 +48,7 @@ A `Waive` is not a deletion. Waived rows stay in `docs/SOW_COMPLIANCE.md` and in
 
 > **For each of the 77 rows in §5: Build, or Waive?**
 
-D-1 is answered: **68 Build, 9 Waive.** Every other decision (D-2 … D-17) narrows the engineering; D-1 fixed its size. The dispositions and the reasoning behind them are in §5.
+D-1 is answered: **68 Build, 9 Waive.** Every other decision (D-2 … D-19) narrows the engineering; D-1 fixed its size. The dispositions and the reasoning behind them are in §5.
 
 **Consequences of leaving D-1 open**
 
@@ -64,7 +64,7 @@ D-1 is answered: **68 Build, 9 Waive.** Every other decision (D-2 … D-17) narr
 
 ---
 
-## 4. Decisions D-2 … D-17
+## 4. Decisions D-2 … D-19
 
 Each decision is posed as a **question** with neutral options, so the reasoning is auditable rather than asserted. The **Decision taken** column records what was chosen; §4.1 records why. D-2, D-3, D-15 and D-16 carry positions supplied directly by the SOW owner; the remainder were decided on engineering judgement under the delegated authority in §6.
 
@@ -88,6 +88,8 @@ Each decision is posed as a **question** with neutral options, so the reasoning 
 | **D-15** | §3.2.2 vs §2.2 | §3.2.2 says *"**Any** authenticated user can create a notification"*. §2.2 defines View-Only / Auditor as *"**read** access to all master data, work orders, history, reports"*. These two SOW clauses contradict each other. v1.0.0 resolves it by denying View-Only (HTTP 403). | (a) View-Only may raise notifications — §2.2 "read-only" is narrowed. (b) View-Only may not — §3.2.2 "any authenticated user" is narrowed. | **(b)**, and record it as a SOW interpretation. A role named "View-Only" that can create records is self-contradictory, and the same reasoning supports keeping §2.2 intact elsewhere. | Client — document owner | **SOW 2.2 wins.** View-Only / Auditor stays read-only; 3.2.2's "any authenticated user" narrows to **Requester and above**. The existing 403 is already correct - **no code change**; the matrix row moves to Met. |
 | **D-16** | §3.3.5 vs §3.5.1 | §3.3.5 says actual labour cost = hours × craft rate *"**from work center master**"*. §3.5.1 says the same figure = hours × **craft rate**. The implementation uses `Craft.hourlyRate` and never reads `WorkCenter.costRatePerHour`, which exists in the schema precisely for this. The SOW names two different rate sources. | (a) `Craft.hourlyRate` is authoritative. (b) `WorkCenter.costRatePerHour` is authoritative. (c) `Craft.hourlyRate` by default, falling back to the work-centre rate where no craft rate is set. | **(c)**. It honours both SOW clauses, needs no new master data, and makes the currently-dead `costRatePerHour` column meaningful. | Client — Maintenance / Finance | **Craft.hourlyRate is the single authoritative labour rate.** Amend 3.3.5's "from work center master" to "from craft master". `WorkCenter.costRatePerHour` is a work-centre overhead concept, is not read by cost calculation, and is not a labour rate. |
 | **D-17** | §5.3 / deferred D6 | The SOW's monetary and quantity columns ship as binary floating point. Deferred item D6 parks the `Float` -> `Decimal` migration in v1.1, but Phase F builds cost rollups and cost reports. Should the migration happen before or after that reporting work? | (a) Migrate to `Decimal` in Phase E, before the rollups exist. (b) Leave in v1.1 and build the rollups on `Float`. | **(a)**. Rounding differences baked into new cost reporting are expensive to unpick later, and the totals are otherwise unauditable. | Client - Finance | Build the **Float -> Decimal migration** for monetary columns in Phase E, promoting deferred item D6 out of v1.1. |
+| **D-18** | §2.2 | §2.2 requires that "additional custom roles must be definable". Six built-in roles ship, encoded as a compile-time `Record<Role, number>`; there is no `Role` or `Permission` entity, route or UI. | (a) Build configurable roles and permissions. (b) Waive the clause — the six built-in roles cover a single-site plant's access model. | **(b)**. A single-site plant with six tiers does not need user-defined roles; configurable RBAC is a multi-site / delegated-administration feature and would add a permission matrix, a migration and an admin surface for no stated operational need. | Client — document owner | **Waive.** Recorded as a formal scope reduction, flagged for SOW-owner acceptance. No code; the six built-in roles stand. |
+| **D-19** | §4.6 | §4.6 requires 99.5% availability during business hours 07:00–19:00, Sunday–Thursday. The repository has no uptime monitor and has never measured availability; the health routes report process liveness only. | (a) Build uptime monitoring and measure the target. (b) Record the service-level target as an operational obligation owned by Client Operations, effective at go-live, as with the D-14 deferrals. | **(b)**. Availability is a consequence of the deployed host, network and operations, not of application code; the same reasoning that placed the maintenance windows and the warranty with Client Operations in D-14 applies. | Client Operations | **Deferred.** The 99.5% business-hours target is owned by Client Operations and confirmed from go-live. No code; monitoring and measurement live with operations. Flagged for SOW-owner acceptance. |
 
 **Decisions that gated worksheet rows:** 13 rows were dispositioned on a decision rather than on matrix evidence alone — rows 7, 8, 14, 17, 32, 36, 37, 39, 49, 59, 63, 75, 76. All 13 are resolved. Row 75 was subsequently waived outright and row 24, which was not in this list, was subsequently built; both changes came from the SOW owner's answers in §6.4. The remaining 64 were dispositioned directly on the matrix evidence.
 
@@ -115,6 +117,8 @@ One line per decision, so the reasoning is auditable without re-reading the opti
 | **D-15** | The role hierarchy makes Viewer the read-only tier, so "any authenticated user" is best read as "any holder of the Requester capability". 3.3.2's Close role floor was remediated the same way. |
 | **D-16** | One authoritative rate removes a silent ambiguity. Craft rate is the correct granularity for labour cost, and no requirement consumes a work-centre rate. |
 | **D-17** | Phase F builds 3.5.3 cost rollups and 3.7.1 cost reports; producing new cost reporting on binary floating point bakes rounding differences into new work and leaves the totals unauditable. Migrating before the rollups exist is cheaper than after. **IMPLEMENTED in Phase E**, E.13: the seven monetary columns are `DECIMAL(12,2)`, still served to the API as JSON numbers, and deferred D6 is promoted out of v1.1. |
+| **D-18** | A single-site plant has no need for user-defined roles; the six tiers already express every access distinction the SOW names, and configurable RBAC would add a permission matrix and an admin surface for no stated operational driver. |
+| **D-19** | Availability is a property of the running service, not the codebase; recording it as an owned operational obligation in the D-14 shape makes it visible at go-live instead of leaving it as an unmeasured `Not Met` clause. |
 
 
 ## 5. The 77-row disposition worksheet
@@ -235,18 +239,18 @@ carries an answer, and the machine check agrees. That is the gate as it now stan
 | Baseline inventory machine-frozen and re-derivable | ✅ `verify_a1.py` exit 0 |
 | All 77 in-scope §3 rows listed with matrix-sourced clause and status | ✅ §5 |
 | Every row carries a proposed phase and any gating decision | ✅ §5 |
-| D-2 … D-17 posed with options, an answer and a rationale | ✅ §4, §4.1 |
+| D-2 … D-19 posed with options, an answer and a rationale | ✅ §4, §4.1 |
 | **Every one of the 77 rows dispositioned `Build` or `Waive`** | ✅ **77 of 77** |
 | **Every waive carries a one-line business reason** | ✅ **10 of 10** |
-| **Every decision answered** | ✅ **16 of 16** |
-| **Rationale recorded for every decision** | ✅ **16 of 16** |
+| **Every decision answered** | ✅ **18 of 18** |
+| **Rationale recorded for every decision** | ✅ **18 of 18** |
 
 **Gate result: PASSED**, subject to one gate that was withdrawn.
 
 ### 6.1 Authority and provenance
 
 **The signature requirement was withdrawn by the SOW owner on 2026-09-26.** The 77
-dispositions and the 16 decisions in this document were decided by the vendor under
+dispositions and the 18 decisions in this document were decided by the vendor under
 delegated authority, on engineering judgement, applying the stated principles: build what
 closes a go-live blocker, fills a genuine functional gap in the maintenance workflow, or is
 small and clearly useful; waive what is nice-to-have, redundant with existing capability, or
