@@ -8,7 +8,7 @@ import {
   invalidTransitionMessage,
   transitionTargets,
 } from '../utils/transitions.js';
-import { resolveWorkOrderPriority } from '../utils/workOrderRules.js';
+import { resolveWorkOrderPriority, highestPriority } from '../utils/workOrderRules.js';
 import { emitAlertToRolesSafely, ALERT_TYPE_HIGH_PRIORITY_NOTIFICATION, TRIAGE_ROLES } from '../services/alertService.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -16,6 +16,7 @@ import {
   notificationCreateSchema,
   notificationUpdateSchema,
   convertNotificationSchema,
+  convertNotificationsSchema,
 } from '../utils/validation.js';
 
 const router = Router();
@@ -524,6 +525,174 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
   }
 });
 
+
+/**
+ * @openapi
+ * /api/notifications/convert-to-wo:
+ *   post:
+ *     summary: Convert several notifications into one corrective work order
+ *     description: >
+ *       SOW 3.2.2 (row 20). Creates a single work order from a set of notifications
+ *       and links every one of them to it through WorkOrderNotifLink, which already
+ *       carries a composite (workOrderId, notificationId) key and therefore expresses
+ *       N notifications to one work order without a schema change. The work order
+ *       takes the highest priority of the set; if any notification is a breakdown the
+ *       work order is an EM and therefore High (SOW 3.3.1). The batch is
+ *       all-or-nothing: if any notification is missing, already converted, not in a
+ *       convertible state, or does not share the others' functional location, nothing
+ *       is written. This route is additive; POST /{id}/convert-to-wo is untouched and
+ *       remains the UI's single-notification path. Validated by the zod schema
+ *       `convertNotificationsSchema`. Requires the Maintenance Planner role.
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `convertNotificationsSchema`; notificationIds is required"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [notificationIds]
+ *             properties:
+ *               notificationIds:
+ *                 type: array
+ *                 minItems: 1
+ *                 items: { type: string }
+ *               workCenterId: { type: string, description: "Defaults to the first available work center" }
+ *               supervisorUserId: { type: string, description: "Defaults to the oldest notification's reporter, then the authenticated user" }
+ *     responses:
+ *       '201':
+ *         description: Work order created from the notifications; every notification is now Converted
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, no work center is available, a notification is not convertible, or the set spans more than one functional location
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '404':
+ *         description: One or more notifications were not found
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/convert-to-wo', authorizeMinRole('Maintenance Planner'), validate(convertNotificationsSchema), async (req: Request, res: Response) => {
+  try {
+    const ids = [...new Set(req.body.notificationIds as string[])];
+    const { workCenterId, supervisorUserId } = req.body;
+
+    const notifications = await prisma.notification.findMany({
+      where: { notificationId: { in: ids }, isDeleted: false },
+      orderBy: [{ createdDate: 'asc' }, { notificationNumber: 'asc' }],
+    });
+    if (notifications.length !== ids.length) {
+      return res.status(404).json({ error: 'One or more notifications were not found' });
+    }
+
+    // All-or-nothing. A half-converted batch would leave some notifications
+    // Converted with no work order that names them, which is worse than refusing
+    // the whole request and letting the caller fix the set.
+    for (const notification of notifications) {
+      if (notification.status === 'Converted') {
+        return res.status(400).json({ error: `Notification ${notification.notificationNumber} already converted` });
+      }
+      if (!canTransition(notification.status, 'Converted')) {
+        return res.status(400).json({
+          error: invalidTransitionMessage(notification.status, 'Converted'),
+          currentStatus: notification.status,
+          allowedTransitions: transitionTargets(notification.status),
+        });
+      }
+    }
+
+    // A work order has exactly one functional location. Aggregating notifications
+    // raised against different locations would produce a job whose stated place is
+    // untrue for at least one of them, so the set must agree. Equipment is used only
+    // when the whole set names the same asset; a mixed set is a location-level job
+    // and leaves the work order's equipment empty rather than pinning it to one.
+    const locationIds = new Set(notifications.map((n) => n.functionalLocationId));
+    if (locationIds.size !== 1) {
+      return res.status(400).json({ error: 'Notifications must share a functional location to be aggregated' });
+    }
+    const equipmentIds = new Set(
+      notifications.map((n) => n.equipmentId).filter((equipmentId): equipmentId is string => !!equipmentId)
+    );
+    const sharedEquipmentId = equipmentIds.size === 1 ? [...equipmentIds][0] : null;
+
+    // SOW 3.2.2 "takes the highest of their priorities", and SOW 3.3.1 makes a
+    // breakdown an emergency, which is always High. resolveWorkOrderPriority is
+    // applied last so the emergency rule wins over the collected priority.
+    const breakdownFlag = notifications.some((n) => n.breakdownFlag);
+    const workOrderType = breakdownFlag ? 'EM' : 'CM';
+    const priority = resolveWorkOrderPriority(workOrderType, highestPriority(notifications.map((n) => n.priority)));
+
+    // The oldest notification (first after the ordering above) supplies the
+    // reporter and, for a single-notification set, the description, so a batch of
+    // one behaves exactly as the single route does.
+    const primary = notifications[0];
+    const description =
+      notifications.length === 1
+        ? primary.description
+        : `Aggregated from ${notifications.length} notifications: ${notifications.map((n) => n.notificationNumber).join(', ')}`;
+
+    const workCenters = await prisma.workCenter.findMany({ where: { isDeleted: false }, take: 1 });
+    const defaultWorkCenter = workCenters[0];
+    if (!defaultWorkCenter) {
+      return res.status(400).json({ error: 'No active work center available' });
+    }
+
+    const woNumber = await generateWoNumber();
+
+    const workOrder = await prisma.$transaction(async (tx) => {
+      const wo = await tx.workOrder.create({
+        data: {
+          woNumber,
+          type: workOrderType,
+          priority,
+          status: 'Draft',
+          functionalLocation: { connect: { functionalLocationId: primary.functionalLocationId } },
+          equipment: sharedEquipmentId ? { connect: { equipmentId: sharedEquipmentId } } : undefined,
+          description,
+          workCenter: { connect: { workCenterId: workCenterId || defaultWorkCenter.workCenterId } },
+          supervisor: { connect: { userId: supervisorUserId || primary.reportedByUserId || req.user!.userId } },
+          reportedBy: { connect: { userId: primary.reportedByUserId } },
+          breakdownFlag,
+          createdBy: req.user!.userId,
+          modifiedBy: req.user!.userId,
+        },
+      });
+
+      for (const notification of notifications) {
+        await tx.workOrderNotifLink.create({
+          data: {
+            workOrderId: wo.workOrderId,
+            notificationId: notification.notificationId,
+            createdBy: req.user!.userId,
+            modifiedBy: req.user!.userId,
+          },
+        });
+        await tx.notification.update({
+          where: { notificationId: notification.notificationId },
+          data: { status: 'Converted', modifiedBy: req.user!.userId },
+        });
+      }
+
+      return wo;
+    });
+
+    await logAuditAction({ table: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
+    for (const notification of notifications) {
+      await logAuditFieldChange({ table: 'Notification', recordId: notification.notificationId, action: 'Update', field: 'status', oldValue: notification.status, newValue: 'Converted', userId: req.user!.userId, ipAddress: req.ip });
+    }
+
+    res.status(201).json(workOrder);
+  } catch (error) {
+    logger.error({ err: error }, 'Error aggregating notifications into a work order');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 /**
  * @openapi

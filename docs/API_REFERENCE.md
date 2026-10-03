@@ -197,9 +197,12 @@ Cause codes are the root-cause categories (SOW 3.1.4) a work order can name. The
 | POST | `/api/notifications` | Raise a notification |
 | PUT | `/api/notifications/{id}` | Update a notification |
 | DELETE | `/api/notifications/{id}` | Soft delete a notification |
+| POST | `/api/notifications/convert-to-wo` | Convert several notifications into one corrective work order |
 | POST | `/api/notifications/{id}/convert-to-wo` | Convert a notification into a corrective work order |
 
 Converting a notification creates a corrective work order — type `EM` when the notification's breakdown flag is set, otherwise `CM` — copies the location and equipment, links the notification to the new work order and sets the notification status to `Converted`. A breakdown conversion is an emergency order, so its priority is raised to `High` regardless of the notification's own priority; a non-breakdown conversion keeps the notification's priority.
+
+`POST /api/notifications/convert-to-wo` (SOW 3.2.2) aggregates several notifications into a single work order. It takes `notificationIds: string[]`, links every notification to the one work order, and moves each to `Converted`; the work order takes the highest priority of the set, and any breakdown makes it an `EM` at `High`. The set must share a functional location and is converted all-or-nothing — a missing id answers 404 and an already-converted or non-convertible id answers 400 with nothing written. This route is additive; `POST /api/notifications/{id}/convert-to-wo` is unchanged.
 
 Raising a notification with `priority: High` also writes an in-app alert (`alertType: High_Priority_Notification`) for every active Maintenance Planner and Maintenance Supervisor, related to the notification through `relatedEntityId`/`relatedEntityType`. The fan-out is best-effort: the notification is still returned if the alert write fails.
 

@@ -315,6 +315,13 @@ export const convertNotificationSchema = z.object({
   supervisorUserId: z.string().min(1).optional(),
 });
 
+// SOW 3.2.2 (row 20): the aggregation path is a separate, additive contract so
+// the single-notification route keeps its exact request and response shape. A
+// non-empty array is required; the route de-duplicates before it writes.
+export const convertNotificationsSchema = convertNotificationSchema.extend({
+  notificationIds: z.array(z.string().min(1)).min(1),
+});
+
 export const equipmentCreateSchema = z.object({
   equipmentCode: z.string().min(1),
   name: z.string().min(1),

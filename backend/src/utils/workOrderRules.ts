@@ -62,6 +62,26 @@ export function resolveWorkOrderPriority(type: string, requestedPriority: string
 }
 
 /**
+ * SOW 3.2.2 (row 20): "Multiple notifications aggregated into one work order."
+ *
+ * The aggregated work order takes the highest of the priorities it collects.
+ * Ranked on the schema's own scale (High > Medium > Low) rather than by list
+ * position, so the caller's ordering cannot decide the result. Unknown values
+ * rank below Low, so a stale string cannot inflate a job's priority.
+ */
+const PRIORITY_RANK: Record<string, number> = { Low: 1, Medium: 2, High: 3 };
+
+export function highestPriority(priorities: string[]): string {
+  let best = 'Low';
+  for (const priority of priorities) {
+    if ((PRIORITY_RANK[priority] ?? 0) > (PRIORITY_RANK[best] ?? 0)) {
+      best = priority;
+    }
+  }
+  return best;
+}
+
+/**
  * SOW 3.1.4 (deferred item D5): "Cause codes as root-cause categories".
  *
  * A breakdown may be raised before anyone knows why the machine stopped, so the
