@@ -15,15 +15,27 @@ import {
   CheckCircle,
   XCircle,
   Eye,
+  UserPlus,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
 import { systemConfigService, type SystemSetting } from '@/services/systemConfigService';
+import { userService } from '@/services/userService';
+import type { User, UserRole, WorkCenter } from '@/types';
 import Header from '@/components/layout/Header';
 
 type AdminTab = 'users' | 'audit' | 'settings';
 
 const PAGE_SIZE = 10;
+
+const USER_ROLES: UserRole[] = [
+  'View-Only',
+  'Requester',
+  'Technician',
+  'Maintenance Supervisor',
+  'Maintenance Planner',
+  'Administrator',
+];
 
 export default function AdministrationPage() {
   const user = useAuthStore((s) => s.user);
@@ -39,6 +51,13 @@ export default function AdministrationPage() {
   const [auditPage, setAuditPage] = useState(0);
   const [auditFilter, setAuditFilter] = useState('');
   const [userSearch, setUserSearch] = useState('');
+
+  // Row 60: an Administrator can onboard a user and deactivate one from the UI.
+  const addUser = useAppStore((s) => s.addUser);
+  const removeUser = useAppStore((s) => s.removeUser);
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [deactivatingId, setDeactivatingId] = useState('');
+  const [userActionError, setUserActionError] = useState('');
 
   // SOW 3.3.3 / 3.2.2: the number prefixes were rendered as fixed text, so the
   // setting looked configurable and was not. They are now loaded from the API
@@ -78,6 +97,22 @@ export default function AdministrationPage() {
       setSettingsError((err as Error).message);
     } finally {
       setSavingKey('');
+    }
+  };
+
+  // Soft delete: the account is deactivated server-side and dropped from the
+  // in-memory list here, so the row disappears without a full reload.
+  const deactivateUser = async (id: string, name: string) => {
+    if (!window.confirm(`Deactivate ${name}? They will no longer be able to sign in.`)) return;
+    setDeactivatingId(id);
+    setUserActionError('');
+    try {
+      await userService.remove(id);
+      removeUser(id);
+    } catch (err) {
+      setUserActionError((err as Error).message);
+    } finally {
+      setDeactivatingId('');
     }
   };
 
@@ -175,8 +210,24 @@ export default function AdministrationPage() {
                     style={{ backgroundColor: '#27272A' }}
                   />
                 </div>
+                <button
+                  onClick={() => { setShowUserForm((v) => !v); setUserActionError(''); }}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-subtle text-primary hover:border-amber"
+                >
+                  <UserPlus className="w-3.5 h-3.5" /> Add User
+                </button>
                 <span className="text-tertiary text-xs ml-auto">{filteredUsers.length} users</span>
               </div>
+              {userActionError && (
+                <p className="mb-4 text-xs text-red-400" role="alert">{userActionError}</p>
+              )}
+              {showUserForm && (
+                <UserForm
+                  workCenters={workCenters}
+                  onCancel={() => setShowUserForm(false)}
+                  onCreated={(created) => { addUser(created); setShowUserForm(false); }}
+                />
+              )}
               {!loading && !storeError && users.length === 0 && (
                 <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No users found in the system.</div>
               )}
@@ -185,7 +236,7 @@ export default function AdministrationPage() {
                 <table className="w-full">
                   <thead>
                     <tr style={{ backgroundColor: '#27272A' }}>
-                      {['Username', 'Full Name', 'Email', 'Role', 'Work Center', 'Status', 'Last Login'].map((h) => (
+                      {['Username', 'Full Name', 'Email', 'Role', 'Work Center', 'Status', 'Last Login', 'Actions'].map((h) => (
                         <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
@@ -215,6 +266,20 @@ export default function AdministrationPage() {
                           </td>
                           <td className="px-4 py-2.5 font-mono text-xs text-secondary">
                             {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {u.userId === user?.userId ? (
+                              <span className="text-tertiary text-xs">You</span>
+                            ) : (
+                              <button
+                                onClick={() => deactivateUser(u.userId, u.fullName)}
+                                disabled={!u.isActive || deactivatingId === u.userId}
+                                aria-label={`Deactivate ${u.fullName}`}
+                                className="text-xs px-2 py-1 rounded border border-subtle text-red-status hover:border-red-status disabled:opacity-40 disabled:text-tertiary"
+                              >
+                                {deactivatingId === u.userId ? '...' : 'Deactivate'}
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -446,5 +511,154 @@ function EditableSetting({
         )}
       </div>
     </div>
+  );
+}
+
+// Row 60: the create half of the admin user lifecycle. Kept as its own
+// component so the page's list/search state is not re-rendered on every
+// keystroke in the form.
+function UserForm({
+  workCenters,
+  onCancel,
+  onCreated,
+}: {
+  workCenters: WorkCenter[];
+  onCancel: () => void;
+  onCreated: (user: User) => void;
+}) {
+  const [form, setForm] = useState({
+    username: '',
+    password: '',
+    fullName: '',
+    email: '',
+    role: 'Technician' as UserRole,
+    workCenterId: '',
+  });
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const created = await userService.create({
+        username: form.username.trim(),
+        password: form.password,
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        role: form.role,
+        workCenterId: form.workCenterId || null,
+      });
+      onCreated(created);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="industrial-card rounded p-4 mb-4 space-y-3">
+      <h3 className="text-primary text-sm font-semibold flex items-center gap-2">
+        <UserPlus className="w-4 h-4 text-amber" /> New User
+      </h3>
+      {error && <p className="text-xs text-red-400" role="alert">{error}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1 text-xs text-secondary">
+          Username
+          <input
+            value={form.username}
+            onChange={(e) => setForm({ ...form, username: e.target.value })}
+            required
+            aria-label="New user username"
+            className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-secondary">
+          Full Name
+          <input
+            value={form.fullName}
+            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            required
+            aria-label="New user full name"
+            className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-secondary">
+          Email
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            required
+            aria-label="New user email"
+            className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-secondary">
+          Temporary Password
+          <input
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            required
+            minLength={8}
+            aria-label="New user password"
+            className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-secondary">
+          Role
+          <select
+            value={form.role}
+            onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+            aria-label="New user role"
+            className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+            style={{ backgroundColor: '#27272A' }}
+          >
+            {USER_ROLES.map((role) => (
+              <option key={role} value={role}>{role}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-secondary">
+          Work Center
+          <select
+            value={form.workCenterId}
+            onChange={(e) => setForm({ ...form, workCenterId: e.target.value })}
+            aria-label="New user work center"
+            className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+            style={{ backgroundColor: '#27272A' }}
+          >
+            <option value="">Unassigned</option>
+            {workCenters.map((wc) => (
+              <option key={wc.workCenterId} value={wc.workCenterId}>{wc.code} — {wc.name}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="text-xs px-3 py-1.5 rounded bg-amber font-medium disabled:opacity-50"
+          style={{ color: '#111113' }}
+        >
+          {submitting ? 'Creating...' : 'Create User'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-xs px-3 py-1.5 rounded border border-subtle text-secondary hover:text-primary"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }

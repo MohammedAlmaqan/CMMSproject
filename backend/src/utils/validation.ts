@@ -619,17 +619,34 @@ export function planPatchIssues(
   return issues;
 }
 
+export const userRoleSchema = z.enum([
+  'View-Only',
+  'Requester',
+  'Technician',
+  'Maintenance Supervisor',
+  'Maintenance Planner',
+  'Administrator',
+]);
+
 export const userUpdateSchema = z
   .object({
     fullName: z.string().trim().min(1).optional(),
     email: z.string().email().optional(),
-    role: z
-      .enum(['View-Only', 'Requester', 'Technician', 'Maintenance Supervisor', 'Maintenance Planner', 'Administrator'])
-      .optional(),
+    role: userRoleSchema.optional(),
     workCenterId: z.string().min(1).nullable().optional(),
     isActive: z.boolean().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required' });
+
+export const userCreateSchema = z.object({
+  username: z.string().trim().min(1),
+  password: z.string().min(8),
+  fullName: z.string().trim().min(1),
+  email: z.string().email(),
+  role: userRoleSchema,
+  workCenterId: z.string().min(1).nullable().optional(),
+  isActive: z.boolean().optional(),
+});
 
 export const attachmentEntityTypeSchema = z.enum(['WorkOrder', 'Notification', 'Equipment']);
 

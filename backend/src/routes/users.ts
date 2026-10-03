@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorize, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction } from '../middleware/audit.js';
-import { userUpdateSchema, validate } from '../utils/validation.js';
+import { userCreateSchema, userUpdateSchema, validate } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -67,6 +67,101 @@ router.get('/', authorize('Administrator'), async (_req: Request, res: Response)
     res.json(users);
   } catch (error) {
     logger.error({ err: error }, 'Error fetching users');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+/**
+ * @openapi
+ * /api/users:
+ *   post:
+ *     summary: Create a user
+ *     description: >
+ *       Administrator-only. Creates an active user from username, password, full name,
+ *       email and role. The username must be unique among non-deleted users (the partial
+ *       unique index ignores soft-deleted rows). The password is hashed with bcrypt at
+ *       cost 10 and is never returned. Validated by the zod schema `userCreateSchema`.
+ *       Writes an AuditLogEntry.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `userCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, password, fullName, email, role]
+ *             properties:
+ *               username: { type: string }
+ *               password: { type: string, minLength: 8 }
+ *               fullName: { type: string }
+ *               email: { type: string, format: email }
+ *               role: { type: string, enum: [View-Only, Requester, Technician, "Maintenance Supervisor", "Maintenance Planner", Administrator] }
+ *               workCenterId: { type: string, nullable: true }
+ *               isActive: { type: boolean }
+ *     responses:
+ *       '201':
+ *         description: User created
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller is not an Administrator
+ *       '409':
+ *         description: Username already exists
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/', authorize('Administrator'), validate(userCreateSchema), async (req: Request, res: Response) => {
+  try {
+    const { username, password, fullName, email, role, workCenterId, isActive } = req.body;
+
+    // User.username is a partial unique index over active rows, so a soft-deleted
+    // account frees its name. Checking here turns the common case into a clear 409
+    // rather than relying on the P2002 handler below.
+    const existing = await prisma.user.findFirst({ where: { username, isDeleted: false } });
+    if (existing) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        username,
+        passwordHash,
+        fullName,
+        email,
+        role,
+        workCenterId: workCenterId || null,
+        isActive: isActive !== undefined ? isActive : true,
+        createdBy: req.user!.userId,
+        modifiedBy: req.user!.userId,
+      },
+      select: {
+        userId: true, username: true, fullName: true, email: true,
+        role: true, workCenterId: true, isActive: true, lastLogin: true,
+        createdBy: true, createdDate: true, modifiedBy: true, modifiedDate: true,
+      },
+    });
+
+    await logAuditAction({ table: 'User', recordId: user.userId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
+
+    res.status(201).json(user);
+  } catch (error) {
+    // A concurrent create can still race the findFirst above; the partial unique
+    // index is the authority, and P2002 is the honest answer to that race.
+    if ((error as { code?: string }).code === 'P2002') {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    logger.error({ err: error }, 'Error creating user');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -266,6 +361,73 @@ router.put('/:id', authorize('Administrator'), validate(userUpdateSchema), async
     res.json(user);
   } catch (error) {
     logger.error({ err: error }, 'Error updating user');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+/**
+ * @openapi
+ * /api/users/{id}:
+ *   delete:
+ *     summary: Deactivate a user (soft delete)
+ *     description: >
+ *       Administrator-only. Marks the user `isDeleted = true` and `isActive = false` rather
+ *       than removing the row, so the account keeps its audit trail but can no longer sign
+ *       in or appear in listings. An Administrator cannot deactivate their own account.
+ *       Writes an AuditLogEntry.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: User userId
+ *     responses:
+ *       '200':
+ *         description: User deactivated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *       '400':
+ *         description: Caller attempted to deactivate their own account
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller is not an Administrator
+ *       '404':
+ *         description: User not found
+ *       '500':
+ *         description: Internal server error
+ */
+router.delete('/:id', authorize('Administrator'), async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+
+    if (id === req.user!.userId) {
+      return res.status(400).json({ error: 'You cannot deactivate your own account' });
+    }
+
+    const existing = await prisma.user.findFirst({ where: { userId: id, isDeleted: false } });
+    if (!existing) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await prisma.user.update({
+      where: { userId: id },
+      data: { isDeleted: true, isActive: false, modifiedBy: req.user!.userId },
+    });
+
+    await logAuditAction({ table: 'User', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
+
+    res.json({ message: 'User deactivated successfully' });
+  } catch (error) {
+    logger.error({ err: error }, 'Error deactivating user');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

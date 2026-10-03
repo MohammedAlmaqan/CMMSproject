@@ -83,6 +83,7 @@ interface AppState {
 
   addUser: (user: User) => void;
   updateUser: (id: string, updates: Partial<User>) => void;
+  removeUser: (id: string) => void;
 
   addLaborEntry: (entry: LaborEntry) => void;
   addMeterReading: (reading: MeterReading) => void;
@@ -347,6 +348,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
         u.userId === id ? { ...u, ...updates } : u
       ),
     }));
+  },
+
+  removeUser: (id) => {
+    set((s) => ({ users: s.users.filter((u) => u.userId !== id) }));
   },
 
   addLaborEntry: (entry) => {
