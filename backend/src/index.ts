@@ -34,6 +34,7 @@ import auditLogRoutes from './routes/auditLog.js';
 import userRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
 import { acquireStartupLock, runSchedulerOnce, startScheduler } from './services/scheduler.js';
+import { startOverdueScheduler } from './services/overdueSweep.js';
 import { createAlert } from './services/alertService.js';
 import { prisma } from './utils/prisma.js';
 import { logger } from './utils/logger.js';
@@ -294,6 +295,7 @@ if (process.env.NODE_ENV !== 'test') {
         }
         await runSchedulerOnce().catch((err) => logger.error({ err }, '[scheduler] startup run failed'));
         startScheduler();
+        startOverdueScheduler();
       } catch (err) {
         logger.error({ err }, '[scheduler] startup wiring failed');
       }

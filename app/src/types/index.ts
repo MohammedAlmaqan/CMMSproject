@@ -293,6 +293,17 @@ export interface WorkOrder extends Auditable {
   safetyNotes: string | null;
   /** SOW 3.3.3 long-text field: multi-line plain text, not WYSIWYG. */
   completionRemarks: string | null;
+  /**
+   * SOW 3.3.1 (row 24): calibration capture, only meaningful on a CAL work
+   * order. All nullable so non-calibration work orders are unaffected.
+   */
+  calibrationResult?: 'Pass' | 'Fail' | null;
+  calibrationAsFound?: string | null;
+  calibrationAsLeft?: string | null;
+  calibrationReferenceStandard?: string | null;
+  calibrationDueDate?: string | null;
+  calibrationIntervalValue?: number | null;
+  calibrationIntervalUnit?: 'Days' | 'Months' | 'Years' | null;
   plannedCost: number;
   actualCost: number;
 }

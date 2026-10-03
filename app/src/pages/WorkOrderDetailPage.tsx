@@ -241,6 +241,26 @@ export default function WorkOrderDetailPage() {
     causeCodeId: '',
   });
 
+  // SOW 3.3.1 (row 24): calibration capture, shown only on a CAL work order.
+  // Strings throughout because the inputs are strings; converted on save.
+  const [calForm, setCalForm] = useState<{
+    calibrationResult: string;
+    calibrationAsFound: string;
+    calibrationAsLeft: string;
+    calibrationReferenceStandard: string;
+    calibrationDueDate: string;
+    calibrationIntervalValue: string;
+    calibrationIntervalUnit: string;
+  }>({
+    calibrationResult: '',
+    calibrationAsFound: '',
+    calibrationAsLeft: '',
+    calibrationReferenceStandard: '',
+    calibrationDueDate: '',
+    calibrationIntervalValue: '',
+    calibrationIntervalUnit: '',
+  });
+
   const [opAdding, setOpAdding] = useState(false);
   const [opForm, setOpForm] = useState<OpFormState>(emptyOpForm);
   const [editingOpId, setEditingOpId] = useState<string | null>(null);
@@ -297,6 +317,20 @@ const isAdmin = hasPermission(['Administrator']);
         safetyNotes: (woData as WorkOrderDetail).safetyNotes ?? '',
         completionRemarks: (woData as WorkOrderDetail).completionRemarks ?? '',
         causeCodeId: (woData as WorkOrderDetail).causeCodeId ?? '',
+      });
+      setCalForm({
+        calibrationResult: (woData as WorkOrderDetail).calibrationResult ?? '',
+        calibrationAsFound: (woData as WorkOrderDetail).calibrationAsFound ?? '',
+        calibrationAsLeft: (woData as WorkOrderDetail).calibrationAsLeft ?? '',
+        calibrationReferenceStandard: (woData as WorkOrderDetail).calibrationReferenceStandard ?? '',
+        calibrationDueDate: (woData as WorkOrderDetail).calibrationDueDate
+          ? String((woData as WorkOrderDetail).calibrationDueDate).slice(0, 10)
+          : '',
+        calibrationIntervalValue:
+          (woData as WorkOrderDetail).calibrationIntervalValue != null
+            ? String((woData as WorkOrderDetail).calibrationIntervalValue)
+            : '',
+        calibrationIntervalUnit: (woData as WorkOrderDetail).calibrationIntervalUnit ?? '',
       });
       setLabor(laborData as LaborEntryDetail[]);
       setHistory(historyData?.data || []);
@@ -468,6 +502,32 @@ const isAdmin = hasPermission(['Administrator']);
       setBusy(null);
     }
   }, [wo, notesForm]);
+
+  // SOW 3.3.1 (row 24): calibration fields ride the existing work-order update
+  // route. The pass/fail result is the one the completion gate checks.
+  const handleSaveCalibration = useCallback(async () => {
+    if (!wo) return;
+    setActionError(null);
+    setBusy('cal:save');
+    try {
+      const updated = await workOrderService.update(wo.workOrderId, {
+        calibrationResult: (calForm.calibrationResult || null) as WorkOrder['calibrationResult'],
+        calibrationAsFound: calForm.calibrationAsFound.trim() ? calForm.calibrationAsFound : null,
+        calibrationAsLeft: calForm.calibrationAsLeft.trim() ? calForm.calibrationAsLeft : null,
+        calibrationReferenceStandard: calForm.calibrationReferenceStandard.trim()
+          ? calForm.calibrationReferenceStandard
+          : null,
+        calibrationDueDate: calForm.calibrationDueDate || null,
+        calibrationIntervalValue: calForm.calibrationIntervalValue ? Number(calForm.calibrationIntervalValue) : null,
+        calibrationIntervalUnit: (calForm.calibrationIntervalUnit || null) as WorkOrder['calibrationIntervalUnit'],
+      });
+      setWo((prev) => (prev ? { ...prev, ...updated } : prev));
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Failed to save calibration');
+    } finally {
+      setBusy(null);
+    }
+  }, [wo, calForm]);
 
   // ---- Operations CRUD ----
   const startAddOperation = useCallback(() => {
@@ -1908,6 +1968,126 @@ const isAdmin = hasPermission(['Administrator']);
               >
                 {busy === 'notes:save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 Save Cause & Notes
+              </button>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'notes' && wo.type === 'CAL' && (
+          <div className="industrial-card rounded p-4 space-y-4 mt-4">
+            <h3 className="text-primary text-sm font-semibold">Calibration</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-tertiary text-xs uppercase tracking-wide mb-2">Result</label>
+                <select
+                  value={calForm.calibrationResult}
+                  onChange={(e) => setCalForm((f) => ({ ...f, calibrationResult: e.target.value }))}
+                  disabled={!canEdit}
+                  aria-label="Calibration result"
+                  className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
+                  style={{ backgroundColor: '#27272A' }}
+                >
+                  <option value="">Not recorded</option>
+                  <option value="Pass">Pass</option>
+                  <option value="Fail">Fail</option>
+                </select>
+                {!calForm.calibrationResult && (
+                  <p className="mt-1 text-[11px] text-amber">
+                    A pass/fail result is required before this calibration can be completed.
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-tertiary text-xs uppercase tracking-wide mb-2">Calibration Due Date</label>
+                <input
+                  type="date"
+                  value={calForm.calibrationDueDate}
+                  onChange={(e) => setCalForm((f) => ({ ...f, calibrationDueDate: e.target.value }))}
+                  disabled={!canEdit}
+                  aria-label="Calibration due date"
+                  className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
+                  style={{ backgroundColor: '#27272A' }}
+                />
+              </div>
+              <div>
+                <label className="block text-tertiary text-xs uppercase tracking-wide mb-2">Interval</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={calForm.calibrationIntervalValue}
+                    onChange={(e) => setCalForm((f) => ({ ...f, calibrationIntervalValue: e.target.value }))}
+                    disabled={!canEdit}
+                    aria-label="Calibration interval value"
+                    placeholder="e.g. 12"
+                    className="w-1/2 px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
+                    style={{ backgroundColor: '#27272A' }}
+                  />
+                  <select
+                    value={calForm.calibrationIntervalUnit}
+                    onChange={(e) => setCalForm((f) => ({ ...f, calibrationIntervalUnit: e.target.value }))}
+                    disabled={!canEdit}
+                    aria-label="Calibration interval unit"
+                    className="w-1/2 px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
+                    style={{ backgroundColor: '#27272A' }}
+                  >
+                    <option value="">Unit</option>
+                    <option value="Days">Days</option>
+                    <option value="Months">Months</option>
+                    <option value="Years">Years</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-tertiary text-xs uppercase tracking-wide mb-2">Reference Standard</label>
+                <input
+                  type="text"
+                  value={calForm.calibrationReferenceStandard}
+                  onChange={(e) => setCalForm((f) => ({ ...f, calibrationReferenceStandard: e.target.value }))}
+                  disabled={!canEdit}
+                  aria-label="Calibration reference standard"
+                  placeholder="Standard or instrument used as reference"
+                  className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
+                  style={{ backgroundColor: '#27272A' }}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-tertiary text-xs uppercase tracking-wide mb-2">As Found</label>
+                <textarea
+                  value={calForm.calibrationAsFound}
+                  onChange={(e) => setCalForm((f) => ({ ...f, calibrationAsFound: e.target.value }))}
+                  rows={3}
+                  disabled={!canEdit}
+                  aria-label="Calibration as found"
+                  placeholder="Readings and condition on arrival"
+                  className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
+                  style={{ backgroundColor: '#27272A' }}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-tertiary text-xs uppercase tracking-wide mb-2">As Left</label>
+                <textarea
+                  value={calForm.calibrationAsLeft}
+                  onChange={(e) => setCalForm((f) => ({ ...f, calibrationAsLeft: e.target.value }))}
+                  rows={3}
+                  disabled={!canEdit}
+                  aria-label="Calibration as left"
+                  placeholder="Readings and condition after adjustment"
+                  className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
+                  style={{ backgroundColor: '#27272A' }}
+                />
+              </div>
+            </div>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={handleSaveCalibration}
+                disabled={busy === 'cal:save'}
+                className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                style={{ backgroundColor: '#D97706', color: '#111113' }}
+              >
+                {busy === 'cal:save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Save Calibration
               </button>
             )}
           </div>

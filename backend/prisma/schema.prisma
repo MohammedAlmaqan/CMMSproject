@@ -366,6 +366,19 @@ model WorkOrder {
   // are nullable: neither is required to raise or complete a work order.
   safetyNotes         String?
   completionRemarks   String?
+  // SOW 3.3.1 (row 24): calibration capture at the owner-selected full depth -
+  // a pass/fail result, the as-found and as-left readings, the reference
+  // standard used, and the next calibration's due date and interval. All
+  // nullable: they apply only to a CAL work order, and a calibration job is
+  // filled in as it is executed. The rule that a CAL work order cannot be
+  // completed without a result is enforced in workOrderRules.ts, not here.
+  calibrationResult            String? // Pass, Fail
+  calibrationAsFound           String?
+  calibrationAsLeft            String?
+  calibrationReferenceStandard String?
+  calibrationDueDate           DateTime?
+  calibrationIntervalValue     Int?
+  calibrationIntervalUnit      String? // Days, Months, Years
   plannedCost         Decimal @db.Decimal(12, 2) @default(0)
   actualCost          Decimal @db.Decimal(12, 2) @default(0)
   createdBy           String   @default("system")

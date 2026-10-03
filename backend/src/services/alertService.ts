@@ -45,6 +45,8 @@ export const TRIAGE_ROLES = ['Maintenance Planner', 'Maintenance Supervisor'] as
 
 export const ALERT_TYPE_PM_GENERATION_FAILED = 'PM_Generation_Failed';
 export const ALERT_TYPE_HIGH_PRIORITY_NOTIFICATION = 'High_Priority_Notification';
+export const ALERT_TYPE_WO_ASSIGNED = 'WO_Assigned';
+export const ALERT_TYPE_WO_OVERDUE = 'WO_Overdue';
 
 /** Insert one alert row for one recipient. */
 export async function createAlert(db: AlertDb, input: AlertInput): Promise<void> {
@@ -112,6 +114,61 @@ export async function emitAlertToRolesSafely(
 ): Promise<void> {
   try {
     await emitAlertToRoles(db, roles, alert, extraUserIds);
+  } catch (err) {
+    logger.error({ err }, `[alerts] failed to emit ${context}`);
+  }
+}
+
+/**
+ * SOW 3.8 (rows 69 and 70): a work-order assignment and an overdue work order.
+ *
+ * Both alerts reach the same pair: the person the job is assigned to and the
+ * supervisor accountable for the work centre's load. Assignment is a supervision
+ * act - the person doing the job has to know, and so does the person answerable
+ * for the centre. The assigned supervisor is named explicitly because they can
+ * sit outside the work centre, so the role query alone would miss them.
+ */
+export interface WorkOrderAlertRef {
+  workOrderId: string;
+  woNumber: string;
+  workCenterId: string;
+  supervisorUserId: string;
+}
+
+export async function workOrderAlertRecipients(
+  db: AlertDb,
+  wo: WorkOrderAlertRef
+): Promise<string[]> {
+  const recipients = await db.user.findMany({
+    where: {
+      isDeleted: false,
+      isActive: true,
+      OR: [
+        { userId: wo.supervisorUserId },
+        { role: 'Maintenance Supervisor', workCenterId: wo.workCenterId },
+      ],
+    },
+    select: { userId: true },
+  });
+  return [...new Set(recipients.map((r) => r.userId))];
+}
+
+/**
+ * `emitAlertToRoles` for a work-order event. Same best-effort contract: the work
+ * order write is what the caller asked for, so a failed alert is logged and
+ * never fails the write.
+ */
+export async function emitWorkOrderAlertSafely(
+  db: AlertDb,
+  wo: WorkOrderAlertRef,
+  alert: BroadcastAlertInput,
+  context = 'work order alert'
+): Promise<void> {
+  try {
+    const recipients = await workOrderAlertRecipients(db, wo);
+    for (const userId of recipients) {
+      await createAlert(db, { ...alert, userId });
+    }
   } catch (err) {
     logger.error({ err }, `[alerts] failed to emit ${context}`);
   }

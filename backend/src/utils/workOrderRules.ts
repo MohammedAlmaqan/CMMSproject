@@ -104,3 +104,24 @@ export function isCompletionBlockedForMissingCause(input: {
 }): boolean {
   return input.nextStatus === 'Completed' && input.breakdownFlag && !input.causeCodeId;
 }
+
+/**
+ * SOW 3.3.1 (row 24): "Calibration work orders with pass/fail tracking".
+ *
+ * The clause asks for a result, so a CAL work order cannot be recorded as
+ * Completed without one. The reading fields are not gated: a pass/fail result
+ * is the clause's floor, and forcing the rest would block a job whose readings
+ * are recorded on a certificate attached elsewhere. As with the cause rule, the
+ * check reads the stored result, so saving the result and completing are
+ * independent calls.
+ */
+export const CALIBRATION_RESULT_REQUIRED_MESSAGE =
+  'A calibration work order cannot be completed without a pass/fail result';
+
+export function isCompletionBlockedForMissingCalibrationResult(input: {
+  nextStatus: string;
+  type: string;
+  calibrationResult: string | null | undefined;
+}): boolean {
+  return input.nextStatus === 'Completed' && input.type === 'CAL' && !input.calibrationResult;
+}

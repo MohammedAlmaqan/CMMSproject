@@ -6,8 +6,9 @@ import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber, generateNotifNumber } from '../utils/sequence.js';
 import { canTransition } from '../utils/transitions.js';
 import { serializeWorkOrderSnapshot } from '../utils/workOrderSnapshots.js';
-import { requiresAtLeastOneOperation, missingOperationMessage, resolveWorkOrderPriority, isCompletionBlockedForMissingCause, BREAKDOWN_CAUSE_REQUIRED_MESSAGE } from '../utils/workOrderRules.js';
+import { requiresAtLeastOneOperation, missingOperationMessage, resolveWorkOrderPriority, isCompletionBlockedForMissingCause, BREAKDOWN_CAUSE_REQUIRED_MESSAGE, isCompletionBlockedForMissingCalibrationResult, CALIBRATION_RESULT_REQUIRED_MESSAGE } from '../utils/workOrderRules.js';
 import { findBlockingChecklist, describeBlockedChecklist } from '../utils/checklistRules.js';
+import { ALERT_TYPE_WO_ASSIGNED, emitWorkOrderAlertSafely } from '../services/alertService.js';
 import { logger } from '../utils/logger.js';
 import {
   validate,
@@ -362,6 +363,9 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
       costCenterCode, internalOrder, breakdownFlag, safetyCriticalFlag,
       causeCodeId,
       safetyNotes, completionRemarks,
+      calibrationResult, calibrationAsFound, calibrationAsLeft,
+      calibrationReferenceStandard, calibrationDueDate,
+      calibrationIntervalValue, calibrationIntervalUnit,
       taskListId,
     } = req.body;
 
@@ -444,6 +448,13 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
           causeCodeId: causeCodeId ?? null,
           safetyNotes: safetyNotes ?? null,
           completionRemarks: completionRemarks ?? null,
+          calibrationResult: calibrationResult ?? null,
+          calibrationAsFound: calibrationAsFound ?? null,
+          calibrationAsLeft: calibrationAsLeft ?? null,
+          calibrationReferenceStandard: calibrationReferenceStandard ?? null,
+          calibrationDueDate: calibrationDueDate ? new Date(calibrationDueDate) : null,
+          calibrationIntervalValue: calibrationIntervalValue ?? null,
+          calibrationIntervalUnit: calibrationIntervalUnit ?? null,
           status: 'Draft',
           createdBy: req.user!.userId,
           modifiedBy: req.user!.userId,
@@ -503,6 +514,22 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
     }
 
     await logAuditAction({ table: 'WorkOrder', recordId: workOrder.workOrderId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
+
+    // SOW 3.8 (row 69): assigning a work order alerts the assignee and the work
+    // centre's supervisor. Best-effort: a failed alert must not turn a work
+    // order that was created successfully into a 500.
+    await emitWorkOrderAlertSafely(
+      prisma,
+      workOrder,
+      {
+        alertType: ALERT_TYPE_WO_ASSIGNED,
+        title: 'Work Order Assigned',
+        message: `Work order ${workOrder.woNumber} has been assigned`,
+        relatedEntityId: workOrder.workOrderId,
+        relatedEntityType: 'WorkOrder',
+      },
+      `work order assignment ${workOrder.woNumber}`
+    );
 
     res.status(201).json(workOrder);
   } catch (error: any) {
@@ -564,6 +591,9 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
       breakdownFlag, safetyCriticalFlag, status,
       causeCodeId,
       safetyNotes, completionRemarks,
+      calibrationResult, calibrationAsFound, calibrationAsLeft,
+      calibrationReferenceStandard, calibrationDueDate,
+      calibrationIntervalValue, calibrationIntervalUnit,
     } = req.body;
 
     // SOW 3.3.1: if this edit leaves the work order an emergency — whether by
@@ -593,6 +623,15 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
         ...(causeCodeId !== undefined && { causeCodeId }),
         ...(safetyNotes !== undefined && { safetyNotes }),
         ...(completionRemarks !== undefined && { completionRemarks }),
+        ...(calibrationResult !== undefined && { calibrationResult }),
+        ...(calibrationAsFound !== undefined && { calibrationAsFound }),
+        ...(calibrationAsLeft !== undefined && { calibrationAsLeft }),
+        ...(calibrationReferenceStandard !== undefined && { calibrationReferenceStandard }),
+        ...(calibrationDueDate !== undefined && {
+          calibrationDueDate: calibrationDueDate ? new Date(calibrationDueDate) : null,
+        }),
+        ...(calibrationIntervalValue !== undefined && { calibrationIntervalValue }),
+        ...(calibrationIntervalUnit !== undefined && { calibrationIntervalUnit }),
         ...(status !== undefined && { status }),
         modifiedBy: req.user!.userId,
       },
@@ -602,7 +641,27 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
 
     await logAuditAction({ table: 'WorkOrder', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
 
-    res.json(await prisma.workOrder.findUnique({ where: { workOrderId: id } }));
+    const updated = await prisma.workOrder.findUnique({ where: { workOrderId: id } });
+
+    // SOW 3.8 (row 69): a reassignment is an assignment. Alert only when the
+    // supervisor actually changes, so a routine edit that echoes the same
+    // supervisor does not re-announce the job.
+    if (updated && supervisorUserId !== undefined && supervisorUserId !== existing.supervisorUserId) {
+      await emitWorkOrderAlertSafely(
+        prisma,
+        updated,
+        {
+          alertType: ALERT_TYPE_WO_ASSIGNED,
+          title: 'Work Order Assigned',
+          message: `Work order ${updated.woNumber} has been assigned`,
+          relatedEntityId: updated.workOrderId,
+          relatedEntityType: 'WorkOrder',
+        },
+        `work order assignment ${updated.woNumber}`
+      );
+    }
+
+    res.json(updated);
   } catch (error) {
     logger.error({ err: error }, 'Error updating work order');
     res.status(500).json({ error: 'Internal server error' });
@@ -854,6 +913,30 @@ router.put(
           ipAddress: req.ip,
         });
       return res.status(409).json({ error: BREAKDOWN_CAUSE_REQUIRED_MESSAGE });
+    }
+
+    // SOW 3.3.1 (row 24): a calibration work order cannot be completed without a
+    // pass/fail result. Same shape as the cause gate above: blocked, audited,
+    // and read from the stored value so saving the result and completing are
+    // independent calls.
+    if (
+      isCompletionBlockedForMissingCalibrationResult({
+        nextStatus: newStatus,
+        type: workOrder.type,
+        calibrationResult: workOrder.calibrationResult,
+      })
+    ) {
+      await logAuditFieldChange({
+        table: 'WorkOrder',
+        recordId: id,
+        action: 'Blocked',
+        field: 'status',
+        oldValue: workOrder.status,
+        newValue: newStatus,
+        userId: req.user!.userId,
+        ipAddress: req.ip,
+      });
+      return res.status(409).json({ error: CALIBRATION_RESULT_REQUIRED_MESSAGE });
     }
 
     const updateData: any = {

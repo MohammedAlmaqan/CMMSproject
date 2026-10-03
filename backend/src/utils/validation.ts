@@ -52,6 +52,17 @@ export const workOrderCreateSchema = z.object({
   // sanity bound, not the column's limit (PostgreSQL text is unbounded).
   safetyNotes: z.string().max(20000).nullable().optional(),
   completionRemarks: z.string().max(20000).nullable().optional(),
+  // SOW 3.3.1 (row 24): calibration capture at full depth. All optional and
+  // nullable — they apply only to a CAL work order, which is filled in as it is
+  // executed. A CAL work order cannot be completed without `calibrationResult`;
+  // that rule lives on the /status route, not here.
+  calibrationResult: z.enum(['Pass', 'Fail']).nullable().optional(),
+  calibrationAsFound: z.string().max(20000).nullable().optional(),
+  calibrationAsLeft: z.string().max(20000).nullable().optional(),
+  calibrationReferenceStandard: z.string().max(20000).nullable().optional(),
+  calibrationDueDate: z.string().min(1).nullable().optional(),
+  calibrationIntervalValue: z.number().int().positive().nullable().optional(),
+  calibrationIntervalUnit: z.enum(['Days', 'Months', 'Years']).nullable().optional(),
   // SOW 3.1.4: a manually created work order copies its operations from a
   // reusable task list. Before this existed the only route to a task list's
   // operations was preventive-maintenance generation, so the reusable-template
