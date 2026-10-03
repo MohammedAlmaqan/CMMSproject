@@ -66,7 +66,7 @@ EXPECT_S3_WAIVED = 10
 EXPECT_S3_WORKSHEET = 77
 GAP_STATUSES = ("Partial", "Not Met")
 PHASES = ("B", "C", "D", "E", "F", "G", "H")
-EXPECT_DECISIONS = [f"D-{n}" for n in range(2, 18)]
+EXPECT_DECISIONS = [f"D-{n}" for n in range(2, 20)]
 
 # ---------------------------------------------------------------------------
 # APPROVED PROMOTIONS
@@ -80,8 +80,10 @@ EXPECT_DECISIONS = [f"D-{n}" for n in range(2, 18)]
 #
 # The list was compiled mechanically by replaying the git history of the matrix
 # and, for each row whose status changed at or after the freeze, recording the
-# commit that set the row's current status. Thirty-seven section 3 rows are
-# promoted. One of them moved in two reviewed hops and is listed twice: row 27
+# commit that set the row's current status. Thirty-seven section 3 rows were
+# promoted by R.2; the post-R.2 block below adds twenty-two more (the R close-
+# out, Phase G.5, Phase H and the post-H sequence). One of them moved in two
+# reviewed hops and is listed twice: row 27
 # (each work order must contain at least one operation) went Not Met -> Partial
 # in Phase C (f3fc1ad) and Partial -> Met when the DB-backed suite ran
 # (6c5b926). expected_counts() applies any from/to pair, so both hops net to
@@ -133,6 +135,35 @@ APPROVED_PROMOTIONS: list = [
     (55, "Not Met", "Met", "be2b092"),   # 3.6 work order history
     (56, "Partial", "Met", "be2b092"),   # 3.6 equipment maintenance history
     (58, "Not Met", "Met", "17c95fb"),   # 3.7.1 report filtering (Phase R / R.2)
+
+    # ---- post-R.2 promotions (re-derived from b6a3a1c..HEAD on 2026-10-03) ----
+    # The block above was current at 2bf586b (R.2). Everything after it was added
+    # by the Phase R close-out, Phase G.5, Phase H and the post-H sequence. Each
+    # entry is keyed by SOW clause and carries the commit whose diff first set the
+    # row's current status. Transitions are single-hop per row; a Not Met -> Met
+    # row previously recorded as two hops still nets the same counts.
+    ("3.2.2 multiple-notifications", "Not Met", "Met", "22d5292"),
+    ("3.3.1 emergency-priority", "Not Met", "Met", "7a08726"),
+    ("3.3.1 calibration", "Not Met", "Met", "f45c02f"),
+    ("3.3.3 long-text", "Not Met", "Met", "7a08726"),
+    ("3.5.3 rollup-location", "Not Met", "Met", "5a05acd"),
+    ("3.5.3 rollup-equipment", "Not Met", "Met", "5a05acd"),
+    ("3.5.3 rollup-wo-type", "Not Met", "Met", "5a05acd"),
+    ("3.5.3 rollup-time", "Partial", "Met", "5a05acd"),
+    ("3.7.1 export", "Not Met", "Met", "465f859"),
+    ("3.7.1 backlog", "Partial", "Met", "b9fedca"),
+    ("3.7.1 pm-compliance", "Partial", "Met", "b9fedca"),
+    ("3.7.1 mttr", "Partial", "Met", "b9fedca"),
+    ("3.7.1 cost-summary", "Partial", "Met", "b9fedca"),
+    ("3.7.1 material-consumption", "Partial", "Met", "b9fedca"),
+    ("3.7.2 backlog-hours", "Not Met", "Met", "ed5bcc6"),
+    ("3.7.2 top10-cost", "Not Met", "Met", "ed5bcc6"),
+    ("3.7.2 awaiting-conversion", "Partial", "Met", "ed5bcc6"),
+    ("3.7.3 ad-hoc-query", "Deferred", "Met", "4e883b3"),
+    ("3.8 alert-assignment", "Not Met", "Met", "f45c02f"),
+    ("3.8 alert-overdue", "Not Met", "Met", "f45c02f"),
+    ("3.8 alert-pm-failure", "Partial", "Met", "37957d5"),
+    ("3.8 alert-high-priority", "Not Met", "Met", "37957d5"),
 ]
 
 # One more row has moved since the freeze and it is NOT a section 3 clause, so
@@ -144,6 +175,22 @@ APPROVED_PROMOTIONS: list = [
 # Format: (clause label, from status, to status, commit)
 APPROVED_ALL_ONLY_PROMOTIONS: list = [
     ("6.4 performance", "Not Met", "Met", "40c852e"),
+
+    # post-R.2 all-scope changes, re-derived from b6a3a1c..HEAD on 2026-10-03.
+    # These are non-section-3 clauses, so they move EXPECT_ALL only.
+    ("2.2 custom-roles", "Not Met", "Waived", "1daa241"),
+    ("2.2 admin-user-management", "Not Met", "Met", "80add36"),
+    ("2.2 requester", "Not Met", "Met", "60d4923"),
+    ("4.1 concurrency", "Deferred", "Partial", "b278eaa"),
+    ("4.2 https", "Partial", "Met", "256c8e9"),
+    ("4.5 iso-14224", "Not Met", "Met", "a0573bd"),
+    ("4.6 availability", "Not Met", "Deferred", "1daa241"),
+    ("5.2 reporting-engine", "Not Met", "Met", "4e883b3"),
+    ("5.4 api-versioning", "Not Met", "Met", "0a437eb"),
+    ("6.2 user-manual", "Partial", "Met", "5dd4cb7"),
+    ("6.2 deployment-guide", "Partial", "Met", "5dd4cb7"),
+    ("6.4 report-correctness", "Not Met", "Met", "7e318bc"),
+    ("6.4 docs-and-training", "Partial", "Met", "5dd4cb7"),
 ]
 
 
@@ -343,7 +390,7 @@ def main():
     if APPROVED_PROMOTIONS:
         emit(f"  approved promotions applied to the freeze: {len(APPROVED_PROMOTIONS)}")
         for n, frm, to, c in APPROVED_PROMOTIONS:
-            emit(f"    register row {n}: {frm} -> {to}  ({c})")
+            emit(f"    promotion {n}: {frm} -> {to}  ({c})")
         emit()
     for s in STATUSES:
         got = s3_counts[s]
