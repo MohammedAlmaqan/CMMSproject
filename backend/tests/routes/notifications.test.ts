@@ -65,7 +65,7 @@ describe('notifications routes', () => {
     expect(res.body.error).toContain('type');
   });
 
-  it("scopes the list to a Requester's own notifications (row 64)", async () => {
+  it("scopes the list to the Requester role only - View-Only, Technician, Supervisor, Planner and Administrator all see every notification (row 64)", async () => {
     const mine = `scoping-mine-${Date.now()}`;
     const theirs = `scoping-theirs-${Date.now()}`;
 
@@ -96,14 +96,21 @@ describe('notifications routes', () => {
     expect(otherAsRequester.body.total).toBe(0);
     expect(otherAsRequester.body.data).toEqual([]);
 
-    // Every role above Requester, and View-Only, still sees all data.
-    const asAdmin = await api().get('/api/notifications').query({ search: theirs }).set(authHeaders(ctx.adminToken));
-    expect(asAdmin.status).toBe(200);
-    expect(asAdmin.body.total).toBeGreaterThanOrEqual(1);
-
-    const asViewOnly = await api().get('/api/notifications').query({ search: theirs }).set(authHeaders(ctx.viewOnlyToken));
-    expect(asViewOnly.status).toBe(200);
-    expect(asViewOnly.body.total).toBeGreaterThanOrEqual(1);
+    // Policy: exactly the Requester role is scoped. View-Only and every tier
+    // above Requester - Technician, Supervisor, Planner and Administrator - see
+    // every notification, so the boundary is the role, not the level.
+    const unscoped: Array<[string, string]> = [
+      ['View-Only', ctx.viewOnlyToken],
+      ['Technician', ctx.technicianToken],
+      ['Supervisor', ctx.supervisorToken],
+      ['Maintenance Planner', ctx.plannerToken],
+      ['Administrator', ctx.adminToken],
+    ];
+    for (const [role, token] of unscoped) {
+      const seen = await api().get('/api/notifications').query({ search: theirs }).set(authHeaders(token));
+      expect(seen.status, `${role} should see all`).toBe(200);
+      expect(seen.body.total, `${role} should see all`).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it('rejects delete by a below-Supervisor role with 403', async () => {

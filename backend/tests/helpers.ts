@@ -372,6 +372,7 @@ export interface TestContext {
   viewOnlyToken: string;
   technicianToken: string;
   supervisorToken: string;
+  plannerToken: string;
   adminId: string;
   operatorId: string;
 }
@@ -382,6 +383,7 @@ export const ctx: TestContext = {
   viewOnlyToken: '',
   technicianToken: '',
   supervisorToken: '',
+  plannerToken: '',
   adminId: '',
   operatorId: '',
 };

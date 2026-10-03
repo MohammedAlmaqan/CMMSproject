@@ -10,8 +10,9 @@ beforeAll(async () => {
   const operator = await prisma.user.findFirst({ where: { username: 'operator', isDeleted: false } });
   const technician = await prisma.user.findFirst({ where: { username: 'tech1', isDeleted: false } });
   const supervisor = await prisma.user.findFirst({ where: { username: 'supervisor', isDeleted: false } });
-  if (!admin || !operator || !technician || !supervisor) {
-    throw new Error('seeded users admin/operator/tech1/supervisor not found — cannot run tests');
+  const planner = await prisma.user.findFirst({ where: { username: 'planner', isDeleted: false } });
+  if (!admin || !operator || !technician || !supervisor || !planner) {
+    throw new Error('seeded users admin/operator/tech1/supervisor/planner not found — cannot run tests');
   }
   ctx.adminId = admin.userId;
   ctx.operatorId = operator.userId;
@@ -22,6 +23,7 @@ beforeAll(async () => {
   ctx.viewOnlyToken = sign(operator.userId, operator.username, 'View-Only');
   ctx.technicianToken = sign(technician.userId, technician.username, technician.role);
   ctx.supervisorToken = sign(supervisor.userId, supervisor.username, supervisor.role);
+  ctx.plannerToken = sign(planner.userId, planner.username, planner.role);
 });
 
 afterAll(async () => {
