@@ -1633,7 +1633,7 @@ With those four recorded, Phase R is closed. Test floor at close: **70 files / 9
 
 ### Post-Phase-H sequencing (owner decisions 2026-10-03)
 
-- **§4.1 200-VU test — GO, no longer deferred.** Sequenced after Phase H; the P2028 blocker is fixed (G.6) and the 100-VU run is clean. Row 253 moves Deferred → Partial (100-VU demonstrated, 200-VU pending). The D-4 second backup target is the only ops dependency for the WAL/RPO proof.
+- **§4.1 200-VU test - executed and Met (H.8).** The P2028 blocker was fixed in G.6 and the 100-VU run is clean; the 200-VU run passed 2026-10-03 (p(95) 1.15 s, `http_req_failed` 0.00%, 0 P2028 / 0×429 / 0×500), so row 253 moves to `Met` (green CI at `6c2f482`, workflow run 37136744688). The D-4 second backup target remains the only ops dependency for the WAL/RPO proof.
 - **Legacy data migration — held to last, not parallel.** The owner provides the legacy dataset only after the schema is frozen at the end of Phase H. Sequence: owner template → two-way worksheet → the importers the data needs → runbook → dry-run report → §6.4/d closes.
 - **§6.4/f documentation gaps (L31, L32).** L31: the install guide documents 5 of 9 env vars — `CORS_ORIGINS`, `LOG_LEVEL`, `BIND_HOST`, `PM_SCHEDULER_CRON` are missing. L32: `screenshots/` is gitignored, so all 19 `USER_MANUAL.md` image references are broken. Both doc-only; sequence them in the §6.4/f close-out pack.
 - **D-4 second backup target.** §4.3 RPO (row 262) stays `Not Met` until a second backup target path is provided; nothing executable until then.
