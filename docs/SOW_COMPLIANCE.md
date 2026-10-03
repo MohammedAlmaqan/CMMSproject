@@ -250,10 +250,10 @@ Notes are populated for `Partial`, `Not Met` and `Waived`. Every row carries an 
 
 | SOW § | Requirement | Status | Evidence | Notes |
 |---|---|---|---|---|
-| §4.1 | Support up to 200 concurrent users, screen load < 2 s, transactional save < 1 s | Deferred | `docs/ARCHITECTURE.md:263-264`; `scripts/k6/smoke.js:30-51` (50 VUs, 2 min ramp / 5 min steady / 1 min down) The 50-VU smoke run passed both configured thresholds: p(95) 36.19 ms against a 2000 ms budget, `http_req_failed` 0.04% (15/37,265 requests). | — |
+| §4.1 | Support up to 200 concurrent users, screen load < 2 s, transactional save < 1 s | Partial | `scripts/k6/acceptance.js` (100-VU acceptance run); `docs/ARCHITECTURE.md:263-264`; `scripts/k6/smoke.js` (50-VU smoke) | **GO approved by the owner 2026-10-03; the prior deferral decision is lifted.** The 100-VU acceptance run passes cleanly (p(95) 235.65 ms against a 2000 ms budget; 0 P2028 / 0×429 / 0×500; tracker G.1 and G.6), so the clause is partially demonstrated; the 200-VU run is now scheduled post-H rather than deferred. |
 | §4.1 | Database handles 500,000 work orders and 100,000 equipment records without degradation | Deferred | `CMMS_FINALIZATION_TRACKER.md:301-306` (500K-WO volume deferred) No volume test has been run; the P2028 pool-exhaustion defect (D4) would surface first at this scale. | — |
 | §4.1 | Architecture allows horizontal scaling with stateless web and API tiers | Partial | API holds no session state (JWT in `backend/src/middleware/auth.ts:21`); `backend/src/services/scheduler.ts` singleton lock | The API tier is stateless and scales horizontally, but the in-process scheduler is a single-instance design, so tier scaling and scheduler correctness must be reconciled before multi-node deployment |
-| §4.2 | All communication encrypted via HTTPS (TLS 1.2+) | Partial | `docs/ADMIN_GUIDE.md:580` (IIS/HTTPS instructions); no TLS termination in `backend/src` (plain HTTP listener) | TLS is delegated to IIS in the documented Windows deployment, which satisfies the design intent, but the HTTPS configuration has been **documented and not executed**, so it is unverified |
+| §4.2 | All communication encrypted via HTTPS (TLS 1.2+) | Partial | `C:\inetpub\cmms-site\web.config` (ARR rewrite `^api/(.*)` → `http://localhost:4000/api/{R:1}`); `docs/ADMIN_GUIDE.md:580` (IIS/HTTPS) | The site is deployed live on the host. Re-verified 2026-10-03: `curl -k https://cmms.local/dashboard` → 200 SPA over HTTPS (`<div id="root">`), but `curl -k https://cmms.local/api/health` → **502.3 Bad Gateway** because no backend process is listening on `:4000`, so the API-over-HTTPS limb is not yet shown. Held at Partial until both limbs are green. |
 | §4.2 | Passwords hashed with bcrypt/PBKDF2 | Met | `backend/src/routes/auth.ts:2` (`BCRYPT_ROUNDS = 12`); `bcrypt.hash`/`bcrypt.compare` in the login path | — |
 | §4.2 | Account lockout after 5 failed attempts | Met | `backend/src/routes/auth.ts:11-13` (5/15/30-minute escalating lockouts); `verify_g3_2.py` lockout assertions | — |
 | §4.2 | Session timeout after 30 minutes of inactivity | Partial | `app/src/hooks/useIdleTimeout.ts` (30-minute browser timeout, 60-second warning) | The timeout is **client-side only**. The server issues an 8-hour JWT (`backend/src/routes/auth.ts`) with no idle-expiry claim, so an unattended session stays valid on the server and a stolen token is not revoked |
@@ -423,9 +423,9 @@ Every limitation acknowledged in the B.5 documentation, plus the gaps this audit
 | Status | All clauses | §3 functional only (126 rows) |
 |---|---|---|
 | Met | 126 | 97 |
-| Partial | 42 | 9 |
+| Partial | 43 | 9 |
 | Not Met | 14 | 0 |
-| Deferred | 7 | 3 |
+| Deferred | 6 | 3 |
 | Excluded | 15 | 7 |
 | Waived | 10 | 10 |
 | **Total rows** | **214** | **126** |
