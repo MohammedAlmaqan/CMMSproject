@@ -54,7 +54,7 @@ Related documents:
 2. Enter your username and password on the sign-in screen.
 3. Select **Sign in**.
 
-![Sign in screen](../screenshots/login.png)
+![Sign in screen](images/login.png)
 
 You are taken to the Dashboard. If you are already signed in and open the application again, you go straight to the Dashboard.
 
@@ -160,7 +160,7 @@ You can raise a work order for maintenance, repair, or a request.
 
 The work order is created in status **Draft** and appears in the list. Record the work order number shown in the list; you will use it for all follow-up.
 
-![New work order form](../screenshots/g5_3_03_create_form.png)
+![New work order form](images/g5_3_03_create_form.png)
 
 ### 5.2 Track the progress of a work order
 
@@ -170,7 +170,7 @@ The work order is created in status **Draft** and appears in the list. Record th
 
 The detail screen shows the current status, and the **History** tab shows every status change with its date and time.
 
-![Work orders list](../screenshots/g5_3_02_work_orders_list.png)
+![Work orders list](images/g5_3_02_work_orders_list.png)
 
 ### 5.3 Raise a problem report (notification)
 
@@ -211,17 +211,17 @@ The detail screen has eight tabs: **Operations, Materials, Labor, Services, Chec
 Work through the tabs as you carry out the job:
 
 - **Operations** - each line of work to be performed. Record what was actually done.
-  ![Operations tab](../screenshots/g1_01_operation_added.png)
+  ![Operations tab](images/g1_01_operation_added.png)
 - **Materials** - parts and consumables issued to the job, drawn from the material register.
-  ![Materials tab](../screenshots/g1_02_material_added.png)
+  ![Materials tab](images/g1_02_material_added.png)
 - **Labor** - time booked against the work, for yourself or a craft. This is what drives the labour cost shown on the work order.
-  ![Labor tab](../screenshots/g1_03_labor_added.png)
+  ![Labor tab](images/g1_03_labor_added.png)
 - **Services** - work sent to an external contractor, with the cost.
-  ![Services tab](../screenshots/g1_04_service_added.png)
+  ![Services tab](images/g1_04_service_added.png)
 - **Checklists** - answer the safety and quality checklist items for this work order.
-  ![Checklists tab](../screenshots/g1_05_checklist_responded.png)
+  ![Checklists tab](images/g1_05_checklist_responded.png)
 - **Comments** - free-text notes and discussion on the job.
-  ![Comments tab](../screenshots/ma_05_comments.png)
+  ![Comments tab](images/ma_05_comments.png)
 
 ### 6.3 Attach a document to the work order
 
@@ -230,7 +230,7 @@ Work through the tabs as you carry out the job:
 3. Select **Upload** and choose a file.
 4. The upload completes and the file is listed with its name, size, and who uploaded it.
 
-![Attachments tab](../screenshots/g3_2_01_wo_attachments_tab.png)
+![Attachments tab](images/g3_2_01_wo_attachments_tab.png)
 
 **Deleting an attachment** is limited to Maintenance Supervisor and Administrator. As a Technician you can upload and download but not delete. If you uploaded the wrong file, add a comment explaining, and ask a supervisor to remove it.
 
@@ -266,7 +266,7 @@ A Maintenance Supervisor can do everything in [section 6](#6-technician), plus t
 
 The **Close** button is available to Maintenance Supervisor and Administrator only. Once a work order is **Closed** no further status change is possible, and the record becomes effectively read-only.
 
-![Closed work order](../screenshots/g5_3_04_wo_closed.png)
+![Closed work order](images/g5_3_04_wo_closed.png)
 
 You can also close from the work orders list: use the close control on the row, which is shown to Maintenance Supervisor and Administrator.
 
@@ -280,8 +280,8 @@ This is how a reported problem becomes tracked work.
 4. Select **Convert to Work Order**.
 5. The system creates a linked work order and marks the notification **Converted**.
 
-![Notification detail](../screenshots/g5_3_05_notification_detail.png)
-![Converted notification](../screenshots/g2_03_notification_detail_converted.png)
+![Notification detail](images/g5_3_05_notification_detail.png)
+![Converted notification](images/g2_03_notification_detail_converted.png)
 
 The new work order appears in the work orders list with a link back to the source notification, and the notification remains in the list as a permanent record of what was raised. The History tab on the work order shows the conversion.
 
@@ -292,9 +292,9 @@ The new work order appears in the work orders list with a link back to the sourc
 3. Set any date range and filters offered on that report.
 4. Read the results, then select **Export** to download a server-built Excel (.xlsx) workbook for Excel or further analysis.
 
-![Backlog report](../screenshots/g5_01_reports_backlog.png)
-![PM compliance report](../screenshots/g5_02_reports_pm_compliance.png)
-![Material report](../screenshots/g5_02_reports_material.png)
+![Backlog report](images/g5_01_reports_backlog.png)
+![PM compliance report](images/g5_02_reports_pm_compliance.png)
+![Material report](images/g5_02_reports_material.png)
 
 The seven reports are listed in [section 12](#12-reference-the-seven-reports). Reports are not restricted by role - every signed-in user can run and export them.
 
@@ -310,8 +310,8 @@ A Maintenance Planner can do everything in [section 7](#7-maintenance-supervisor
 2. The page shows summary tiles for Time-Based, Meter-Based, Combined, and Active plan counts.
 3. The table below lists every plan with its plan code, description, equipment, strategy, interval, call horizon, work center, task list, status, next due date, and a **Generate** action.
 
-![PM plan list](../screenshots/g4a_01_plan_list.png)
-![PM plan details](../screenshots/g4a_02_plan_row_details.png)
+![PM plan list](images/g4a_01_plan_list.png)
+![PM plan details](images/g4a_02_plan_row_details.png)
 
 Use the search box and the strategy and status filters to find the plans you own. Note the **Next Due** column: that is the date the plan is next expected to generate a work order.
 
@@ -447,7 +447,7 @@ All seven are on the **Reports** screen, all are available to every signed-in ro
 | Downtime | How long has each asset been down, and what drove it? |
 | Material Usage | Which materials are being consumed, and on which work orders? |
 
-![Reports screen](../screenshots/g5_01_reports_backlog.png)
+![Reports screen](images/g5_01_reports_backlog.png)
 
 ---
 

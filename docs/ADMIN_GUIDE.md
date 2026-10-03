@@ -61,7 +61,7 @@ The deployment has three processes:
 
 **The frontend and the API are separate origins.** The browser calls the API on a different port, so the API's `CORS_ORIGINS` must include the exact frontend origin or every request fails in the browser while working fine from `curl`. This is the single most common cause of "the app loads but shows no data".
 
-![API docs](../screenshots/g6b_06_api_docs.png)
+![API docs](images/g6b_06_api_docs.png)
 
 ### 2.1 Only one backend instance may run the scheduler
 
