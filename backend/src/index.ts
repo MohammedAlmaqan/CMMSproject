@@ -167,7 +167,10 @@ app.use(pinoHttp({
   },
 }));
 
-app.use('/api/auth/login', authLimiter);
+// SOW 5.4: the API is served under both the unversioned `/api` prefix and the
+// versioned `/api/v1` prefix. The same router is mounted twice, so the two
+// prefixes cannot drift; the login limiter is registered for both.
+app.use(['/api/auth/login', '/api/v1/auth/login'], authLimiter);
 
 // Swagger
 const swaggerSpec = swaggerJsdoc({
@@ -192,8 +195,12 @@ const swaggerSpec = swaggerJsdoc({
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
 
+// All application routes and health checks live on one router so it can be
+// mounted under both `/api` and `/api/v1`.
+const apiRouter = express.Router();
+
 // Health check
-app.get('/api/health', (_req, res) => {
+apiRouter.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -215,7 +222,7 @@ const existing = await prisma.systemAlert.findFirst({
   logger.info('[scheduler] stale health detected — SystemAlert created');
 }
 
-app.get('/api/health/scheduler', async (_req, res) => {
+apiRouter.get('/health/scheduler', async (_req, res) => {
   try {
 const last = await prisma.schedulerRun.findFirst({
       where: { status: 'success', isDeleted: false },
@@ -245,34 +252,38 @@ const last = await prisma.schedulerRun.findFirst({
   }
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/functional-locations', functionalLocationRoutes);
-app.use('/api/equipment', equipmentRoutes);
-app.use('/api/equipment-meters', equipmentMeterRoutes);
-app.use('/api/work-centers', workCenterRoutes);
-app.use('/api/materials', materialRoutes);
-app.use('/api/failure-codes', failureCodeRoutes);
-app.use('/api/cause-codes', causeCodeRoutes);
-app.use('/api/task-lists', taskListRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/work-orders', workOrderRoutes);
-app.use('/api/work-order-operations', workOrderOperationRoutes);
-app.use('/api/work-order-materials', workOrderMaterialRoutes);
-app.use('/api/work-order-cost-splits', workOrderCostSplitRoutes);
-app.use('/api/system-config', systemConfigRoutes);
-app.use('/api/labor', laborRoutes);
-app.use('/api/external-services', externalServiceRoutes);
-app.use('/api/crafts', craftRoutes);
-app.use('/api/maintenance-plans', maintenancePlanRoutes);
-app.use('/api/safety-checklists', safetyChecklistRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/alerts', alertRoutes);
-app.use('/api/comments', commentRoutes);
-app.use('/api/attachments', attachmentRoutes);
-app.use('/api/audit-log', auditLogRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+// Routes (relative to the mount prefix)
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/functional-locations', functionalLocationRoutes);
+apiRouter.use('/equipment', equipmentRoutes);
+apiRouter.use('/equipment-meters', equipmentMeterRoutes);
+apiRouter.use('/work-centers', workCenterRoutes);
+apiRouter.use('/materials', materialRoutes);
+apiRouter.use('/failure-codes', failureCodeRoutes);
+apiRouter.use('/cause-codes', causeCodeRoutes);
+apiRouter.use('/task-lists', taskListRoutes);
+apiRouter.use('/notifications', notificationRoutes);
+apiRouter.use('/work-orders', workOrderRoutes);
+apiRouter.use('/work-order-operations', workOrderOperationRoutes);
+apiRouter.use('/work-order-materials', workOrderMaterialRoutes);
+apiRouter.use('/work-order-cost-splits', workOrderCostSplitRoutes);
+apiRouter.use('/system-config', systemConfigRoutes);
+apiRouter.use('/labor', laborRoutes);
+apiRouter.use('/external-services', externalServiceRoutes);
+apiRouter.use('/crafts', craftRoutes);
+apiRouter.use('/maintenance-plans', maintenancePlanRoutes);
+apiRouter.use('/safety-checklists', safetyChecklistRoutes);
+apiRouter.use('/reports', reportRoutes);
+apiRouter.use('/alerts', alertRoutes);
+apiRouter.use('/comments', commentRoutes);
+apiRouter.use('/attachments', attachmentRoutes);
+apiRouter.use('/audit-log', auditLogRoutes);
+apiRouter.use('/users', userRoutes);
+apiRouter.use('/dashboard', dashboardRoutes);
+
+// SOW 5.4: expose the same router under the versioned path.
+app.use('/api', apiRouter);
+app.use('/api/v1', apiRouter);
 
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

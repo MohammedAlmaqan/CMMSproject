@@ -96,8 +96,13 @@ describe('the configuration endpoint', () => {
   });
 
   it('is mounted in the api', () => {
+    // SOW 5.4 (row 294): the routes now hang off one apiRouter that is mounted
+    // under both `/api` and `/api/v1`, so the mount is asserted on the router
+    // plus both prefixes rather than on a single hard-coded `/api/...` path.
     const index = readFileSync(resolve(here, '../../src/index.ts'), 'utf8');
-    expect(index).toMatch(/app\.use\('\/api\/system-config'/);
+    expect(index).toMatch(/apiRouter\.use\('\/system-config'/);
+    expect(index).toMatch(/app\.use\('\/api', apiRouter\)/);
+    expect(index).toMatch(/app\.use\('\/api\/v1', apiRouter\)/);
   });
 });
 
