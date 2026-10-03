@@ -100,9 +100,10 @@ describe('the configuration endpoint', () => {
     // under both `/api` and `/api/v1`, so the mount is asserted on the router
     // plus both prefixes rather than on a single hard-coded `/api/...` path.
     const index = readFileSync(resolve(here, '../../src/index.ts'), 'utf8');
-    expect(index).toMatch(/apiRouter\.use\('\/system-config'/);
-    expect(index).toMatch(/app\.use\('\/api', apiRouter\)/);
-    expect(index).toMatch(/app\.use\('\/api\/v1', apiRouter\)/);
+    // Anchored to line start so a commented-out mount fails the guard.
+    expect(index).toMatch(/^apiRouter\.use\('\/system-config'/m);
+    expect(index).toMatch(/^app\.use\('\/api', apiRouter\);/m);
+    expect(index).toMatch(/^app\.use\('\/api\/v1', apiRouter\);/m);
   });
 });
 
