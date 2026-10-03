@@ -65,6 +65,47 @@ describe('notifications routes', () => {
     expect(res.body.error).toContain('type');
   });
 
+  it("scopes the list to a Requester's own notifications (row 64)", async () => {
+    const mine = `scoping-mine-${Date.now()}`;
+    const theirs = `scoping-theirs-${Date.now()}`;
+
+    const owned = await api()
+      .post('/api/notifications')
+      .set(authHeaders(ctx.operatorToken))
+      .send({ ...body(), description: mine, priority: 'Low' });
+    expect(owned.status).toBe(201);
+    createdNotificationIds.push(owned.body.notificationId);
+
+    const other = await api()
+      .post('/api/notifications')
+      .set(authHeaders(ctx.adminToken))
+      .send({ ...body(), description: theirs, priority: 'Low', reportedByUserId: ctx.adminId });
+    expect(other.status).toBe(201);
+    createdNotificationIds.push(other.body.notificationId);
+
+    // Search is used rather than paging through the whole table, so the
+    // assertion does not depend on where in the list the fixture lands.
+    const ownList = await api().get('/api/notifications').query({ search: mine }).set(authHeaders(ctx.operatorToken));
+    expect(ownList.status).toBe(200);
+    expect(ownList.body.total).toBeGreaterThanOrEqual(1);
+
+    // The Requester cannot see a notification someone else reported, and the
+    // count is scoped too (not just the page).
+    const otherAsRequester = await api().get('/api/notifications').query({ search: theirs }).set(authHeaders(ctx.operatorToken));
+    expect(otherAsRequester.status).toBe(200);
+    expect(otherAsRequester.body.total).toBe(0);
+    expect(otherAsRequester.body.data).toEqual([]);
+
+    // Every role above Requester, and View-Only, still sees all data.
+    const asAdmin = await api().get('/api/notifications').query({ search: theirs }).set(authHeaders(ctx.adminToken));
+    expect(asAdmin.status).toBe(200);
+    expect(asAdmin.body.total).toBeGreaterThanOrEqual(1);
+
+    const asViewOnly = await api().get('/api/notifications').query({ search: theirs }).set(authHeaders(ctx.viewOnlyToken));
+    expect(asViewOnly.status).toBe(200);
+    expect(asViewOnly.body.total).toBeGreaterThanOrEqual(1);
+  });
+
   it('rejects delete by a below-Supervisor role with 403', async () => {
     const res = await api().delete(`/api/notifications/${createdId}`).set(authHeaders(ctx.operatorToken));
     expect(res.status).toBe(403);

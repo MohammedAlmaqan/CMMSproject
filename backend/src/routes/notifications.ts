@@ -139,6 +139,15 @@ router.get('/', async (req: Request, res: Response) => {
     if (priority) where.priority = priority as string;
     if (status) where.status = status as string;
 
+    // SOW 2.2 / row 64: a Requester sees only the requests they raised, which is
+    // what the Admin screen's role table has always promised ("Requester: view
+    // own requests") but the list never enforced. The restriction is scoped to
+    // exactly the Requester role: every role above it triages the whole backlog,
+    // and View-Only is deliberately "read access to all data".
+    if (req.user!.role === 'Requester') {
+      where.reportedByUserId = req.user!.userId;
+    }
+
     const skipNum = skip ? parseInt(skip as string, 10) || 0 : 0;
     const takeNum = take ? parseInt(take as string, 10) || 50 : 50;
 
