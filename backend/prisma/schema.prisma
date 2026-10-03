@@ -710,7 +710,7 @@ model AuditLogEntry {
 
 model SystemAlert {
   alertId           String   @id @default(uuid())
-  alertType         String   // WO_Assigned, WO_Overdue, PM_Generation, High_Priority_Notification
+  alertType         String   // WO_Assigned, WO_Overdue, PM_Generation, PM_Generation_Failed, High_Priority_Notification
   userId            String
   title             String
   message           String

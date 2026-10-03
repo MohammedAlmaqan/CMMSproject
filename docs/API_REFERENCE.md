@@ -201,6 +201,8 @@ Cause codes are the root-cause categories (SOW 3.1.4) a work order can name. The
 
 Converting a notification creates a corrective work order — type `EM` when the notification's breakdown flag is set, otherwise `CM` — copies the location and equipment, links the notification to the new work order and sets the notification status to `Converted`. A breakdown conversion is an emergency order, so its priority is raised to `High` regardless of the notification's own priority; a non-breakdown conversion keeps the notification's priority.
 
+Raising a notification with `priority: High` also writes an in-app alert (`alertType: High_Priority_Notification`) for every active Maintenance Planner and Maintenance Supervisor, related to the notification through `relatedEntityId`/`relatedEntityType`. The fan-out is best-effort: the notification is still returned if the alert write fails.
+
 ### Work Orders
 
 | Method | Path | Summary |
@@ -293,6 +295,8 @@ Crafts are seeded reference data. They are CRUD through the API (write guards: M
 | POST | `/api/maintenance-plans/run-scheduler` | Run the PM scheduler immediately (Administrator) |
 | POST | `/api/maintenance-plans/{id}/generate-wo` | Generate a work order from a maintenance plan |
 
+A generation that fails — an invalid plan status or priority, a missing target or functional location, or an unexpected error — answers 4xx/5xx and raises a `PM_Generation_Failed` alert to every active Maintenance Planner and Maintenance Supervisor, plus the caller, related to the plan. The nightly scheduler raises the same alert (without a caller) when it fails a plan.
+
 ### Safety Checklists
 
 | Method | Path | Summary |
@@ -334,7 +338,7 @@ The month-scoped reports accept `year` and `month` and default to the current mo
 | PUT | `/api/alerts/read-all` | Mark all of the current user's alerts as read |
 | PUT | `/api/alerts/{id}/read` | Mark one alert as read |
 
-Alert operations are scoped to the authenticated user.
+Alert operations are scoped to the authenticated user. Alerts are written server-side by `backend/src/services/alertService.ts`; each row is addressed to one user, and roles that receive a fan-out are resolved to their individual members. The alert types are `PM_Generation` (a manual generation succeeded), `PM_Generation_Failed` (a manual or scheduled generation failed — to the Maintenance Planner and Maintenance Supervisor roles, plus the caller on the manual route), `High_Priority_Notification` (a notification raised at `High` priority — to the same two roles), `Account_Lockout` and `Scheduler_Stale`.
 
 ### Comments
 

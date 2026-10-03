@@ -34,6 +34,7 @@ import auditLogRoutes from './routes/auditLog.js';
 import userRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
 import { acquireStartupLock, runSchedulerOnce, startScheduler } from './services/scheduler.js';
+import { createAlert } from './services/alertService.js';
 import { prisma } from './utils/prisma.js';
 import { logger } from './utils/logger.js';
 
@@ -204,13 +205,11 @@ const existing = await prisma.systemAlert.findFirst({
   if (existing) return;
   const admin = await prisma.user.findFirst({ where: { role: 'Administrator', isActive: true } });
   if (!admin) return;
-  await prisma.systemAlert.create({
-    data: {
-      alertType: 'Scheduler_Stale',
-      userId: admin.userId,
-      title: 'PM Scheduler Stale',
-      message: 'PM scheduler has not reported a successful run within 25 hours.',
-    },
+  await createAlert(prisma, {
+    alertType: 'Scheduler_Stale',
+    userId: admin.userId,
+    title: 'PM Scheduler Stale',
+    message: 'PM scheduler has not reported a successful run within 25 hours.',
   });
   logger.info('[scheduler] stale health detected — SystemAlert created');
 }

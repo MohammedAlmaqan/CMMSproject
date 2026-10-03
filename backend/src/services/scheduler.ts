@@ -4,6 +4,7 @@ import { prisma } from '../utils/prisma.js';
 import { logger } from '../utils/logger.js';
 import { evaluatePlan, type IntervalUnit, type MeterThreshold, type PlanStrategy } from '../utils/pmDueRules.js';
 import { baseCycleKey, generatePmWorkOrder, PmGenerationError } from './pmGeneration.js';
+import { emitAlertToRolesSafely, ALERT_TYPE_PM_GENERATION_FAILED, TRIAGE_ROLES } from './alertService.js';
 
 export interface SchedulerRunResult {
   ranAt: string;
@@ -201,6 +202,22 @@ export async function runSchedulerOnce(options: SchedulerOnceOptions = {}): Prom
         result.errors.push(`${plan.planCode}: ${err instanceof Error ? err.message : String(err)}`);
       }
       logger.error({ err }, `[scheduler] plan ${plan.planCode} failed`);
+      // SOW 3.8 / row 71: an unattended run has no caller to tell, so a failed
+      // plan has to reach the planners and supervisors as an alert. Best-effort:
+      // one plan's alert failure must not abort the remaining plans.
+      await emitAlertToRolesSafely(
+        prisma,
+        TRIAGE_ROLES,
+        {
+          alertType: ALERT_TYPE_PM_GENERATION_FAILED,
+          title: 'Scheduled PM Work Order Generation Failed',
+          message: `Scheduled generation failed for plan ${plan.planCode}: ${err instanceof Error ? err.message : String(err)}`,
+          relatedEntityId: plan.planId,
+          relatedEntityType: 'MaintenancePlan',
+        },
+        [],
+        `scheduled PM generation failure for plan ${plan.planCode}`
+      );
     }
     }
     await new Promise((r) => setImmediate(r));

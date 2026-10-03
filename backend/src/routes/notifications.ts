@@ -9,6 +9,7 @@ import {
   transitionTargets,
 } from '../utils/transitions.js';
 import { resolveWorkOrderPriority } from '../utils/workOrderRules.js';
+import { emitAlertToRolesSafely, ALERT_TYPE_HIGH_PRIORITY_NOTIFICATION, TRIAGE_ROLES } from '../services/alertService.js';
 import { logger } from '../utils/logger.js';
 import {
   validate,
@@ -285,6 +286,27 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
     });
 
     await logAuditAction({ table: 'Notification', recordId: notification.notificationId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
+
+    // SOW 3.8 / row 72: a High-priority notification is the one that must reach a
+    // human immediately, so it is fanned out to the planners and supervisors as an
+    // in-app alert. Best-effort: the notification itself is already committed, and
+    // an alert failure must not turn a raised notification into a 500.
+    if (priority === 'High') {
+      await emitAlertToRolesSafely(
+        prisma,
+        TRIAGE_ROLES,
+        {
+          alertType: ALERT_TYPE_HIGH_PRIORITY_NOTIFICATION,
+          title: 'High Priority Notification',
+          message: `Notification ${notification.notificationNumber} raised with High priority: ${description}`,
+          relatedEntityId: notification.notificationId,
+          relatedEntityType: 'Notification',
+          createdBy: req.user!.userId,
+        },
+        [],
+        `High-priority notification ${notification.notificationNumber}`
+      );
+    }
 
     res.status(201).json(notification);
   } catch (error: any) {

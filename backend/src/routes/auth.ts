@@ -5,6 +5,7 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { JWT_SECRET, JWT_EXPIRES_IN } from '../utils/config.js';
 import { logger } from '../utils/logger.js';
+import { createAlert } from '../services/alertService.js';
 
 const router = Router();
 
@@ -250,15 +251,13 @@ router.post('/login', async (req: Request, res: Response) => {
         },
       });
       if (shouldLock) {
-        await tx.systemAlert.create({
-          data: {
-            alertType: 'Account_Lockout',
-            userId: currentUser.userId,
-            title: 'Account temporarily locked',
-            message: 'The account was locked after five failed sign-in attempts within 15 minutes.',
-            relatedEntityId: currentUser.userId,
-            relatedEntityType: 'User',
-          },
+        await createAlert(tx, {
+          alertType: 'Account_Lockout',
+          userId: currentUser.userId,
+          title: 'Account temporarily locked',
+          message: 'The account was locked after five failed sign-in attempts within 15 minutes.',
+          relatedEntityId: currentUser.userId,
+          relatedEntityType: 'User',
         });
       }
       return { status: shouldLock ? 423 as const : 401 as const };

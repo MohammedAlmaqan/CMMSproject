@@ -6,6 +6,7 @@ import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { validate, schedulerRunSchema, maintenancePlanCreateSchema, maintenancePlanUpdateSchema, planPatchIssues } from '../utils/validation.js';
 import { runSchedulerOnce } from '../services/scheduler.js';
 import { generatePmWorkOrder, PmGenerationError } from '../services/pmGeneration.js';
+import { createAlert, emitAlertToRolesSafely, ALERT_TYPE_PM_GENERATION_FAILED, TRIAGE_ROLES } from '../services/alertService.js';
 import { isoDay } from '../utils/pmDueRules.js';
 import { logger } from '../utils/logger.js';
 
@@ -667,8 +668,11 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
  *         description: Internal server error
  */
 router.post('/:id/generate-wo', authorizeMinRole('Maintenance Planner'), async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  // Held outside the try so the failure alert below can name the plan even when
+  // generation threw before the route had a row to read.
+  let planCode: string | null = null;
   try {
-    const id = req.params.id as string;
     const plan = await prisma.maintenancePlan.findFirst({
       where: { planId: id, isDeleted: false },
       select: { planId: true, planCode: true },
@@ -676,6 +680,7 @@ router.post('/:id/generate-wo', authorizeMinRole('Maintenance Planner'), async (
     if (!plan) {
       return res.status(404).json({ error: 'Maintenance plan not found' });
     }
+    planCode = plan.planCode;
 
     // A manual generation is not subject to the call horizon, which is a
     // scheduling window rather than a permission, so the cycle is today's.
@@ -708,15 +713,13 @@ router.post('/:id/generate-wo', authorizeMinRole('Maintenance Planner'), async (
       return res.status(200).json({ ...existing, alreadyExisted: true, skipReason: outcome.skipReason });
     }
 
-    await prisma.systemAlert.create({
-      data: {
-        alertType: 'PM_Generation',
-        userId: req.user!.userId,
-        title: 'PM Work Order Generated',
-        message: `Work order ${outcome.woNumber} generated from plan ${plan.planCode}`,
-        relatedEntityId: outcome.workOrderId,
-        relatedEntityType: 'WorkOrder',
-      },
+    await createAlert(prisma, {
+      alertType: 'PM_Generation',
+      userId: req.user!.userId,
+      title: 'PM Work Order Generated',
+      message: `Work order ${outcome.woNumber} generated from plan ${plan.planCode}`,
+      relatedEntityId: outcome.workOrderId,
+      relatedEntityType: 'WorkOrder',
     });
 
     await logAuditAction({ table: 'WorkOrder', recordId: outcome.workOrderId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
@@ -726,6 +729,26 @@ router.post('/:id/generate-wo', authorizeMinRole('Maintenance Planner'), async (
     });
     res.status(201).json({ ...workOrder, notificationId: outcome.notificationId });
   } catch (error) {
+    // SOW 3.8 / row 71: a generation that failed is exactly the event a planner
+    // needs to see. Emitted before the error response so the alert is raised even
+    // when the response itself is a 500; best-effort, so a failed alert never
+    // masks the real error.
+    if (planCode) {
+      await emitAlertToRolesSafely(
+        prisma,
+        TRIAGE_ROLES,
+        {
+          alertType: ALERT_TYPE_PM_GENERATION_FAILED,
+          title: 'PM Work Order Generation Failed',
+          message: `Generation failed for plan ${planCode}: ${error instanceof Error ? error.message : String(error)}`,
+          relatedEntityId: id,
+          relatedEntityType: 'MaintenancePlan',
+          createdBy: req.user!.userId,
+        },
+        [req.user!.userId],
+        `PM generation failure for plan ${planCode}`
+      );
+    }
     if (error instanceof PmGenerationError) {
       const status = error.code === 'PLAN_NOT_FOUND' ? 404 : 400;
       return res.status(status).json({ error: error.message, code: error.code });

@@ -294,8 +294,20 @@ export async function purgeWorkCenters(workCenterIds: (string | null | undefined
 export async function purgeNotifications(notificationIds: (string | null | undefined)[]): Promise<void> {
   const ids = clean(notificationIds);
   if (ids.length === 0) return;
+  // Row 72 writes one `SystemAlert` per triage recipient for a High-priority
+  // notification, related through `relatedEntityId`. A teardown that removes the
+  // notification but not its alerts leaves a row pointing at nothing, which the
+  // invariance check reports. They are found by the notification id, not by
+  // title, because an id is exact and a title is not.
+  const alertIds = (
+    await prisma.systemAlert.findMany({
+      where: { relatedEntityType: 'Notification', relatedEntityId: { in: ids } },
+      select: { alertId: true },
+    })
+  ).map((a) => a.alertId);
   await prisma.workOrderNotifLink.deleteMany({ where: { notificationId: { in: ids } } });
   await prisma.notification.deleteMany({ where: { notificationId: { in: ids } } });
+  await purgeAlerts(alertIds);
   await purgeAudit(ids);
 }
 

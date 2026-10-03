@@ -1,9 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { api, authHeaders, ctx, purgeNotifications, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 let createdId = '';
 let flat = '';
+// Every notification and work order this file raises goes here, so the teardown
+// can reach them through the helpers. `purgeNotifications` also clears the row-72
+// alerts a High-priority notification now fans out, which a hand-rolled
+// `notification.deleteMany` would leave behind.
+const createdNotificationIds: string[] = [];
+const createdWorkOrderIds: string[] = [];
 
 describe('notifications routes', () => {
   beforeAll(async () => {
@@ -11,11 +17,8 @@ describe('notifications routes', () => {
   });
 
   afterAll(async () => {
-    if (createdId) {
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: createdId } }).catch(() => {});
-      await prisma.notification.deleteMany({ where: { notificationId: createdId } }).catch(() => {});
-      await prisma.workOrderNotifLink.deleteMany({ where: { notificationId: createdId } }).catch(() => {});
-    }
+    await purgeWorkOrders(createdWorkOrderIds);
+    await purgeNotifications(createdNotificationIds);
   });
 
   const body = () => ({
@@ -46,6 +49,7 @@ describe('notifications routes', () => {
     const res = await api().post('/api/notifications').set(authHeaders(ctx.operatorToken)).send(body());
     expect(res.status).toBe(201);
     createdId = res.body.notificationId;
+    createdNotificationIds.push(createdId);
     expect(res.body.notificationNumber).toBeTruthy();
     expect(
       await prisma.auditLogEntry.count({ where: { tableName: 'Notification', recordId: createdId, action: 'Create' } })
@@ -88,6 +92,7 @@ describe('notifications routes', () => {
       .send({ ...body(), description: 'reporter carry-over' });
     expect(notif.status).toBe(201);
     const notificationId = notif.body.notificationId;
+    createdNotificationIds.push(notificationId);
 
     const res = await api()
       .post(`/api/notifications/${notificationId}/convert-to-wo`)
@@ -95,17 +100,41 @@ describe('notifications routes', () => {
       .send({});
     expect(res.status).toBe(201);
     const workOrderId = res.body.workOrderId;
+    createdWorkOrderIds.push(workOrderId);
 
     const wo = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId } });
     expect(wo.reportedByUserId).toBe(ctx.operatorId);
     // The converter is a different person, and is recorded as such.
     expect(wo.createdBy).toBe(ctx.adminId);
+  });
 
-    await prisma.auditLogEntry.deleteMany({ where: { recordId: workOrderId } }).catch(() => {});
-    await prisma.workOrderNotifLink.deleteMany({ where: { notificationId } }).catch(() => {});
-    await prisma.workOrder.deleteMany({ where: { workOrderId } }).catch(() => {});
-    await prisma.auditLogEntry.deleteMany({ where: { recordId: notificationId } }).catch(() => {});
-    await prisma.notification.deleteMany({ where: { notificationId } }).catch(() => {});
+  /**
+   * SOW 3.8 (row 72) itself: a High-priority notification must reach the people
+   * who triage. Observed against live rows, because the emission is a database
+   * write and an in-memory assertion would prove nothing about the alert a
+   * supervisor actually sees.
+   */
+  it('raises an in-app alert to the triage roles for a High-priority notification', async () => {
+    const res = await api().post('/api/notifications').set(authHeaders(ctx.operatorToken)).send(body());
+    expect(res.status).toBe(201);
+    const notificationId = res.body.notificationId;
+    createdNotificationIds.push(notificationId);
+
+    const triage = await prisma.user.findMany({
+      where: { isDeleted: false, isActive: true, role: { in: ['Maintenance Planner', 'Maintenance Supervisor'] } },
+      select: { userId: true },
+    });
+    expect(triage.length).toBeGreaterThan(0);
+
+    const alerts = await prisma.systemAlert.findMany({
+      where: { relatedEntityType: 'Notification', relatedEntityId: notificationId },
+    });
+    expect(alerts.length).toBe(triage.length);
+    for (const alert of alerts) {
+      expect(alert.alertType).toBe('High_Priority_Notification');
+      expect(alert.isRead).toBe(false);
+    }
+    expect(new Set(alerts.map((a) => a.userId))).toEqual(new Set(triage.map((u) => u.userId)));
   });
 
   /**
@@ -115,22 +144,14 @@ describe('notifications routes', () => {
    * observation cannot overwrite the original report.
    */
   describe('damages and observations', () => {
-    let observationId = '';
-
-    afterAll(async () => {
-      if (observationId) {
-        await prisma.auditLogEntry.deleteMany({ where: { recordId: observationId } }).catch(() => {});
-        await prisma.notification.deleteMany({ where: { notificationId: observationId } }).catch(() => {});
-      }
-    });
-
     it('stays null when the reporter supplies nothing, rather than defaulting to a string', async () => {
       const res = await api()
         .post('/api/notifications')
         .set(authHeaders(ctx.adminToken))
         .send({ ...body(), description: 'no observation' });
       expect(res.status).toBe(201);
-      observationId = res.body.notificationId;
+      const observationId = res.body.notificationId;
+      createdNotificationIds.push(observationId);
 
       const row = await prisma.notification.findUniqueOrThrow({ where: { notificationId: observationId } });
       expect(row.damagesObservations).toBeNull();
@@ -143,14 +164,12 @@ describe('notifications routes', () => {
         .send({ ...body(), description: 'pump noisy', damagesObservations: 'mechanical seal weeping' });
       expect(res.status).toBe(201);
       const id = res.body.notificationId;
+      createdNotificationIds.push(id);
 
       const row = await prisma.notification.findUniqueOrThrow({ where: { notificationId: id } });
       // The report and the finding are two facts, not one overwritten field.
       expect(row.description).toBe('pump noisy');
       expect(row.damagesObservations).toBe('mechanical seal weeping');
-
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
-      await prisma.notification.deleteMany({ where: { notificationId: id } }).catch(() => {});
     });
 
     it('records an observation added later, once somebody has inspected', async () => {
@@ -159,6 +178,7 @@ describe('notifications routes', () => {
         .set(authHeaders(ctx.adminToken))
         .send({ ...body(), description: 'bearing hot' });
       const id = created.body.notificationId;
+      createdNotificationIds.push(id);
 
       const res = await api()
         .put(`/api/notifications/${id}`)
@@ -169,9 +189,6 @@ describe('notifications routes', () => {
       const row = await prisma.notification.findUniqueOrThrow({ where: { notificationId: id } });
       expect(row.damagesObservations).toBe('housing cracked, oil in base');
       expect(row.description).toBe('bearing hot');
-
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
-      await prisma.notification.deleteMany({ where: { notificationId: id } }).catch(() => {});
     });
 
     it('returns the observation on the detail read', async () => {
@@ -180,13 +197,11 @@ describe('notifications routes', () => {
         .set(authHeaders(ctx.adminToken))
         .send({ ...body(), description: 'odd noise', damagesObservations: 'play in bearing' });
       const id = created.body.notificationId;
+      createdNotificationIds.push(id);
 
       const res = await api().get(`/api/notifications/${id}`).set(authHeaders(ctx.adminToken));
       expect(res.status).toBe(200);
       expect(res.body.damagesObservations).toBe('play in bearing');
-
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
-      await prisma.notification.deleteMany({ where: { notificationId: id } }).catch(() => {});
     });
   });
 });
