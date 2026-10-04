@@ -177,6 +177,7 @@ APPROVED_PROMOTIONS: list = [
     ("3.2.2 notification-create (D-15)", "Partial", "Met", "this commit"),
     ("3.1.3 capacity-board (read-only reading)", "Partial", "Met", "this commit"),
     ("3.3.8 file-type (D-11)", "Partial", "Waived", "this commit"),
+    ("3.1.4 task-list equipment association", "Partial", "Met", "this commit"),
 ]
 
 # One more row has moved since the freeze and it is NOT a section 3 clause, so

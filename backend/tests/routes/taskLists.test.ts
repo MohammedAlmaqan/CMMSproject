@@ -239,4 +239,158 @@ describe('task lists routes', () => {
       expect(res.body.error).toContain('quantity');
     });
   });
+
+  // SOW 3.1.4 also requires a task list to be associable with an equipment
+  // class or a specific piece of equipment. Both columns had existed since the
+  // schema was written and the API had always persisted, filtered on and
+  // returned them, but no case here proved it - the row was held Partial on the
+  // strength of an untested claim rather than an observed defect. These cases
+  // close that: association set, read back through a second request, filtered
+  // on, and cleared.
+  describe('equipment class and asset association (SOW 3.1.4)', () => {
+    const CLASS_NAME = `PUMP-STATION-${stamp}`;
+    const OTHER_CLASS_NAME = `VALVE-STATION-${stamp}`;
+    const assocIds: string[] = [];
+    let assetOne = '';
+    let assetTwo = '';
+
+    beforeAll(async () => {
+      // Two distinct real assets. equipmentId is a foreign key onto Equipment, so
+      // this cannot be exercised with an arbitrary string - which is itself worth
+      // asserting rather than working around.
+      const eqs = await api().get('/api/equipment').set(authHeaders(ctx.adminToken));
+      const live = eqs.body.filter((e: { isDeleted: boolean }) => !e.isDeleted);
+      expect(live.length).toBeGreaterThanOrEqual(2);
+      assetOne = live[0].equipmentId;
+      assetTwo = live[1].equipmentId;
+      expect(assetOne).not.toBe(assetTwo);
+    });
+
+    afterAll(async () => {
+      await purgeTaskLists(assocIds);
+    });
+
+    const mk = async (extra: Record<string, unknown>, suffix: string) => {
+      const res = await api()
+        .post('/api/task-lists')
+        .set(authHeaders(ctx.operatorToken))
+        .send({
+          code: `TLA-${suffix}-${Date.now()}`,
+          description: `association ${suffix}`,
+          workCenterId,
+          ...extra,
+        });
+      expect(res.status).toBe(201);
+      assocIds.push(res.body.taskListId);
+      return res;
+    };
+
+    it('persists an equipment class and returns it with no asset set', async () => {
+      const res = await mk({ equipmentClass: CLASS_NAME }, 'CLASS');
+
+      expect(res.body.equipmentClass).toBe(CLASS_NAME);
+      expect(res.body.equipmentId).toBeNull();
+      // A second request, so this is persistence and not just an echo of the body.
+      const read = await api().get(`/api/task-lists/${res.body.taskListId}`).set(authHeaders(ctx.operatorToken));
+      expect(read.status).toBe(200);
+      expect(read.body.equipmentClass).toBe(CLASS_NAME);
+      expect(read.body.equipmentId).toBeNull();
+    });
+
+    it('persists a specific asset and returns it with no class set', async () => {
+      const res = await mk({ equipmentId: assetOne }, 'ASSET');
+
+      expect(res.body.equipmentId).toBe(assetOne);
+      expect(res.body.equipmentClass).toBeNull();
+      const read = await api().get(`/api/task-lists/${res.body.taskListId}`).set(authHeaders(ctx.operatorToken));
+      expect(read.body.equipmentId).toBe(assetOne);
+      expect(read.body.equipmentClass).toBeNull();
+    });
+
+    it('refuses an asset that does not exist, rather than storing a dangling reference', async () => {
+      const res = await api()
+        .post('/api/task-lists')
+        .set(authHeaders(ctx.operatorToken))
+        .send({
+          code: `TLA-BAD-${Date.now()}`,
+          description: 'unknown asset',
+          workCenterId,
+          equipmentId: 'no-such-equipment',
+        });
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      const stored = await prisma.taskList.count({
+        where: { code: { startsWith: 'TLA-BAD-' }, isDeleted: false },
+      });
+      expect(stored).toBe(0);
+    });
+
+    it('filters by equipment class, and a class query does not match an asset-scoped list', async () => {
+      const mine = await mk({ equipmentClass: CLASS_NAME }, 'FILTERCLASS');
+      // Same asset as another list, different class: proves the class filter is
+      // a real predicate and not a substring match on the wrong column.
+      const otherClass = await mk(
+        { equipmentClass: OTHER_CLASS_NAME, equipmentId: assetTwo },
+        'FILTEROTHER',
+      );
+
+      const res = await api()
+        .get(`/api/task-lists?equipmentClass=${encodeURIComponent(CLASS_NAME)}`)
+        .set(authHeaders(ctx.operatorToken));
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+
+      const ids = res.body.map((t: { taskListId: string }) => t.taskListId);
+      expect(ids).toContain(mine.body.taskListId);
+      expect(ids).not.toContain(otherClass.body.taskListId);
+      // Every row returned actually carries the class that was asked for.
+      for (const t of res.body) {
+        expect(t.equipmentClass).toBe(CLASS_NAME);
+      }
+    });
+
+    it('filters by specific asset, excluding the class-wide list and any other asset', async () => {
+      const scoped = await mk({ equipmentId: assetOne }, 'FILTERASSET');
+      const classWide = await mk({ equipmentClass: CLASS_NAME }, 'FILTERWIDE');
+      const otherAsset = await mk({ equipmentId: assetTwo }, 'FILTEROTHERASSET');
+
+      const res = await api()
+        .get(`/api/task-lists?equipmentId=${encodeURIComponent(assetOne)}`)
+        .set(authHeaders(ctx.operatorToken));
+      expect(res.status).toBe(200);
+
+      const ids = res.body.map((t: { taskListId: string }) => t.taskListId);
+      expect(ids).toContain(scoped.body.taskListId);
+      expect(ids).not.toContain(classWide.body.taskListId);
+      expect(ids).not.toContain(otherAsset.body.taskListId);
+      for (const t of res.body) {
+        expect(t.equipmentId).toBe(assetOne);
+      }
+    });
+
+    it('clears both associations back to a fleet-wide routine', async () => {
+      const res = await mk({ equipmentClass: CLASS_NAME, equipmentId: assetOne }, 'CLEAR');
+
+      // null is the clearing contract: both columns are nullable in
+      // taskListUpdateSchema. An empty string is not accepted for equipmentId,
+      // which is min(1), so sending '' fails validation before the route runs.
+      const put = await api()
+        .put(`/api/task-lists/${res.body.taskListId}`)
+        .set(authHeaders(ctx.operatorToken))
+        .send({ equipmentClass: null, equipmentId: null });
+      expect(put.status).toBe(200);
+      expect(put.body.equipmentClass).toBeNull();
+      expect(put.body.equipmentId).toBeNull();
+
+      const read = await api().get(`/api/task-lists/${res.body.taskListId}`).set(authHeaders(ctx.operatorToken));
+      expect(read.body.equipmentClass).toBeNull();
+      expect(read.body.equipmentId).toBeNull();
+
+      // And the cleared list is no longer reachable through either filter.
+      for (const query of [`equipmentId=${encodeURIComponent(assetOne)}`, `equipmentClass=${encodeURIComponent(CLASS_NAME)}`]) {
+        const filtered = await api().get(`/api/task-lists?${query}`).set(authHeaders(ctx.operatorToken));
+        const ids = filtered.body.map((t: { taskListId: string }) => t.taskListId);
+        expect(ids).not.toContain(res.body.taskListId);
+      }
+    });
+  });
 });
