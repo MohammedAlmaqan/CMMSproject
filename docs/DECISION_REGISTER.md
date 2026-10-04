@@ -48,7 +48,7 @@ A `Waive` is not a deletion. Waived rows stay in `docs/SOW_COMPLIANCE.md` and in
 
 > **For each of the 77 rows in §5: Build, or Waive?**
 
-D-1 is answered: **68 Build, 9 Waive.** Every other decision (D-2 … D-19) narrows the engineering; D-1 fixed its size. The dispositions and the reasoning behind them are in §5.
+D-1 is answered: **68 Build, 9 Waive** (as first recorded; **superseded by §6.5 → 67 Build / 10 Waive**). Every other decision (D-2 … D-19) narrows the engineering; D-1 fixed its size. The dispositions and the reasoning behind them are in §5.
 
 **Consequences of leaving D-1 open**
 
