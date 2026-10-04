@@ -164,6 +164,17 @@ APPROVED_PROMOTIONS: list = [
     ("3.8 alert-overdue", "Not Met", "Met", "f45c02f"),
     ("3.8 alert-pm-failure", "Partial", "Met", "37957d5"),
     ("3.8 alert-high-priority", "Not Met", "Met", "37957d5"),
+
+    # ---- owner-decision closures, 2026-10-04 (no code change) ----
+    # These rows were already implemented or already correct and were held
+    # Partial only by an owner interpretation. Unlike the entries above, the
+    # justifying artefact is a decision, not an implementation commit, so the
+    # decision ID in the matrix Notes is the durable anchor. "this commit" is
+    # the tracker's existing self-reference sentinel, needed because the
+    # status change and this wiring must land in the same commit for the gate
+    # to stay green, which puts the SHA out of reach in advance. Backfill the
+    # real SHA once one exists.
+    ("3.2.2 notification-create (D-15)", "Partial", "Met", "this commit"),
 ]
 
 # One more row has moved since the freeze and it is NOT a section 3 clause, so
