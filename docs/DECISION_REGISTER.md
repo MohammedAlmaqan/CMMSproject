@@ -48,7 +48,7 @@ A `Waive` is not a deletion. Waived rows stay in `docs/SOW_COMPLIANCE.md` and in
 
 > **For each of the 77 rows in §5: Build, or Waive?**
 
-D-1 is answered: **68 Build, 9 Waive** (as first recorded; **superseded by §6.5 → 67 Build / 10 Waive**). Every other decision (D-2 … D-19) narrows the engineering; D-1 fixed its size. The dispositions and the reasoning behind them are in §5.
+D-1 is answered: **68 Build, 9 Waive** (as first recorded; **superseded by §6.5 → 66 Build / 11 Waive**). Every other decision (D-2 … D-19) narrows the engineering; D-1 fixed its size. The dispositions and the reasoning behind them are in §5.
 
 **Consequences of leaving D-1 open**
 
@@ -135,8 +135,8 @@ Generated from `docs/SOW_COMPLIANCE.md` by machine; every row's clause text and 
 | **E** | Data integrity, audit, history and costing basis | 10 | 1 |
 | **F** | Reporting, BI layer and the UAT pack (6.4.1, 6.4.2) | 14 | 1 |
 | **G** | Non-functional and operational readiness (6.4.3) | 0 | 1 |
-| **H** | Remaining §3 surface, including calibration and alerts | 10 | 5 |
-| | **Total** | **67** | **10** |
+| **H** | Remaining §3 surface, including calibration and alerts | 9 | 6 |
+| | **Total** | **66** | **11** |
 
 **Phase G has no §3 build rows and that is not an oversight.** Its only §3 clause was OAuth2
 (row 76), waived under D-5. The non-functional work that §6.4.3 actually demands — the 100-VU
@@ -184,7 +184,7 @@ Evidence for each row — the exact code path, endpoint or absence that justifie
 | 33 | §3.3.5 | Technician identification via login; entries stamped with user and timestamp | Partial | B | - | **Build** | The labour route trusts a client-supplied userId, so labour cost can be attributed to the wrong technician. Named an open 6.4 item. |
 | 34 | §3.3.6 | Additional miscellaneous costs (travel, permits) as line items | Not Met | E | - | **Build** | Travel and permit costs are real and currently have nowhere to be recorded. |
 | 35 | §3.3.7 | WO cannot be set to "In Progress" unless all mandatory safety checklists are acknowledged (sign-off via electronic signature) | Met | D | - | **Build** | The safety gate enforced checklist status, not item answers; making `response` nullable and dropping the `'NA'` pre-fill closed it. Electronic signature stays excluded per X4. **[Closed in Phase D — `9b2e9bd`, `369ff13`, `7b3a17a`. The gate now requires `status = 'Completed'` *and* zero unanswered items, and clearing an answer re-arms the sign-off. The X4 exclusion is unaffected and is carried by its own matrix row.]** |
-| 36 | §3.3.8 | Any file type may be attached up to 10 MB per file | Partial | H | D-11 | **Build** | [D-11] Widened document allowlist under D-11; the 10 MB cap is already met and executables stay blocked. |
+| 36 | §3.3.8 | Any file type may be attached up to 10 MB per file | Partial | H | D-11 | **Waive** | [D-11] The "any file type" limb is waived: a bounded allowlist is kept, with the 10 MB cap and the executable and script denylist intact. |
 | 37 | §3.3.8 | Threaded comments visible in the work order detail view, posted by any participant | Waived | H | D-12 | **Waive** | [D-12] A flat comment list meets the collaboration need; threading adds a parent relation and recursive query for negligible gain. |
 | 38 | §3.3.8 | Complete audit log recording user, timestamp, action, and old/new value for field modifications | Partial | E | - | **Build** | Old and new values are captured at only a minority of write sites, so the audit log cannot support an investigation. |
 | 39 | §3.4.1 | Plan fields: Plan Code, Description, Equipment/Functional Location (one or a list), Work Center, Task List template, Priority, associated Notifications | Partial | D | D-10 | **Build** | [D-10] A plan cannot target the equipment class, or the list of assets, that the SOW describes. See D-10. |
@@ -347,10 +347,11 @@ D-5. Unlike the other flags, this one will not be revisited.
 
 ### 6.5 One arithmetic correction
 
-The SOW owner expected a final tally of **66 Build / 11 Waive**. The verified
-tally is **67 Build / 10 Waive**.
+The SOW owner expected a final tally of **66 Build / 11 Waive**. The register
+now records exactly that tally, after a fourth named correction.
 
-Three worksheet rows changed disposition, and each was named explicitly:
+Applying the Phase A flag answers changed three worksheet rows, each named
+explicitly:
 
 | Row | Change | Effect |
 |---|---|---|
@@ -360,12 +361,29 @@ Three worksheet rows changed disposition, and each was named explicitly:
 
 Net effect on the 68 / 9 baseline: **Build -1, Waive +1**, giving 67 / 10. D-3,
 D-4 and D-5 changed decision *answers* but no row's disposition, so they do not
-move the totals. Reaching 66 / 11 needs exactly one further row waived, and no
-such row was named, so none has been assumed. The correct fix is either to name
-the eleventh row or to accept 67 / 10; the register records 67 / 10 because that
-is what the named decisions actually produce. The `Waived` status added to the
-compliance matrix makes 67 independently re-derivable: 38 Met + 67 build + 10
-waived + 4 Deferred + 7 Excluded = 126.
+move the totals. That intermediate 67 / 10 tally was recorded while the eleventh
+waived row was still unnamed, and was never the owner's expected figure.
+
+The fourth correction names it. On 2026-10-04 the owner confirmed that worksheet
+row 36 (§3.3.8, "Any file type may be attached up to 10 MB per file") is waived
+rather than built. D-11's own decision text already read "the 'any file type'
+limb is waived", so a `Build` disposition contradicted the decision it cites:
+
+| Row | Change | Effect |
+|---|---|---|
+| 36 | `Build` to `Waive` | Build -1, Waive +1 |
+
+| Tally | Build | Waive |
+|---|---|---|
+| Phase A as first recorded | 68 | 9 |
+| After the three named flag-answer corrections | 67 | 10 |
+| After row 36 was named (current) | **66** | **11** |
+
+The Phase H split is therefore 9 Build / 6 Waive. The `Waived` status added to the
+compliance matrix makes 66 independently re-derivable: 38 Met + 66 build + 11
+waived + 4 Deferred + 7 Excluded = 126. The superseded 68 / 9 and 67 / 10
+figures are kept above rather than overwritten, because they are what the
+register recorded in between and are cited by the `v1.1-8` audit sweep.
 
 ---
 

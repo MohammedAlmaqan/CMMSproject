@@ -61,8 +61,8 @@ EXPECT_S3 = {
 # the worksheet, the count broke, and the register stopped lining up with the
 # matrix. The register is the historical record of what Phase A decided, so the
 # 77 must not move as later phases land; the BUILD count is what shrinks.
-EXPECT_S3_BUILD = 67
-EXPECT_S3_WAIVED = 10
+EXPECT_S3_BUILD = 66
+EXPECT_S3_WAIVED = 11
 EXPECT_S3_WORKSHEET = 77
 GAP_STATUSES = ("Partial", "Not Met")
 PHASES = ("B", "C", "D", "E", "F", "G", "H")
@@ -176,6 +176,7 @@ APPROVED_PROMOTIONS: list = [
     # real SHA once one exists.
     ("3.2.2 notification-create (D-15)", "Partial", "Met", "this commit"),
     ("3.1.3 capacity-board (read-only reading)", "Partial", "Met", "this commit"),
+    ("3.3.8 file-type (D-11)", "Partial", "Waived", "this commit"),
 ]
 
 # One more row has moved since the freeze and it is NOT a section 3 clause, so
@@ -618,7 +619,7 @@ def main():
          f"{'OK' if len(gaps) == len(reg_build) else 'see note'}")
     emit(f"    matrix WAIVED         : {len(waived):>3}   register Waive : {len(reg_waive):>3}   "
          f"{'OK' if len(waived) == len(reg_waive) else 'MISMATCH'}")
-    # The register's Build count is frozen at 67. The matrix build set shrinks
+    # The register's Build count is frozen at 66. The matrix build set shrinks
     # as rows reach Met, so a lower matrix figure is progress, not a drift.
     # The register side is still the authority for what was decided.
     SI["matrix_register_build_ok"] = len(gaps) <= len(reg_build)
