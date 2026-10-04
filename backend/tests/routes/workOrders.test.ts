@@ -353,19 +353,36 @@ describe('work orders routes', () => {
 
     // Row 149 (SOW 3.3.8): a priority change has to be readable from the trail
     // without re-deriving it from another table.
-    const rows = await prisma.auditLogEntry.findMany({
+    //
+    // Matched on the exact new value rather than with findFirst on the column
+    // name: this file has an earlier test that also edits the description, so a
+    // name-only lookup can hand back that older row and the assertion then
+    // depends on which row the database happens to return first.
+    const descriptionDiff = await prisma.auditLogEntry.findFirst({
       where: {
         tableName: 'WorkOrder',
         recordId: createdId,
         action: 'Update',
-        fieldName: { in: ['description', 'priority'] },
+        fieldName: 'description',
+        newValue: 'edited by row 149',
       },
     });
-    const byField = new Map(rows.map((r) => [r.fieldName, r]));
-    expect(byField.get('description')?.newValue).toBe('edited by row 149');
-    expect(byField.get('priority')?.oldValue).toBe(prior?.priority);
-    expect(byField.get('priority')?.newValue).toBe(nextPriority);
-    expect(byField.get('priority')?.userId).toBe(ctx.operatorId);
+    expect(descriptionDiff).not.toBeNull();
+    expect(descriptionDiff?.oldValue).toBe(prior?.description);
+    expect(descriptionDiff?.userId).toBe(ctx.operatorId);
+
+    const priorityDiff = await prisma.auditLogEntry.findFirst({
+      where: {
+        tableName: 'WorkOrder',
+        recordId: createdId,
+        action: 'Update',
+        fieldName: 'priority',
+        newValue: nextPriority,
+      },
+    });
+    expect(priorityDiff).not.toBeNull();
+    expect(priorityDiff?.oldValue).toBe(prior?.priority);
+    expect(priorityDiff?.userId).toBe(ctx.operatorId);
   });
 
   it('leaves the cost columns to costs.ts instead of logging them twice', async () => {

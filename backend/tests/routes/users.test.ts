@@ -109,12 +109,23 @@ describe('users routes', () => {
 
     // Row 149 (SOW 3.3.8). A single-column edit records exactly that column with
     // both values, which is the difference between a trail entry and a diff.
+    //
+    // Filtered on the new value as well as the column name. A name-only
+    // findFirst is only deterministic while a column is written once per file,
+    // and that is an accident of test order rather than a property worth
+    // relying on: workOrders.test.ts learned this the hard way when CI returned
+    // an older description row from an earlier test.
     const diff = await prisma.auditLogEntry.findFirst({
-      where: { tableName: 'User', recordId: tempUserId, action: 'Update', fieldName: 'fullName' },
+      where: {
+        tableName: 'User',
+        recordId: tempUserId,
+        action: 'Update',
+        fieldName: 'fullName',
+        newValue: 'Updated Temp User',
+      },
     });
     expect(diff).not.toBeNull();
     expect(diff?.oldValue).toBe('Temp Test User');
-    expect(diff?.newValue).toBe('Updated Temp User');
     expect(diff?.userId).toBe(ctx.adminId);
   });
 
@@ -127,7 +138,13 @@ describe('users routes', () => {
     expect(res.body.role).toBe('Requester');
 
     const diff = await prisma.auditLogEntry.findFirst({
-      where: { tableName: 'User', recordId: tempUserId, action: 'Update', fieldName: 'role' },
+      where: {
+        tableName: 'User',
+        recordId: tempUserId,
+        action: 'Update',
+        fieldName: 'role',
+        newValue: 'Requester',
+      },
     });
     expect(diff).not.toBeNull();
     expect(diff?.oldValue).toBe('Technician');
@@ -155,7 +172,7 @@ describe('users routes', () => {
     expect(rows.every((r) => r.fieldName !== 'passwordHash')).toBe(true);
     expect(JSON.stringify(rows)).not.toContain('rotated-not-a-real-hash');
 
-    const emailDiff = rows.find((r) => r.fieldName === 'email');
+    const emailDiff = rows.find((r) => r.fieldName === 'email' && r.newValue === 'temp.updated@example.com');
     expect(emailDiff).toBeDefined();
     expect(emailDiff?.oldValue).toBe('temp@example.com');
     expect(emailDiff?.newValue).toBe('temp.updated@example.com');

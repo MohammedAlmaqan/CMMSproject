@@ -1,4 +1,4 @@
-﻿﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { api, authHeaders, ctx, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
@@ -87,21 +87,36 @@ afterAll(async () => {
 
     // Row 149 (SOW 3.3.8): the columns that moved carry their old and new
     // values, so a changed labour step is reconstructable from the trail alone.
-    const rows = await prisma.auditLogEntry.findMany({
+    //
+    // Matched on the exact new value rather than by column name alone: a
+    // name-only lookup depends on which row the database returns first once a
+    // file has edited the same column more than once, and the two disagree
+    // without either being wrong.
+    const descriptionDiff = await prisma.auditLogEntry.findFirst({
       where: {
         tableName: 'WorkOrderOperation',
         recordId: opId,
         action: 'Update',
-        fieldName: { in: ['description', 'plannedHours'] },
+        fieldName: 'description',
+        newValue: 'edited step',
       },
     });
-    const byField = new Map(rows.map((r) => [r.fieldName, r]));
+    expect(descriptionDiff).not.toBeNull();
+    expect(descriptionDiff?.oldValue).toBe(prior?.description ?? null);
+    expect(descriptionDiff?.userId).toBe(ctx.adminId);
 
-    expect(byField.get('description')?.oldValue).toBe(prior?.description ?? null);
-    expect(byField.get('description')?.newValue).toBe('edited step');
-    expect(byField.get('plannedHours')?.oldValue).toBe(String(prior?.plannedHours ?? ''));
-    expect(byField.get('plannedHours')?.newValue).toBe('3.5');
-    expect(byField.get('plannedHours')?.userId).toBe(ctx.adminId);
+    const hoursDiff = await prisma.auditLogEntry.findFirst({
+      where: {
+        tableName: 'WorkOrderOperation',
+        recordId: opId,
+        action: 'Update',
+        fieldName: 'plannedHours',
+        newValue: '3.5',
+      },
+    });
+    expect(hoursDiff).not.toBeNull();
+    expect(hoursDiff?.oldValue).toBe(prior?.plannedHours === null || prior?.plannedHours === undefined ? '' : String(prior.plannedHours));
+    expect(hoursDiff?.userId).toBe(ctx.adminId);
   });
 
   it('records no diff row for a column the update did not change', async () => {
