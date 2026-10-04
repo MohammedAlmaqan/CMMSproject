@@ -1649,6 +1649,47 @@ With those four recorded, Phase R is closed. Test floor at close: **70 files / 9
 
 - **Positive finding — the row-294 mount gate was blind until a negative injection exposed it.** The first version of the `systemConfig.test.ts` mount assertions used an unanchored regex (`apiRouter.use('/system-config'` and the two `app.use(...)` mounts), so commenting out `app.use('/api/v1', apiRouter)` in `backend/src/index.ts` still passed: the regex matched the commented-out line and the suite stayed green. Anchoring every assertion to the start of its line (`^app.use('/api/v1', apiRouter);` / `m`) made the injection fail as it should, and restoring the mount passed. Same class as the E.10 registry that would have "matched nothing and silently audited nothing" — a gate that cannot fail is worse than no gate, because its green is counted as evidence. Every new gate on this project gets a negative injection before it is trusted. Recorded at `d42ec77`, workflow run 37150726276.
 
+- **Audit-trail sweep, Finding 1 (2026-10-04, docs-only).** The register's D-1 answer and this tracker's gate narrative were the last two places still quoting the **68 Build / 9 Waive** first-recorded tally. Both now carry an inline "superseded by §6.5 → 67 Build / 10 Waive" pointer; the originals are kept, so the flip stays auditable. Register §6.5 remains the authority (rows 24, 30, 75 net **Build −1 / Waive +1**). Outcome: no unannotated stale figure remains in either document, and no status moved.
+- **Audit-trail sweep, Finding 2 (2026-10-04, docs-only) - no promotion is missing from the verifier.** The reverse check asked whether every build commit the tracker cites as promotion evidence also appears in `verify_a1.py`. It does not, by design: the tracker cites the **build** commit plus its CI run, while the verifier keys each entry to the commit whose diff **set the row's status**, and for a build-then-promote pair those are two different commits. Matched **by clause**, every promotion the tracker records has a verifier entry, and both scopes reconcile (`verify_a1.py` exit 0). So the literal-SHA mismatch is the anchor convention, not a coverage hole. The one real residual - a reader cannot tie a tracker's build SHA to the verifier's status commit without help - is closed by the cross-reference below. Outcome: all 31 verifier status commits reconciled against their tracker sections — 13 were already cited in the tracker or SOW, and the **18 that were cited nowhere** are now named here; no status moved.
+
+#### Promotion-evidence ↔ verifier-status SHA cross-reference
+
+Left column: the commit the tracker cites as the promotion evidence (build SHA, plus CI run where the tracker names one). Right column: the `verify_a1.py` promotion entry - clause, from→to, and the status-setting commit. A `=` marks a documentation-only promotion, where the evidence commit and the status-setting commit are the same. Every other row is a build-then-promote pair: the two SHAs differ by design, and this table is the join between them.
+
+| Tracker evidence | Verifier entry (clause; from→to; status commit) |
+|---|---|
+| Phase F recount `5fc4383` | §3 rows 2–6, 9, 11, 12, 14–16, 18, 21, 22, 25, 28, 33; PM/NM→M; `5fc4383` = |
+| Phase D `7b3a17a` / `9b2e9bd` | §3.4.1–§3.4.3, rows 39–43 & 45–48 (row 44 excluded); PM/NM→M; `1c14c25` |
+| Phase E green suite `6c5b926` | §3.3.3 at-least-one-operation; PM→M; `6c5b926` = |
+| Phase C | §3.1.4 task lists per class, §3.3.3 at-least-one-operation; NM→PM (first hop); `f3fc1ad` |
+| Phase E `722e1a3` | §3.3.6 travel/permit line items (NM→M), §3.5.1 planned cost (PM→M); `722e1a3` = |
+| Phase E `e256ad1` | §3.3.3 Reported By; PM→M; `e256ad1` = |
+| Phase E `96645ee` | §3.2.2 damages/observations; NM→M; `96645ee` = |
+| Phase E `abb580f` | §3.3.4 material reservation; NM→M; `abb580f` = |
+| Phase E `98c356e` | §3.3.5 labour cost; PM→M; `98c356e` = |
+| Phase C safety gate | §3.3.7 safety gate; PM→M; `d56aa2e` |
+| E.11 `8151746` | §3.6 work-order / equipment history, rows 55 & 56; NM/PM→M; `be2b092` |
+| R.2 `17c95fb` | §3.7.1 report filtering; NM→M; `17c95fb` = |
+| G.6 `40c852e` | §6.4 performance (100 VU); NM→M; `40c852e` = |
+| H.4 Layer A `9b1758c` (run 37071130720) | §3.3.1 emergency, §3.3.3 long-text; NM→M; `7a08726` |
+| H.5 Layer B1 `ad428a1` (run 37124329927) | §3.8 alert-pm-failure, alert-high-priority; PM/NM→M; `37957d5` |
+| H.6 Layer B2 `e639d47` | §3.2.2 multiple-notifications; NM→M; `22d5292` |
+| H.7/H.8/H.9 Layer C `761d0bb` (run 37131906999) | §3.3.1 calibration, §3.8 alert-assignment, alert-overdue; NM/PM→M; `f45c02f` |
+| H.7 decisions, 200-VU GO `6c2f482` (run 37136744688) | §4.1 concurrency; D→PM; `b278eaa` |
+| H.7 follow-up, IIS verified | §4.2 https; PM→M; `256c8e9` |
+| H.10 `5dd4cb7` (run 37141326175) | §6.2 user-manual, deployment-guide, §6.4 docs-and-training; PM→M; `5dd4cb7` = |
+| R.3 rows 65–67 | §3.7.2 backlog-hours, top10-cost, awaiting-conversion; NM/NM/PM→M; `ed5bcc6` |
+| R.4 five reports | §3.7.1 backlog, pm-compliance, mttr, cost-summary, material-consumption; PM→M; `b9fedca` |
+| R.5 xlsx export | §3.7.1 export; NM→M; `465f859` |
+| R.6 view layer | §3.7.3 ad-hoc-query (D→M), §5.2 reporting-engine (NM→M); `4e883b3` |
+| R.7 independent reconcile | §6.4 report-correctness; NM→M; `7e318bc` |
+| R.8 full recount | §3.5.3 rollup-location/equipment/wo-type (NM→M), rollup-time (PM→M); `5a05acd` |
+| Post-H row 60 `581c1d0` (run 37146679517) | §2.2 admin-user-management; NM→M; `80add36` |
+| Post-H row 64 `4b00233` (run 37147538004) | §2.2 requester; NM→M; `60d4923` |
+| Post-H row 267 `6cb510f` (run 37148106485) | §4.5 iso-14224; NM→M; `a0573bd` |
+| Post-H row 294 `271e445` (run 37149026522) | §5.4 api-versioning; NM→M; `0a437eb` |
+| Post-H D-18/D-19 decision | §2.2 custom-roles (NM→Waived), §4.6 availability (NM→Deferred); `1daa241` |
+
 ## Post-Go-Live Backlog (v1.1)
 
 Schema findings raised during Phase 7 documentation (7.3). Triaged 2026-09-25: **no v1.0.0 scope change** — all are v1.1 items. Recorded against the SOW compliance matrix in 7.6.
