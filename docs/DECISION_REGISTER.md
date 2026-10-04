@@ -385,6 +385,9 @@ waived + 4 Deferred + 7 Excluded = 126. The superseded 68 / 9 and 67 / 10
 figures are kept above rather than overwritten, because they are what the
 register recorded in between and are cited by the `v1.1-8` audit sweep.
 
+> **Superseded 2026-10-04:** row 147's D-11 reclassification named the eleventh
+> waived row, bringing the tally to 66/11.
+
 ---
 
 ## 7. Dependencies not held (corrected for Phase G, 2026-09-29)
