@@ -139,6 +139,9 @@ describe('AUDITED_FIELDS', () => {
       EquipmentMeter: 'meterId',
       MaintenancePlan: 'planId',
       SafetyChecklistTemplate: 'checklistTemplateId',
+      User: 'userId',
+      WorkOrder: 'workOrderId',
+      WorkOrderOperation: 'operationId',
     };
     expect(Object.keys(ownKey).sort()).toEqual(Object.keys(AUDITED_FIELDS).sort());
     for (const [table, fields] of Object.entries(AUDITED_FIELDS)) {
@@ -151,5 +154,23 @@ describe('AUDITED_FIELDS', () => {
     expect(AUDITED_FIELDS.Craft).toContain('workCenterId');
     expect(AUDITED_FIELDS.MaintenancePlan).toContain('taskListId');
     expect(AUDITED_FIELDS.FailureCode).toContain('parentCodeId');
+  });
+
+  it('never lists a column whose diff would leak a secret or duplicate another writer', () => {
+    // A diff records the old and new value verbatim, so a hash on this list
+    // would put the password itself in the audit trail. The password endpoint
+    // stays action-only precisely because of this.
+    expect(AUDITED_FIELDS.User).not.toContain('passwordHash');
+    // Lockout counters are written by the login path, not by an administrator
+    // editing a profile.
+    for (const f of ['failedLoginCount', 'lockedUntil', 'lastLogin']) {
+      expect(AUDITED_FIELDS.User, `User.${f}`).not.toContain(f);
+    }
+    // recomputeWorkOrderCosts already diffs the two cost columns on every
+    // recompute; listing them here would record the same change twice.
+    expect(AUDITED_FIELDS.WorkOrder).not.toContain('plannedCost');
+    expect(AUDITED_FIELDS.WorkOrder).not.toContain('actualCost');
+    // Generated once at creation and never edited, so a diff could never fire.
+    expect(AUDITED_FIELDS.WorkOrder).not.toContain('woNumber');
   });
 });

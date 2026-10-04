@@ -2,7 +2,8 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorize, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditAction } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { userCreateSchema, userUpdateSchema, validate } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
@@ -354,9 +355,19 @@ router.put('/:id', authorize('Administrator'), validate(userUpdateSchema), async
 
     // A profile edit touches several columns at once. Recording one label with
     // no values behind it used to look like a field diff in the trail without
-    // being one, so it is filed as an action. Per-field diffs for profile edits
-    // are the open part of row 38.
-    await logAuditAction({ table: 'User', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
+    // being one, so per-column diffs are written instead - which is what makes a
+    // role change legible afterwards (SOW 3.3.8, row 149). `passwordHash` is not
+    // in AUDITED_FIELDS.User, so the before-row's hash cannot reach the trail
+    // even though `existing` carries it.
+    await logFieldChanges({
+      table: 'User',
+      recordId: id,
+      before: existing,
+      after: user,
+      fields: AUDITED_FIELDS.User,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(user);
   } catch (error) {

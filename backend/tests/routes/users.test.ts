@@ -91,7 +91,7 @@ describe('users routes', () => {
     expect(res.body.error).toContain('email');
   });
 
-  it('updates a user as Administrator and writes an audit row', async () => {
+  it('updates a user as Administrator and diffs the columns that moved', async () => {
     const before = await prisma.auditLogEntry.count({
       where: { tableName: 'User', recordId: tempUserId, action: 'Update' },
     });
@@ -106,6 +106,59 @@ describe('users routes', () => {
         where: { tableName: 'User', recordId: tempUserId, action: 'Update' },
       })
     ).toBe(before + 1);
+
+    // Row 149 (SOW 3.3.8). A single-column edit records exactly that column with
+    // both values, which is the difference between a trail entry and a diff.
+    const diff = await prisma.auditLogEntry.findFirst({
+      where: { tableName: 'User', recordId: tempUserId, action: 'Update', fieldName: 'fullName' },
+    });
+    expect(diff).not.toBeNull();
+    expect(diff?.oldValue).toBe('Temp Test User');
+    expect(diff?.newValue).toBe('Updated Temp User');
+    expect(diff?.userId).toBe(ctx.adminId);
+  });
+
+  it('diffs a role change so the privilege move is legible after the fact', async () => {
+    const res = await api()
+      .put(`/api/users/${tempUserId}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ role: 'Requester' });
+    expect(res.status).toBe(200);
+    expect(res.body.role).toBe('Requester');
+
+    const diff = await prisma.auditLogEntry.findFirst({
+      where: { tableName: 'User', recordId: tempUserId, action: 'Update', fieldName: 'role' },
+    });
+    expect(diff).not.toBeNull();
+    expect(diff?.oldValue).toBe('Technician');
+    expect(diff?.newValue).toBe('Requester');
+  });
+
+  it('keeps passwordHash out of the audit trail while diffing other columns', async () => {
+    // The before-row handed to logFieldChanges carries the hash, so this asserts
+    // the exclusion is real and not just an intention in a comment. The temp
+    // user is hard-deleted in teardown, so the rotated hash is this file's to
+    // leave behind.
+    await prisma.user.update({
+      where: { userId: tempUserId },
+      data: { passwordHash: 'rotated-not-a-real-hash' },
+    });
+    const res = await api()
+      .put(`/api/users/${tempUserId}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ email: 'temp.updated@example.com' });
+    expect(res.status).toBe(200);
+
+    const rows = await prisma.auditLogEntry.findMany({
+      where: { tableName: 'User', recordId: tempUserId, action: 'Update' },
+    });
+    expect(rows.every((r) => r.fieldName !== 'passwordHash')).toBe(true);
+    expect(JSON.stringify(rows)).not.toContain('rotated-not-a-real-hash');
+
+    const emailDiff = rows.find((r) => r.fieldName === 'email');
+    expect(emailDiff).toBeDefined();
+    expect(emailDiff?.oldValue).toBe('temp@example.com');
+    expect(emailDiff?.newValue).toBe('temp.updated@example.com');
   });
 
   it('blocks a non-admin from changing another users password', async () => {

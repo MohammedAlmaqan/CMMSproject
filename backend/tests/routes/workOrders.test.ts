@@ -339,6 +339,54 @@ describe('work orders routes', () => {
     ).toBe(before + 1);
   });
 
+  it('diffs the columns that moved on update (row 149)', async () => {
+    const prior = await prisma.workOrder.findUnique({ where: { workOrderId: createdId } });
+    const nextPriority = prior?.priority === 'High' ? 'Medium' : 'High';
+
+    const res = await api()
+      .put(`/api/work-orders/${createdId}`)
+      .set(authHeaders(ctx.operatorToken))
+      .send({ description: 'edited by row 149', priority: nextPriority });
+    expect(res.status).toBe(200);
+    expect(res.body.description).toBe('edited by row 149');
+    expect(res.body.priority).toBe(nextPriority);
+
+    // Row 149 (SOW 3.3.8): a priority change has to be readable from the trail
+    // without re-deriving it from another table.
+    const rows = await prisma.auditLogEntry.findMany({
+      where: {
+        tableName: 'WorkOrder',
+        recordId: createdId,
+        action: 'Update',
+        fieldName: { in: ['description', 'priority'] },
+      },
+    });
+    const byField = new Map(rows.map((r) => [r.fieldName, r]));
+    expect(byField.get('description')?.newValue).toBe('edited by row 149');
+    expect(byField.get('priority')?.oldValue).toBe(prior?.priority);
+    expect(byField.get('priority')?.newValue).toBe(nextPriority);
+    expect(byField.get('priority')?.userId).toBe(ctx.operatorId);
+  });
+
+  it('leaves the cost columns to costs.ts instead of logging them twice', async () => {
+    // plannedCost and actualCost are absent from AUDITED_FIELDS.WorkOrder on
+    // purpose: recomputeWorkOrderCosts writes its own diff for them, so a plain
+    // edit of a work order with no cost inputs must add no cost diff of its own.
+    const before = await prisma.auditLogEntry.count({
+      where: { tableName: 'WorkOrder', recordId: createdId, action: 'Update', fieldName: 'plannedCost' },
+    });
+    const res = await api()
+      .put(`/api/work-orders/${createdId}`)
+      .set(authHeaders(ctx.operatorToken))
+      .send({ internalOrder: 'IO-ROW149' });
+    expect(res.status).toBe(200);
+    expect(
+      await prisma.auditLogEntry.count({
+        where: { tableName: 'WorkOrder', recordId: createdId, action: 'Update', fieldName: 'plannedCost' },
+      })
+    ).toBe(before);
+  });
+
   it('rejects delete by a below-Supervisor role with 403', async () => {
     const res = await api().delete(`/api/work-orders/${createdId}`).set(authHeaders(ctx.operatorToken));
     expect(res.status).toBe(403);

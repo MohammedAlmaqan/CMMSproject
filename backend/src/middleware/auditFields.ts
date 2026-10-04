@@ -9,7 +9,10 @@ import type {
   Material,
   SafetyChecklistTemplate,
   TaskList,
+  User,
   WorkCenter,
+  WorkOrder,
+  WorkOrderOperation,
 } from '@prisma/client';
 
 /** Only real columns of the model may be listed, so a typo is a compile error
@@ -81,6 +84,37 @@ export const AUDITED_FIELDS = {
   SafetyChecklistTemplate: [
     'name', 'description', 'isMandatory',
   ] satisfies AuditedColumns<SafetyChecklistTemplate>,
+
+  // Transactional tables, not master data, but they carry the edits an
+  // investigator actually asks about. Added when SOW 3.3.8's coverage was
+  // re-measured and these three were closed.
+
+  User: [
+    'username', 'fullName', 'email', 'role', 'workCenterId', 'isActive',
+  ] satisfies AuditedColumns<User>,
+  // `passwordHash` is absent on purpose: a diff would put the old and new
+  // secret in an audit row, so the password endpoint stays action-only. Nor are
+  // `failedLoginCount`, `lockedUntil` or `lastLogin`, which are lockout state
+  // written by the login path rather than edits an administrator makes.
+
+  WorkOrder: [
+    'type', 'priority', 'status', 'functionalLocationId', 'equipmentId',
+    'description', 'workCenterId', 'supervisorUserId', 'reportedByUserId',
+    'plannedStart', 'plannedFinish', 'actualStart', 'actualFinish',
+    'costCenterCode', 'internalOrder', 'breakdownFlag', 'safetyCriticalFlag',
+    'causeCodeId', 'safetyNotes', 'completionRemarks', 'calibrationResult',
+    'calibrationAsFound', 'calibrationAsLeft', 'calibrationReferenceStandard',
+    'calibrationDueDate', 'calibrationIntervalValue', 'calibrationIntervalUnit',
+  ] satisfies AuditedColumns<WorkOrder>,
+  // `plannedCost` and `actualCost` are absent because `utils/costs.ts` already
+  // diffs them on every recompute; listing them here would log the same change
+  // twice. `woNumber` and `sourcePlanId`/`sourcePlanCycle` are absent because
+  // they are generated once at creation and never edited.
+
+  WorkOrderOperation: [
+    'sequenceNumber', 'description', 'craftId', 'plannedHours',
+    'numberOfTechnicians', 'actualHours', 'status',
+  ] satisfies AuditedColumns<WorkOrderOperation>,
 } as const;
 
 export type AuditedTable = keyof typeof AUDITED_FIELDS;

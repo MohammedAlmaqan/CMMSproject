@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditAction } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { validate, operationCreateSchema, operationUpdateSchema } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
@@ -229,7 +230,19 @@ router.put('/:id', authorizeMinRole('Technician'), validate(operationUpdateSchem
 
     await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAuditAction({ table: 'WorkOrderOperation', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
+    // Per-column diffs, so the trail says which step field moved and from what
+    // to what. `operation` is the post-update row; the cost recompute above
+    // touches the parent work order's costs, not this row, so it is still the
+    // correct "after" here.
+    await logFieldChanges({
+      table: 'WorkOrderOperation',
+      recordId: id,
+      before: existing,
+      after: operation,
+      fields: AUDITED_FIELDS.WorkOrderOperation,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(operation);
   } catch (error) {

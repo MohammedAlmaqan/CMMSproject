@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditFieldChange, logAuditAction } from '../middleware/audit.js';
+import { logAuditFieldChange, logAuditAction, logFieldChanges } from '../middleware/audit.js';
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber, generateNotifNumber } from '../utils/sequence.js';
 import { canTransition } from '../utils/transitions.js';
@@ -639,9 +640,25 @@ router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema
 
     await recomputeWorkOrderCosts(id, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAuditAction({ table: 'WorkOrder', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
-
     const updated = await prisma.workOrder.findUnique({ where: { workOrderId: id } });
+
+    // Per-column diffs rather than one generic "Update" row: the trail should
+    // say which column moved and from what to what, so a reassignment or a
+    // priority change is legible without cross-referencing another table. Read
+    // after the cost recompute so `updated` is the settled row; the cost columns
+    // are absent from AUDITED_FIELDS.WorkOrder because costs.ts already diffs
+    // them, and listing them here would log that change twice.
+    if (updated) {
+      await logFieldChanges({
+        table: 'WorkOrder',
+        recordId: id,
+        before: existing,
+        after: updated,
+        fields: AUDITED_FIELDS.WorkOrder,
+        userId: req.user!.userId,
+        ipAddress: req.ip,
+      });
+    }
 
     // SOW 3.8 (row 69): a reassignment is an assignment. Alert only when the
     // supervisor actually changes, so a routine edit that echoes the same

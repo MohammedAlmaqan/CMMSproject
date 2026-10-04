@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+﻿﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { api, authHeaders, ctx, purgeWorkOrders } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
@@ -71,6 +71,55 @@ afterAll(async () => {
       .set(authHeaders(ctx.adminToken))
       .send({ workOrderId: woId, sequenceNumber: -1, description: '' });
     expect(res.status).toBe(400);
+  });
+
+  it('diffs the operation columns that moved on update (row 149)', async () => {
+    // Read the values first rather than hardcoding them, so the assertion is
+    // about the diff and not about whatever this file happened to create.
+    const prior = await prisma.workOrderOperation.findUnique({ where: { operationId: opId } });
+
+    const res = await api()
+      .put(`/api/work-order-operations/${opId}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ description: 'edited step', plannedHours: 3.5 });
+    expect(res.status).toBe(200);
+    expect(res.body.description).toBe('edited step');
+
+    // Row 149 (SOW 3.3.8): the columns that moved carry their old and new
+    // values, so a changed labour step is reconstructable from the trail alone.
+    const rows = await prisma.auditLogEntry.findMany({
+      where: {
+        tableName: 'WorkOrderOperation',
+        recordId: opId,
+        action: 'Update',
+        fieldName: { in: ['description', 'plannedHours'] },
+      },
+    });
+    const byField = new Map(rows.map((r) => [r.fieldName, r]));
+
+    expect(byField.get('description')?.oldValue).toBe(prior?.description ?? null);
+    expect(byField.get('description')?.newValue).toBe('edited step');
+    expect(byField.get('plannedHours')?.oldValue).toBe(String(prior?.plannedHours ?? ''));
+    expect(byField.get('plannedHours')?.newValue).toBe('3.5');
+    expect(byField.get('plannedHours')?.userId).toBe(ctx.adminId);
+  });
+
+  it('records no diff row for a column the update did not change', async () => {
+    const before = await prisma.auditLogEntry.count({
+      where: { tableName: 'WorkOrderOperation', recordId: opId, action: 'Update' },
+    });
+    // Re-sending the value already on the row moves nothing, and the honest
+    // outcome of a no-op update is an empty trail, not a row of nulls.
+    const res = await api()
+      .put(`/api/work-order-operations/${opId}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ description: 'edited step' });
+    expect(res.status).toBe(200);
+    expect(
+      await prisma.auditLogEntry.count({
+        where: { tableName: 'WorkOrderOperation', recordId: opId, action: 'Update' },
+      })
+    ).toBe(before);
   });
 
   it('rejects delete by a below-Technician role with 403', async () => {
