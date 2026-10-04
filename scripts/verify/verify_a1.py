@@ -175,6 +175,7 @@ APPROVED_PROMOTIONS: list = [
     # to stay green, which puts the SHA out of reach in advance. Backfill the
     # real SHA once one exists.
     ("3.2.2 notification-create (D-15)", "Partial", "Met", "this commit"),
+    ("3.1.3 capacity-board (read-only reading)", "Partial", "Met", "this commit"),
 ]
 
 # One more row has moved since the freeze and it is NOT a section 3 clause, so
