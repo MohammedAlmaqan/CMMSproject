@@ -185,6 +185,12 @@ APPROVED_PROMOTIONS: list = [
     # per column. The six remaining handlers are an accepted residual recorded
     # as L37, not a status blocker; owner acceptance 2026-10-04.
     ("3.3.8 complete audit log", "Partial", "Met", "this commit"),
+
+    # SOW 3.6 (row 188). 77 of 78 write handlers log; the one exception,
+    # auth.ts POST /login, is a permanent ratified carve-out that the owner
+    # placed outside this clause. Diff coverage is 3.3.8, not 3.6, and is
+    # tracked on row 149 and L37; owner acceptance 2026-10-04.
+    ("3.6 general change log", "Partial", "Met", "this commit"),
 ]
 
 # One more row has moved since the freeze and it is NOT a section 3 clause, so
