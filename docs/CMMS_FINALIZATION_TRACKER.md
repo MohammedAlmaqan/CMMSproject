@@ -1694,10 +1694,20 @@ Left column: the commit the tracker cites as the promotion evidence (build SHA, 
 | Post-H row 294 `271e445` (run 37149026522) | §5.4 api-versioning; NM→M; `0a437eb` |
 | Post-H D-18/D-19 decision | §2.2 custom-roles (NM→Waived), §4.6 availability (NM→Deferred); `1daa241` |
 | Post-H row 8 `1e4b28c` (run 182) | SOW §3.1.4 failure capture, owner decision 2026-10-05; PM→M; `1e4b28c` = |
-| Post-H row 331 `this commit` — SOW §6.4 §3-implementation limb, accepted conditionally 2026-10-05 on failure capture landing (`1e4b28c`, run 182); NM→M; `this commit` = |
-| Owner decisions 2026-10-05 — SOW §3.5.2 cost-split editor deferral confirmed, no code, status unchanged `Partial`; §3.1.4 failure capture `1e4b28c` = |
-| Owner decisions 2026-10-05 — SOW §6.4 defect limb, four WCAG residuals accepted for v1.1 (v1.1-11..14), no code; NM→M; `this commit` = |
-| Owner decisions 2026-10-05 — SOW §4.3 backup mechanisms: transaction-log recovery accepted, differential declined (not deferred), row 261 stays `Partial`, L28 closed, no code = |
+| Post-H row 331 `this commit` — SOW §6.4 §3-implementation limb, accepted conditionally 2026-10-05 on failure capture landing (`1e4b28c`, run 182); NM→M; `c86e890` (run 183, green) = |
+| Owner decisions 2026-10-05 — SOW §3.5.2 cost-split editor deferral confirmed, no code, status unchanged `Partial`; §3.1.4 failure capture `1e4b28c` (run 182); the §3.5.2 note itself is `47e02a2` (run 184, queued) = |
+| Owner decisions 2026-10-05 — SOW §6.4 defect limb, four WCAG residuals accepted for v1.1 (v1.1-11..14), no code; NM→M; `d7c8b74`, **CI run 185 cancelled by the 2026-10-05 Actions incident — no green run at this SHA; content green on descendant run 186** = |
+| Owner decisions 2026-10-05 — SOW §4.3 backup mechanisms: transaction-log recovery accepted, differential declined (not deferred), row 261 stays `Partial`, L28 closed, no code; `4ff8814` (run 186, green) = |
+
+## Pending CI verification (2026-10-05 GitHub Actions incident)
+
+GitHub Actions failed to assign hosted runners on 2026-10-05. Two commits pushed during the incident
+have **no green run at their own SHA**: `a0fa86d`, which never had a run created because it shared a
+push with `c86e890` and Actions fires once per push at the tip SHA, and `d7c8b74`, whose run 185 was
+cancelled with zero steps executed. Both are documentation-only and both had their content exercised by
+green runs on descendant commits, so neither is unverified in fact — what is missing is a
+checkable citation. `d7c8b74` is the one to watch, because it is a status promotion (row 334 NM→M). **To close this section:** once Actions is healthy, re-run those two SHAs and
+replace each with its run ID. Green in the meantime: `1e4b28c` (182), `c86e890` (183), `4ff8814` (186).
 
 ## Post-Go-Live Backlog (v1.1)
 

@@ -241,7 +241,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # target is deployment-configurable, and archive_mode is still off on the
     # live cluster, so this records a proven and re-runnable mechanism rather
     # than a live host that is already archiving. Owner acceptance 2026-10-05.
-    ("RPO < 1 hour", "Not Met", "Met", "this commit"),
+    ("RPO < 1 hour", "Not Met", "Met", "f341a46"),
 
     # SOW 6.4 "All functional requirements listed in 3 are implemented and pass
     # UAT scripts" (row 331) is a conjunction over section 3, so it was Not Met
@@ -256,7 +256,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # close on acceptance alone; the condition was row 8 landing first, and it did.
     # No row was reclassified to make the arithmetic work. "this commit" because
     # the status change and this entry land together; backfill the SHA.
-    ("6.4 implementation", "Not Met", "Met", "this commit"),
+    ("6.4 implementation", "Not Met", "Met", "c86e890"),
 
     # SOW 6.4 "No open Critical or Major defects at go-live" (row 334). The clause
     # is scoped to Critical and Major, and the two defects that were release-blocking
@@ -272,7 +272,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # severity judgement. The missing Command Palette focus trap is the item most
     # likely to be argued up, since a focus trap is a real 2.1 AA criterion. Not a
     # waiver: no row moved to Waived. "this commit" - backfill the SHA.
-    ("6.4 defects", "Not Met", "Met", "this commit"),
+    ("6.4 defects", "Not Met", "Met", "d7c8b74 (CI run 185 cancelled by the 2026-10-05 Actions incident; content green on descendant run 186)"),
 ]
 
 

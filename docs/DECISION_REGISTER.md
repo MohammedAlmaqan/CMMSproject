@@ -406,6 +406,32 @@ sub-clause is not an open §3 defect. That reasoning is sound while the deferral
 being sound the moment the editor is pulled into scope - so a reversal has to reopen row 331 rather
 than just flip row 175.
 
+**CI verification ledger for the 2026-10-05 promotions — read this before citing any of them.**
+GitHub Actions failed to assign hosted runners throughout 2026-10-05 (status-page incident, Actions
+degraded; jobs cancelled with zero steps executed). Two commits pushed during the incident have **no
+green run at their own SHA**. The distinction that matters is between *a commit with a green run at its
+own SHA* and *a commit whose content is only covered by a descendant's run* — only the first supports
+the usual "verified by green CI at `<sha>`, run N" citation.
+
+| Commit | What it promotes | Run | State |
+|---|---|---|---|
+| `1e4b28c` | row 8 §3.1.4 failure capture `Partial`→`Met` | 182 | **Green** |
+| `a0fa86d` | backfill of the row-8 SHA into the verifier and tracker | **none** | **No run was ever created.** Pushed in the same push as `c86e890`; Actions fires once per push at the tip SHA, so this commit has no run of its own. Its content is exercised by runs 183 and 186. |
+| `c86e890` | row 331 §6.4 / a `Not Met`→`Met` | 183 | **Green** |
+| `47e02a2` | §3.5.2 cost-split deferral confirmation (no status change) | 184 | Queued when last checked |
+| `d7c8b74` | row 334 §6.4 / b `Not Met`→`Met` | 185 | **Cancelled, zero steps executed.** No green run at this SHA. Content is green on descendant run 186 (`4ff8814`). |
+| `4ff8814` | §4.3 backup decision (no status change) | 186 | **Green** |
+
+**Two are genuinely unverified at their own SHA and are recorded as such: `a0fa86d` and `d7c8b74`.** Both
+are documentation-only, and both had their content exercised by a green run on a descendant commit, so
+the risk is small — but small is not the same as green, and the matrix notes now say so in those words
+rather than implying verification that does not exist. **`d7c8b74` is the one worth watching, because it
+is a status promotion**: row 334 moves `Not Met`→`Met` with no green run at the SHA that made the move.
+No other promotion in this set lacks one.
+
+Not a billing or account problem, and nothing to fix in the repository — for the record: 2,000
+included minutes, 215 used, $0 charged, and runs 177-182 in this repo's own history are all green.
+
 **SOW §6.4 / row 331 - §3 implementation limb - accepted conditionally 2026-10-05, condition
 discharged 2026-10-05.** The clause is a conjunction: every §3 requirement implemented, and the UAT
 scripts passing. The UAT-pack half had already closed at R.7, where
