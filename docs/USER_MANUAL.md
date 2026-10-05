@@ -361,21 +361,37 @@ Select **Administration**. The screen has three tabs:
 - **Audit Log** - every recorded change, filterable by table, action, and free text, and paginated. Only Administrators can read it; any other role selecting this tab receives an error.
 - **Settings** - shows configuration. The two number-prefix rows (`wo_number_prefix`, `notif_number_prefix`) load from `GET /api/system-config` and are editable by an Administrator (saved via `PUT /api/system-config`); the remaining rows are a read-only display of static values.
 
-### 9.2 Create a user - `API only`, and the API does not support it either
+### 9.2 Create a user
 
-**There is no `POST /api/users` endpoint and no create-user screen.** Users come from the seed script or are inserted into the database directly. See the [Administrator Guide](ADMIN_GUIDE.md#61-create-a-user) for the supported procedure.
+1. Select **Administration**, then the **Users & Roles** tab.
+2. Select **Add User**.
+3. Enter a username, a password of at least 8 characters, the person's full name, an email address, and a role.
+4. Select **Create User**.
+
+The new account is active immediately and can sign in. Optionally assign a work center for a Technician. The same operation is available as `POST /api/users` for Administrators. A duplicate active username is refused with **409**, and the action is written to the audit log. See the [Administrator Guide](ADMIN_GUIDE.md#61-create-a-user) for the field rules.
 
 ### 9.3 Disable a user
 
 1. Confirm the person should no longer sign in. Disabling takes effect at their next sign-in attempt; they are not signed out of an existing session.
-2. Use the API:
+2. In **Administration → Users & Roles**, select **Deactivate** on that row and confirm.
+3. To re-enable, send `"isActive": true`:
 
 ```
 PUT /api/users/{userId}
 { "isActive": false }
 ```
 
-A disabled account is refused at sign-in with the generic `Invalid credentials` message - the system deliberately does not tell the user that the account is disabled. Re-enable by sending `"isActive": true`.
+A disabled account is refused at sign-in with the generic `Invalid credentials` message - the system deliberately does not tell the user that the account is disabled. The UI cannot re-enable an account; use the `PUT` call above, or see [6.3](ADMIN_GUIDE.md#63-disable-and-re-enable-a-user).
+
+### 9.3a Delete or decommission a user
+
+The **Deactivate** button in **Administration → Users & Roles** performs the soft delete, so this is the same operation as disabling from the user's point of view - it removes the account from every list, blocks sign-in, and preserves the historical record so the person's name stays on work orders, labour entries and audit entries. The underlying call, if you prefer the API:
+
+```
+DELETE /api/users/{userId}
+```
+
+Deactivating your own account is refused with **400**. If the username should remain reusable, prefer disabling over deleting. See [6.7](ADMIN_GUIDE.md#67-delete-or-decommission-a-user).
 
 ### 9.4 Reset a password
 
@@ -470,17 +486,15 @@ Each of the first six tabs has its own add form, so you stay on the work order w
 
 ## 14. Reference: operations that are not available in the screen
 
-These operations exist in the system but have no screen. This section exists so you are not left looking for a button that is not there.
+These operations exist in the system but have no screen. This section exists so you are not left looking for a button that is not there. **Creating, disabling and deactivating a user all have screens** - see [section 9.2](#92-create-a-user) and [9.3](#93-disable-a-user) - so they are deliberately absent from this list.
 
 | Operation | Screen available? | How it is done |
 |---|---|---|
 | Raise a notification | No | `POST /api/notifications` - Requester and above |
 | Create / edit / delete a PM plan | No | `/api/maintenance-plans` endpoints - Maintenance Planner and above |
 | Run the PM scheduler manually | No | `POST /api/maintenance-plans/run-scheduler` - Administrator |
-| Create a user | No | **No API exists.** Insert into the database - see the [Administrator Guide](ADMIN_GUIDE.md#61-create-a-user) |
 | Reset a user's password | No | `PUT /api/users/{userId}/password` - Administrator |
-| Disable a user | No | `PUT /api/users/{userId}` with `isActive: false` |
-| Delete a user | No | **No API exists.** Soft delete by database update - see the [Administrator Guide](ADMIN_GUIDE.md#67-delete-or-decommission-a-user) |
+| Re-enable a disabled user | No | `PUT /api/users/{userId}` with `isActive: true` - Administrator |
 | Clear a lockout early | No | **No API exists.** Database update - see the [Administrator Guide](ADMIN_GUIDE.md#64-clear-an-account-lockout) |
 | Edit a number-prefix setting | Yes (Administrator) | `PUT /api/system-config`; other settings come from environment variables - see the [Administrator Guide](ADMIN_GUIDE.md#3-configuration) |
 

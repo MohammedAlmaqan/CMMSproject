@@ -216,15 +216,16 @@ The safeguards, in the order they engage: startup lease lock, mid-run heartbeat,
 
 ## Backup strategy
 
-Implemented in `scripts/backup.bat` and rehearsed by `scripts/restore-drill.bat`; evidence is recorded in tracker row 6.2.
+Implemented in `scripts/backup.bat` and rehearsed by `scripts/restore-drill.bat`; evidence is recorded in tracker row 6.2. Continuous WAL archiving and point-in-time recovery are layered on top by `scripts/pitr-drill.ps1`; configuration and the measured result are in [ADMIN_GUIDE §7.8](ADMIN_GUIDE.md#78-wal-archiving-configuration-d-4) and tracker row G.3.
 
 - **Schedule:** daily 02:00 via Windows Task Scheduler, invoking `pg_dump.exe` (resolved from `PATH` first, then a documented PostgreSQL 18 local fallback).
 - **Output:** plain SQL, `backups\cmms-YYYY-MM-DD-HHmm.sql`, written to a `.tmp` file first and only promoted after the dump exits 0 and is non-empty, so a failed run can never leave a truncated file that looks valid.
 - **Flags:** `--no-owner --no-privileges`, restoring as a single owner.
 - **Retention:** newest 14 files kept, older ones deleted — roughly 14 days at one run per day.
-- **RPO:** ≤ 24 h, bounded by the daily schedule.
+- **RPO:** **5 minutes with WAL archiving on; up to 24 h without it.** The daily schedule alone bounds the RPO at 24 h. The continuous WAL configuration in [ADMIN_GUIDE §7.8](ADMIN_GUIDE.md#78-wal-archiving-configuration-d-4) — `archive_mode=on`, an `archive_command` targeting a second backup location, `archive_timeout=300` — was **measured on this host 2026-10-05** by `scripts/pitr-drill.ps1`: 6 segments archived / 0 failed, observed commit-to-archive lag 1 s, and a point-in-time recovery to a chosen `recovery_target_time` that kept 340/340 work orders. The `archive_timeout` bound is what makes the 5-minute figure hold rather than being an average. `archive_mode` is still `off` on the live cluster, so the 5-minute figure describes the proven mechanism, not the current live state — enabling it there is a deployment step.
 - **RTO:** 5.35 s measured in the initial drill, on a ~307 KB dump containing 84 work orders. Read that as a smoke-level restore time for a small dataset, not a production RTO commitment for a full-size database.
 - **Restore drill:** `restore-drill.bat` restores a dump into `cmms_restore_test`, runs a real `WorkOrder` query against it, drops the database, and asserts it is gone. This is what turns "we have backups" into evidence.
+- **Point-in-time recovery:** `pitr-drill.ps1` covers the transaction-log limb that a daily `pg_dump` cannot. It stands up a throwaway cluster with the WAL settings applied, archives segments to a secondary path, then restores a base backup (`pg_basebackup -X none`) into a *second* throwaway cluster and replays the archive to a `recovery_target_time` placed between two committed marker rows, asserting the earlier marker survives and the later one does not. A full restore is still the first step of any PITR; the archive only narrows the point you return to.
 
 ### Attachments are backed up as a paired snapshot
 

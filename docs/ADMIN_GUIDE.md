@@ -255,13 +255,31 @@ This matters for a plant that takes the API down overnight for maintenance: move
 
 ## 6. User administration
 
-All six roles exist in the same table. The UI has **no create, edit, or delete user screen**; the Administration screen's Users & Roles tab is read-only. Several procedures therefore have no API endpoint at all and are done in the database. This section is the supported procedure for each.
+All six roles exist in the same table. **Administration → Users & Roles is not read-only**: it can create a user (Add User) and deactivate one (per-row Deactivate). Both operations are backed by real endpoints, and both are the supported path - they are written to the audit log and the password hash never leaves the server.
+
+Two procedures still have **no endpoint of their own**: clearing an account lockout early ([6.4](#64-clear-an-account-lockout)) and re-enabling a deactivated account ([6.3](#63-disable-and-re-enable-a-user) - the `PUT` exists, but there is no UI control). This section gives the supported procedure for each operation, API first, with SQL kept only as a fallback for bulk or scripted work.
 
 All SQL below uses the quoted `"User"` table, which is case-sensitive. Substitute the `userId`, not the username, in the API calls.
 
 ### 6.1 Create a user
 
-**There is no `POST /api/users` endpoint and no create screen.** The only way to add a user is a direct insert. Generate the bcrypt hash first - the application hashes with a cost factor of 10, the same as the seed:
+**In the UI:** **Administration → Users & Roles → Add User**. Enter username, password, full name, email and role. The account is usable immediately.
+
+**As an API**, as an Administrator:
+
+```
+POST /api/users
+{ "username": "jsmith", "password": "<at least 8 characters>", "fullName": "Jane Smith",
+  "email": "jsmith@example.com", "role": "Technician", "workCenterId": null }
+```
+
+`role` must be exactly one of `Administrator`, `Maintenance Planner`, `Maintenance Supervisor`, `Technician`, `Requester`, `View-Only`; an invalid value is rejected with **400** by `userCreateSchema`, which the direct insert below could not do. A duplicate active `username` is refused with **409**. `workCenterId` is optional and links a Technician to a work center; send `null` or omit it if unsure. The server hashes the password at bcrypt cost 10 and **never returns the hash**, and the creation is written to the audit log with action `Create`.
+
+`username` is unique only across non-deleted rows, enforced by a partial unique index, so a deleted user may reuse their username.
+
+Do not create a user with a known or shared password. Communicate it directly and have them change it; there is no "must change on first sign-in" flag, so treat the value as final.
+
+**Fallback - direct insert.** Prefer the API or the screen. A direct insert is only for seeding or bulk provisioning, and it bypasses validation and the audit log. Generate the bcrypt hash first - the application hashes with a cost factor of 10, the same as the seed:
 
 ```cmd
 cd CMMSproject\backend
@@ -284,14 +302,7 @@ VALUES (
 );
 ```
 
-Rules that must be respected:
-
-- `role` must be exactly one of `Administrator`, `Maintenance Planner`, `Maintenance Supervisor`, `Technician`, `Requester`, `View-Only`. The value is a free-text column with no constraint, so a typo produces a user that appears in no permission level and can sign in but do nothing. Verify with the query in [4.4](#44-useful-read-only-queries) after inserting.
-- `username` is unique only across non-deleted rows, enforced by a partial unique index. A deleted user may reuse their username.
-- `workCenterId` is optional and links a Technician to a work center; leave it `NULL` if unsure.
-- Do not insert the user with a known or shared password. Communicate it directly and have them change it.
-
-Because this write bypasses the application, **it is not written to the audit log.** Note the creation out of band, and prefer provisioning through a script so it is repeatable.
+Note the one thing the insert cannot protect you from: `role` is a free-text column with no database constraint, so a typo produces a user that appears in no permission level and can sign in but do nothing. The API rejects that value; the insert does not. Verify with the query in [4.4](#44-useful-read-only-queries) after inserting, and record the creation out of band.
 
 ### 6.2 List users and their state
 
@@ -301,7 +312,7 @@ The API, as an Administrator:
 GET /api/users?take=200
 ```
 
-Or read the database directly using the query in [4.4](#44-useful-read-only-queries). The Users & Roles tab shows the same information in the UI, read-only.
+Or read the database directly using the query in [4.4](#44-useful-read-only-queries). The Users & Roles tab shows the same information in the UI, and can create and deactivate ([6.1](#61-create-a-user), [6.7](#67-delete-or-decommission-a-user)).
 
 ### 6.3 Disable and re-enable a user
 
@@ -310,12 +321,21 @@ PUT /api/users/{userId}
 { "isActive": false }
 ```
 
-To re-enable, send `"isActive": true`. This is written to the audit log with the field name and old and new values.
+**In the UI:** the per-row **Deactivate** button on **Administration → Users & Roles** does the same thing.
+
+To re-enable, send `"isActive": true`. Both directions are written to the audit log with the field name and old and new values. **There is no UI control for re-enabling** and no delete-and-recreate shortcut, so a re-enable is an API call (or a SQL update - see the fallback below).
 
 Two things to know:
 
 - Disabling takes effect at the user's **next** sign-in attempt. It does not terminate a session already in progress, and there is no server-side session revocation in this system - see [13](#13-deferred-and-not-implemented).
 - A disabled account returns the same generic `Invalid credentials` as a wrong password. This is deliberate, to avoid confirming which usernames exist. When a user insists their password is right, check the active flag.
+
+SQL fallback for re-enabling, if the API is unreachable (bypasses the audit log):
+
+```sql
+UPDATE "User" SET "isActive" = true, "modifiedBy" = 'admin'
+WHERE username = 'jsmith' AND "isDeleted" = false;
+```
 
 ### 6.4 Clear an account lockout
 
@@ -344,13 +364,21 @@ Administrator only. **It does not require the target user's current password** -
 
 ### 6.6 Review users and roles in the UI
 
-**Administration → Users & Roles** is a read-only list: username, full name, email, role, active flag, and last sign-in. Use it to answer "who has access, and who has actually been signing in" - `lastLogin` distinguishes an active account from a dormant one.
+**Administration → Users & Roles** lists username, full name, email, role, active flag, and last sign-in, and carries the **Add User** form and the per-row **Deactivate** control ([6.1](#61-create-a-user), [6.7](#67-delete-or-decommission-a-user)). Role and work-center edits are still API-only (`PUT /api/users/{userId}`); the list is otherwise read-only. Use it to answer "who has access, and who has actually been signing in" - `lastLogin` distinguishes an active account from a dormant one.
 
-The **RBAC Configuration** panel on the same screen is fixed text, is not editable, and does not reflect enforcement. One line is inaccurate: it states a Requester can "view own requests", but the Notifications list is not filtered by reporter and shows every notification to every signed-in user. Use the real behaviour documented in the [User Manual](USER_MANUAL.md#54-follow-up-the-status-of-notifications).
+The **RBAC Configuration** panel on the same screen is fixed text, is not editable, and does not reflect enforcement. Its statement that a Requester can "view own requests" is now **true**: the Notifications list filters `reportedByUserId` to the caller for the Requester role (row 64, green CI at `4b00233`). The panel is still static text, so treat it as orientation rather than as the enforcement surface.
 
 ### 6.7 Delete or decommission a user
 
-**There is no user delete endpoint and no delete button.** Deleting users is done with a soft delete, consistent with the rest of the system:
+**As an API**, as an Administrator:
+
+```
+DELETE /api/users/{userId}
+```
+
+**In the UI:** the per-row **Deactivate** control on **Administration → Users & Roles** performs the same soft delete - it calls this endpoint, so there is no separate UI-only behaviour to reconcile.
+
+This is a soft delete, consistent with the rest of the system: it sets `isDeleted=true` and `isActive=false`, writes an audit entry with action `Delete`, and **refuses self-deactivation with 400**. An unknown `userId` returns **404**.
 
 ```sql
 UPDATE "User"
@@ -358,7 +386,9 @@ SET "isDeleted" = true, "isActive" = false, "modifiedBy" = 'admin'
 WHERE username = 'jsmith';
 ```
 
-This removes the account from every list and blocks sign-in while **preserving the historical record** - their name remains on work orders, labor entries, comments, and audit entries, which is what makes those records auditable. This is the reason to soft delete rather than `DELETE`: a hard delete would orphan the historical attribution.
+The SQL above is a **fallback for bulk or scripted decommissioning** where no token is available; it bypasses the audit log, so record it out of band. Prefer `DELETE /api/users/{userId}` for anything interactive.
+
+Either way this removes the account from every list and blocks sign-in while **preserving the historical record** - their name remains on work orders, labor entries, comments, and audit entries, which is what makes those records auditable. This is the reason to soft delete rather than `DELETE`: a hard delete would orphan the historical attribution.
 
 A soft-deleted user's username becomes reusable, because uniqueness is enforced only across non-deleted rows. This is also the mechanism behind the unique-index behaviour in [6.1](#61-create-a-user).
 

@@ -74,7 +74,7 @@ Each decision is posed as a **question** with neutral options, so the reasoning 
 |---|---|---|---|---|---|---|
 | **D-2** | §6.4.6 | §6.4.6 requires "Documentation delivered **and training completed**". Decision X7 already removed training from scope. The criterion cannot be satisfied as written. | (a) Amend §6.4.6 to documentation-only, consistent with X7. (b) Reinstate training, reversing X7. | **(a)**. X7 was an explicit Client decision; leaving the contradictory criterion in place creates a permanent unmeetable acceptance criterion. | Client | Amend SOW 6.4.6 to "Documentation delivered". The training limb is removed entirely, consistent with X7. **Applied**: the matrix row is amended with the original wording struck through. |
 | **D-3** | §3.5.1 | Planned labour cost is implemented as `plannedHours × numberOfTechnicians × craftRate`. The SOW formula reads `planned labour hours × craft rate`. The SOW does not state whether planned hours are per technician or per operation. **Every planned-cost figure and the §3.7.1 cost summary depend on the answer.** | (a) Planned hours are per technician — current implementation stands. (b) Planned hours are per operation — divide out the technician multiplier. (c) Treat as unspecified and agree a plant convention. | **(c)**, then (a) or (b) as the convention. This is a Finance question, not an engineering one, and the two answers produce materially different planned totals. | Client — Maintenance / Finance | Planned hours are the operation's **total** labour hours, so planned labour cost = planned hours x craft rate, exactly as SOW 3.5.1 states. **Confirmed by the SOW owner 2026-09-26**: remove the `numberOfTechnicians` multiplier from `backend/src/utils/costs.ts:19`. The code change lands with row 49 in Phase E. |
-| **D-4** | §4.3 | §4.3 requires **RPO < 1 hour**. The delivered backup is a daily `pg_dump`, giving an RPO of up to 24 hours — three times the objective. | (a) Implement WAL archiving and differential backups to meet 1 h. Requires PostgreSQL configuration and a second backup target. (b) Accept a 24 h RPO in writing as a deviation, with the business impact stated. | **(a)** if the plant cannot absorb a day of lost work; **(b)** is acceptable only if someone with authority signs the risk. A daily schedule cannot be described as meeting §4.3. | Client IT / Operations | Build WAL archiving plus base/differential backup to meet RPO < 1 h. **Confirmed by the SOW owner 2026-09-26**: write the WAL archiving config and update the backup/restore scripts. The proof-of-working is recorded as a **pending rehearsal** against a live PostgreSQL host and a second backup target - a pending verification, NOT a scope reduction. |
+| **D-4** | §4.3 | §4.3 requires **RPO < 1 hour**. The delivered backup is a daily `pg_dump`, giving an RPO of up to 24 hours — three times the objective. | (a) Implement WAL archiving and differential backups to meet 1 h. Requires PostgreSQL configuration and a second backup target. (b) Accept a 24 h RPO in writing as a deviation, with the business impact stated. | **(a)** if the plant cannot absorb a day of lost work; **(b)** is acceptable only if someone with authority signs the risk. A daily schedule cannot be described as meeting §4.3. | Client IT / Operations | Build WAL archiving plus base/differential backup to meet RPO < 1 h. **Confirmed by the SOW owner 2026-09-26**: write the WAL archiving config and update the backup/restore scripts. **Rehearsed 2026-10-05**, so the proof-of-working is no longer pending: `scripts\pitr-drill.ps1` ran the WAL configuration against a live PostgreSQL host and a local secondary backup target (`C:\cmms-wal\wal`) and **measured the RPO at 5 minutes** — 6 segments archived / 0 failed, observed commit-to-archive lag 1 s, `archive_timeout=300` bounding worst-case loss to 5 min, and a PITR to a chosen `recovery_target_time` that retained 340/340 work orders. Matrix row 262 moved `Not Met → Met`. The target path is deployment-configurable, and `archive_mode` is still `off` on the live cluster, so enabling it there remains a deployment step — the mechanism is proven and re-runnable, not already running in production. |
 | **D-5** | §5.5, §3.10 | §5.5 requires OAuth2 / OpenID Connect with Azure AD or on-premises AD. §3.10 requires the API to use OAuth2. v1.0.0 ships first-party JWT login, with no OAuth2 flow and no directory integration. | (a) An Azure AD tenant and app registration are available — implement OAuth2/OIDC. (b) No tenant available — accept first-party JWT as a written §5.5 deviation. | Depends entirely on **(a)** being available. If no tenant exists, (b) is the only route, and it should be recorded as a deviation rather than left as a silent `Not Met`. | Client IT | Retain first-party JWT login. OAuth2/OIDC is **waived as a formal, documented SOW 5.5 deviation**. **Confirmed by the SOW owner 2026-09-26**: internal use only, no Azure AD. Does not reopen. |
 | **D-6** | §3.9 | §3.9 requires a *"Responsive web interface that functions on tablets and smartphones"*. X2–X4 removed mobile **camera**, **offline** and **signatures**; they did not remove the responsive shell. This row is `Not Met` and carries no exclusion. | (a) Tablets and phones are in scope — build a responsive layout. (b) Desktop/laptop only — waive the row and record that field devices are out of scope. | Depends on how the plant actually works. If technicians use tablets in the field, (a). The current fixed-width sidebar and multi-column tables are not usable at phone width. | Client — Operations | Build a responsive web layout: Tailwind breakpoints, mobile navigation drawer, table stacking. **No PWA, offline, camera or signature** - X2 to X4 stand. |
 | **D-7** | §4.2 | §4.2 requires row-level data access control *"if multisite/cost-centre separation is required (optional, TBD)"*. The SOW itself marks this optional and undetermined. | (a) Separation is required — implement per-user / per-cost-centre scoping on list routes. (b) Not required — close the row. | **(b)** unless the Client operates multiple sites with separate cost-centre visibility. The SOW wrote "optional, TBD"; leaving it unanswered leaves the row permanently open. | Client | Not required. Row closed as out of scope; no code. |
@@ -103,7 +103,7 @@ One line per decision, so the reasoning is auditable without re-reading the opti
 |---|---|
 | **D-2** | X7 already removed training from scope, so the criterion was unmeetable as written; deleting the limb resolves a standing contradiction instead of leaving a permanent failure. |
 | **D-3** | Matches the SOW formula literally and the common CMMS convention in which the operation carries total planned labour, and removes a crew multiplier the SOW never mentions. **Confirmed by the SOW owner. IMPLEMENTED in Phase E**, commit `ca9aa63`: the multiplier is gone from `computeWorkOrderCosts`, and the differential test proves the planned total changed by exactly the multiplier and by nothing else. |
-| **D-4** | A daily pg_dump against a 1-hour RPO objective is a 24x miss, and a plant cannot absorb a day of lost work orders. **Cannot be verified until a live PostgreSQL host and a second backup target are provided.** |
+| **D-4** | A daily pg_dump against a 1-hour RPO objective is a 24x miss, and a plant cannot absorb a day of lost work orders. *(Superseded 2026-10-05: this read "**Cannot be verified until a live PostgreSQL host and a second backup target are provided.**" Both were supplied and the rehearsal measured the RPO at 5 minutes — see the D-4 decision row.)* |
 | **D-5** | Internal use only, so no identity provider is needed. An integration that could be neither completed nor verified is worse than a recorded deviation. **Confirmed by the SOW owner: does not reopen.** |
 | **D-6** | SOW 1.3 and 3.9 both expect tablet and browser use, and the fixed sidebar plus multi-column tables are unusable at phone width. |
 | **D-7** | The SOW itself marks row-level data access control "optional, TBD" and no multisite cost-centre separation requirement has been stated. |
@@ -329,17 +329,42 @@ multiplier in `backend/src/utils/costs.ts:19` is removed and
 `plannedCost = plannedHours x craftRate` matches 3.5.1 exactly. The code change
 lands with row 49 in Phase E.
 
-**D-4 - backup RPO - confirmed `Build`, proof pending.** The WAL archiving config
-and the backup/restore scripts get written. The restore rehearsal needs a live
-PostgreSQL host (**held** since Phase G on this host) and a second backup target;
-the second target alone remains a **pending verification**, so the RPO proof is
-recorded as pending — explicitly **not** a scope reduction and not a waiver. The
-daily `pg_dump` mechanism already works and was rehearsed on 2026-09-29: the full
-`backup.bat` plus `restore-drill.bat` drill **passed** (newest dump of 189 work
-orders restored into `cmms_restore_test` in 5.75 s with 75/75 attachments
-verified and the drill database dropped). The WAL archiving configuration is
-written in `docs/ADMIN_GUIDE.md` §7.8 and its RPO proof remains pending the
-second backup target.
+**D-4 - backup RPO - confirmed `Build`, proof rehearsed 2026-10-05.** The WAL
+archiving config and the backup/restore scripts are written and were run. The
+restore rehearsal needed a live PostgreSQL host (**held** since Phase G on this
+host) and a second backup target; both are now in place — the target used was
+`C:\cmms-wal\wal`, and the path is deployment-configurable. The daily `pg_dump`
+mechanism was rehearsed first, on 2026-09-29: the full `backup.bat` plus
+`restore-drill.bat` drill **passed** (newest dump of 189 work orders restored
+into `cmms_restore_test` in 5.75 s with 75/75 attachments verified and the drill
+database dropped).
+
+The WAL limb was then rehearsed the same day by `scripts\pitr-drill.ps1`, which
+stands up a throwaway cluster with the `docs/ADMIN_GUIDE.md` §7.8 settings
+applied, archives segments to the secondary target, and restores a base backup
+into a second throwaway cluster to replay the archive to a chosen
+`recovery_target_time`. It **measured the RPO at 5 minutes**: 6 segments
+archived / 0 failed, observed commit-to-archive lag 1 s, `archive_timeout=300`
+bounding worst-case loss, and 340/340 work orders retained after recovery. The
+rehearsal also surfaced three defects a configuration review would have missed,
+all now documented in §7.8 — `copy` cannot be reused as `restore_command` on
+Windows, `recovery.signal` is required or recovery silently stops at the backup
+end LSN, and `pg_basebackup -X stream` hides post-backup WAL in the backup's own
+start segment.
+
+So the RPO proof is no longer pending, and matrix row 262 moved `Not Met → Met`.
+This remains **not** a scope reduction and not a waiver: the row was answered by
+building and measuring, which is what D-4 was confirmed to require. Row 261
+(§4.3, full/differential/transaction-log) stays `Partial` on the differential
+limb alone, and **on owner decision 2026-10-05 the differential limb is
+deliberately not planned** — not for want of tooling, since `pg_basebackup
+--incremental` and `pg_combinebackup` are community features and
+`pg_combinebackup.exe` resolves on this host, but because an incremental chain
+buys nothing against an RPO already bounded at 5 minutes while coupling every
+incremental to the full backup and to every incremental beneath it. That is a
+new decision if the Client ever wants it, not a residual on D-4. `archive_mode`
+is still `off` on the live cluster, so turning it on there with a real second
+target is a deployment step.
 
 **D-5 / row 76 - OAuth2 - waive confirmed, does not reopen.** Internal use only;
 no Azure AD and no on-premises AD. The 5.5 deviation stands as documented in
