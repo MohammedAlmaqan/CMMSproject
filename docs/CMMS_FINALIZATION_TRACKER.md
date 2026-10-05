@@ -1697,6 +1697,7 @@ Left column: the commit the tracker cites as the promotion evidence (build SHA, 
 | Post-H row 331 `this commit` — SOW §6.4 §3-implementation limb, accepted conditionally 2026-10-05 on failure capture landing (`1e4b28c`, run 182); NM→M; `this commit` = |
 | Owner decisions 2026-10-05 — SOW §3.5.2 cost-split editor deferral confirmed, no code, status unchanged `Partial`; §3.1.4 failure capture `1e4b28c` = |
 | Owner decisions 2026-10-05 — SOW §6.4 defect limb, four WCAG residuals accepted for v1.1 (v1.1-11..14), no code; NM→M; `this commit` = |
+| Owner decisions 2026-10-05 — SOW §4.3 backup mechanisms: transaction-log recovery accepted, differential declined (not deferred), row 261 stays `Partial`, L28 closed, no code = |
 
 ## Post-Go-Live Backlog (v1.1)
 

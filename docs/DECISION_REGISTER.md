@@ -323,6 +323,42 @@ the field, so the desktop layout stands. This retires the single largest
 discretionary item identified in Phase A. D-6's buildable subset is therefore not
 required, and the related PWA, offline, camera and signature items stay waived.
 
+**SOW §4.3 / row 261 - backup mechanisms - owner accepted transaction-log recovery and declined
+differential backup on 2026-10-05; no code.** Action Sheet item 6. The clause enumerates three mechanisms
+and the decision is to stand on two of them:
+
+| Mechanism | Position after this decision |
+|---|---|
+| Full | Delivered and verified — drill passed 2026-09-29 (189 work orders restored in 5.75 s, 75/75 attachments) |
+| Transaction log | Delivered and verified — `scripts/pitr-drill.ps1`, 2026-10-05 (6 archived / 0 failed, 1 s lag, `recovery_target_time` replay of 340/340 work orders) |
+| **Differential** | **Will not be built.** Not scheduled, not deferred to v1.1 |
+
+**Row 261 stays `Partial`, and that is the point rather than a failure to finish.** Two of three enumerated
+mechanisms are live; the third is not coming. The Action Sheet's own risk column said what would happen -
+"if it is neither built nor formally waived, the requirement stays open at acceptance" - and this is that
+outcome, arrived at deliberately. No row was moved to `Waived`, and no date is attached to building it
+later, because that would misdescribe the decision as an intention.
+
+**The reasoning holds on the measured numbers, which is the part worth keeping.** Worst-case loss is
+5 minutes (row 262), so the question is not whether differential backups are *good* but whether they would
+*help*: a differential taken every N hours makes the bound worse than the 5-minute WAL bound already
+measured, since recovery would then need the differential plus WAL from that point forward. Against that,
+an incremental chain couples every restore to base-plus-chain retention - one lost segment invalidates the
+chain - while WAL replay degrades gracefully and is already proven on this host. Accepting the mechanism
+that is already proven and faster than the alternative is the substantive reason, not a budget one.
+
+**Two things this decision explicitly does not touch.** It does not change §4.3/RPO (row 262), which
+stays `Met` on the WAL evidence and was not part of this call. And it does not put the live host into
+archiving mode - `archive_mode` is still off here, and row 262 records that as a deployment step rather
+than something this delivery has already done.
+
+**L28 is closed by this decision, with no code.** Its disposition used to read "V1.1-OPS - WAL archiving
+and differential backups, plus a documented point-in-time recovery drill against the 1-hour RPO". Both
+halves have moved in opposite directions from that: the RPO half is resolved because WAL plus the drill
+are built (G.3), so nothing in the v1.1 item was needed for it, and the differential half is declined
+outright rather than pushed to v1.1. The original text is kept in the row rather than deleted, because
+"closed as not going to be built" and "still owed in v1.1" are very different handovers.
+
 **SOW §6.4 / row 334 - no open Critical or Major defects - owner accepted the four WCAG residuals
 for v1.1 on 2026-10-05.** The clause is scoped to Critical and Major, so the question is whether any of
 them remain open. The two that were release-blocking are not: §3.3.7 safety-checklist gating and §3.3.2
