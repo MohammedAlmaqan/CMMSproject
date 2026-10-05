@@ -323,6 +323,29 @@ the field, so the desktop layout stands. This retires the single largest
 discretionary item identified in Phase A. D-6's buildable subset is therefore not
 required, and the related PWA, offline, camera and signature items stay waived.
 
+**SOW §6.4 / row 331 - §3 implementation limb - accepted conditionally 2026-10-05, condition
+discharged 2026-10-05.** The clause is a conjunction: every §3 requirement implemented, and the UAT
+scripts passing. The UAT-pack half had already closed at R.7, where
+`scripts\verify\verify_r7.py` independently recomputes and reconciles all ten reports against the base
+tables. The implementation half was held open by two §3 rows.
+
+The owner accepted this limb **conditionally, and the condition was not "accept it"**. The stated
+instruction was that it must not close on the strength of the acceptance alone, and that the dependency
+on Action Sheet item 1 had to be recorded and the item had to land before the row moved. Both happened, in
+that order: the dependency is recorded in the row 331 note, Action Sheet item 1 landed as `1e4b28c`
+(SOW §3.1.4 `Partial` → `Met`, CI run 182 green), and only then did the row move.
+
+The second open row, §3.5.2, is the cost-splitting editor: the percentage-allocation route is fully
+verified and no screen exposes the editor. That is held for v1.1 on owner decision 2026-10-04, which
+defers a sub-clause rather than leaving a §3 defect open, so the conjunction the clause requires is
+satisfied. The §3 tally re-derived from the Status column is 126 rows: 104 Met, 11 Waived, 7 Excluded,
+3 Deferred, 1 Partial, 0 Not Met.
+
+**Not a waiver, and not arithmetic.** Nothing was moved to `Waived` to make the total work. The 214 rows
+still spread across six statuses, and the one remaining §3 Partial is named in the row note rather than
+rounded away. If the cost-split editor is ever pulled into v1.1 scope, row 331 should be re-examined
+against the §3 total instead of being assumed still satisfied.
+
 **SOW §3.1.4 / row 8 - failure capture - confirmed `Build`, owner decision 2026-10-05.**
 The `FailureCode` table and its CRUD API were delivered and fully manageable, but
 no work order could name one: there was no column, so a maintained failure list had

@@ -1694,6 +1694,7 @@ Left column: the commit the tracker cites as the promotion evidence (build SHA, 
 | Post-H row 294 `271e445` (run 37149026522) | §5.4 api-versioning; NM→M; `0a437eb` |
 | Post-H D-18/D-19 decision | §2.2 custom-roles (NM→Waived), §4.6 availability (NM→Deferred); `1daa241` |
 | Post-H row 8 `1e4b28c` (run 182) | SOW §3.1.4 failure capture, owner decision 2026-10-05; PM→M; `1e4b28c` = |
+| Post-H row 331 `this commit` — SOW §6.4 §3-implementation limb, accepted conditionally 2026-10-05 on failure capture landing (`1e4b28c`, run 182); NM→M; `this commit` = |
 
 ## Post-Go-Live Backlog (v1.1)
 

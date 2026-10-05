@@ -242,6 +242,21 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # live cluster, so this records a proven and re-runnable mechanism rather
     # than a live host that is already archiving. Owner acceptance 2026-10-05.
     ("RPO < 1 hour", "Not Met", "Met", "this commit"),
+
+    # SOW 6.4 "All functional requirements listed in 3 are implemented and pass
+    # UAT scripts" (row 331) is a conjunction over section 3, so it was Not Met
+    # while any section 3 row stayed open. Two things closed it on 2026-10-05.
+    # The UAT-pack limb closed at R.7 (7e318bc, above). The implementation limb
+    # closed when the last two open rows resolved: 3.1.4 moved Partial -> Met in
+    # 1e4b28c (failure capture), and 3.5.2 is held for v1.1 on owner decision
+    # 2026-10-04, a deferral of a sub-clause rather than an open defect. The
+    # section 3 tally re-derived from the Status column is 126 rows: 104 Met,
+    # 11 Waived, 7 Excluded, 3 Deferred, 1 Partial, 0 Not Met. Owner accepted this
+    # limb conditionally on 2026-10-05, on the explicit condition that it must not
+    # close on acceptance alone; the condition was row 8 landing first, and it did.
+    # No row was reclassified to make the arithmetic work. "this commit" because
+    # the status change and this entry land together; backfill the SHA.
+    ("6.4 implementation", "Not Met", "Met", "this commit"),
 ]
 
 
