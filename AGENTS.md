@@ -21,6 +21,10 @@ reviewer correction; see "Commit discipline" below.
   change requires verifier expectations to move with it, both belong in the same
   commit — splitting them leaves a red gate in between.
 - Never bundle a code change with a docs change unless they are the same concern.
+- **Every commit carries `Co-Authored-By: Claude Opus 4.8 (1M context)
+  <noreply@anthropic.com>`.** Attribution is not optional and is not a
+  docs-only concern: a commit without the trailer is missing required metadata
+  regardless of what else it changes.
 - Before committing, re-read the diff. Do not trust an edit that was made from
   memory of the file's contents; re-read the actual line.
 
