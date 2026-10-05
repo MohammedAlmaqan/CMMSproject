@@ -12,6 +12,7 @@ import { craftService } from '@/services/craftService';
 import { materialService } from '@/services/materialService';
 import { safetyChecklistService } from '@/services/safetyChecklistService';
 import { attachmentService } from '@/services/attachmentService';
+import { failureCodeService } from '@/services/failureCodeService';
 import type { User, WorkOrder } from '@/types';
 
 vi.mock('@/services/workOrderService', () => ({
@@ -54,6 +55,10 @@ vi.mock('@/services/attachmentService', () => ({
   attachmentService: { getByEntity: vi.fn(), upload: vi.fn(), download: vi.fn(), remove: vi.fn() },
 }));
 
+vi.mock('@/services/failureCodeService', () => ({
+  failureCodeService: { getAll: vi.fn() },
+}));
+
 const adminUser: User = {
   userId: 'u-admin',
   username: 'admin',
@@ -86,6 +91,7 @@ const baseWo: WorkOrder = {
   safetyCriticalFlag: false,
     safetyNotes: null,
     causeCodeId: null,
+    failureCodeId: null,
   completionRemarks: null,
   plannedCost: 0,
   actualCost: 0,
@@ -118,6 +124,7 @@ describe('WorkOrderDetailPage', () => {
     vi.mocked(materialService.getAll).mockResolvedValue([]);
     vi.mocked(safetyChecklistService.getTemplates).mockResolvedValue([]);
     vi.mocked(attachmentService.getByEntity).mockResolvedValue([]);
+    vi.mocked(failureCodeService.getAll).mockResolvedValue([]);
     vi.mocked(workOrderService.transitionStatus).mockResolvedValue(baseWo);
   });
 
@@ -179,6 +186,34 @@ describe('WorkOrderDetailPage', () => {
     await waitFor(() => {
       expect(vi.mocked(workOrderService.transitionStatus)).toHaveBeenCalledWith('wo-1', 'Planned');
     });
+  });
+
+  it('says so when the failure-code lookup fails, instead of showing a list that looks complete', async () => {
+    // An empty dropdown is ambiguous: it reads as "no failure codes exist" when
+    // the truth may be "the lookup failed". The page still has to load - a
+    // secondary lookup must not take the work order down with it - but the
+    // picker must not pretend the list is complete.
+    vi.mocked(failureCodeService.getAll).mockRejectedValue(new Error('failure-code lookup down'));
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: 'Failure, Cause & Notes' }));
+
+    expect(
+      await screen.findByText(/Failure codes could not be loaded/)
+    ).toBeInTheDocument();
+  });
+
+  it('offers the failure picker without a warning when the lookup succeeds', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: 'Failure, Cause & Notes' }));
+
+    expect(await screen.findByLabelText('Failure code')).toBeInTheDocument();
+    expect(screen.queryByText(/Failure codes could not be loaded/)).not.toBeInTheDocument();
   });
 
   it('shows the Close transition for a Completed work order and calls transitionStatus', async () => {

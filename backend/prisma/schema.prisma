@@ -220,6 +220,8 @@ model FailureCode {
 
   parent FailureCode?  @relation("FailureCodeHierarchy", fields: [parentCodeId], references: [failureCodeId])
   children FailureCode[] @relation("FailureCodeHierarchy")
+
+  workOrders WorkOrder[]
 }
 
 model CauseCode {
@@ -360,6 +362,14 @@ model WorkOrder {
   // notification-converted breakdowns stay valid; the rule that a breakdown
   // must name a cause is enforced when it is completed, not when it is raised.
   causeCodeId         String?
+  // SOW 3.1.4 (owner decision 2026-10-05): the failure this work order was
+  // raised to correct, chosen from the FailureCode hierarchy. Deliberately
+  // distinct from `causeCodeId` because the two answer different questions:
+  // the failure records what was observed, the cause records why. Nullable,
+  // with no completion gate - the clause asks that a failure be recorded as
+  // data, and SOW 3.2.2's notification key fields name no failure code, so
+  // nothing in the SOW makes one mandatory before completion.
+  failureCodeId       String?
   // SOW 3.3.3: a long-text field for safety notes and completion remarks.
   // Delivered as multi-line plain text rather than WYSIWYG (the approved
   // default); job instructions remain the free-text `description` column. Both
@@ -397,6 +407,7 @@ model WorkOrder {
   supervisor         User     @relation("Supervisor", fields: [supervisorUserId], references: [userId])
   reportedBy         User     @relation("ReportedBy", fields: [reportedByUserId], references: [userId])
   causeCode          CauseCode? @relation(fields: [causeCodeId], references: [causeCodeId])
+  failureCode        FailureCode? @relation(fields: [failureCodeId], references: [failureCodeId])
   operations         WorkOrderOperation[]
   woMaterials        WorkOrderMaterial[]
   externalServices   ExternalServiceCost[]

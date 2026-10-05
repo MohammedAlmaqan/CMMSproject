@@ -289,6 +289,14 @@ export interface WorkOrder extends Auditable {
   /** SOW 3.1.4 (D5): root cause of a breakdown, chosen from CauseCode. Required before a breakdown can be completed. */
   causeCodeId: string | null;
   causeCode?: CauseCode | null;
+  /**
+   * SOW 3.1.4 (owner decision 2026-10-05): the failure this work order was
+   * raised to correct, chosen from the FailureCode hierarchy. Optional and with
+   * no completion gate — the failure is often known only once the asset is
+   * opened up, and no SOW clause makes one mandatory.
+   */
+  failureCodeId: string | null;
+  failureCode?: FailureCode | null;
   /** SOW 3.3.3 long-text field: multi-line plain text, not WYSIWYG. */
   safetyNotes: string | null;
   /** SOW 3.3.3 long-text field: multi-line plain text, not WYSIWYG. */

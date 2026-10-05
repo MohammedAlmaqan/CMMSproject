@@ -47,6 +47,12 @@ export const workOrderCreateSchema = z.object({
   // cause is known - but a breakdown cannot be completed without one, so the
   // picker on the work-order screen is the caller for this field.
   causeCodeId: z.string().min(1).nullable().optional(),
+  // SOW 3.1.4 (owner decision 2026-10-05): the failure this work order was
+  // raised to correct, chosen from the FailureCode hierarchy. Optional and
+  // nullable with no completion gate, unlike causeCodeId above: the failure is
+  // frequently known only once the asset is opened up, and nothing in the SOW
+  // makes one mandatory. The picker on the work-order screen is the caller.
+  failureCodeId: z.string().min(1).nullable().optional(),
   // SOW 3.3.3: the long-text field for safety notes and completion remarks.
   // Multi-line plain text; nullable because neither is required. The cap is a
   // sanity bound, not the column's limit (PostgreSQL text is unbounded).

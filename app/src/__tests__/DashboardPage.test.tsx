@@ -86,6 +86,7 @@ const storeWorkOrder: WorkOrder = {
   safetyCriticalFlag: false,
     safetyNotes: null,
     causeCodeId: null,
+    failureCodeId: null,
   completionRemarks: null,
   plannedCost: 0,
   actualCost: 0,

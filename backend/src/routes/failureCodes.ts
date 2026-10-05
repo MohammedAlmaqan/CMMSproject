@@ -38,9 +38,9 @@ function buildTree(flat: any[]): any[] {
  *     summary: List failure codes
  *     description: >
  *       Returns non-deleted failure codes, optionally filtered by a case-insensitive search
- *       over code and description. Note: as of v1.0.0 no work order column references this
- *       table, so failure/cause capture against a work order is not yet wired up - tracked
- *       as a v1.1 backlog item.
+ *       over code and description. Codes are selectable on a work order as of the
+ *       v1.1 failure-capture change (SOW 3.1.4): `WorkOrder.failureCodeId`
+ *       references this table and the work-order detail screen sets it.
  *     tags: [Failure Codes]
  *     security:
  *       - bearerAuth: []

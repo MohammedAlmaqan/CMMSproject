@@ -1,4 +1,4 @@
-# Phase A — Scope Freeze and Decision Register
+﻿# Phase A — Scope Freeze and Decision Register
 
 | | |
 |---|---|
@@ -322,6 +322,43 @@ that line explicitly.
 the field, so the desktop layout stands. This retires the single largest
 discretionary item identified in Phase A. D-6's buildable subset is therefore not
 required, and the related PWA, offline, camera and signature items stay waived.
+
+**SOW §3.1.4 / row 8 - failure capture - confirmed `Build`, owner decision 2026-10-05.**
+The `FailureCode` table and its CRUD API were delivered and fully manageable, but
+no work order could name one: there was no column, so a maintained failure list had
+nothing behind it. The owner was asked to build it before go-live and did, so
+`WorkOrder.failureCodeId` now references `FailureCode` (migration
+`20261005120000_work_order_failure_code`), both work-order reads return `failureCode`,
+and the work-order screen offers a Failure picker driven off the maintained list.
+`backend/tests/routes/failureCapture.test.ts` covers 11 cases.
+
+Two engineering calls inside that decision are worth recording, because both were
+choices rather than consequences:
+
+1. **A new column, not a reuse of `causeCodeId`.** A failure records what was
+   observed and a cause records why; a work order usually knows the first long
+   before the second. Reusing one column would force a choice between the two at
+   data-entry time and lose one of them. The consequence is that the breakdown
+   cause-code completion rule (D5, tracker H.4) is unchanged and still keyed on
+   `causeCodeId` alone - a failure code does not satisfy it, and
+   `failureCapture.test.ts` asserts exactly that boundary.
+2. **No completion gate on a failure code.** §3.2.2's notification key-field list
+   names no failure code and no clause makes one mandatory, so a blocking rule
+   would be a requirement this system invented. The field is therefore recorded as
+   data, not as a gate. If a gate is wanted later that is a new clause, not a
+   tightening of this one.
+
+**Correction to tracker v1.1-1.** That entry recorded the open items as "failure
+capture against a work order *and* cause/failure on notifications". The first is
+delivered above. The second is not evidenced by any §3 clause key-field -§3.2.2
+enumerates its notification fields (auto number, Type, Priority, Functional
+Location/Equipment, Reported By, Date & Time, Description, Breakdown indicator,
+Damages/observations) and a cause or failure code is not among them. Attributing it
+to §3.1.4 was an over-attribution, so it cannot hold row 8 open. Cause/failure
+capture on a notification remains available as an enhancement; recording it would
+need an SOW reference that does not exist or a new owner decision. This is a
+correction of a bookkeeping attribution, not a scope reduction: nothing was waived
+and no row was closed on acceptance alone.
 
 **D-3 - planned cost - confirmed per-operation total.** Planned hours are the
 operation's total labour, not per-technician, so the `numberOfTechnicians`

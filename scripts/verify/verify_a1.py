@@ -101,6 +101,19 @@ APPROVED_PROMOTIONS: list = [
     (4, "Partial", "Met", "5fc4383"),    # 3.1.2
     (5, "Partial", "Met", "5fc4383"),    # 3.1.2
     (6, "Partial", "Met", "5fc4383"),    # 3.1.3 craft rates
+    # SOW 3.1.4 "Cause codes as root-cause categories" (row 8) had two limbs.
+    # H.4 (9b1758c) closed the cause limb. The failure limb - a managed
+    # FailureCode list that no work order could name - closed on 2026-10-05
+    # under owner decision 1: WorkOrder.failureCodeId references FailureCode,
+    # both reads return it, and the work-order screen sets it
+    # (migration 20261005120000_work_order_failure_code,
+    # backend/tests/routes/failureCapture.test.ts). There is deliberately no
+    # completion gate on a failure code, because SOW 3.2.2's notification
+    # key-field list names none and no clause makes one mandatory. This entry
+    # cannot cite its own commit because the status change and this wiring land
+    # together; "this commit" is the sentinel the tracker already uses. Backfill
+    # the SHA. Durable anchor: owner decision 2026-10-05, tracker v1.1-1.
+    (8, "Partial", "Met", "this commit"),  # 3.1.4 failure capture
     (9, "Partial", "Met", "5fc4383"),    # 3.1.4 task lists
     (10, "Not Met", "Partial", "f3fc1ad"),  # 3.1.4 task lists per class
     (11, "Partial", "Met", "5fc4383"),   # 3.1.4 task-list copy
