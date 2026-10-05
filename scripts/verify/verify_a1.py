@@ -271,8 +271,8 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # heading and the per-item mitigating factor it records, not on a recorded
     # severity judgement. The missing Command Palette focus trap is the item most
     # likely to be argued up, since a focus trap is a real 2.1 AA criterion. Not a
-    # waiver: no row moved to Waived. "this commit" - backfill the SHA.
-    ("6.4 defects", "Not Met", "Met", "d7c8b74 (CI run 185 cancelled by the 2026-10-05 Actions incident; content green on descendant run 186)"),
+    # waiver: no row moved to Waived. Green CI at this SHA, run 185 (attempt 4).
+    ("6.4 defects", "Not Met", "Met", "d7c8b74 (green CI run 185, attempt 4)"),
 ]
 
 

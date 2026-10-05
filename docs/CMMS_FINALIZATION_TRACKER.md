@@ -1696,10 +1696,21 @@ Left column: the commit the tracker cites as the promotion evidence (build SHA, 
 | Post-H row 8 `1e4b28c` (run 182) | SOW §3.1.4 failure capture, owner decision 2026-10-05; PM→M; `1e4b28c` = |
 | Post-H row 331 `this commit` — SOW §6.4 §3-implementation limb, accepted conditionally 2026-10-05 on failure capture landing (`1e4b28c`, run 182); NM→M; `c86e890` (run 183, green) = |
 | Owner decisions 2026-10-05 — SOW §3.5.2 cost-split editor deferral confirmed, no code, status unchanged `Partial`; §3.1.4 failure capture `1e4b28c` (run 182); the §3.5.2 note itself is `47e02a2` (run 184, queued) = |
-| Owner decisions 2026-10-05 — SOW §6.4 defect limb, four WCAG residuals accepted for v1.1 (v1.1-11..14), no code; NM→M; `d7c8b74`, **CI run 185 cancelled by the 2026-10-05 Actions incident — no green run at this SHA; content green on descendant run 186** = |
+| Owner decisions 2026-10-05 — SOW §6.4 defect limb, four WCAG residuals accepted for v1.1 (v1.1-11..14), no code; NM→M; `d7c8b74`, **green CI run 185** (attempt 4; re-run after the 2026-10-05 Actions incident cancelled the first attempt) = |
 | Owner decisions 2026-10-05 — SOW §4.3 backup mechanisms: transaction-log recovery accepted, differential declined (not deferred), row 261 stays `Partial`, L28 closed, no code; `4ff8814` (run 186, green) = |
 
-## Pending CI verification (2026-10-05 GitHub Actions incident)
+## CI verification exceptions (2026-10-05 GitHub Actions incident)
+
+GitHub Actions lost hosted-runner assignment on 2026-10-05; affected runs show jobs `cancelled` with zero
+steps executed, which is runner loss rather than a test failure. Two commits from that window are
+recorded here permanently rather than pending.
+
+| Commit | State | Why |
+|---|---|---|
+| `d7c8b74` (row 334 `Not Met`→`Met`) | **Green, run 185 attempt 4** | Cancelled on attempt 1, re-run to `success` at its own SHA. Verified normally; the earlier pending note was replaced, not deleted. |
+| `a0fa86d` (row-8 SHA backfill) | **No run, permanently** | Interior commit of the same push as `c86e890`; Actions fires one run per push at the tip SHA, so no run can exist at this SHA. Content verified by descendant run 186 (`4ff8814`). |
+| `47e02a2` (row 175 note) | **No green run** | Run 184 attempt 3: Frontend green through 10 steps, Backend `cancelled` with zero steps. Partial coverage, not a failure. Note-only change; no status moved. |
+
 
 GitHub Actions failed to assign hosted runners on 2026-10-05. Two commits pushed during the incident
 have **no green run at their own SHA**: `a0fa86d`, which never had a run created because it shared a

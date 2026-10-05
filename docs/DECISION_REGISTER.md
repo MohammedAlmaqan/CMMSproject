@@ -416,18 +416,23 @@ the usual "verified by green CI at `<sha>`, run N" citation.
 | Commit | What it promotes | Run | State |
 |---|---|---|---|
 | `1e4b28c` | row 8 §3.1.4 failure capture `Partial`→`Met` | 182 | **Green** |
-| `a0fa86d` | backfill of the row-8 SHA into the verifier and tracker | **none** | **No run was ever created.** Pushed in the same push as `c86e890`; Actions fires once per push at the tip SHA, so this commit has no run of its own. Its content is exercised by runs 183 and 186. |
+| `a0fa86d` | backfill of the row-8 SHA into the verifier and tracker | **none, permanently** | **No run can exist at this SHA.** Pushed in the same push as `c86e890`; Actions fires one run per push at the tip SHA, so an interior commit never gets its own. Permanent, not pending — re-pushing does not create one. Content verified by descendant run 186 (`4ff8814`). |
 | `c86e890` | row 331 §6.4 / a `Not Met`→`Met` | 183 | **Green** |
-| `47e02a2` | §3.5.2 cost-split deferral confirmation (no status change) | 184 | Queued when last checked |
-| `d7c8b74` | row 334 §6.4 / b `Not Met`→`Met` | 185 | **Cancelled, zero steps executed.** No green run at this SHA. Content is green on descendant run 186 (`4ff8814`). |
+| `47e02a2` | §3.5.2 cost-split deferral confirmation (no status change) | 184 | Attempt 3, `failure`: Frontend green through all 10 steps, Backend `cancelled` with zero steps executed. Partial runner loss, not a test failure. |
+| `d7c8b74` | row 334 §6.4 / b `Not Met`→`Met` | 185 | **Green** (attempt 4). Run 185 was `cancelled` with zero steps executed by the 2026-10-05 Actions incident and later re-run to green at this SHA, so this promotion is verified by a run of its own. |
 | `4ff8814` | §4.3 backup decision (no status change) | 186 | **Green** |
 
-**Two are genuinely unverified at their own SHA and are recorded as such: `a0fa86d` and `d7c8b74`.** Both
-are documentation-only, and both had their content exercised by a green run on a descendant commit, so
-the risk is small — but small is not the same as green, and the matrix notes now say so in those words
-rather than implying verification that does not exist. **`d7c8b74` is the one worth watching, because it
-is a status promotion**: row 334 moves `Not Met`→`Met` with no green run at the SHA that made the move.
-No other promotion in this set lacks one.
+**One commit can never have a green run at its own SHA: `a0fa86d`.** It was pushed in the same push as
+`c86e890`, and Actions fires one run per push at the tip SHA, so an interior commit never receives its
+own run. That is a property of how Actions works, not a gap someone left open, and re-pushing will not
+create one — so it is recorded permanently rather than as pending. Its content is verified by
+descendant run 186 (`4ff8814`). **`d7c8b74` is no longer in this category:** run 185 was cancelled by the
+2026-10-05 incident and has since been re-run to `success` at attempt 4, so row 334 is verified by a run
+of its own and the pending note has been replaced. **Separately, `47e02a2` (run 184) has no green run
+either**, though for a different reason: attempt 3 ran Frontend to completion through all 10 steps and
+had Backend cancelled with zero steps, so the run is a partial record of partial coverage rather than
+either a pass or a test failure. Its content is a note-only change to row 175.
+
 
 Not a billing or account problem, and nothing to fix in the repository — for the record: 2,000
 included minutes, 215 used, $0 charged, and runs 177-182 in this repo's own history are all green.
