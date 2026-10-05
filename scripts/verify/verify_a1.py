@@ -257,6 +257,22 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # No row was reclassified to make the arithmetic work. "this commit" because
     # the status change and this entry land together; backfill the SHA.
     ("6.4 implementation", "Not Met", "Met", "this commit"),
+
+    # SOW 6.4 "No open Critical or Major defects at go-live" (row 334). The clause
+    # is scoped to Critical and Major, and the two defects that were release-blocking
+    # are remediated and verified: 3.3.7 safety-checklist gating and 3.3.2
+    # role-enforced transitions are both Met on the DB-backed suites, with 3.3.5
+    # labour attribution and 3.2.1/3.2.3 notification generation closed at Phase F
+    # and the UAT pack delivered at R.7. Four WCAG findings remain open and the
+    # owner reviewed each by name on 2026-10-05 and accepted them for v1.1; they are
+    # now named backlog items (v1.1-11..14) rather than prose. Worth recording that
+    # docs/WCAG-AUDIT.md carries no severity scale at all, so "none of these four is
+    # Critical or Major" rests on the audit's own "acceptable for light pass"
+    # heading and the per-item mitigating factor it records, not on a recorded
+    # severity judgement. The missing Command Palette focus trap is the item most
+    # likely to be argued up, since a focus trap is a real 2.1 AA criterion. Not a
+    # waiver: no row moved to Waived. "this commit" - backfill the SHA.
+    ("6.4 defects", "Not Met", "Met", "this commit"),
 ]
 
 

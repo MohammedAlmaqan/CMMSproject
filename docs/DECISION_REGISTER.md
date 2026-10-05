@@ -323,6 +323,37 @@ the field, so the desktop layout stands. This retires the single largest
 discretionary item identified in Phase A. D-6's buildable subset is therefore not
 required, and the related PWA, offline, camera and signature items stay waived.
 
+**SOW §6.4 / row 334 - no open Critical or Major defects - owner accepted the four WCAG residuals
+for v1.1 on 2026-10-05.** The clause is scoped to Critical and Major, so the question is whether any of
+them remain open. The two that were release-blocking are not: §3.3.7 safety-checklist gating and §3.3.2
+role-enforced transitions are both `Met` on the DB-backed suites, and §3.3.5 labour attribution and
+§3.2.1/§3.2.3 notification generation closed at Phase F, with the UAT pack delivered at R.7. The four
+residuals the owner accepted, named so the acceptance is auditable:
+
+| # | Gap | Mitigating factor recorded in the audit |
+|---|---|---|
+| 1 | Command Palette overlay has no focus trap | Escape/Enter work; focus returns naturally on close |
+| 2 | `WorkOrderDetailPage` inline edit rows reuse `aria`-labelled controls | Edits are mechanically equivalent |
+| 3 | Chart tick text contrast on plot backgrounds | `≥ 4.5:1` in most panes; axis strokes are decorative and excluded from the text-contrast rule |
+| 4 | `title`-labelled icon buttons take their accessible name from `title` | `title` does supply an accessible name; left as-is |
+
+**The honest caveat, because it is the weak link in this closure.** `docs\WCAG-AUDIT.md` has **no
+severity scale** - no Critical/Major/Minor classification anywhere. So the claim that none of these four
+is Critical or Major is an inference from the section heading "Known remaining gaps (acceptable for light
+pass)" plus the per-item mitigating factor recorded above, not a severity judgement anyone wrote down. If
+this clause is ever audited adversarially, that is the first thing a reviewer will press on, and the row
+note says so in the same words. Item 1 is the one to watch: a missing focus trap is a genuine 2.1 AA
+criterion rather than a cosmetic gap, and it is the item most likely to be argued up.
+
+**Not a waiver.** No row moved to `Waived`, and the four are not left as an untracked paragraph - they are
+named backlog items v1.1-11 through v1.1-14, so the acceptance is a scheduling decision with a visible
+queue behind it rather than a disappearance. Withdrawing the acceptance reopens this row on item 1 first.
+
+Also recorded, because it is easy to assume otherwise: `scripts\verify\verify_g3_5.py` drives this audit
+through a live browser against `localhost:3000` and is **not** part of the standing gate. It was not run
+for this entry, so the closure rests on the audit document plus the DB-backed suites, not on a fresh
+automated pass.
+
 **SOW §3.5.2 / row 175 - cost-split editor - v1.1 deferral confirmed 2026-10-05, no code.** The
 percentage-allocation route is delivered and verified (18 live cases at Phase F, `e2a005d`), and no
 screen exposes it, so the allocation is not usable from the product. The owner was asked to confirm or
