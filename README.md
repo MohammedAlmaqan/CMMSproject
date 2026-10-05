@@ -227,6 +227,7 @@ All routes are under `/api`. Full request/response schemas are in Swagger at `/a
 | `scripts\start.bat` | Start the API (PM2 if present, else `node dist/index.js`) and the frontend dev server |
 | `scripts\backup.bat` | Database backup |
 | `scripts\restore-drill.bat` | Verify a backup actually restores |
+| `scripts\pitr-drill.ps1` | Prove WAL archiving + point-in-time recovery and measure the RPO (ADMIN_GUIDE 7.8) |
 | `scripts\seed-demo.bat` | **Destructive** demo reseed, fresh installs only |
 | `scripts\verify\` | One-off per-phase verification scripts left over from the finalization work (Python/TS) |
 | `scripts\k6\smoke.js` | k6 smoke test |

@@ -218,6 +218,17 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     ("6.2 deployment-guide", "Partial", "Met", "5dd4cb7"),
     ("6.4 report-correctness", "Not Met", "Met", "7e318bc"),
     ("6.4 docs-and-training", "Partial", "Met", "5dd4cb7"),
+
+    # SOW 4.3 "RPO < 1 hour" (row 262). The blocker this row named was the
+    # absence of a second backup target, so the drill supplies one and measures
+    # the objective instead of asserting it: on 2026-10-05 scripts/pitr-drill.ps1
+    # archived WAL to a local secondary path and restored to a chosen
+    # recovery_target_time. Observed commit-to-archive lag 1 s, with
+    # archive_timeout=300 bounding worst-case loss to 5 minutes. The archive
+    # target is deployment-configurable, and archive_mode is still off on the
+    # live cluster, so this records a proven and re-runnable mechanism rather
+    # than a live host that is already archiving. Owner acceptance 2026-10-05.
+    ("RPO < 1 hour", "Not Met", "Met", "this commit"),
 ]
 
 

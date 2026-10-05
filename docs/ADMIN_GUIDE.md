@@ -441,12 +441,12 @@ It prints `PASS` only if all of that succeeded, and cleans up the scratch databa
 
 ### 7.6 Recovery objectives
 
-- **RPO - up to 24 hours.** The backup is daily, so a failure between runs can lose a day's work. The D-4 WAL archiving configuration ([7.8](#78-wal-archiving-configuration-d-4)) is written to narrow this toward 1 hour; its proof is pending a second backup target.
+- **RPO - measured at 5 minutes with WAL archiving on, 24 hours without it.** The daily `pg_dump` alone gives an RPO of up to 24 hours, because a failure between runs loses a day of work. With the WAL archiving configuration in [7.8](#78-wal-archiving-configuration-d-4) enabled, the objective is met and no longer asserted: measured on this host 2026-10-05 at an observed commit-to-archive lag of **1 s** with `archive_timeout=300`, which bounds worst-case loss to **5 minutes**. That bound only holds once `archive_mode=on` is actually set on the running host.
 - **RTO - measured, not designed.** The installation guide records a 5.35 second restore measured on 2026-09-25 against a local dataset of 84 work orders and a 306,826-byte dump. That is a restore of the *database into a scratch database on the same host*; it excludes application rebuild time, IIS configuration, and the attachment restore. Re-measure after meaningful database growth or any infrastructure change, and record the new figure rather than quoting the old one.
 
-The two together mean a nightly backup gives you a working system again within minutes, but potentially a day of data loss. If the plant cannot accept a day of loss, the daily schedule is the thing to change - the tooling supports a more frequent run, because retention and naming are time-based.
+The two together mean a nightly backup gives you a working system again within minutes, but potentially a day of data loss. If the plant cannot accept a day of loss, either enable WAL archiving per [7.8](#78-wal-archiving-configuration-d-4) or schedule `backup.bat` more often - the tooling supports a more frequent run, because retention and naming are time-based.
 
-The drill was re-measured on 2026-09-29 against the `cmms` database at 189 work orders and a 730,878-byte dump (post-migration): restore completed in 5.75 seconds with 75/75 attachment files verified and the scratch database dropped. PITR via WAL replay ([7.8](#78-wal-archiving-configuration-d-4)) is not yet measured.
+The drill was re-measured on 2026-09-29 against the `cmms` database at 189 work orders and a 730,878-byte dump (post-migration): restore completed in 5.75 seconds with 75/75 attachment files verified and the scratch database dropped. PITR via WAL replay ([7.8](#78-wal-archiving-configuration-d-4)) was measured separately on 2026-10-05 by `scripts\pitr-drill.ps1` against a 1,632,927-byte dump at 340 work orders: replay from the archive stopped at a chosen `recovery_target_time` in 1.64 s, keeping the transaction committed before the target and discarding the one committed after it.
 
 ### 7.7 Full system recovery order
 
@@ -474,7 +474,27 @@ max_connections = 100          # see 14.3 connection-pool sizing
 
 Apply by editing `postgresql.conf` and restarting PostgreSQL, or by `ALTER SYSTEM SET ... ; SELECT pg_reload_conf();` for the settings that allow it (`archive_mode` needs a restart). Point-in-time recovery is then a `pg_basebackup` (or the latest full `pg_dump`) plus replay of the archived WAL segment series up to the desired point.
 
-**Proof status - pending verification, not a scope reduction.** The configuration above is written and rehearsable against a live host (held since Phase G), but its RPO proof requires a **second backup target** that is not yet available to this host. The RPO < 1 hour row in `docs/SOW_COMPLIANCE.md` (§4.3) stays `Not Met` until that pending proof lands; the full backup/restore drill in 7.5 already passes on this host.
+**The restore side needs `restore_command`, and not the same command as the archive side.** Recovering to a point in time requires both of these, and omitting either one fails quietly:
+
+```
+restore_command = 'powershell.exe -NoProfile -Command Copy-Item -LiteralPath <SECOND-BACKUP-TARGET>/wal/%f -Destination %p -Force'
+recovery_target_time = '2026-10-05 17:29:45+03'
+recovery_target_inclusive = on
+recovery_target_action = 'promote'
+```
+
+- **Do not reuse `copy` for `restore_command` on Windows.** The archive form `copy /Y "%p" <target>/%f` works because its destination is absolute. PostgreSQL expands `%p` for a restore as the *relative* `pg_wal/RECOVERYXLOG`, and cmd parses the `/` in that as an option switch, so the copy silently transfers 0 files and recovery ends with `invalid checkpoint record` or `could not locate required checkpoint record`. PowerShell's `Copy-Item` has no such parsing rule.
+- **`recovery.signal` must exist in the data directory.** Without it PostgreSQL only performs crash recovery from `backup_label`, stops at the backup's end LSN, and ignores `restore_command` and `recovery_target_time` entirely - the cluster comes up looking healthy, with every transaction after the backup missing.
+- **Take the base backup with `pg_basebackup -X none` for this workflow.** With `-X stream` the backup's `pg_wal` holds a *truncated* copy of the segment the backup began in; recovery prefers that local file, stops at the backup end, and skips WAL that was written to that same segment after the backup finished. Replaying from the archive is what the RPO argument depends on anyway.
+
+**Proof status - measured 2026-10-05, and reproducible.** `scripts\pitr-drill.ps1` stands up a throwaway cluster on its own port, applies the settings above with the target pointed at a real directory (`C:\cmms-wal\wal` for the rehearsal - the value is deployment-configurable and any local path works), loads a `pg_dump` of the live database, and then proves both halves: it archives segments (`pg_stat_archiver` reported 6 archived / 0 failed) and restores the base backup into a *second* throwaway cluster, replaying from the archive to a `recovery_target_time` placed between two committed marker rows. The drill asserts the marker before the target is present, the marker after it is absent, and the application row count matches (340/340 work orders); the log shows `recovery stopping before commit of transaction 962`, `selected new timeline ID: 2` and `archive recovery complete`.
+
+```powershell
+$env:PGPASSWORD = '...'
+scripts\pitr-drill.ps1 -ArchiveDir C:\cmms-wal
+```
+
+What this does **not** do is change the live cluster: `archive_mode` is still `off` on the `localhost:5432` instance, so nothing is archiving yet. Turning it on there, with a real second target, is the remaining deployment step.
 
 ---
 
