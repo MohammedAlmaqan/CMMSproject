@@ -113,7 +113,7 @@ APPROVED_PROMOTIONS: list = [
     # cannot cite its own commit because the status change and this wiring land
     # together; "this commit" is the sentinel the tracker already uses. Backfill
     # the SHA. Durable anchor: owner decision 2026-10-05, tracker v1.1-1.
-    (8, "Partial", "Met", "this commit"),  # 3.1.4 failure capture
+    (8, "Partial", "Met", "1e4b28c"),  # 3.1.4 failure capture
     (9, "Partial", "Met", "5fc4383"),    # 3.1.4 task lists
     (10, "Not Met", "Partial", "f3fc1ad"),  # 3.1.4 task lists per class
     (11, "Partial", "Met", "5fc4383"),   # 3.1.4 task-list copy
