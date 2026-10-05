@@ -323,6 +323,22 @@ the field, so the desktop layout stands. This retires the single largest
 discretionary item identified in Phase A. D-6's buildable subset is therefore not
 required, and the related PWA, offline, camera and signature items stay waived.
 
+**SOW §3.5.2 / row 175 - cost-split editor - v1.1 deferral confirmed 2026-10-05, no code.** The
+percentage-allocation route is delivered and verified (18 live cases at Phase F, `e2a005d`), and no
+screen exposes it, so the allocation is not usable from the product. The owner was asked to confirm or
+reverse the deferral and confirmed it. **Status unchanged at `Partial`**, which is the honest reading:
+confirming a deferral improves nothing about the editor, and a row whose clause is half built should
+not read `Met`. It is not a waiver either - no row was moved to `Waived`.
+
+Two things worth recording because they are easy to misread later. First, **the validation the screen
+would need already exists server-side**: the route rejects a set that does not total 100 and any line
+below the floor with 400s, and replaces the whole set in one transaction so a partially applied
+allocation cannot be left behind. Reversing the deferral is a surface, not a feature. Second, **this row
+is the last `Partial` in §3**, and §6.4 / row 331 closed on 2026-10-05 on the basis that a deferred
+sub-clause is not an open §3 defect. That reasoning is sound while the deferral stands, and it stops
+being sound the moment the editor is pulled into scope - so a reversal has to reopen row 331 rather
+than just flip row 175.
+
 **SOW §6.4 / row 331 - §3 implementation limb - accepted conditionally 2026-10-05, condition
 discharged 2026-10-05.** The clause is a conjunction: every §3 requirement implemented, and the UAT
 scripts passing. The UAT-pack half had already closed at R.7, where
