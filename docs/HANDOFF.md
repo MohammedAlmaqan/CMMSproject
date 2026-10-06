@@ -36,7 +36,7 @@
 - **7.2 System Architecture** `2643cb8` — `docs/ARCHITECTURE.md`. Accepted as B.2.
 - **7.3 ER diagram + data dictionary** `7c093d8` — `docs/ER_DIAGRAM.md` (hand-authored Mermaid, no new deps) + `docs/DATA_DICTIONARY.md` (35 models then; 38 models today, 7 domains). Accepted as B.3.
   - Verification method worth reusing: the diagram was **cross-checked programmatically against `schema.prisma`** — entity count, braces, cardinality tokens, 45 FK columns matched per table and per column, and 45 relationship edges matched 45 `@relation`s with none invented and none missing. That check caught a genuinely dropped `MAINTENANCE_PLAN → TASK_LIST` edge. **This is the standard for future generated docs.**
-- **7.4 API reference** — `docs/API_REFERENCE.md` written; at the time only `workOrders.ts` was annotated and 23 routers / 108 endpoints lacked `@openapi` blocks. Today every router carries `@openapi` annotations (26 routers, 133 ops).
+- **7.4 API reference** — `docs/API_REFERENCE.md` written; at the time only `workOrders.ts` was annotated and 23 routers / 108 endpoints lacked `@openapi` blocks. Today every router carries `@openapi` annotations (27 routers, 141 ops; the earlier reading of 26 routers / 133 ops, counted 2026-10-02, is superseded).
 
 ### Deferred to v1.1 (triaged 2026-09-25, no v1.0.0 scope change)
 
