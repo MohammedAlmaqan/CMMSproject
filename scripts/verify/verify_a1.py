@@ -284,6 +284,22 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # backfilled the real SHA once its push-run was in. Durable anchor: decision D-7, confirmed by
     # the SOW owner 2026-10-05, and the row-260 Note in SOW_COMPLIANCE.md.
     ("4.2 multisite-cost-centre", "Not Met", "Met", "59c38b5 (green CI run 189 at e4d3f95)"),
+
+    # SOW 5.5 "Authentication via OAuth2 / OpenID Connect, with Azure AD or
+    # on-premises AD integration" (row 298). Waived under decision D-5, which
+    # named §5.5 and §3.10 together and was owner-accepted 2026-09-26: no Azure
+    # AD or on-premises AD is available, and retained first-party JWT login was
+    # recorded as a formal SOW 5.5 deviation. Row 76 (§3.10) already carried
+    # Waived from the same decision; row 298 never moved. This is exactly the
+    # case the Waived status exists for - a documented, closing-decision record
+    # rather than a silent Not Met - and D-5's own outcome says "waived as a
+    # formal, documented SOW 5.5 deviation", matching the register closing note
+    # "the 5.5 deviation stands as documented in D-5". Not a build and not a
+    # deferral: nothing is unbuilt and nothing reopened. "this commit" because
+    # the status change and this entry land together; backfill the SHA. Durable
+    # anchor: decision D-5, its 2026-09-26 owner confirmation, and the row-298
+    # Note in SOW_COMPLIANCE.md.
+    ("5.5 oauth2", "Not Met", "Waived", "this commit"),
 ]
 
 
