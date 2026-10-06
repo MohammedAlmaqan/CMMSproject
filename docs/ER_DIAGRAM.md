@@ -174,6 +174,8 @@ erDiagram
         string status
         boolean breakdownFlag
         boolean safetyCriticalFlag
+        string causeCodeId FK
+        string failureCodeId FK
         datetime plannedStart
         datetime plannedFinish
         string sourcePlanId
@@ -429,6 +431,8 @@ erDiagram
     USER ||--o{ SYSTEM_ALERT : "notified"
     USER ||--o{ COMMENT : "writes"
     WORK_ORDER ||--o{ WORK_ORDER_OPERATION : "comprises"
+    CAUSE_CODE ||--o{ WORK_ORDER : "names a cause on"
+    FAILURE_CODE ||--o{ WORK_ORDER : "names a failure on"
     WORK_ORDER ||--o{ WORK_ORDER_MATERIAL : "consumes"
     WORK_ORDER ||--o{ EXTERNAL_SERVICE_COST : "purchased through"
     WORK_ORDER ||--o{ COST_SPLIT : "charged to"
@@ -458,11 +462,13 @@ erDiagram
 These are properties of the current schema, recorded so the diagram is not read as
 promising more than the schema delivers.
 
-1. **`CAUSE_CODE` has no foreign key at all.** Neither `CAUSE_CODE` nor `FAILURE_CODE` is
-   referenced by `WORK_ORDER` or `NOTIFICATION`. Both hierarchies exist as reference data,
-   but no column currently records a failure or cause against a work order. This is a
-   functional gap, not a modelling convenience — see
-   [DATA_DICTIONARY.md](./DATA_DICTIONARY.md#org--master-data) for the exact field state.
+1. **`CAUSE_CODE` and `FAILURE_CODE` are reference hierarchies, now wired to work.**
+   `WORK_ORDER.causeCodeId` (SOW 3.1.4, H.4, `9b1758c`) and `WORK_ORDER.failureCodeId`
+   (owner decision 2026-10-05, run 182, `ON DELETE SET NULL`) are nullable foreign keys,
+   so a work order can name a cause and a failure mode while the code tables remain
+   reference data that outlives any single order. Both columns are nullable: a work order
+   need not know its cause before one is recorded, and no join on `NOTIFICATION` exists —
+   only `WORK_ORDER` references either hierarchy.
 
 2. **`MAINTENANCE_PLAN.functionalLocationId` is not a foreign key.** The column exists
    (nullable) and is listed above without a `FK` marker, because the schema declares no
@@ -476,10 +482,11 @@ promising more than the schema delivers.
    no database foreign key, so the database cannot guarantee the target row exists.
    `Attachment.uploadedByUserId` is likewise a plain string with no `USER` relation.
 
-4. **Five tables stand alone** and intentionally have no foreign key: `CAUSE_CODE`
-   (self-reference aside, see 1), `ATTACHMENT`, `SYSTEM_CONFIG`, `SCHEDULER_RUN` and
-   `SEQUENCE_COUNTER`. The last three are infrastructure for the application, not for the
-   maintenance domain.
+4. **Five tables carry no foreign key of their own**: `CAUSE_CODE` (a leaf of the failure
+   taxonomy — referenced by `WORK_ORDER`, see 1 — but holding no `*Id` of its own),
+   `ATTACHMENT` (its `uploadedByUserId` is a plain string, see 3), `SYSTEM_CONFIG`,
+   `SCHEDULER_RUN` and `SEQUENCE_COUNTER`. The last three are infrastructure for the
+   application, not for the maintenance domain.
 
 5. **Optional parents are drawn as `o|`.** `WORK_ORDER.equipmentId`,
    `NOTIFICATION.equipmentId`, `TASK_LIST.equipmentId`, `MAINTENANCE_PLAN.equipmentId` and
