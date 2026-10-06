@@ -4,7 +4,8 @@ import { prisma } from '../../src/utils/prisma.js';
 
 // SOW 3.1.4 (matrix row 8, deferred item D5): cause codes as root-cause
 // categories. The CauseCode table existed but no work order could name one, so
-// MTTR-by-cause (row 62) had no data behind it.
+// the MTTR report (row 62, SOW §3.7.1 per equipment/location) had no breakdown
+// data behind it.
 //
 // The rule under test is deliberately at the end of the lifecycle, not the
 // start: a breakdown may be raised before its cause is known, but it cannot be

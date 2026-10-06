@@ -87,8 +87,9 @@ export function highestPriority(priorities: string[]): string {
  * A breakdown may be raised before anyone knows why the machine stopped, so the
  * cause is not required at creation. It is required at the other end: a
  * breakdown cannot be recorded as Completed until it names a cause. Without this
- * the CauseCode column would be optional everywhere and the MTTR-by-cause
- * report (row 62) would rest on data nobody was ever asked for.
+ * the CauseCode column would be optional everywhere and the MTTR report
+ * (row 62, SOW §3.7.1 per equipment/location) would rest on breakdowns whose
+ * stored cause is whatever was left blank.
  *
  * The check is written against the *effective* values, not the submitted body:
  * an edit that completes a work order whose cause was set earlier, or that
