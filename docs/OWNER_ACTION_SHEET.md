@@ -1,6 +1,6 @@
 # Owner Action Sheet — go-live decisions
 
-Ten items need your answer. Thirteen more I will close without you. Nothing else is waiting.
+Seven items need your answer. Thirteen more I will close without you. Nothing else is waiting.
 
 **Table 1 — Owner decisions**
 
