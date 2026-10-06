@@ -6,7 +6,7 @@ Reference documentation for the CMMS REST API, version 1.0.0.
 - **Interactive UI:** `/api-docs` (Swagger UI)
 - **Machine-readable spec:** [`openapi.json`](./openapi.json) (OpenAPI 3.0.0, also served live at `/api-docs.json`)
 
-The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The checked-in `docs/openapi.json` is an exported snapshot and may lag the newest routes (the routers currently expose 133 operations; the committed export was taken at 114 operations / 71 paths) — re-export it after a fresh build by saving `/api-docs.json`.
+The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The generated spec lags the repository by exactly one operation: `POST /api/cause-codes` (`backend/src/routes/causeCodes.ts`) carries no `@openapi` block, so live `/api-docs.json` omits it. This document therefore counts **141 operations across 87 paths and 27 routers**; the live spec reports 140. The checked-in `docs/openapi.json` is an exported snapshot of the live spec, refreshed from a running server on 2026-10-06 (140 operations / 87 paths — earlier exports lagged; the 2026-10-02 export showed 114 operations / 71 paths). Re-export it after a fresh build by saving `/api-docs.json`.
 
 ## Authentication
 
@@ -54,7 +54,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 
 ## Endpoint groups
 
-133 operations across 84 paths and 26 routers. Counted live from a running server's `/api-docs.json` on 2026-10-02; the stale `docs/openapi.json` snapshot shows 114 across 71 paths.
+141 operations across 87 paths and 27 routers, counted against the running server's `/api-docs.json` on 2026-10-06. The repository routers are the reference: live `/api-docs.json` reports 140 because `POST /api/cause-codes` is un-annotated (see above). The previous 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
 
 | Group | Base path | Operations |
 | --- | --- | --- |
@@ -65,8 +65,9 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 | Work Centers | `/api/work-centers` | 6 |
 | Materials | `/api/materials` | 7 |
 | Failure Codes | `/api/failure-codes` | 6 |
+| Cause Codes | `/api/cause-codes` | 5 |
 | Task Lists | `/api/task-lists` | 5 |
-| Notifications | `/api/notifications` | 6 |
+| Notifications | `/api/notifications` | 7 |
 | Work Orders | `/api/work-orders` | 7 |
 | Work Order Operations | `/api/work-order-operations` | 4 |
 | Work Order Materials | `/api/work-order-materials` | 4 |
@@ -81,7 +82,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 | Comments | `/api/comments` | 3 |
 | Attachments | `/api/attachments` | 4 |
 | Audit Log | `/api/audit-log` | 1 |
-| Users | `/api/users` | 5 |
+| Users | `/api/users` | 7 |
 | Dashboard | `/api/dashboard` | 3 |
 | System Config | `/api/system-config` | 2 |
 
@@ -377,12 +378,14 @@ Upload takes a `multipart/form-data` body with a single `file` part. Files are c
 | Method | Path | Summary |
 | --- | --- | --- |
 | GET | `/api/users` | List all users (Administrator only) |
+| POST | `/api/users` | Create an active user (Administrator only) |
 | GET | `/api/users/options` | List active users for pickers |
 | GET | `/api/users/{id}` | Get one user |
 | PUT | `/api/users/{id}` | Update a user (Administrator only) |
+| DELETE | `/api/users/{id}` | Soft delete a user (Administrator only) |
 | PUT | `/api/users/{id}/password` | Change a password |
 
-Use `/api/users/options` for dropdown and assignee fields; it is available from the Requester role upwards. Password hashes are never returned. A user may change their own password by supplying `currentPassword`; an Administrator may set any user's password without it.
+Use `/api/users/options` for dropdown and assignee fields; it is available from the Requester role upwards. Password hashes are never returned. Creation (`POST`, validated by `userCreateSchema`) and deletion (`DELETE`, which sets `isDeleted` and `isActive` to `false` rather than removing the row) are Administrator-only. A user may change their own password by supplying `currentPassword`; an Administrator may set any user's password without it.
 
 ### Dashboard
 
