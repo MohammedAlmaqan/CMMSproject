@@ -273,6 +273,18 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # likely to be argued up, since a focus trap is a real 2.1 AA criterion. Not a
     # waiver: no row moved to Waived. Green CI at this SHA, run 185 (attempt 4).
     ("6.4 defects", "Not Met", "Met", "d7c8b74 (green CI run 185, attempt 4)"),
+
+    # SOW 4.2 "Row-level data access control if multisite/cost-centre separation is required
+    # (optional, TBD)" (row 260). The clause is conditional, so the question was never whether
+    # per-cost-centre scoping exists but whether it is required. The owner answered 2026-10-05:
+    # multisite cost-centre separation is not required for a single-site plant - the same fact
+    # D-18 rested on - so the condition is false and the clause is satisfied by its own terms.
+    # No code is expected and no gap is outstanding, which makes this a status move rather than
+    # a build or a waiver: nothing was declined, and nothing was left unbuilt. "this commit"
+    # because the status change and this entry must land together for the gate to stay green;
+    # backfill the real SHA. Durable anchor: decision D-7, confirmed by the SOW owner 2026-10-05,
+    # and the row-260 Note in SOW_COMPLIANCE.md.
+    ("4.2 multisite-cost-centre", "Not Met", "Met", "this commit"),
 ]
 
 
