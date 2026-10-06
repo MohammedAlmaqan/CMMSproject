@@ -1,1 +1,2 @@
 taskOperationId,taskListId,sequenceNumber,description,craftId,plannedHours,numberOfTechnicians,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,TL-01,10,Strip and inspect pump,MECH,8,2,,,,,

@@ -1,1 +1,2 @@
 planId,planCode,description,equipmentId,functionalLocationId,workCenterId,taskListId,strategyType,intervalValue,intervalUnit,callHorizonValue,callHorizonUnit,startDate,endDate,priority,generatedWorkOrderStatus,notificationId,activeFlag,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,PLAN-01,Pump 101 quarterly service,PMP-101,,WC-01,TL-01,Time,90,Days,7,Days,2026-06-01,,Medium,Planned,,true,,,,,

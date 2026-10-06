@@ -1,1 +1,2 @@
 userId,username,passwordHash,fullName,email,role,workCenterId,isActive,failedLoginCount,lockedUntil,lastLogin,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,j.doe,,Jane Doe,j.doe@plant.example,Technician,WC-01,true,,,,,,,,

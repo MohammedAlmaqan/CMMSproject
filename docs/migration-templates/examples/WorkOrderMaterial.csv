@@ -1,1 +1,2 @@
 woMaterialId,workOrderId,materialId,operationId,plannedQuantity,actualQuantity,unitCost,reservationQuantity,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,WO-2026-0001,MAT-001,WO-2026-0001.10,2,1,315.40,2,,,,,

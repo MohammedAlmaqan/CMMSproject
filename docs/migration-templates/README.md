@@ -10,11 +10,13 @@ owner returns the filled samples.
 - **Source of truth:** `backend/prisma/schema.prisma`, re-read to generate this 
   directory. Regenerate from the schema (not from this text) after any column, 
   relation or enum change to this catalog.
-- **Files:** one `*.csv` per table migration can populate from legacy data - 
-  header row uses the exact column names; the second row is a single fabricated 
-  example showing value formats. Delete the example row before filling real data. 
-  UTF-8, first row is the header, RFC 4180 comma-separated, fields with comma or 
-  double-quote quoted and doubled.
+- **Files:** one `*.csv` per table migration can populate from legacy data - the
+  header uses the exact column names and every required column is present as a
+  header; there are **no example rows** in the fill-in files, the cells below the
+  header are the owner's to fill. Fabricated example rows live separately in the
+  [example rows](#the-example-rows) section, outside anything the owner will send
+  back. UTF-8, first row is the header, RFC 4180 comma-separated, fields with comma
+  or double-quote quoted and doubled.
 - **Excluded tables** carry one reason each in [Exclusions](#exclusions).
 
 ## Fill order
@@ -397,7 +399,12 @@ a different reason, so each reason is stated:
 - **`SystemConfig`** - application configuration set at deployment, not legacy master data.
 - **`WorkOrderSnapshot`** - the immutable, complete history captured at each status change (SOW 3.6); importing it would fake the audit record it exists to provide.
 
-These eight are the entire exclusion set: every other table in `schema.prisma` is represented above.
+These eight are the entire exclusion set, and it is **runtime-only**: every
+migratable domain table is represented above, including `Comment`, `Attachment`
+and `MeterReading` (each has a template in the fill order). The eighth exclusion,
+`WorkOrderSnapshot`, is the immutable status-change history captured at each
+transition (SOW 3.6) - the same append-only audience as `AuditLogEntry`, not a
+domain table a legacy system could populate.
 
 ## The example rows
 
@@ -406,3 +413,7 @@ coherent miniature plant - `WC-01`, location `P-A.01`, pump `PMP-101`, seal
 `MAT-001`, task list `TL-01`, plan `PLAN-01`, one work order `WO-2026-0001` raised 
 from notification `NTFY-0001` - so the composite keys line up if the owner wants 
 to sanity-check cross-file references by hand.
+
+The rows live in `examples/` as one `*.csv` per template, each carrying the same
+header as its fill-in file with one example row beneath it. They are reference
+material only: the owner fills the top-level `*.csv` files, never these.

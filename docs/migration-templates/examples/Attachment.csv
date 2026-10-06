@@ -1,1 +1,2 @@
 attachmentId,entityType,entityId,originalName,mimeType,sizeBytes,storagePath,uploadedByUserId,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,WorkOrder,WO-2026-0001,seal-replacement.jpg,image/jpeg,245760,workorders/WO-2026-0001/seal-replacement.jpg,j.doe,,,,,

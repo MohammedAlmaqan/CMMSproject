@@ -1,1 +1,2 @@
 notificationId,notificationNumber,type,priority,functionalLocationId,equipmentId,reportedByUserId,description,damagesObservations,breakdownFlag,status,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,NTFY-0001,M1,High,P-A.01,PMP-101,j.doe,Seal leaking,Significant leak under gland,true,Open,,,,,
