@@ -295,11 +295,10 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # rather than a silent Not Met - and D-5's own outcome says "waived as a
     # formal, documented SOW 5.5 deviation", matching the register closing note
     # "the 5.5 deviation stands as documented in D-5". Not a build and not a
-    # deferral: nothing is unbuilt and nothing reopened. "this commit" because
-    # the status change and this entry land together; backfill the SHA. Durable
-    # anchor: decision D-5, its 2026-09-26 owner confirmation, and the row-298
-    # Note in SOW_COMPLIANCE.md.
-    ("5.5 oauth2", "Not Met", "Waived", "this commit"),
+    # deferral: nothing is unbuilt and nothing reopened. Promotion commit
+    # 5a65ab8 (green CI run 193). Durable anchor: decision D-5, its 2026-09-26
+    # owner confirmation, and the row-298 Note in SOW_COMPLIANCE.md.
+    ("5.5 oauth2", "Not Met", "Waived", "5a65ab8"),
 ]
 
 
