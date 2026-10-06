@@ -1698,6 +1698,9 @@ Left column: the commit the tracker cites as the promotion evidence (build SHA, 
 | Owner decisions 2026-10-05 — SOW §3.5.2 cost-split editor deferral confirmed, no code, status unchanged `Partial`; §3.1.4 failure capture `1e4b28c` (run 182); the §3.5.2 note itself is `47e02a2` (run 184, queued) = |
 | Owner decisions 2026-10-05 — SOW §6.4 defect limb, four WCAG residuals accepted for v1.1 (v1.1-11..14), no code; NM→M; `d7c8b74`, **green CI run 185** (attempt 4; re-run after the 2026-10-05 Actions incident cancelled the first attempt) = |
 | Owner decisions 2026-10-05 — SOW §4.3 backup mechanisms: transaction-log recovery accepted, differential declined (not deferred), row 261 stays `Partial`, L28 closed, no code; `4ff8814` (run 186, green) = |
+| SOW §5.5 row-298 waiver `5a65ab8` (run 193, green) | §5.5 oauth2; Not Met→Waived (owner decision D-5, 2026-09-26); status commit `5a65ab8` = |
+| Migration CSV templates `159814c` (run 194, green) | Documentation-only, no verifier promotion — 30 schema-derived templates + README for the migration trial run; `159814c` = |
+| API reference reconciliation `8412dfb` (run 195, green) | Documentation-only, no verifier promotion — API_REFERENCE, DATA_DICTIONARY and openapi.json aligned with schema and live API; `8412dfb` = |
 
 ## CI verification exceptions (2026-10-05 GitHub Actions incident)
 
