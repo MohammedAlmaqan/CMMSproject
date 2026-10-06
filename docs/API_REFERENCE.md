@@ -410,5 +410,5 @@ These are documented gaps, not bugs to work around silently. All are tracked as 
 
 - Monetary fields (`standardCost`, `cost`, `unitCost`, `costRatePerHour`, `hourlyRate`, `plannedCost`, `actualCost`, work order cost totals) are `DECIMAL(12,2)` since D-17/E.13 and are served to the API as JSON numbers. Quantity/duration columns (`currentStock`, hours, `percentage`) remain binary float.
 - `MaintenancePlan.functionalLocationId` is a retained compatibility column with no `@relation` and is not enforced as a foreign key. Target-based planning moved to `MaintenancePlanTarget`, whose `functionalLocationId` (and `equipmentId`) **are** enforced foreign keys (schema.prisma, F3).
-- Failure codes and causes are not yet referenced by any work order column.
+- Cause and failure codes are referenced by work orders through nullable `causeCodeId` / `failureCodeId` (SOW 3.1.4), so a work order can name its root cause and the failure observed, and a breakdown must name its cause before completion. No `Notification` and no `WorkOrderOperation` column references either taxonomy, and `failureCodeId` has no completion gate.
 - `WorkOrderOperation.status` and several other status and type columns are free text rather than constrained enums.
