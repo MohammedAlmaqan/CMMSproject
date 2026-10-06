@@ -1,0 +1,2 @@
+workCenterId,code,name,dailyCapacityHours,costRatePerHour,isActive,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,WC-01,Pump Bay,8.0,45.00,,,,,,

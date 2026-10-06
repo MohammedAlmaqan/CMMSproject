@@ -1,0 +1,2 @@
+operationId,workOrderId,sequenceNumber,description,craftId,plannedHours,numberOfTechnicians,actualHours,status,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,WO-2026-0001,10,Replace mechanical seal,MECH,4,2,3.5,Completed,,,,,

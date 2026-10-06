@@ -1,0 +1,2 @@
+laborEntryId,operationId,userId,hoursWorked,entryDateTime,notes,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,WO-2026-0001.10,j.doe,3.5,2026-05-29T11:40:00Z,Including test run,,,,,

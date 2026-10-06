@@ -1,0 +1,2 @@
+equipmentId,equipmentCode,name,description,functionalLocationId,manufacturer,model,serialNumber,assetTag,equipmentClass,criticality,installationDate,warrantyExpiryDate,operationalStatus,technicalParameters,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,PMP-101,Transfer pump 101,Main transfer pump,P-A.01,Grundfos,CR64,SFN-2020-0001,TAG-101,Pump,A,,2027-01-31,Active,{},,,,,

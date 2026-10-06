@@ -1,0 +1,2 @@
+functionalLocationId,locationCode,description,parentLocationId,locationType,operationalStatus,installationDate,gpsCoordinates,safetyCritical,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,P-A.01,Pump area A,P-A,Area,Active,1998-06-01,,false,,,,,
