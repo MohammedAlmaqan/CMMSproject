@@ -119,6 +119,52 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/cause-codes:
+ *   post:
+ *     summary: Create a cause code
+ *     description: >
+ *       Creates a cause code row. Validated by the zod schema `causeCodeCreateSchema`
+ *       (both fields required). Requires the Requester role.
+ *     tags: [Cause Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `causeCodeCreateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code: { type: string }
+ *               description: { type: string }
+ *             required: [code, description]
+ *     responses:
+ *       '201':
+ *         description: Cause code created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 causeCodeId: { type: string }
+ *                 code: { type: string }
+ *                 description: { type: string }
+ *                 createdBy: { type: string }
+ *                 createdDate: { type: string, format: date-time }
+ *                 modifiedBy: { type: string }
+ *                 modifiedDate: { type: string, format: date-time }
+ *       '400':
+ *         description: zod validation failed
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Requester
+ *       '500':
+ *         description: Internal server error
+ */
 router.post('/', authorizeMinRole('Requester'), validate(causeCodeCreateSchema), async (req: Request, res: Response) => {
   try {
     const { code, description } = req.body;

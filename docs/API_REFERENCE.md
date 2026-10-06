@@ -6,7 +6,7 @@ Reference documentation for the CMMS REST API, version 1.0.0.
 - **Interactive UI:** `/api-docs` (Swagger UI)
 - **Machine-readable spec:** [`openapi.json`](./openapi.json) (OpenAPI 3.0.0, also served live at `/api-docs.json`)
 
-The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The generated spec lags the repository by exactly one operation: `POST /api/cause-codes` (`backend/src/routes/causeCodes.ts`) carries no `@openapi` block, so live `/api-docs.json` omits it. This document therefore counts **141 operations across 87 paths and 27 routers**; the live spec reports 140. The checked-in `docs/openapi.json` is an exported snapshot of the live spec, refreshed from a running server on 2026-10-06 (140 operations / 87 paths — earlier exports lagged; the 2026-10-02 export showed 114 operations / 71 paths). Re-export it after a fresh build by saving `/api-docs.json`.
+The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The repository routers and the live spec agree at **141 operations across 87 paths and 27 routers**. The checked-in `docs/openapi.json` is an exported snapshot of the live spec, refreshed from a running server on 2026-10-06 (141 operations / 87 paths — earlier exports lagged; the 2026-10-02 export showed 114 operations / 71 paths). Re-export it after a fresh build by saving `/api-docs.json`.
 
 ## Authentication
 
@@ -54,7 +54,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 
 ## Endpoint groups
 
-141 operations across 87 paths and 27 routers, counted against the running server's `/api-docs.json` on 2026-10-06. The repository routers are the reference: live `/api-docs.json` reports 140 because `POST /api/cause-codes` is un-annotated (see above). The previous 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
+141 operations across 87 paths and 27 routers, counted against the running server's `/api-docs.json` on 2026-10-06. The repository routers and the live spec agree at 141 (`POST /api/cause-codes` was the last un-annotated handler; it now carries an `@openapi` block). The previous 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
 
 | Group | Base path | Operations |
 | --- | --- | --- |
