@@ -419,7 +419,7 @@ the usual "verified by green CI at `<sha>`, run N" citation.
 | `a0fa86d` | backfill of the row-8 SHA into the verifier and tracker | **none, permanently** | **No run can exist at this SHA.** Pushed in the same push as `c86e890`; Actions fires one run per push at the tip SHA, so an interior commit never gets its own. Permanent, not pending — re-pushing does not create one. Content verified by descendant run 186 (`4ff8814`). |
 | `c86e890` | row 331 §6.4 / a `Not Met`→`Met` | 183 | **Green** |
 | `47e02a2` | §3.5.2 cost-split deferral confirmation (no status change) | 184 | Attempt 3, `failure`: Frontend green through all 10 steps, Backend `cancelled` with zero steps executed. Partial runner loss, not a test failure. |
-| `d7c8b74` | row 334 §6.4 / b `Not Met`→`Met` | 185 | **Green** (attempt 4). Run 185 was `cancelled` with zero steps executed by the 2026-10-05 Actions incident and later re-run to green at this SHA, so this promotion is verified by a run of its own. |
+| `d7c8b74` | row 334 §6.4 / c `Not Met`→`Met` | 185 | **Green** (attempt 4). Run 185 was `cancelled` with zero steps executed by the 2026-10-05 Actions incident and later re-run to green at this SHA, so this promotion is verified by a run of its own. |
 | `4ff8814` | §4.3 backup decision (no status change) | 186 | **Green** |
 
 **One commit can never have a green run at its own SHA: `a0fa86d`.** It was pushed in the same push as
