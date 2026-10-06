@@ -182,28 +182,27 @@ APPROVED_PROMOTIONS: list = [
     # These rows were already implemented or already correct and were held
     # Partial only by an owner interpretation. Unlike the entries above, the
     # justifying artefact is a decision, not an implementation commit, so the
-    # decision ID in the matrix Notes is the durable anchor. "this commit" is
-    # the tracker's existing self-reference sentinel, needed because the
-    # status change and this wiring must land in the same commit for the gate
-    # to stay green, which puts the SHA out of reach in advance. Backfill the
-    # real SHA once one exists.
-    ("3.2.2 notification-create (D-15)", "Partial", "Met", "this commit"),
-    ("3.1.3 capacity-board (read-only reading)", "Partial", "Met", "this commit"),
-    ("3.3.8 file-type (D-11)", "Partial", "Waived", "this commit"),
-    ("3.1.4 task-list equipment association", "Partial", "Met", "this commit"),
-    ("3.1.5 material-to-operation link", "Partial", "Met", "this commit"),
+    # decision ID in the matrix Notes is the durable anchor. The SHAs below
+    # were backfilled 2026-10-06 from git blame on each row's Status cell:
+    # each is the 2026-10-04 commit whose diff set the row's current status
+    # and wired its verifier entry.
+    ("3.2.2 notification-create (D-15)", "Partial", "Met", "6353ae69"),
+    ("3.1.3 capacity-board (read-only reading)", "Partial", "Met", "8e193045"),
+    ("3.3.8 file-type (D-11)", "Partial", "Waived", "76333df9"),
+    ("3.1.4 task-list equipment association", "Partial", "Met", "7dea7ecb"),
+    ("3.1.5 material-to-operation link", "Partial", "Met", "89dff117"),
 
     # Row 149 (SOW 3.3.8). The clause asks for old/new value on field
     # modifications, and the three permission-bearing PUT handlers now diff
     # per column. The six remaining handlers are an accepted residual recorded
     # as L37, not a status blocker; owner acceptance 2026-10-04.
-    ("3.3.8 complete audit log", "Partial", "Met", "this commit"),
+    ("3.3.8 complete audit log", "Partial", "Met", "2e6cc44f"),
 
     # SOW 3.6 (row 188). 77 of 78 write handlers log; the one exception,
     # auth.ts POST /login, is a permanent ratified carve-out that the owner
     # placed outside this clause. Diff coverage is 3.3.8, not 3.6, and is
     # tracked on row 149 and L37; owner acceptance 2026-10-04.
-    ("3.6 general change log", "Partial", "Met", "this commit"),
+    ("3.6 general change log", "Partial", "Met", "1d702458"),
 ]
 
 # One more row has moved since the freeze and it is NOT a section 3 clause, so
@@ -282,9 +281,9 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # No code is expected and no gap is outstanding, which makes this a status move rather than
     # a build or a waiver: nothing was declined, and nothing was left unbuilt. "this commit"
     # because the status change and this entry must land together for the gate to stay green;
-    # backfill the real SHA. Durable anchor: decision D-7, confirmed by the SOW owner 2026-10-05,
-    # and the row-260 Note in SOW_COMPLIANCE.md.
-    ("4.2 multisite-cost-centre", "Not Met", "Met", "this commit"),
+    # backfilled the real SHA once its push-run was in. Durable anchor: decision D-7, confirmed by
+    # the SOW owner 2026-10-05, and the row-260 Note in SOW_COMPLIANCE.md.
+    ("4.2 multisite-cost-centre", "Not Met", "Met", "59c38b5 (green CI run 189 at e4d3f95)"),
 ]
 
 
