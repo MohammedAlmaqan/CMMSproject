@@ -155,9 +155,9 @@ not carried.
 
 | `equipmentCode` | `name` = Description | `manufacturer` / `model` / `serialNumber` | `assetTag` = Sort field (code if Sort blank) | `equipmentClass` = Object type | `criticality` |
 |-----------------|----------------------|-------------------------------------------|----------------------------------------------|--------------------------------|---------------|
-| T-401-EPF4 | T-401-TANK, PROCESS | *(blank — not in source)* | P10159-03-4EDA-1102 | TACT | A (S) |
+| T-401-EPF4 | T-401-TANK, PROCESS | *(blank — not in source)* | P10159-03-4EDA-1102 | TACT | S |
 | LBK01 | LBK01 LOAD BANK | *(blank)* | LBK01 | ESCA | B (M) |
-| P-08A-EPF3 | P-08A-PUMP, OIL PROCESS | FLOWSERVE / 80-50CPX160 / 594165-005-02 | P-08A-EPF3 | PUCE | A (S) |
+| P-08A-EPF3 | P-08A-PUMP, OIL PROCESS | FLOWSERVE / 80-50CPX160 / 594165-005-02 | P-08A-EPF3 | PUCE | S |
 | DG907E | DG907E DIESEL GENERATOR MODEL GEP110-4 | OLYMPIAN / GEP110-4 / OLY00000PLEN03616 | DG907E | EGGE | B (M) |
 | K638B | K638B COMPRESSOR MOBILE ATLAS COPCO | ATLAS COPCO / XAS98 KD / WUX667221 | K638B/ WORKSHOP YARD | COSC | B (M) |
 | DG908A | DG908A DIESEL OLYMPIAN GENERATOR GEP1651 | OLYMPIAN / GEP165-1*2614/1500 / OLY00000JLEL02057 | DG908A/ EPF01 | EGGE | B (M) |
@@ -165,10 +165,39 @@ not carried.
 | JT-01-UNIT | JT-01 JET PUMP UNIT | NATIONAL OILWELL VARCO / *(blank)* / *(blank)* | JT-01-UNIT | *(blank — `Object type` empty in source)* | B (M) |
 | K630I | K630I COMPRESSOR, AIR UTILITY | FIAC / 1121510641 / IYD0210564 | K630I-FIRE TRUCK PARKING | CORE | C (L) |
 
-ABC→criticality confirmed against the EPF `EXPLANATION` sheet: H High, M Medium,
-L Low, **S Safety Critical**. Per the owner, S maps to **A** (never B): S and H
-both land on A. `operationalStatus` stays default Active; `technicalParameters`
-stays `{}`.
+ABC→criticality — record of the withdrawn S→A mapping, and the S tier reading
+now in force (supersedes the earlier read, 2026-10-07):
+
+- **Superseded:** the first fill read the ABC indicator's `S` as "Safety
+  Critical" and mapped it to criticality **A** ("S maps to A, never B; S and H
+  both land on A"). That rule is **withdrawn by the owner on 2026-10-07**. The
+  history is preserved above; this supersedes it.
+- **Reading now in force:** the ABC indicator is a single tier column — one
+  character per row, from one dropdown (`H`, `L`, `M`, `S` in the PM Tracker
+  `Equip list`; relabelled `A`, `B`, `C`, `S` in
+  `dataset/asset - updated with SCE S in ABC indicator.xlsx`). `S` (Safety
+  Critical) is the **highest tier on the criticality axis: S > A > B > C**. It is
+  not an orthogonal flag.
+- **Counts (full dataset):** 2128 of 6000 rows carry `S` in the updated asset
+  file (PM Tracker `Equip list` cross-check: 2141 of 6163). The two sources are
+  coded differently (H/L/M/S vs A/B/C/S) and agree on the SCE population.
+- **No bridge and no loss — the cascade does not apply.** The owner's sequencing
+  decision (2026-10-07) makes the tier widening the first v1.1 item, landing
+  before the trial harness and importers, so the two SCE rows below carry the
+  literal, correct value `S` — not a preview — and no sample row is deferred. A
+  deferral would have lost 3 WOs, 3 notifications, 3 links and the sample's only
+  Comment row (10 transaction rows) plus the 2 SCE equipment rows; under this
+  decision that loss statement is moot and nothing is dropped.
+- **v1.1 fix (named):** widen `Equipment.criticality` to accept `S` ranked above
+  `A` — the `schema.prisma` comment, the two `z.enum(['S','A','B','C'])` sites
+  in `backend/src/utils/validation.ts`, the OpenAPI/Swagger enum docs in
+  `backend/src/routes/equipment.ts` and `docs/openapi.json`, the template
+  value-set note in `docs/migration-templates/README.md`, and the tier mentions
+  in `DATA_DICTIONARY.md` / `ISO_14224_MAPPING.md`. No DB change (the column is
+  `TEXT NOT NULL`, no CHECK constraint). Committed as `5aa0094`; the harness and
+  importers are built against the widened schema.
+
+`operationalStatus` stays default Active; `technicalParameters` stays `{}`.
 
 ### `Notification` (13)
 
