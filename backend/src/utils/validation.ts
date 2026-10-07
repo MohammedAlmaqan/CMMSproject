@@ -271,7 +271,7 @@ export const equipmentImportRowSchema = z.object({
   serialNumber: z.string().trim().optional(),
   assetTag: z.string().trim().optional(),
   equipmentClass: z.string().trim().optional(),
-  criticality: z.enum(['A', 'B', 'C']),
+  criticality: z.enum(['S', 'A', 'B', 'C']),
   operationalStatus: z.enum(['Active', 'Inactive', 'Decommissioned']).optional(),
 });
 
@@ -349,7 +349,7 @@ export const equipmentCreateSchema = z.object({
   serialNumber: z.string().optional(),
   assetTag: z.string().optional(),
   equipmentClass: z.string().optional(),
-  criticality: z.enum(['A', 'B', 'C']),
+  criticality: z.enum(['S', 'A', 'B', 'C']),
   installationDate: z.string().min(1).nullable().optional(),
   warrantyExpiryDate: z.string().min(1).nullable().optional(),
   operationalStatus: z.enum(['Active', 'Inactive', 'Decommissioned']).optional(),

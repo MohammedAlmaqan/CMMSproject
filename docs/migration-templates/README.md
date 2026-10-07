@@ -132,7 +132,7 @@ the assets to be maintained, each mounted at one functional location.
 - Required: `equipmentCode`, `name`, `description`, `functionalLocationId`, `manufacturer`, `model`, `serialNumber`, `assetTag`, `equipmentClass`, `criticality`
 - Optional: `equipmentId`, `installationDate`, `warrantyExpiryDate`, `operationalStatus (Active, Inactive, Decommissioned)`, `technicalParameters`
 - Foreign keys: `functionalLocationId` -> FunctionalLocation.locationCode
-- Value sets: `criticality`: A, B, C; `operationalStatus`: Active, Inactive, Decommissioned
+- Value sets: `criticality`: S, A, B, C; `operationalStatus`: Active, Inactive, Decommissioned
 - Blank on import: `createdBy`, `createdDate`, `modifiedBy`, `modifiedDate`, `isDeleted`
 
 ### `EquipmentMeter`

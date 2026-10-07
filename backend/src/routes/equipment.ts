@@ -62,7 +62,7 @@ const EQUIPMENT_CSV_COLUMNS = [
  *         schema: { type: string }
  *       - in: query
  *         name: criticality
- *         schema: { type: string, enum: [A, B, C] }
+ *         schema: { type: string, enum: [S, A, B, C] }
  *       - in: query
  *         name: equipmentClass
  *         schema: { type: string }
@@ -296,7 +296,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
  *         schema: { type: string }
  *       - in: query
  *         name: criticality
- *         schema: { type: string, enum: [A, B, C] }
+ *         schema: { type: string, enum: [S, A, B, C] }
  *       - in: query
  *         name: equipmentClass
  *         schema: { type: string }
@@ -319,7 +319,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
  *                   serialNumber: { type: string }
  *                   assetTag: { type: string }
  *                   equipmentClass: { type: string }
- *                   criticality: { type: string, enum: [A, B, C] }
+ *                   criticality: { type: string, enum: [S, A, B, C] }
  *                   operationalStatus: { type: string, enum: [Active, Inactive, Decommissioned] }
  *                   installationDate: { type: string, format: date-time, nullable: true }
  *                   warrantyExpiryDate: { type: string, format: date-time, nullable: true }
@@ -360,7 +360,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
  *               serialNumber: { type: string }
  *               assetTag: { type: string }
  *               equipmentClass: { type: string }
- *               criticality: { type: string, enum: [A, B, C] }
+ *               criticality: { type: string, enum: [S, A, B, C] }
  *               operationalStatus: { type: string, enum: [Active, Inactive, Decommissioned] }
  *               installationDate: { type: string, format: date-time, nullable: true }
  *               warrantyExpiryDate: { type: string, format: date-time, nullable: true }
@@ -717,7 +717,7 @@ router.post('/', authorizeMinRole('Technician'), validate(equipmentCreateSchema)
  *               serialNumber: { type: string }
  *               assetTag: { type: string }
  *               equipmentClass: { type: string }
- *               criticality: { type: string, enum: [A, B, C] }
+ *               criticality: { type: string, enum: [S, A, B, C] }
  *               operationalStatus: { type: string, enum: [Active, Inactive, Decommissioned] }
  *               installationDate: { type: string, format: date-time, nullable: true }
  *               warrantyExpiryDate: { type: string, format: date-time, nullable: true }

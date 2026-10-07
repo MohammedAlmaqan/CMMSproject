@@ -62,7 +62,7 @@ CMMS expresses the lower half of that hierarchy across two models.
 | `serialNumber` | Serial / equipment number | Covered |
 | `assetTag` | Owner asset number | Covered |
 | `functionalLocationId` | Parent location | Covered |
-| `criticality` (`A`, `B`, `C`) | Criticality / importance | Covered |
+| `criticality` (`S`, `A`, `B`, `C`) | Criticality / importance | Covered |
 | `installationDate`, `warrantyExpiryDate` | Dates of installation / warranty | Covered |
 | `operationalStatus` (`Active`, `Inactive`, `Decommissioned`) | Equipment status | Covered |
 | `technicalParameters` (JSON) | Technical / design data | Covered — open field, not enumerated |

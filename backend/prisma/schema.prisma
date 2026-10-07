@@ -84,7 +84,7 @@ model Equipment {
   serialNumber         String
   assetTag             String
   equipmentClass       String
-  criticality          String   // A, B, C
+  criticality          String   // S, A, B, C
   installationDate     DateTime?
   warrantyExpiryDate   DateTime?
   operationalStatus    String   @default("Active") // Active, Inactive, Decommissioned
