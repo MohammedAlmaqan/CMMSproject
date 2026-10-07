@@ -1,0 +1,3 @@
+userId,username,passwordHash,fullName,email,role,workCenterId,isActive,failedLoginCount,lockedUntil,lastLogin,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,khaled9,,khaled9,khaled9@migration.local,Technician,,,,,,,,,,
+,xghilanwe,,xghilanwe,xghilanwe@migration.local,Technician,,,,,,,,,,

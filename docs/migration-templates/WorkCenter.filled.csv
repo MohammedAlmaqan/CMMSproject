@@ -1,0 +1,5 @@
+workCenterId,code,name,dailyCapacityHours,costRatePerHour,isActive,createdBy,createdDate,modifiedBy,modifiedDate,isDeleted
+,I_MECH,mechanical goup,8,0,,,,,,
+,I_ELEC,electrical group,8,0,,,,,,
+,I_INST,instrumentaiton and controlsystem group,8,0,,,,,,
+,I_INSP,plant inspection group,8,0,,,,,,
