@@ -38,7 +38,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
  * /api/work-orders:
  *   get:
  *     summary: List work orders (paginated with filters)
- *     description: Returns a page of non-deleted work orders ordered by created date desc.
+ *     description: Returns a page of non-deleted work orders ordered by created date desc. Visibility is role-scoped (SOW 2.2) - a Technician sees their home work centre, a Supervisor their work centre or supervised orders, a Requester only their own.
  *     tags: [Work Orders]
  *     parameters:
  *       - in: query
@@ -110,6 +110,27 @@ router.get('/', async (req: Request, res: Response) => {
     if (status) where.status = status as string;
     if (equipmentId) where.equipmentId = equipmentId as string;
     if (workCenterId) where.workCenterId = workCenterId as string;
+
+    // SOW 2.2: list visibility is role-scoped. Administrator, Maintenance
+    // Planner and View-Only see everything; a Technician sees work orders in
+    // their home work centre; a Supervisor sees their home work centre or any
+    // work order they supervise; a Requester sees only what they raised.
+    const role = req.user!.role;
+    if (role === 'Technician' || role === 'Maintenance Supervisor') {
+      const me = await prisma.user.findUnique({
+        where: { userId: req.user!.userId },
+        select: { workCenterId: true },
+      });
+      // workOrder.workCenterId is required, so a null home matches nothing.
+      const homeWorkCenterId = me?.workCenterId ?? null;
+      where.AND = [
+        role === 'Technician'
+          ? { workCenterId: homeWorkCenterId }
+          : { OR: [{ workCenterId: homeWorkCenterId }, { supervisorUserId: req.user!.userId }] },
+      ];
+    } else if (role === 'Requester') {
+      where.AND = [{ reportedByUserId: req.user!.userId }];
+    }
 
     const skipNum = skip ? parseInt(skip as string, 10) || 0 : 0;
     const takeNum = take ? parseInt(take as string, 10) || 50 : 50;

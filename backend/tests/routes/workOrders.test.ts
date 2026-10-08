@@ -77,6 +77,62 @@ describe('work orders routes', () => {
     expect(Array.isArray(res.body.data)).toBe(true);
   });
 
+  const listIds = async (token: string): Promise<string[]> => {
+    const res = await api().get('/api/work-orders?take=200').set(authHeaders(token));
+    expect(res.status).toBe(200);
+    return res.body.data.map((w: { workOrderId: string }) => w.workOrderId);
+  };
+
+  it('scopes the list to a Technician home work centre (SOW 2.2)', async () => {
+    const tech = await prisma.user.findFirstOrThrow({ where: { username: 'tech1' }, select: { workCenterId: true } });
+    const other = await prisma.workCenter.findFirstOrThrow({ where: { workCenterId: { not: tech.workCenterId! } }, select: { workCenterId: true } });
+    const mine = await api().post('/api/work-orders').set(authHeaders(ctx.adminToken)).send(body({ workCenterId: tech.workCenterId }));
+    const theirs = await api().post('/api/work-orders').set(authHeaders(ctx.adminToken)).send(body({ workCenterId: other.workCenterId }));
+    expect(mine.status).toBe(201);
+    expect(theirs.status).toBe(201);
+    extraIds.push(mine.body.workOrderId, theirs.body.workOrderId);
+
+    const ids = await listIds(ctx.technicianToken);
+    expect(ids).toContain(mine.body.workOrderId);
+    expect(ids).not.toContain(theirs.body.workOrderId);
+  });
+
+  it('scopes a Supervisor to their home work centre or orders they supervise (SOW 2.2)', async () => {
+    const sup = await prisma.user.findFirstOrThrow({ where: { username: 'supervisor' }, select: { userId: true, workCenterId: true } });
+    const other = await prisma.workCenter.findFirstOrThrow({ where: { workCenterId: { not: sup.workCenterId! } }, select: { workCenterId: true } });
+    const supervised = await api().post('/api/work-orders').set(authHeaders(ctx.adminToken)).send(body({ workCenterId: other.workCenterId, supervisorUserId: sup.userId }));
+    const hidden = await api().post('/api/work-orders').set(authHeaders(ctx.adminToken)).send(body({ workCenterId: other.workCenterId, supervisorUserId: ctx.adminId }));
+    expect(supervised.status).toBe(201);
+    expect(hidden.status).toBe(201);
+    extraIds.push(supervised.body.workOrderId, hidden.body.workOrderId);
+
+    const ids = await listIds(ctx.supervisorToken);
+    expect(ids).toContain(supervised.body.workOrderId);
+    expect(ids).not.toContain(hidden.body.workOrderId);
+  });
+
+  it('scopes a Requester to orders they raised (SOW 2.2)', async () => {
+    const mine = await api().post('/api/work-orders').set(authHeaders(ctx.operatorToken)).send(body());
+    const other = await api().post('/api/work-orders').set(authHeaders(ctx.adminToken)).send(body());
+    expect(mine.status).toBe(201);
+    expect(other.status).toBe(201);
+    extraIds.push(mine.body.workOrderId, other.body.workOrderId);
+
+    const ids = await listIds(ctx.operatorToken);
+    expect(ids).toContain(mine.body.workOrderId);
+    expect(ids).not.toContain(other.body.workOrderId);
+  });
+
+  it('shows every work order to Administrator, Planner and View-Only (SOW 2.2)', async () => {
+    const anyWo = await api().post('/api/work-orders').set(authHeaders(ctx.adminToken)).send(body());
+    expect(anyWo.status).toBe(201);
+    extraIds.push(anyWo.body.workOrderId);
+
+    for (const token of [ctx.plannerToken, ctx.viewOnlyToken, ctx.adminToken]) {
+      expect(await listIds(token)).toContain(anyWo.body.workOrderId);
+    }
+  });
+
   it('rejects requests without a token with 401', async () => {
     const res = await api().get('/api/work-orders');
     expect(res.status).toBe(401);

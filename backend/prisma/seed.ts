@@ -52,13 +52,21 @@ async function main() {
 
   const hash = await bcrypt.hash('password', 10);
 
+  // Work Centers -- created before the users: a Technician and a Supervisor carry
+  // a home work centre, which is what the work-order list is scoped by (SOW 2.2).
+  const wc = await Promise.all([
+    prisma.workCenter.create({ data: { workCenterId: uuid(), code: 'MECH', name: 'Mechanical Workshop', dailyCapacityHours: 8, costRatePerHour: 45 } }),
+    prisma.workCenter.create({ data: { workCenterId: uuid(), code: 'ELEC', name: 'Electrical Team', dailyCapacityHours: 8, costRatePerHour: 50 } }),
+    prisma.workCenter.create({ data: { workCenterId: uuid(), code: 'INST', name: 'Instrumentation Team', dailyCapacityHours: 8, costRatePerHour: 55 } }),
+  ]);
+
   // Users
   const users = await Promise.all([
     prisma.user.create({ data: { userId: uuid(), username: 'admin', passwordHash: hash, fullName: 'Admin User', email: 'admin@cmms.local', role: 'Administrator', isActive: true } }),
     prisma.user.create({ data: { userId: uuid(), username: 'planner', passwordHash: hash, fullName: 'Maintenance Planner', email: 'planner@cmms.local', role: 'Maintenance Planner', isActive: true } }),
-    prisma.user.create({ data: { userId: uuid(), username: 'supervisor', passwordHash: hash, fullName: 'Maintenance Supervisor', email: 'supervisor@cmms.local', role: 'Maintenance Supervisor', isActive: true } }),
-    prisma.user.create({ data: { userId: uuid(), username: 'tech1', passwordHash: hash, fullName: 'Technician One', email: 'tech1@cmms.local', role: 'Technician', isActive: true } }),
-    prisma.user.create({ data: { userId: uuid(), username: 'tech2', passwordHash: hash, fullName: 'Technician Two', email: 'tech2@cmms.local', role: 'Technician', isActive: true } }),
+    prisma.user.create({ data: { userId: uuid(), username: 'supervisor', passwordHash: hash, fullName: 'Maintenance Supervisor', email: 'supervisor@cmms.local', role: 'Maintenance Supervisor', workCenterId: wc[0].workCenterId, isActive: true } }),
+    prisma.user.create({ data: { userId: uuid(), username: 'tech1', passwordHash: hash, fullName: 'Technician One', email: 'tech1@cmms.local', role: 'Technician', workCenterId: wc[0].workCenterId, isActive: true } }),
+    prisma.user.create({ data: { userId: uuid(), username: 'tech2', passwordHash: hash, fullName: 'Technician Two', email: 'tech2@cmms.local', role: 'Technician', workCenterId: wc[1].workCenterId, isActive: true } }),
     prisma.user.create({ data: { userId: uuid(), username: 'operator', passwordHash: hash, fullName: 'Plant Operator', email: 'operator@cmms.local', role: 'Requester', isActive: true } }),
     prisma.user.create({ data: { userId: uuid(), username: 'auditor', passwordHash: hash, fullName: 'External Auditor', email: 'auditor@cmms.local', role: 'View-Only', isActive: true } }),
   ]);
@@ -70,13 +78,6 @@ async function main() {
   const unit1 = await prisma.functionalLocation.create({ data: { functionalLocationId: uuid(), locationCode: 'UN-001', description: 'Distillation Unit', parentLocationId: area1.functionalLocationId, locationType: 'Unit', operationalStatus: 'Active' } });
   const unit2 = await prisma.functionalLocation.create({ data: { functionalLocationId: uuid(), locationCode: 'UN-002', description: 'Reactor Unit', parentLocationId: area1.functionalLocationId, locationType: 'Unit', operationalStatus: 'Active' } });
   const sub1 = await prisma.functionalLocation.create({ data: { functionalLocationId: uuid(), locationCode: 'SU-001', description: 'Cooling System', parentLocationId: unit1.functionalLocationId, locationType: 'Sub-unit', operationalStatus: 'Active' } });
-
-  // Work Centers
-  const wc = await Promise.all([
-    prisma.workCenter.create({ data: { workCenterId: uuid(), code: 'MECH', name: 'Mechanical Workshop', dailyCapacityHours: 8, costRatePerHour: 45 } }),
-    prisma.workCenter.create({ data: { workCenterId: uuid(), code: 'ELEC', name: 'Electrical Team', dailyCapacityHours: 8, costRatePerHour: 50 } }),
-    prisma.workCenter.create({ data: { workCenterId: uuid(), code: 'INST', name: 'Instrumentation Team', dailyCapacityHours: 8, costRatePerHour: 55 } }),
-  ]);
 
   // Crafts
   await Promise.all([
