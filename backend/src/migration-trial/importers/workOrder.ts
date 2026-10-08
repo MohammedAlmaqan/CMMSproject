@@ -31,10 +31,14 @@ function parse(rows: TrialCsvRow[]): DatasetResult {
   const plannedFinish = dateCol();
   const actualStart = dateCol();
   const actualFinish = dateCol();
-  // Optional (nullable) columns per the templates README line 283; a blank
-  // source cell is an absent value, so it lands null rather than a fabricated "".
-  const costCenterCode = textCol({});
-  const internalOrder = textCol({});
+  // Optional in the source template (the `WorkOrder` "Optional:" bullet in the
+  // templates README) but NOT NULL in the schema, both with a "" default, so a
+  // blank cell delivers that default rather than null. Prisma rejects null for
+  // a non-nullable String - and reports it as a missing `functionalLocation`
+  // argument instead of naming the field that was actually wrong, which is how
+  // all 13 work orders were first rejected by the trial run.
+  const costCenterCode = textCol({ blankDefault: '' });
+  const internalOrder = textCol({ blankDefault: '' });
   const breakdownFlag = boolCol({ blankDefault: false });
   const safetyCriticalFlag = boolCol({ blankDefault: false });
   const causeCodeId = textCol({});
