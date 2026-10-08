@@ -1,8 +1,11 @@
 # Data Assessment Request — go-live migration trial run
 
 Requested 2026-10-06 to unblock rows 40 (§1.3), 307 (§5.7) and 335 (§6.4 / d, the
-go-live blocker). No importer is built or requested here: this is the data
-assessment that decides whether the migration trial run can be attempted.
+go-live blocker). No importer was built or requested here at the time: this is
+the data assessment that decides whether the migration trial run can be
+attempted. *Superseded 2026-10-08: the filled samples arrived on 2026-10-07, and
+the importers and trial-run harness they feed were built at `dbd48af` the next
+day, so the trial run is no longer unattemptable for want of tooling.*
 
 ## What is being asked
 

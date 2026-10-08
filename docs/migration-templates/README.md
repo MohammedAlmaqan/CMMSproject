@@ -4,8 +4,10 @@ Fixes the input format for the legacy dataset by schema, so the owner can
 supply master data without guessing column names, types or foreign keys.
 **These files are a specification**: filling them is the prerequisite to the 
 trial run ([DATA_ASSESSMENT_REQUEST](../DATA_ASSESSMENT_REQUEST.md)), not the 
-migration itself. Importers and the trial-run harness are built only after the 
-owner returns the filled samples.
+migration itself. Importers and the trial-run harness were built after the 
+owner returned the filled samples (`dbd48af`). *This sentence previously read
+"Importers and the trial-run harness are built only after the owner returns the
+filled samples."*
 
 - **Source of truth:** `backend/prisma/schema.prisma`, re-read to generate this 
   directory. Regenerate from the schema (not from this text) after any column, 

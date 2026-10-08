@@ -16,10 +16,13 @@ reference workbooks `WO Status.xlsx` / `Maint Activity Types.xlsx`.
   comment; 4 work centres; 2 users; 22 functional locations; 9 equipment; 14
   materials. The transaction tables (`Notification`, `WorkOrder`,
   `WorkOrderNotifLink` = 13 each, `Material` = 14) are within the requested
-  12–15. The master tables (`WorkCenter` = 4, `User` = 2, `Equipment` = 9,
+  10–20. The master tables (`WorkCenter` = 4, `User` = 2, `Equipment` = 9,
   `FunctionalLocation` = 22) are sized to **FK-closure** — they contain exactly
   the codes the transaction rows reference plus the parent FL chain up to the
-  plant — so their row counts follow the closure, not the 12–15 band.
+  plant — so their row counts follow the closure, not the 10–20 band.
+  *Superseded: this bullet previously said the requested band was 12–15. The
+  request is [DATA_ASSESSMENT_REQUEST](../DATA_ASSESSMENT_REQUEST.md) §Sample
+  size, which specifies **10–20 rows per dataset**; that is the band above.*
 - **Not filled (with reasons):** the other 21 templates. `Craft`, `FailureCode`,
   `CauseCode`, `TaskList*`, `MaintenancePlan*`, `WorkOrderOperation`,
   `WorkOrderMaterial`, `LaborEntry`, `ExternalServiceCost`, `CostSplit`,
@@ -28,8 +31,10 @@ reference workbooks `WO Status.xlsx` / `Maint Activity Types.xlsx`.
   deliberately deferred (see [Meter patch](#meter-patch)); the 8 runtime-only
   exclusions in the README stay excluded.
 - The header-only blanks are untouched; the filled sample is a separate
-  `*.filled.csv` per template. No importers or trial-run harness have been built
-  — those come after this sample is reviewed.
+  `*.filled.csv` per template. The importers and the trial-run harness this
+  sample feeds were built afterwards at `dbd48af` (`npm run trial:run` in
+  `backend/`). *Superseded: this bullet previously read "No importers or
+  trial-run harness have been built — those come after this sample is reviewed."*
 
 ## Sample selection
 
