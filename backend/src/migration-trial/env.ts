@@ -3,7 +3,16 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/** The backend package root - the directory holding `package.json`, `.env`,
+ * `node_modules/` and `prisma/` - two levels up from this file, which lives at
+ * `backend/src/migration-trial/`. Resolving it one level short pointed at
+ * `backend/src`, so the prisma bin and `.env` lookups missed and the first
+ * trial run failed before it read a single CSV. */
+export const backendDir = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+);
 
 /** Read one key out of backend/.env (or the process env) without printing it. */
 export function envValue(key: string): string | undefined {
