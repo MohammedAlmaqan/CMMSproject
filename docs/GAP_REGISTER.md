@@ -125,3 +125,14 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 10 decisions-not-gap = **36 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
+
+---
+
+## Closure log
+
+Snapshot tables above stay frozen. Rows are appended as each item closes, and carry
+the SHA and green CI run recorded when the item landed.
+
+| ID | Closed | SHA | Run |
+|---|---|---|---|
+| C9 | 2026-10-09 | `446cfd5` | 223 |
