@@ -24,7 +24,7 @@ An ESM Node application (`"type": "module"` in `backend/package.json`) built wit
 
 ### PostgreSQL 15+
 
-The system of record, database name `cmms`. The schema is **migration-managed** — 38 Prisma models across 15 migrations, applied with `prisma migrate deploy`. `prisma db push` is retired and must not be used. Integrity relies on a mix of Prisma-level constraints and hand-written partial unique indexes, notably `WorkOrder(sourcePlanId, sourcePlanCycle) WHERE isDeleted = false`, which is what makes PM generation idempotent.
+The system of record, database name `cmms`. The schema is **migration-managed** — 38 Prisma models across 19 migrations (previously cited here as 15, before the 2026-10-02 to 2026-10-05 migrations), applied with `prisma migrate deploy`. `prisma db push` is retired and must not be used. Integrity relies on a mix of Prisma-level constraints and hand-written partial unique indexes, notably `WorkOrder(sourcePlanId, sourcePlanCycle) WHERE isDeleted = false`, which is what makes PM generation idempotent.
 
 ### PM2 process manager (`backend/ecosystem.config.cjs`)
 
@@ -59,7 +59,7 @@ flowchart TB
         BK["backups/<br/>cmms-YYYY-MM-DD-HHmm.sql<br/>+ matching -uploads folder<br/>newest 14 of each kept"]
     end
 
-    DB[("PostgreSQL 15+ - database cmms<br/>38 models / 15 migrations")]
+    DB[("PostgreSQL 15+ - database cmms<br/>38 models / 19 migrations")]
     TASKSCHED["Windows Task Scheduler<br/>daily 02:00"]
 
     B -->|443| STATIC

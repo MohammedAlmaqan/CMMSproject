@@ -11,7 +11,7 @@ For the initial installation itself, see the [Installation & Deployment Guide](I
 Related documents:
 
 - [User Manual](USER_MANUAL.md) - the guide you give to plant users
-- [API Reference](API_REFERENCE.md) - all 129 endpoints across 26 route groups
+- [API Reference](API_REFERENCE.md) - all 141 endpoints across 27 route groups (supersedes the 129 across 26 cited here earlier)
 - [Architecture](ARCHITECTURE.md) - design decisions and measured performance
 - [Handoff](HANDOFF.md) - known open risks carried into production
 

@@ -29,13 +29,19 @@ These counts are the actual current state, not aspirations:
 | Thing | Count |
 |-------|-------|
 | Prisma models | 38 |
-| Prisma migrations | 15 |
-| Backend API route files | 26 |
-| Backend route groups mounted | 26 |
-| Backend test files | 70 `.test.ts` run by vitest (33 unit + 37 routes); 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 73 |
+| Prisma migrations | 19 |
+| Backend API route files | 27 |
+| Backend route groups mounted | 27 |
+| Backend test files | 81 `.test.ts` run by vitest (35 unit + 46 routes), listing 1080 tests; 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 84 |
 | Frontend pages | 17 |
-| Frontend service modules | 23 |
-| Frontend test files | 7 |
+| Frontend service modules | 25 |
+| Frontend test files | 8 |
+
+*Re-derived 2026-10-08 against the repository at `3fbbea1`. The previous
+table - 15 migrations, 26 route files and groups, 70 backend tests (33 + 37)
+and a tracked total of 73, 23 service modules, 7 frontend tests - was written
+before the 2026-10-02 to 2026-10-07 work and is kept here rather than
+silently overwritten.*
 
 ## Implemented functionality
 
@@ -269,21 +275,21 @@ CMMSproject/
 │   └── src/
 │       ├── components/         # layout, dashboard (incl. the R3F canvas)
 │       ├── pages/              # 17 page components
-│       ├── services/           # 23 API service modules
+│       ├── services/           # 25 API service modules
 │       ├── store/              # Zustand
 │       ├── types/              # TypeScript types
-│       └── __tests__/          # 7 test files
+│       └── __tests__/          # 8 test files
 ├── backend/                    # Express API
 │   ├── src/
-│   │   ├── routes/             # 26 route files
+│   │   ├── routes/             # 27 route files
 │   │   ├── middleware/         # auth, RBAC, audit, validation
 │   │   ├── services/           # scheduler and domain logic
 │   │   └── utils/              # logger, csv, prisma client
 │   ├── prisma/
 │   │   ├── schema.prisma       # 38 models
-│   │   ├── migrations/         # 15 migrations
+│   │   ├── migrations/         # 19 migrations
 │   │   └── seed.ts             # guarded demo seed
-│   └── tests/                  # 70 test files + 3 support = 73 tracked
+│   └── tests/                  # 81 test files + 3 support = 84 tracked
 ├── scripts/                    # Windows batch scripts, k6, verify scripts
 ├── docs/                        # all documentation; README.md is the only .md at the root
 │   ├── CMMS_FINALIZATION_TRACKER.md
