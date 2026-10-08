@@ -32,7 +32,7 @@ These counts are the actual current state, not aspirations:
 | Prisma migrations | 19 |
 | Backend API route files | 27 |
 | Backend route groups mounted | 27 |
-| Backend test files | 81 `.test.ts` run by vitest (35 unit + 46 routes), listing 1080 tests; 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 84 |
+| Backend test files | 81 `.test.ts` run by vitest (35 unit + 46 routes), 1084 tests executed (`vitest list` prints 1080: it counts each `it.each` template once, the runner expands them); 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 84 |
 | Frontend pages | 17 |
 | Frontend service modules | 25 |
 | Frontend test files | 8 |
