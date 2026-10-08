@@ -66,6 +66,29 @@ function fmtValue(value: unknown): string {
   return String(value);
 }
 
+/**
+ * One readable line for a row the database refused. Prisma's message opens
+ * with a code frame and puts the cause on the last line, so keeping the first
+ * line recorded either an empty reason or a source snippet - a rejection table
+ * nobody can act on. Keep the tail, squash the whitespace, prefix the Prisma
+ * error code when there is one, redact anything that looks like a connection
+ * string (the harness never prints one), and cap the length so a row stays a
+ * row.
+ */
+function describeError(err: unknown): string {
+  const code =
+    err !== null && typeof err === 'object' && 'code' in err && typeof (err as { code: unknown }).code === 'string'
+      ? `${(err as { code: string }).code} `
+      : '';
+  const raw = err instanceof Error ? err.message : String(err);
+  const oneLine = raw
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b(?:postgres|postgresql):\/\/\S+/gi, '<connection-string>');
+  const body = oneLine.length > 300 ? `...${oneLine.slice(-300)}` : oneLine;
+  return `${code}${body}`;
+}
+
 /** One delivery rule per CSV column, how it acted across the dataset's rows. */
 function summarizeColumns(
   headers: string[],
@@ -150,8 +173,7 @@ async function importDataset(
           };
         })[importer.model].create({ data });
       } catch (err) {
-        failReason =
-          err instanceof Error ? `create failed: ${err.message.split('\n')[0]}` : 'create failed';
+        failReason = `create failed: ${describeError(err)}`;
       }
     }
 
