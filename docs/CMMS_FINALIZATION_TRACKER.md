@@ -1701,6 +1701,10 @@ Left column: the commit the tracker cites as the promotion evidence (build SHA, 
 | SOW §5.5 row-298 waiver `5a65ab8` (run 193, green) | §5.5 oauth2; Not Met→Waived (owner decision D-5, 2026-09-26); status commit `5a65ab8` = |
 | Migration CSV templates `159814c` (run 194, green) | Documentation-only, no verifier promotion — 30 schema-derived templates + README for the migration trial run; `159814c` = |
 | API reference reconciliation `8412dfb` (run 195, green) | Documentation-only, no verifier promotion — API_REFERENCE, DATA_DICTIONARY and openapi.json aligned with schema and live API; `8412dfb` = |
+| Migration sample fill `fcb0917` (run 201, green) | No verifier promotion — the nine `*.filled.csv` trial-run samples written from the owner's workbooks, plus `FILL_REPORT.md`; `fcb0917` = |
+| Equipment criticality widened to S `5aa0094` (run 202, green) | No verifier promotion — `Equipment.criticality` accepts `S, A, B, C` with S above A, in `schema.prisma`, the two `z.enum` sites in `validation.ts`, the route `@openapi` blocks and the exported spec; the withdrawn S→A mapping is not revived; `5aa0094` = |
+| SCE sample rows carry S `c804cbf` (run 203, green) | No verifier promotion — the two SCE rows in the sample set `criticality = S` under the owner decision of 2026-10-07, and `FILL_REPORT`'s old S→A rule is superseded; `c804cbf` = |
+| Trial importers and harness `dbd48af` (run 204, green) | No verifier promotion — `backend/src/migration-trial/` (nine database-free importers, row verifier, report renderer, throwaway-schema runner) behind `npm run trial:run`; `dbd48af` = |
 
 ## CI verification exceptions (2026-10-05 GitHub Actions incident)
 
