@@ -20,7 +20,7 @@ A Vite 7 + TypeScript single-page app. In development the Vite dev server listen
 
 ### Express + TypeScript API (`backend/`)
 
-An ESM Node application (`"type": "module"` in `backend/package.json`) built with `tsc` to `backend/dist/` and run as plain Node. It listens on port 4000 (`process.env.PORT`, default `4000`). Data access goes through Prisma ORM against PostgreSQL. The API is stateless with respect to sessions: it validates a bearer JWT and holds no session store. It mounts 26 route groups plus a Swagger UI, and every router except `auth.ts` applies `router.use(authenticate)` so authentication is enforced per router rather than globally. Cross-cutting concerns are deliberately separated: `src/middleware/` (auth, RBAC, validation, audit), `src/services/` (domain logic and the scheduler), `src/utils/` (config, logger, CSV, sequencing).
+An ESM Node application (`"type": "module"` in `backend/package.json`) built with `tsc` to `backend/dist/` and run as plain Node. It listens on port 4000 (`process.env.PORT`, default `4000`). Data access goes through Prisma ORM against PostgreSQL. The API is stateless with respect to sessions: it validates a bearer JWT and holds no session store. It mounts 27 route groups plus a Swagger UI (previously cited here as 26, before `routes/causeCodes.ts` was added in `9b1758c` on 2026-10-03; counted 2026-10-08), and every router except `auth.ts` applies `router.use(authenticate)` so authentication is enforced per router rather than globally. Cross-cutting concerns are deliberately separated: `src/middleware/` (auth, RBAC, validation, audit), `src/services/` (domain logic and the scheduler), `src/utils/` (config, logger, CSV, sequencing).
 
 ### PostgreSQL 15+
 
