@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditAction, logAuditFieldChange, changedFields } from '../middleware/audit.js';
+import { logAuditFieldChange, changedFields, auditMiddleware } from '../middleware/audit.js';
 import { validate, costSplitReplaceSchema } from '../utils/validation.js';
 import { checkAllocation, describeProblem, allocate } from '../utils/costSplits.js';
 import { logger } from '../utils/logger.js';
@@ -266,7 +266,7 @@ router.put('/', authorizeMinRole('Maintenance Planner'), validate(costSplitRepla
  *       '500':
  *         description: Internal server error
  */
-router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), auditMiddleware('CostSplit'), async (req: Request, res: Response) => {
   try {
     const splitId = String(req.params.id);
     const existing = await prisma.costSplit.findFirst({ where: { splitId, isDeleted: false } });
@@ -284,8 +284,6 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
     }
 
     await prisma.costSplit.update({ where: { splitId }, data: { isDeleted: true, modifiedBy: req.user!.userId } });
-
-    await logAuditAction({ table: 'CostSplit', recordId: splitId, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Cost split deleted successfully' });
   } catch (error) {

@@ -112,9 +112,15 @@ export async function logAuditAction(entry: ActionEntry) {
 }
 
 /**
- * A per-route `res.json` wrapper that records one audit row per successful
- * write. Unused: kept for completeness, but nothing mounts it, so treat it as
- * unverified code rather than as a path requests take. See the note inside.
+ * A per-route `res.json` wrapper that records one base audit row per successful
+ * write, with the action derived from the request method and the record id from
+ * `req.params.id`. C6b mounts it on the DELETE routes of the C6 route files
+ * (alerts has none), so those handlers no longer call logAuditAction by hand.
+ * It is deliberately not mounted on their POST/PUT routes: the creates send
+ * domain-specific id keys (serviceCostId, woMaterialId and so on) that this
+ * middleware does not read, and the PUT routes already record per-column diffs
+ * through logFieldChanges. Widening those cases is deferred to v1.1. See the
+ * note inside on why mounting it at all is deliberate.
  */
 export function auditMiddleware(tableName: string) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -137,15 +143,13 @@ export function auditMiddleware(tableName: string) {
           // its own errors, so awaiting it here cannot turn an audit failure into
           // a failed request; that policy is unchanged.
           //
-          // Note this is latent hardening, not a fix for observed residue: this
-          // middleware has never been registered. It was defined in the initial
-          // commit 6f6d944 and `git log -S` shows no commit ever mounting it, so
-          // no request has ever passed through it. Every mutating route calls
-          // logAuditAction/logFieldChanges directly and awaits. R.9 D3 recorded it
-          // as the cause of the audit residue; that was wrong, and the residue
-          // actually comes from the missing FK from audit rows to their parent
-          // table, which lets a hard-deleted test fixture leave its audit trail
-          // behind. See the R.9 D3 audit entry in the tracker.
+          // C6b mounts this on the DELETE routes of the C6 files (see the doc
+          // comment above). That was not always so: from the initial commit
+          // 6f6d944 until C6b, nothing registered the function, and R.9 D3
+          // corrected an earlier claim that its fire-and-forget form caused the
+          // audit residue - the residue comes from the missing FK from audit rows
+          // to their parent table, which lets a hard-deleted test fixture leave
+          // its audit trail behind. See the R.9 D3-audit entry in the tracker.
           await logAuditAction({
             table: tableName,
             recordId,

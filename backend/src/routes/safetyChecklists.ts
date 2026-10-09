@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditAction, logAuditFieldChange, logFieldChanges } from '../middleware/audit.js';
+import { logAuditAction, logAuditFieldChange, logFieldChanges, auditMiddleware } from '../middleware/audit.js';
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -565,7 +565,7 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
  *       '500':
  *         description: Internal server error
  */
-router.delete('/work-order-checklist/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
+router.delete('/work-order-checklist/:id', authorizeMinRole('Technician'), auditMiddleware('WorkOrderChecklist'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.workOrderChecklist.findFirst({
@@ -584,8 +584,6 @@ router.delete('/work-order-checklist/:id', authorizeMinRole('Technician'), async
       where: { woChecklistId: id },
       data: { isDeleted: true, modifiedBy: req.user!.userId },
     });
-
-    await logAuditAction({ table: 'WorkOrderChecklist', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Work order checklist deleted successfully' });
   } catch (error) {

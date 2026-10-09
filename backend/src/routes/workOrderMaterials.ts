@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges, auditMiddleware } from '../middleware/audit.js';
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { assertReservable, getMaterialAvailability } from '../services/materialAvailability.js';
@@ -365,7 +365,7 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
  *       '500':
  *         description: Internal server error
  */
-router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: Response) => {
+router.delete('/:id', authorizeMinRole('Technician'), auditMiddleware('WorkOrderMaterial'), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.workOrderMaterial.findFirst({
@@ -381,8 +381,6 @@ router.delete('/:id', authorizeMinRole('Technician'), async (req: Request, res: 
     });
 
     await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
-
-    await logAuditAction({ table: 'WorkOrderMaterial', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
 
     res.json({ message: 'Work order material deleted successfully' });
   } catch (error) {
