@@ -154,6 +154,8 @@ the SHA and green CI run recorded when the item landed.
 | D5 | 2026-10-09 | `62b6185` | 229 |
 | C2 | 2026-10-09 | `22c3b2e` | 232 |
 | C6 | 2026-10-09 | `5f11e25` | 236 |
+| B2 | 2026-10-09 | `16a02eb` | 238 |
+| B3 | 2026-10-09 | `fede127` | 238 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -175,3 +177,12 @@ and the setting joins the writable allowlist with its own 1-100 validation. The 
 is deliberately narrow - the DELETE routes only. Extending the middleware to `PUT /:id`
 and to named-id params (`:woId`) was considered and **deferred as a v1.1 candidate, not
 overlooked**.
+
+**B2** and **B3** are owner acceptances recorded as register edits, not code. B2 accepts
+the §3.5.2 cost-split-screen deferral for go-live (matrix row 331); B3 accepts the defect
+position — the four accessibility items, named and carried (matrix row 334). Both
+formalise earlier decisions (2026-10-04 and 2026-10-05) and add no work; the underlying
+screen and accessibility items remain v1.1 (`N1`, `N2`). They share run 238, the first
+green tip carrying them, pushed together with **B1**'s reclassification (`1310340`) and
+the **D1** OpenAPI-coverage correction (`018e570`). B1 and D1 are not closures: B1 moved
+to "close now" work, and D1's sweep is still open.
