@@ -60,11 +60,10 @@ What it is, where it lives, size.
 | D4 | Matrix §5.4 line 292's limbs are contradicted: BOM lines have `POST`/`PUT`/`DELETE` (`equipment.ts:963`/`:1049`/`:1114`), cost splits are created and soft-deleted (`workOrderCostSplits.ts:256`), and plan meters are written in the plan `PUT` (`maintenancePlans.ts:509-513`) — so "deletes are absent on several entities" and "child collections are read-only" no longer hold for master data or work orders. Residual deletes genuinely absent: `SystemAlert`, checklist templates, meter readings, system config — none of which is master data or a work order. Status is the owner's call | Matrix line 292 (§5.4) | S (edit) |
 | D5 | Tracker v1.1-6's premise is wrong on the current tree: there is no audit-log action filter dropdown in `AdministrationPage.tsx` (only a free-text filter at line 128, which already matches on `action`, so `Blocked` entries are isolable today). What is stale is the v1.1-6 wording itself and the swagger `action` description at `auditLog.ts:37`, which lists Create/Update/Delete/Run while `AuditAction` includes `Blocked` (`middleware/audit.ts:6`) and five routes write it (labor `:152`/`:285`, notifications `:413`, workOrders `:862`/`:900`) | Tracker v1.1-6 | S |
 
-## C. Blocked on owner (3)
+## C. Blocked on owner (2)
 
 | ID | Item | Where it lives |
 |---|---|---|
-| B2 | Go-live acceptance of the remaining partial functional requirement. Table 1 item 3 named items 1 and 2; item 1 is delivered (`1e4b28c`), so the question is now the cost-split screen alone, which is already decided for v1.1 (N1) | Table 1 item 3 |
 | B3 | Confirm the defect position is acceptable for go-live (the four accessibility items, named and carried) | Table 1 item 4 |
 | B4 | Authorisation to delete the 61 orphan fixture task lists and the orphaned audit rows on `WorkOrder`/`WorkOrderOperation`/`MaintenancePlan` | OWNER_ACTION_SHEET footnote under Table 2 |
 
@@ -111,6 +110,9 @@ What it is, where it lives, size.
   `docs/migration-templates/dataset/`, and the 21 unfilled templates have no source
   rows (`migration-templates/FILL_REPORT.md` §Scope). Not a blocker — executable
   migration-and-measurement work. Category A retitled "code and data gap".
+- **B2 → accepted and closed.** The owner accepted the §3.5.2 cost-split-screen
+  deferral for go-live on 2026-10-09, formalising the 2026-10-04 decision (matrix
+  row 331). The screen itself remains v1.1 work (N1); nothing is added.
 
 ## Coverage check
 
@@ -128,8 +130,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-17 code and data gaps · 5 documentation gaps · 3 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **36 open items**.
+17 code and data gaps · 5 documentation gaps · 2 blocked on owner · 1 blocked on external ·
+10 decisions-not-gap = **35 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
