@@ -17,6 +17,7 @@ let flat = '';
 let wc = '';
 let sup = '';
 let wcSupId = '';
+let probeCenterId = '';
 const woIds: string[] = [];
 let baselineOverdueAlertIds: string[] = [];
 
@@ -53,22 +54,31 @@ async function overdueAlerts(workOrderId: string) {
 }
 
 beforeAll(async () => {
-  const [loc, center, supervisor] = await Promise.all([
+  const [loc, supervisor] = await Promise.all([
     prisma.functionalLocation.findFirst({ where: { isDeleted: false }, orderBy: { locationCode: 'asc' } }),
-    prisma.workCenter.findFirst({ where: { isDeleted: false } }),
     prisma.user.findFirst({ where: { username: 'supervisor' } }),
   ]);
-  if (!loc || !center || !supervisor) {
-    throw new Error('seeded location, work center or supervisor not found');
+  if (!loc || !supervisor) {
+    throw new Error('seeded location or supervisor not found');
   }
   flat = loc.functionalLocationId;
-  wc = center.workCenterId;
   sup = supervisor.userId;
 
-  // The seeded supervisor has no work centre, so a test supervisor bound to the
-  // work centre is what makes the role branch of the recipient rule observable
-  // rather than an assumption about the seed.
+  // A dedicated probe work centre keeps the "work centre supervisor" branch of
+  // the recipient rule observable without assuming anything about how the seed
+  // assigns home work centres (register C9 gave the seeded supervisor one).
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+  const probeCenter = await prisma.workCenter.create({
+    data: {
+      code: `WC-PROBE-${stamp}`,
+      name: 'Alert Probe Work Centre',
+      dailyCapacityHours: 8,
+      costRatePerHour: 0,
+    },
+  });
+  wc = probeCenter.workCenterId;
+  probeCenterId = wc;
+
   const wcSup = await prisma.user.create({
     data: {
       username: `wc-sup-${stamp}`,
@@ -96,6 +106,7 @@ afterAll(async () => {
     where: { alertType: ALERT_TYPE_WO_OVERDUE, alertId: { notIn: baselineOverdueAlertIds } },
   });
   await prisma.user.deleteMany({ where: { userId: wcSupId } });
+  await prisma.workCenter.deleteMany({ where: { workCenterId: probeCenterId } });
 });
 
 describe('SOW 3.8 work order alerts (rows 69 and 70)', () => {
