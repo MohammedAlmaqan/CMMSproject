@@ -267,6 +267,11 @@ afterAll(async () => {
       .send({ status: 'Completed' });
     expect(signoff.status).toBe(200);
     expect(signoff.body.status).toBe('Completed');
+    // C6a: the sign-off is recorded as a status column diff.
+    const statusDiff = await prisma.auditLogEntry.findFirst({
+      where: { tableName: 'WorkOrderChecklist', recordId: gateChecklistId, action: 'Update', fieldName: 'status' },
+    });
+    expect(statusDiff?.newValue).toBe('Completed');
 
     const items = await prisma.workOrderChecklistItem.findMany({ where: { woChecklistId: gateChecklistId } });
     expect(items.every((i) => i.response === null)).toBe(true);
@@ -290,6 +295,12 @@ afterAll(async () => {
       .set(authHeaders(ctx.adminToken))
       .send({ response: 'Yes' });
     expect(res.status).toBe(200);
+    // C6a: an item answer is recorded as a response column diff.
+    const answerDiff = await prisma.auditLogEntry.findFirst({
+      where: { tableName: 'WorkOrderChecklistItem', recordId: items[0].woChecklistItemId, action: 'Update', fieldName: 'response' },
+    });
+    expect(answerDiff?.oldValue).toBeNull();
+    expect(answerDiff?.newValue).toBe('Yes');
 
     const blocked = await api()
       .put(`/api/work-orders/${gateWoId}/status`)
@@ -335,5 +346,17 @@ afterAll(async () => {
 
     const back = await prisma.workOrderChecklist.findUnique({ where: { woChecklistId: gateChecklistId } });
     expect(back!.status).toBe('In Progress');
+    // C6a: the re-arm downgrade is recorded as a status column diff.
+    const downgrade = await prisma.auditLogEntry.findFirst({
+      where: {
+        tableName: 'WorkOrderChecklist',
+        recordId: gateChecklistId,
+        action: 'Update',
+        fieldName: 'status',
+        oldValue: 'Completed',
+        newValue: 'In Progress',
+      },
+    });
+    expect(downgrade).toBeTruthy();
   });
 });

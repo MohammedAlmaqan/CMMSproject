@@ -3,15 +3,20 @@ import type {
   CauseCode,
   Equipment,
   EquipmentMeter,
+  ExternalServiceCost,
   FailureCode,
   FunctionalLocation,
   MaintenancePlan,
   Material,
   SafetyChecklistTemplate,
+  SystemAlert,
   TaskList,
   User,
   WorkCenter,
   WorkOrder,
+  WorkOrderChecklist,
+  WorkOrderChecklistItem,
+  WorkOrderMaterial,
   WorkOrderOperation,
 } from '@prisma/client';
 
@@ -116,6 +121,33 @@ export const AUDITED_FIELDS = {
     'sequenceNumber', 'description', 'craftId', 'plannedHours',
     'numberOfTechnicians', 'actualHours', 'status',
   ] satisfies AuditedColumns<WorkOrderOperation>,
+
+  // C6a: the remaining single-row write routes that used to record only an
+  // action row now diff the columns that moved, same policy as the master-data
+  // tables above. `SystemAlert` covers the single-alert read endpoint; the
+  // bulk read-all stays action-only because it is a multi-row event with no
+  // one record to diff (see alerts.ts).
+
+  SystemAlert: [
+    'isRead',
+  ] satisfies AuditedColumns<SystemAlert>,
+
+  ExternalServiceCost: [
+    'vendor', 'description', 'cost', 'invoiceRef', 'category',
+  ] satisfies AuditedColumns<ExternalServiceCost>,
+
+  WorkOrderChecklist: [
+    'status', 'signedBy', 'signedDate',
+  ] satisfies AuditedColumns<WorkOrderChecklist>,
+
+  WorkOrderChecklistItem: [
+    'response', 'comment',
+  ] satisfies AuditedColumns<WorkOrderChecklistItem>,
+
+  WorkOrderMaterial: [
+    'operationId', 'plannedQuantity', 'actualQuantity', 'unitCost',
+    'reservationQuantity',
+  ] satisfies AuditedColumns<WorkOrderMaterial>,
 } as const;
 
 export type AuditedTable = keyof typeof AUDITED_FIELDS;

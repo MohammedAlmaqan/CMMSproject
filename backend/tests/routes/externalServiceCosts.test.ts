@@ -130,6 +130,12 @@ describe('external service costs routes', () => {
 
       const row = await prisma.externalServiceCost.findUniqueOrThrow({ where: { serviceCostId: id } });
       expect(row.category).toBe('Permit');
+      // C6a: the reclassification is recorded as a column diff.
+      const catDiff = await prisma.auditLogEntry.findFirst({
+        where: { tableName: 'ExternalServiceCost', recordId: id, action: 'Update', fieldName: 'category' },
+      });
+      expect(catDiff?.oldValue).toBe('Service');
+      expect(catDiff?.newValue).toBe('Permit');
       // An update that does not mention the category must not clear it.
       const res2 = await api()
         .put(`/api/external-services/${id}`)
@@ -138,6 +144,11 @@ describe('external service costs routes', () => {
       expect(res2.status).toBe(200);
       const row2 = await prisma.externalServiceCost.findUniqueOrThrow({ where: { serviceCostId: id } });
       expect(row2.category).toBe('Permit');
+      const costDiff = await prisma.auditLogEntry.findFirst({
+        where: { tableName: 'ExternalServiceCost', recordId: id, action: 'Update', fieldName: 'cost' },
+      });
+      expect(costDiff).toBeTruthy();
+      expect(costDiff?.oldValue).not.toBe(costDiff?.newValue);
     });
 
     it('returns the category on the list endpoint', async () => {

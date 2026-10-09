@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditAction } from '../middleware/audit.js';
+import { logAuditAction, logAuditFieldChange, changedFields } from '../middleware/audit.js';
 import { validate, costSplitReplaceSchema } from '../utils/validation.js';
 import { checkAllocation, describeProblem, allocate } from '../utils/costSplits.js';
 import { logger } from '../utils/logger.js';
@@ -167,7 +167,7 @@ router.put('/', authorizeMinRole('Maintenance Planner'), validate(costSplitRepla
 
     const removed = await prisma.costSplit.findMany({
       where: { workOrderId, isDeleted: false },
-      select: { splitId: true },
+      select: { splitId: true, costCenterCode: true, percentage: true },
     });
 
     // Replace, do not upsert-per-line: a transaction is what makes a rejected
@@ -188,7 +188,37 @@ router.put('/', authorizeMinRole('Maintenance Planner'), validate(costSplitRepla
       return created;
     });
 
-    await logAuditAction({ table: 'CostSplit', recordId: workOrderId, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
+    // One set-level diff rather than a per-line diff: the allocation's meaning
+    // is the whole set (the percentages must total 100), so the audit row
+    // records the old and new allocation as ordered JSON. Sorted by cost centre
+    // so an unchanged set cannot appear changed only because rows came back in
+    // a different order.
+    const byCostCenter = (a: { costCenterCode: string }, b: { costCenterCode: string }) =>
+      a.costCenterCode.localeCompare(b.costCenterCode);
+    const beforeSet = removed
+      .map((s) => ({ costCenterCode: s.costCenterCode, percentage: s.percentage }))
+      .sort(byCostCenter);
+    const afterSet = updated
+      .map((s) => ({ costCenterCode: s.costCenterCode, percentage: s.percentage }))
+      .sort(byCostCenter);
+
+    const setChange = changedFields(
+      { costAllocation: beforeSet },
+      { costAllocation: afterSet },
+      ['costAllocation']
+    );
+    if (setChange.length > 0) {
+      await logAuditFieldChange({
+        table: 'CostSplit',
+        recordId: workOrderId,
+        action: 'Update',
+        field: setChange[0].field,
+        oldValue: setChange[0].oldValue,
+        newValue: setChange[0].newValue,
+        userId: req.user!.userId,
+        ipAddress: req.ip,
+      });
+    }
 
     res.json({
       workOrderId,

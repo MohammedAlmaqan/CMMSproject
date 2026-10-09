@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditAction } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { assertReservable, getMaterialAvailability } from '../services/materialAvailability.js';
 import { validate, woMaterialCreateSchema, woMaterialUpdateSchema } from '../utils/validation.js';
@@ -300,7 +301,15 @@ router.put('/:id', authorizeMinRole('Technician'), validate(woMaterialUpdateSche
 
     await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAuditAction({ table: 'WorkOrderMaterial', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
+    await logFieldChanges({
+      table: 'WorkOrderMaterial',
+      recordId: id,
+      before: existing,
+      after: material,
+      fields: AUDITED_FIELDS.WorkOrderMaterial,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json({
       ...material,

@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditAction } from '../middleware/audit.js';
+import { logAuditAction, logAuditFieldChange, logFieldChanges } from '../middleware/audit.js';
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { logger } from '../utils/logger.js';
 import {
   validate,
@@ -386,7 +387,15 @@ router.put('/work-order-checklist/:id', authorizeMinRole('Technician'), validate
       },
     });
 
-    await logAuditAction({ table: 'WorkOrderChecklist', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
+    await logFieldChanges({
+      table: 'WorkOrderChecklist',
+      recordId: id,
+      before: existing,
+      after: checklist,
+      fields: AUDITED_FIELDS.WorkOrderChecklist,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(checklist);
   } catch (error) {
@@ -484,11 +493,30 @@ router.put('/work-order-checklist-item/:id', authorizeMinRole('Technician'), val
           where: { woChecklistId: item.woChecklistId },
           data: { status: 'In Progress' },
         });
-        await logAuditAction({ table: 'WorkOrderChecklist', recordId: item.woChecklistId, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
+        // The downgrade is a real status change, so record it as one rather
+        // than an action row with no values.
+        await logAuditFieldChange({
+          table: 'WorkOrderChecklist',
+          recordId: item.woChecklistId,
+          action: 'Update',
+          field: 'status',
+          oldValue: 'Completed',
+          newValue: 'In Progress',
+          userId: req.user!.userId,
+          ipAddress: req.ip,
+        });
       }
     }
 
-    await logAuditAction({ table: 'WorkOrderChecklistItem', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
+    await logFieldChanges({
+      table: 'WorkOrderChecklistItem',
+      recordId: id,
+      before: existing,
+      after: item,
+      fields: AUDITED_FIELDS.WorkOrderChecklistItem,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(item);
   } catch (error) {

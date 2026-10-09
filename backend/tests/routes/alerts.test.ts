@@ -85,5 +85,12 @@ describe('alerts routes', () => {
         where: { tableName: 'SystemAlert', recordId: alertId, action: 'Update' },
       })
     ).toBe(before + 1);
+
+    // C6a: the single-alert read records a column diff, not a bare action row.
+    const diff = await prisma.auditLogEntry.findFirst({
+      where: { tableName: 'SystemAlert', recordId: alertId, action: 'Update', fieldName: 'isRead' },
+    });
+    expect(diff?.oldValue).toBe('false');
+    expect(diff?.newValue).toBe('true');
   });
 });

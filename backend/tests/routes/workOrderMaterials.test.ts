@@ -165,6 +165,12 @@ afterAll(async () => {
         .send({ reservationQuantity: 30 });
       expect(res.status).toBe(200);
       expect(res.body.availability.reservedQuantity).toBe(100);
+      // The line already reserved 30, so the value did not move: a PUT that
+      // changes nothing records no field diff (C6a).
+      const diff = await prisma.auditLogEntry.findFirst({
+        where: { tableName: 'WorkOrderMaterial', recordId: line.woMaterialId, action: 'Update', fieldName: 'reservationQuantity' },
+      });
+      expect(diff).toBeNull();
     });
 
     it('releases the reservation when the holding work order is cancelled', async () => {
@@ -202,6 +208,18 @@ afterAll(async () => {
     expect(
       await prisma.auditLogEntry.count({ where: { tableName: 'WorkOrderMaterial', recordId: woMatId, action: 'Create' } })
     ).toBeGreaterThanOrEqual(1);
+
+    // C6a: a later plan-quantity edit is recorded as a column diff.
+    const put = await api()
+      .put(`/api/work-order-materials/${woMatId}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ plannedQuantity: 5 });
+    expect(put.status).toBe(200);
+    const diff = await prisma.auditLogEntry.findFirst({
+      where: { tableName: 'WorkOrderMaterial', recordId: woMatId, action: 'Update', fieldName: 'plannedQuantity' },
+    });
+    expect(diff?.oldValue).toBe('2');
+    expect(diff?.newValue).toBe('5');
   });
 
   it('rejects a malformed body with a zod-derived 400', async () => {

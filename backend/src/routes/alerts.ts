@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditAction } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -201,7 +202,19 @@ router.put('/:id/read', authorizeMinRole('Requester'), async (req: Request, res:
       data: { isRead: true },
     });
 
-    await logAuditAction({ table: 'SystemAlert', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
+    // A single-alert read moves one known column, so record the diff (false to
+    // true) rather than a bare action row. The bulk read-all above stays
+    // action-only: it changes many rows at once and has no single record to
+    // diff against.
+    await logFieldChanges({
+      table: 'SystemAlert',
+      recordId: id,
+      before: existing,
+      after: alert,
+      fields: AUDITED_FIELDS.SystemAlert,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(alert);
   } catch (error) {

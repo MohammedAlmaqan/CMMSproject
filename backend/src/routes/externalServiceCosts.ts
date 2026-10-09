@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
-import { logAuditAction } from '../middleware/audit.js';
+import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
+import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import {
   validate,
@@ -217,7 +218,17 @@ router.put('/:id', authorizeMinRole('Technician'), validate(externalServiceUpdat
 
     await recomputeWorkOrderCosts(existing.workOrderId, { userId: req.user!.userId, ipAddress: req.ip });
 
-    await logAuditAction({ table: 'ExternalServiceCost', recordId: id, action: 'Update', userId: req.user!.userId, ipAddress: req.ip });
+    // Which columns moved, from what to what. `existing` is the row as it was
+    // read before the update, so the diff is against the real prior state.
+    await logFieldChanges({
+      table: 'ExternalServiceCost',
+      recordId: id,
+      before: existing,
+      after: service,
+      fields: AUDITED_FIELDS.ExternalServiceCost,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     res.json(service);
   } catch (error) {

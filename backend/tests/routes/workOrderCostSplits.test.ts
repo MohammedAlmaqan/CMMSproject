@@ -248,6 +248,10 @@ describe('cost-split route suite (SOW 3.5.2, :175)', () => {
       where: { tableName: 'CostSplit', recordId: woId, action: 'Update' },
     });
     expect(audit).toBeTruthy();
+    // C6a: the whole-set replace is audited as one set-level field diff.
+    expect(audit?.fieldName).toBe('costAllocation');
+    expect(audit?.newValue).toContain('CC-100');
+    expect(audit?.newValue).toContain('CC-200');
   });
 
   it('keeps the previous allocation intact after a rejected set', async () => {
