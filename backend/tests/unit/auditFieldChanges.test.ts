@@ -142,6 +142,11 @@ describe('AUDITED_FIELDS', () => {
       User: 'userId',
       WorkOrder: 'workOrderId',
       WorkOrderOperation: 'operationId',
+      SystemAlert: 'alertId',
+      ExternalServiceCost: 'serviceCostId',
+      WorkOrderChecklist: 'woChecklistId',
+      WorkOrderChecklistItem: 'woChecklistItemId',
+      WorkOrderMaterial: 'woMaterialId',
     };
     expect(Object.keys(ownKey).sort()).toEqual(Object.keys(AUDITED_FIELDS).sort());
     for (const [table, fields] of Object.entries(AUDITED_FIELDS)) {
