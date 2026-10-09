@@ -20,6 +20,7 @@ import {
   CalendarClock,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { hasMinRole, routeFloor } from '@/lib/rbac';
 import { useState } from 'react';
 
 interface SidebarProps {
@@ -75,7 +76,9 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 overflow-y-auto">
-        {navigation.map((item) => {
+        {navigation
+          .filter((item) => hasMinRole(user?.role, routeFloor(item.path)))
+          .map((item) => {
           const isActive = location.pathname.startsWith(item.path);
           const Icon = item.icon;
           return (

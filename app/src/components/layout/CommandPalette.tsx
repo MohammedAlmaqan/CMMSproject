@@ -17,6 +17,9 @@ import {
   Plus,
   ArrowRight,
 } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
+import { hasMinRole } from '@/lib/rbac';
+import type { UserRole } from '@/types';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -30,10 +33,13 @@ interface CommandItem {
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   action: () => void;
   category: string;
+  /** Minimum role allowed to see/run the command (matched against backend write floors). */
+  floor?: UserRole;
 }
 
 export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const navigate = useNavigate();
+  const role = useAuthStore((s) => s.user?.role);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,24 +54,25 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       { id: 'nav-mat', label: 'Go to Materials', icon: Package, category: 'Navigation', action: () => { navigate('/materials'); onClose(); } },
       { id: 'nav-tl', label: 'Go to Task Lists', icon: ClipboardList, category: 'Navigation', action: () => { navigate('/task-lists'); onClose(); } },
       { id: 'nav-rep', label: 'Go to Reports', icon: BarChart3, category: 'Navigation', action: () => { navigate('/reports'); onClose(); } },
-      { id: 'nav-admin', label: 'Go to Administration', icon: Shield, category: 'Navigation', action: () => { navigate('/administration'); onClose(); } },
-      { id: 'act-cwo', label: 'Create Work Order', icon: Plus, category: 'Actions', action: () => { navigate('/work-orders'); onClose(); } },
-      { id: 'act-cnot', label: 'Create Notification', icon: Plus, category: 'Actions', action: () => { navigate('/notifications'); onClose(); } },
-      { id: 'act-ceq', label: 'Add Equipment', icon: Plus, category: 'Actions', action: () => { navigate('/equipment'); onClose(); } },
-      { id: 'act-cmat', label: 'Add Material', icon: Plus, category: 'Actions', action: () => { navigate('/materials'); onClose(); } },
+      { id: 'nav-admin', label: 'Go to Administration', icon: Shield, category: 'Navigation', floor: 'Administrator', action: () => { navigate('/administration'); onClose(); } },
+      { id: 'act-cwo', label: 'Create Work Order', icon: Plus, category: 'Actions', floor: 'Requester', action: () => { navigate('/work-orders/new'); onClose(); } },
+      { id: 'act-cnot', label: 'Create Notification', icon: Plus, category: 'Actions', floor: 'Requester', action: () => { navigate('/notifications'); onClose(); } },
+      { id: 'act-ceq', label: 'Add Equipment', icon: Plus, category: 'Actions', floor: 'Technician', action: () => { navigate('/equipment'); onClose(); } },
+      { id: 'act-cmat', label: 'Add Material', icon: Plus, category: 'Actions', floor: 'Requester', action: () => { navigate('/materials'); onClose(); } },
     ],
     [navigate, onClose]
   );
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return commands;
+    const visible = commands.filter((c) => !c.floor || hasMinRole(role, c.floor));
+    if (!query.trim()) return visible;
     const q = query.toLowerCase();
-    return commands.filter(
+    return visible.filter(
       (c) =>
         c.label.toLowerCase().includes(q) ||
         c.category.toLowerCase().includes(q)
     );
-  }, [query, commands]);
+  }, [query, commands, role]);
 
   useEffect(() => {
     if (open) {

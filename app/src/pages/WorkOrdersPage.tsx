@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { useAuthStore } from '@/store/authStore';
+import { hasMinRole } from '@/lib/rbac';
 import { workOrderService } from '@/services/workOrderService';
 import { ApiError } from '@/lib/api';
 import type { WorkOrder, ViewMode, WorkOrderStatus, Priority } from '@/types';
@@ -77,6 +78,8 @@ const TRANSITIONS: Record<string, string[]> = {
 export default function WorkOrdersPage() {
   const navigate = useNavigate();
   const hasPermission = useAuthStore((s) => s.hasPermission);
+  const role = useAuthStore((s) => s.user?.role);
+  const canCreate = hasMinRole(role, 'Requester');
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [workOrders, setWorkOrders] = useState<WorkOrderRow[]>([]);
@@ -184,7 +187,7 @@ export default function WorkOrdersPage() {
     <>
       <Header
         title="WORK ORDERS"
-        onCreate={() => navigate('/work-orders/new')}
+        onCreate={canCreate ? () => navigate('/work-orders/new') : undefined}
         tabs={[
           { label: 'List View', value: 'list', active: viewMode === 'list', onClick: () => setViewMode('list') },
           { label: 'Board View', value: 'board', active: viewMode === 'board', onClick: () => setViewMode('board') },
@@ -263,12 +266,14 @@ export default function WorkOrdersPage() {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-2">
             <p className="text-sm text-secondary">No work orders found</p>
-            <button
-              onClick={() => navigate('/work-orders/new')}
-              className="px-4 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight transition-colors"
-            >
-              Create Work Order
-            </button>
+            {canCreate && (
+              <button
+                onClick={() => navigate('/work-orders/new')}
+                className="px-4 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight transition-colors"
+              >
+                Create Work Order
+              </button>
+            )}
           </div>
         ) : viewMode === 'list' ? (
           <div className="industrial-card rounded overflow-hidden">

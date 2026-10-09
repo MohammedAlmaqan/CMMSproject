@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, UserRole } from '@/types';
 import { authService } from '@/services/authService';
+import { roleHierarchy } from '@/lib/rbac';
 
 interface AuthState {
   user: User | null;
@@ -14,15 +15,6 @@ interface AuthState {
   hasPermission: (requiredRoles: UserRole[]) => boolean;
   clearError: () => void;
 }
-
-const roleHierarchy: Record<UserRole, number> = {
-  'Administrator': 6,
-  'Maintenance Planner': 5,
-  'Maintenance Supervisor': 4,
-  'Technician': 3,
-  'Requester': 2,
-  'View-Only': 1,
-};
 
 export const useAuthStore = create<AuthState>()(
   persist(

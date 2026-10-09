@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { hasMinRole, routeFloor } from '@/lib/rbac';
 import { useAppStore } from '@/store/appStore';
 import AppLayout from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/LoginPage';
@@ -24,6 +25,15 @@ import NotFoundPage from '@/pages/NotFoundPage';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function RoleRoute({ path, children }: { path: string; children: React.ReactNode }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const role = useAuthStore((s) => s.user?.role);
+  if (!hasMinRole(role, routeFloor(path))) {
+    return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
 }
 
 function AppInitializer({ children }: { children: React.ReactNode }) {
@@ -57,7 +67,7 @@ function App() {
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/work-orders" element={<WorkOrdersPage />} />
-                  <Route path="/work-orders/new" element={<WorkOrderCreatePage />} />
+                  <Route path="/work-orders/new" element={<RoleRoute path="/work-orders/new"><WorkOrderCreatePage /></RoleRoute>} />
                   <Route path="/work-orders/:id" element={<WorkOrderDetailPage />} />
                   <Route path="/notifications" element={<NotificationsPage />} />
                   <Route path="/notifications/:id" element={<NotificationDetailPage />} />
@@ -69,7 +79,7 @@ function App() {
                   <Route path="/task-lists" element={<TaskListsPage />} />
                   <Route path="/preventive-maintenance" element={<PreventiveMaintenancePage />} />
                   <Route path="/reports" element={<ReportsPage />} />
-                  <Route path="/administration" element={<AdministrationPage />} />
+                  <Route path="/administration" element={<RoleRoute path="/administration"><AdministrationPage /></RoleRoute>} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
               </AppLayout>
