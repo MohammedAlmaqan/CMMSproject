@@ -141,6 +141,7 @@ the SHA and green CI run recorded when the item landed.
 | D4 | 2026-10-09 | `c4875a9` | 229 |
 | D5 | 2026-10-09 | `62b6185` | 229 |
 | C2 | 2026-10-09 | `22c3b2e` | 232 |
+| C6 | 2026-10-09 | `5f11e25` | 236 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -148,3 +149,17 @@ Run 223 was green before that flake surfaced; run 226 is the first fully green t
 `1590ffd` (C10) landed on a red run 225 that the `e3d87e6` fix cleared.
 C9's matrix line-63 note correction (Technician "view assigned") landed at `e7c331b`
 (run 230); the earlier line-62 Supervisor-Close correction is item D3 above.
+
+C6 landed in three parts, so the table carries the tip (`5f11e25`, run 236) rather than
+one SHA for the item. **C6a** (`c37f7a4`, run 233) added field-level old/new diffs on the
+single-row write routes the register names; run 233 was red because
+`tests/unit/auditFieldChanges.test.ts` enumerates every `AUDITED_FIELDS` key in its own
+map, and the follow-up `3589324` (run 234) registered the new tables there. **C6b**
+(`de73cf9`, run 235) mounted `auditMiddleware` on the four `DELETE /:id` routes and
+removed their hand-written Delete rows. **C6c** (`5f11e25`, run 236) delivered the
+configurable purge: a daily job reads the `audit_retention_years` setting (default 7) and
+deletes older entries, `POST /api/audit-log/purge` runs it on demand for an Administrator,
+and the setting joins the writable allowlist with its own 1-100 validation. The C6b mount
+is deliberately narrow - the DELETE routes only. Extending the middleware to `PUT /:id`
+and to named-id params (`:woId`) was considered and **deferred as a v1.1 candidate, not
+overlooked**.
