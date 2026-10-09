@@ -136,3 +136,9 @@ the SHA and green CI run recorded when the item landed.
 | ID | Closed | SHA | Run |
 |---|---|---|---|
 | C9 | 2026-10-09 | `446cfd5` | 223 |
+| C10 | 2026-10-09 | `1590ffd` | 226 |
+
+C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
+assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
+Run 223 was green before that flake surfaced; run 226 is the first fully green tip.
+`1590ffd` (C10) landed on a red run 225 that the `e3d87e6` fix cleared.
