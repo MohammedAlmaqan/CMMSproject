@@ -169,6 +169,7 @@ the SHA and green CI run recorded when the item landed.
 | C6 | 2026-10-09 | `5f11e25` | 236 |
 | B2 | 2026-10-09 | `16a02eb` | 238 |
 | B3 | 2026-10-09 | `fede127` | 238 |
+| B4 | 2026-10-09 | `4d2d7c7` | 239 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -199,3 +200,8 @@ screen and accessibility items remain v1.1 (`N1`, `N2`). They share run 238, the
 green tip carrying them, pushed together with **B1**'s reclassification (`1310340`) and
 the **D1** OpenAPI-coverage correction (`018e570`). B1 and D1 are not closures: B1 moved
 to "close now" work, and D1's sweep is still open.
+
+**B4** (`4d2d7c7`, run 239) is the authorized orphan cleanup. The deletion itself ran
+against the gate/test database (`cmms_gate`), so the table honours the `r9d-orphan-clean`
+commit that shipped the tool and recorded the run, with the register processing at
+`5114d8d`.
