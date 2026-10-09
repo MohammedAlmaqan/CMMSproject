@@ -34,7 +34,7 @@ router.use(authenticate);
  *         name: action
  *         schema:
  *           type: string
- *         description: Filter by action - Create, Update, Delete, Run
+ *         description: Filter by action - Create, Update, Delete, Run, Blocked
  *       - in: query
  *         name: skip
  *         schema:
