@@ -145,3 +145,5 @@ C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
 Run 223 was green before that flake surfaced; run 226 is the first fully green tip.
 `1590ffd` (C10) landed on a red run 225 that the `e3d87e6` fix cleared.
+C9's matrix line-63 note correction (Technician "view assigned") landed at `e7c331b`
+(run 230); the earlier line-62 Supervisor-Close correction is item D3 above.
