@@ -1,5 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import {
+  AUDIT_RETENTION_KEY,
+  MAX_AUDIT_RETENTION_YEARS,
+  MIN_AUDIT_RETENTION_YEARS,
+} from './auditRetentionRules.js';
 
 export const workOrderStatusSchema = z.enum([
   'Draft',
@@ -123,18 +128,46 @@ export const craftCreateSchema = z.object({
 
 export const craftUpdateSchema = craftCreateSchema.partial();
 
-export const systemConfigUpdateSchema = z.object({
-  key: z.enum(['wo_number_prefix', 'notif_number_prefix']),
-  value: z
-    .string()
-    .trim()
-    .min(1)
-    .max(20)
+export const systemConfigUpdateSchema = z
+  .object({
+    key: z.enum(['wo_number_prefix', 'notif_number_prefix', AUDIT_RETENTION_KEY]),
+    value: z
+      .string()
+      .trim()
+      .min(1)
+      .max(20),
+  })
+  .superRefine(({ key, value }, ctx) => {
+    // SOW 4.3: the retention window is a whole number of years, and its bound is
+    // enforced here so a caller cannot store a value that `parseRetentionYears`
+    // would silently replace with the default - an accepted write that changes
+    // nothing is worse than a refused one.
+    if (key === AUDIT_RETENTION_KEY) {
+      const years = Number(value);
+      if (
+        !Number.isInteger(years) ||
+        years < MIN_AUDIT_RETENTION_YEARS ||
+        years > MAX_AUDIT_RETENTION_YEARS
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['value'],
+          message: `Retention must be a whole number of years between ${MIN_AUDIT_RETENTION_YEARS} and ${MAX_AUDIT_RETENTION_YEARS}`,
+        });
+      }
+      return;
+    }
     // A prefix is pasted into every generated number, so it is restricted to
     // characters that cannot break a number's readability or a downstream
     // filter. No spaces, no separators, no path characters.
-    .regex(/^[A-Za-z0-9_-]+$/, 'Prefix may contain only letters, digits, hyphen and underscore'),
-});
+    if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['value'],
+        message: 'Prefix may contain only letters, digits, hyphen and underscore',
+      });
+    }
+  });
 
 export const costSplitItemSchema = z.object({
   costCenterCode: z.string().trim().min(1),

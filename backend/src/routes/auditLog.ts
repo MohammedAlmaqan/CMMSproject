@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
+import { purgeAuditLogOnce } from '../services/auditRetention.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -117,6 +118,52 @@ router.get('/', authorizeMinRole('Administrator'), async (req: Request, res: Res
     res.json({ data: entries, total, skip: skipNum, take: takeNum });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching audit log');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/audit-log/purge:
+ *   post:
+ *     summary: Purge audit entries older than the retention window (Administrator only)
+ *     description: >
+ *       Deletes every audit entry whose timestamp is older than the configured
+ *       retention window (SystemConfig key audit_retention_years, default 7
+ *       years, measured in UTC calendar years). Entries at or after the cutoff
+ *       are kept. The run is itself recorded as an AuditLogEntry Run row naming
+ *       the acting Administrator. Restricted to the Administrator role.
+ *     tags: [Audit Log]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Purge complete
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ranAt: { type: string, format: date-time }
+ *                 retentionYears: { type: integer }
+ *                 cutoff: { type: string, format: date-time }
+ *                 deleted: { type: integer }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller is not an Administrator
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/purge', authorizeMinRole('Administrator'), async (req: Request, res: Response) => {
+  try {
+    const result = await purgeAuditLogOnce(new Date(), {
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
+    res.json(result);
+  } catch (error) {
+    logger.error({ err: error }, 'Error purging audit log');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

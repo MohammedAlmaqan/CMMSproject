@@ -11,6 +11,7 @@ const page = readFileSync(
   resolve(here, '../../../app/src/pages/AdministrationPage.tsx'), 'utf8');
 const service = readFileSync(
   resolve(here, '../../../app/src/services/systemConfigService.ts'), 'utf8');
+const retention = readFileSync(resolve(here, '../../src/services/auditRetention.ts'), 'utf8');
 
 // SOW 3.3.3 / 3.2.2: work order and notification numbers carry a configurable
 // prefix. Generation already read SystemConfig, so the wiring existed — what did
@@ -64,6 +65,35 @@ describe('only known settings are writable', () => {
     expect(systemConfigUpdateSchema.safeParse({
       key: 'wo_number_prefix', value: 'A'.repeat(21),
     }).success).toBe(false);
+  });
+});
+
+describe('the audit retention window is a setting, not a stray key', () => {
+  // SOW 4.3. The default (7 years) has been seeded since the schema was written,
+  // but nothing read it, so history grew forever. The admin screen may edit it,
+  // which makes it a writable key like the prefixes - and the key the screen
+  // writes must be the key the purge reads.
+  it('is on the writable allowlist and read by the purge at the same key', () => {
+    expect(route).toMatch(/key: AUDIT_RETENTION_KEY/);
+    expect(retention).toMatch(/key: AUDIT_RETENTION_KEY, isDeleted: false/);
+  });
+
+  it('accepts a whole number of years inside 1-100', () => {
+    for (const value of ['1', '7', '100', ' 30 ']) {
+      expect(systemConfigUpdateSchema.safeParse({ key: 'audit_retention_years', value }).success).toBe(true);
+    }
+  });
+
+  it('rejects a value the purge would silently replace with the default', () => {
+    // An accepted write that changes nothing is worse than a refused one: the
+    // admin would believe the window moved when it had not.
+    for (const value of ['0', '-1', '101', 'abc', '7.5', '']) {
+      expect(systemConfigUpdateSchema.safeParse({ key: 'audit_retention_years', value }).success).toBe(false);
+    }
+  });
+
+  it('still refuses an unknown key', () => {
+    expect(systemConfigUpdateSchema.safeParse({ key: 'audit_retention_days', value: '7' }).success).toBe(false);
   });
 });
 

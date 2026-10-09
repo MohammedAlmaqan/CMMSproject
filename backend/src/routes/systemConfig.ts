@@ -3,6 +3,12 @@ import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditFieldChange } from '../middleware/audit.js';
 import { validate, systemConfigUpdateSchema } from '../utils/validation.js';
+import {
+  AUDIT_RETENTION_KEY,
+  DEFAULT_AUDIT_RETENTION_YEARS,
+  MAX_AUDIT_RETENTION_YEARS,
+  MIN_AUDIT_RETENTION_YEARS,
+} from '../utils/auditRetentionRules.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -43,6 +49,16 @@ const SETTINGS: SettingDefinition[] = [
     description: 'Prefix for auto-generated notification numbers, for example N',
     fallback: 'N',
     maxLength: 20,
+  },
+  {
+    // SOW 4.3. The value is a number of years, not a prefix, and it has its own
+    // validation branch in systemConfigUpdateSchema; the generic regex below the
+    // allowlist does not apply to it.
+    key: AUDIT_RETENTION_KEY,
+    label: 'Audit log retention (years)',
+    description: `How many years of audit history are kept before the daily purge removes older entries, ${MIN_AUDIT_RETENTION_YEARS}-${MAX_AUDIT_RETENTION_YEARS}, default ${DEFAULT_AUDIT_RETENTION_YEARS}`,
+    fallback: String(DEFAULT_AUDIT_RETENTION_YEARS),
+    maxLength: 3,
   },
 ];
 
@@ -113,12 +129,14 @@ router.get('/', async (_req: Request, res: Response) => {
  *             properties:
  *               key:
  *                 type: string
- *                 enum: [wo_number_prefix, notif_number_prefix]
+ *                 enum: [wo_number_prefix, notif_number_prefix, audit_retention_years]
  *               value:
  *                 type: string
  *                 minLength: 1
  *                 maxLength: 20
- *                 pattern: '^[A-Za-z0-9_-]+$'
+ *                 description: >
+ *                   A prefix for the prefix keys, matching ^[A-Za-z0-9_-]+$; or a
+ *                   whole number of years (1-100) for audit_retention_years.
  *     responses:
  *       '200':
  *         description: Setting saved
