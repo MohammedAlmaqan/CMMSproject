@@ -26,7 +26,7 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code gap (16)
+## A. Close now — code and data gap (17)
 
 What it is, where it lives, size.
 
@@ -48,6 +48,7 @@ What it is, where it lives, size.
 | C19 | Settings screen is mostly static. 6 of the rows shown (session timeout, PM scheduler time, audit retention, upload limit, password policy, language) are hard-coded `SettingItem` markup at `AdministrationPage.tsx:393-398` with nothing enforcing those values; only the two number-prefix rows are backed by `system-config` | Found on my own; `README.md:264` | M |
 | C20 | Lint debt. Re-measured 2026-10-08: backend `npx eslint .` = **43 errors, 0 warnings**; app = **29 errors, 2 warnings**. `README.md:266` records 41 / 28+2 measured 2026-10-02 | Found on my own; `README.md:266` | M |
 | C21 | Dependency advisories with upgrades available. Re-measured 2026-10-08: backend `npm audit --omit=dev` = **10** (1 critical, 6 high, 3 moderate; `qs`/`body-parser`/`express`); app = **4** (3 high, 1 moderate; `react-router-dom`). Both report `npm audit fix`. `README.md:265` says 9 with "no criticals" | Found on my own; `README.md:265` | S/M |
+| B1 | Legacy migration accuracy: the Client dataset **is** held at `docs/migration-templates/dataset/` (2,259 open-WO rows, 6,163 equipment, 5,954 materials), so the full legacy load and the >99.9% accuracy figure on Client data are executable. The 21 unfilled templates are **not** a gap: `FILL_REPORT.md` §Scope records that they have no source rows or are deliberately deferred (meter patch). **Reclassified from "Blocked on owner" 2026-10-09** — nothing is pending from the Client | Matrix lines 40 (§1.3), 307 (§5.7), 335 (§6.4); Table 1 item 5; `migration-templates/TRIAL_RUN_REPORT.md`; `migration-templates/FILL_REPORT.md` §Scope | M + run window |
 
 ## B. Close now — documentation gap (5)
 
@@ -59,11 +60,10 @@ What it is, where it lives, size.
 | D4 | Matrix §5.4 line 292's limbs are contradicted: BOM lines have `POST`/`PUT`/`DELETE` (`equipment.ts:963`/`:1049`/`:1114`), cost splits are created and soft-deleted (`workOrderCostSplits.ts:256`), and plan meters are written in the plan `PUT` (`maintenancePlans.ts:509-513`) — so "deletes are absent on several entities" and "child collections are read-only" no longer hold for master data or work orders. Residual deletes genuinely absent: `SystemAlert`, checklist templates, meter readings, system config — none of which is master data or a work order. Status is the owner's call | Matrix line 292 (§5.4) | S (edit) |
 | D5 | Tracker v1.1-6's premise is wrong on the current tree: there is no audit-log action filter dropdown in `AdministrationPage.tsx` (only a free-text filter at line 128, which already matches on `action`, so `Blocked` entries are isolable today). What is stale is the v1.1-6 wording itself and the swagger `action` description at `auditLog.ts:37`, which lists Create/Update/Delete/Run while `AuditAction` includes `Blocked` (`middleware/audit.ts:6`) and five routes write it (labor `:152`/`:285`, notifications `:413`, workOrders `:862`/`:900`) | Tracker v1.1-6 | S |
 
-## C. Blocked on owner (4)
+## C. Blocked on owner (3)
 
 | ID | Item | Where it lives |
 |---|---|---|
-| B1 | The Client's legacy dataset, and everything that can only come from it: the >99.9% accuracy figure on Client data, the full legacy load, and the 21 unfilled templates that arrive with it (`FILL_REPORT.md:26` "the other 21 templates") | Matrix lines 40 (§1.3), 307 (§5.7), 335 (§6.4); Table 1 item 5; DECISION_REGISTER "Client legacy data" dependency |
 | B2 | Go-live acceptance of the remaining partial functional requirement. Table 1 item 3 named items 1 and 2; item 1 is delivered (`1e4b28c`), so the question is now the cost-split screen alone, which is already decided for v1.1 (N1) | Table 1 item 3 |
 | B3 | Confirm the defect position is acceptable for go-live (the four accessibility items, named and carried) | Table 1 item 4 |
 | B4 | Authorisation to delete the 61 orphan fixture task lists and the orphaned audit rows on `WorkOrder`/`WorkOrderOperation`/`MaintenancePlan` | OWNER_ACTION_SHEET footnote under Table 2 |
@@ -105,6 +105,13 @@ What it is, where it lives, size.
 - **Re-measured figures:** teardown sites 68 → 55; lint 41 / 28+2 → 43 / 29+2;
   advisories 9 / "no criticals" → 10 / 1 critical; Settings static rows "5 of 7" → 6 of 8.
 
+## Reclassifications (2026-10-09)
+
+- **B1 → A.** Nothing is pending from the Client: the legacy dataset is held at
+  `docs/migration-templates/dataset/`, and the 21 unfilled templates have no source
+  rows (`migration-templates/FILL_REPORT.md` §Scope). Not a blocker — executable
+  migration-and-measurement work. Category A retitled "code and data gap".
+
 ## Coverage check
 
 All 34 `Partial`/`Not Met` matrix lines map to exactly one entry above:
@@ -121,7 +128,7 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-16 code gaps · 5 documentation gaps · 4 blocked on owner · 1 blocked on external ·
+17 code and data gaps · 5 documentation gaps · 3 blocked on owner · 1 blocked on external ·
 10 decisions-not-gap = **36 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
