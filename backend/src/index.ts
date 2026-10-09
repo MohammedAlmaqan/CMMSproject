@@ -199,6 +199,8 @@ app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
 // mounted under both `/api` and `/api/v1`.
 const apiRouter = express.Router();
 
+import { authenticate } from './middleware/auth.js';
+
 // Health check
 apiRouter.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -222,7 +224,7 @@ const existing = await prisma.systemAlert.findFirst({
   logger.info('[scheduler] stale health detected — SystemAlert created');
 }
 
-apiRouter.get('/health/scheduler', async (_req, res) => {
+apiRouter.get('/health/scheduler', authenticate, async (_req: express.Request, res: express.Response) => {
   try {
 const last = await prisma.schedulerRun.findFirst({
       where: { status: 'success', isDeleted: false },
