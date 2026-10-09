@@ -60,11 +60,11 @@ What it is, where it lives, size.
 | D4 | Matrix §5.4 line 292's limbs are contradicted: BOM lines have `POST`/`PUT`/`DELETE` (`equipment.ts:963`/`:1049`/`:1114`), cost splits are created and soft-deleted (`workOrderCostSplits.ts:256`), and plan meters are written in the plan `PUT` (`maintenancePlans.ts:509-513`) — so "deletes are absent on several entities" and "child collections are read-only" no longer hold for master data or work orders. Residual deletes genuinely absent: `SystemAlert`, checklist templates, meter readings, system config — none of which is master data or a work order. Status is the owner's call | Matrix line 292 (§5.4) | S (edit) |
 | D5 | Tracker v1.1-6's premise is wrong on the current tree: there is no audit-log action filter dropdown in `AdministrationPage.tsx` (only a free-text filter at line 128, which already matches on `action`, so `Blocked` entries are isolable today). What is stale is the v1.1-6 wording itself and the swagger `action` description at `auditLog.ts:37`, which lists Create/Update/Delete/Run while `AuditAction` includes `Blocked` (`middleware/audit.ts:6`) and five routes write it (labor `:152`/`:285`, notifications `:413`, workOrders `:862`/`:900`) | Tracker v1.1-6 | S |
 
-## C. Blocked on owner (1)
+## C. Blocked on owner (0)
 
-| ID | Item | Where it lives |
-|---|---|---|
-| B4 | Authorisation to delete the 61 orphan fixture task lists and the orphaned audit rows on `WorkOrder`/`WorkOrderOperation`/`MaintenancePlan` | OWNER_ACTION_SHEET footnote under Table 2 |
+Empty since 2026-10-09 — all four owner items (B1–B4) are resolved. B1 was
+reclassified to close-now work, B2 and B3 were accepted, and B4 was applied
+(see the closure log and Reclassifications).
 
 ## D. Blocked on external (1)
 
@@ -116,6 +116,19 @@ What it is, where it lives, size.
   accessibility items, named and carried) for go-live on 2026-10-09, formalising
   the 2026-10-05 decision (matrix row 334). The items remain v1.1 work (N2);
   nothing is added.
+- **B4 → applied and closed.** The authorized orphan cleanup ran on 2026-10-09
+  against the gate/test database (`cmms_gate`, the database a gate is evidence
+  about) via `backend/scripts/r9d-orphan-clean.ts`, after a `pg_dump` backup of
+  both `cmms` and `cmms_gate`. Deleted: 38 soft-deleted `TL-T*` fixture task
+  lists (unreferenced by any plan) with the 114 `TaskList` audit rows that name
+  them, plus 198/83/35 orphan audit rows on `WorkOrder`/`WorkOrderOperation`/
+  `MaintenancePlan`. The register said 61 task lists; 38 remained — the count
+  was re-derived from the database, not copied from earlier prose. Zero deleted
+  ids are named by any test, script, or gate; the db-invariance check named
+  exactly the 468 removed rows and nothing else, and the baseline was
+  re-snapshot afterwards. The developer `cmms` database was clean and was not
+  the target. Not a blocker; placeholder where in the phases fits was the
+  closure log.
 
 ## Coverage check
 
@@ -133,8 +146,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-17 code and data gaps · 5 documentation gaps · 1 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **34 open items**.
+17 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
+10 decisions-not-gap = **33 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
