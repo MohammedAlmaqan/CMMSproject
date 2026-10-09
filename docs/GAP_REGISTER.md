@@ -140,6 +140,7 @@ the SHA and green CI run recorded when the item landed.
 | D3 | 2026-10-09 | `10610cd` | 228 |
 | D4 | 2026-10-09 | `c4875a9` | 229 |
 | D5 | 2026-10-09 | `62b6185` | 229 |
+| C2 | 2026-10-09 | `22c3b2e` | 232 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
