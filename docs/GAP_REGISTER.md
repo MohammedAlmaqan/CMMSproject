@@ -26,7 +26,7 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (13)
+## A. Close now — code and data gap (12)
 
 What it is, where it lives, size.
 
@@ -36,7 +36,6 @@ What it is, where it lives, size.
 | C2 | Frontend access control: navigation and routes are not filtered by role. `app/src/components/layout/Sidebar.tsx` renders all 11 items for every role (matrix line 301), and `ProtectedRoute` checks authentication only (`app/src/App.tsx:24-27`); role is used only to gate data fetches (`appStore.ts:153-166`) | OWNER_ACTION_SHEET Table 2 "Frontend access control"; matrix line 301 (§5.5) | M |
 | C3 | Planning and intake screens. `PreventiveMaintenancePage.tsx` exists with a plan list, filters and per-plan generate, and the APIs exist (`maintenancePlans.ts:292` `POST`, `:420` `PUT`, `:226` `POST /run-scheduler`), but there is no plan create/edit UI (`maintenancePlanService.ts` calls only list + generate), no on-demand scheduler control, and no notification-intake form anywhere in `app/src` (matrix line 64 names it) | Table 2 "Planning and intake screens"; matrix lines 38 (§1.3), 52 (§2.1), 61 (§2.2) | L |
 | C4 | Master-data editing and bulk access. The write APIs exist — BOM `POST`/`PUT`/`DELETE` (`equipment.ts:963`, `:1049`, `:1114`), cost splits (`workOrderCostSplits.ts`), meters (`equipmentMeters.ts`), plan meters written inside the plan `PUT` (`maintenancePlans.ts:509-513`) — but no screen drives them; there is no JSON bulk endpoint for functional locations (`functionalLocations.ts:275`/`:394` are single-row) and no OData-style query grammar (no `$filter`/`$top` anywhere; conventional `skip`/`take` only) | Table 2 "Master-data editing and bulk access"; matrix lines 295, 296 (§5.4), 59 (§2.2) | L |
-| C5 | Live-API importers for open work orders and functional locations. Only `POST /api/equipment/import.csv` (`equipment.ts:154`) and `POST /api/materials/import.csv` (`materials.ts:132`) exist; the work-order and location importers built at `dbd48af` are the database-free trial harness under `backend/src/migration-trial/` (`workOrder.ts:153`), not routes | Table 2 "Migration tooling"; matrix line 306 (§5.7) | M |
 | C6 | Audit completeness: per-column old/new values on the handlers that lack them, enforced at the middleware boundary, plus the configurable 7-year purge job. Measured 2026-10-08: 5 route files with `PUT` routes import neither `logFieldChanges` nor `logAuditFieldChange` (alerts, externalServiceCosts, safetyChecklists, workOrderCostSplits, workOrderMaterials — 7 handlers), `auditMiddleware` is exported at `backend/src/middleware/audit.ts:119` and never used, and no purge/retention job exists (matrix line 264: the 7-year default is a seed comment only) | Table 2 "Audit completeness"; matrix lines 55 (§2.1), 264 (§4.3), 289, 290 (§5.3) | L |
 | C9 | "View assigned" not enforced: `GET /api/work-orders` builds `where` with no assignment scoping (`workOrders.ts:97-131`), so every holder sees every work order | Matrix line 63 (§2.2) | M |
 | C10 | Unauthenticated `/api/health/scheduler` exposes plan counts and last-run state; the handler carries no `authenticate` and `apiRouter` has no global auth middleware (`index.ts:225`) | Matrix line 300 (§5.5) | S |
@@ -144,8 +143,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-13 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **29 open items**.
+12 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
+10 decisions-not-gap = **28 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -172,6 +171,7 @@ the SHA and green CI run recorded when the item landed.
 | C14 | 2026-10-10 | `fd86709` | 243 |
 | C20 | 2026-10-10 | `cfc6108` | 246 |
 | C21 | 2026-10-10 | `ad93610` | 248 |
+| C5 | 2026-10-10 | `eefcff1` | 252 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -278,4 +278,18 @@ the app are likewise out of scope here (they need `tailwindcss@4`, a breaking ch
 not counted by `--omit=dev`. `README.md:265` is corrected to this state with the superseded
 figures kept in the line; the item left no `SOW_COMPLIANCE.md` Status to move and, like C20,
 was found on my own and recorded only here, with no tracker `v1.1` row.
+
+**C5** (`eefcff1`, run 252) added the two missing live importers —
+`POST /api/functional-locations/import.csv` and `POST /api/work-orders/import.csv` — both
+Maintenance Planner-only, on the same mapping rules as the trial harness so a live load and
+the accuracy trial cannot diverge. A new helper (`backend/src/migration-trial/liveImport.ts`)
+resolves the importers' FK refs against live master data (plus rows created earlier in the
+same file, so a location's parent can come from the same upload), then upserts by natural key
+with an audit row; an unresolved ref, a malformed row or a Prisma failure is reported per row
+rather than aborting the run. Nine route tests cover the auth/role/header guards, parent and
+child resolution within one file, idempotent re-import as update, and per-row rejection of
+unknown references. The item left no matrix Status to move — the matrix line 306 Status is
+the owner's call — and the line 306 note and the Table 2 "Migration tooling" wording that
+still read as harness-only are **D1**'s remaining sweep, named here so closing C5 does not
+silently leave them stale.
 
