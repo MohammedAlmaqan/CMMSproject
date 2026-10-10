@@ -12,22 +12,24 @@ import { api, authHeaders, ctx, purgeMaintenancePlans } from '../helpers.js';
  * Row 71 is about the alert, so both cases are asserted against live rows: the
  * failing insert is observed, not assumed from a return value.
  *
- * The failure is produced by a plan whose `generatedWorkOrderStatus` is outside
- * the pair the SOW allows. The create route validates that field, so the fixture
- * is written straight through Prisma - the point is the generation path's
- * behaviour once an invalid value is already stored, which is a real state after a
- * database edit or a restored backup.
+ * The failure is produced by a plan that cannot be generated because it names
+ * neither an equipment nor a functional location and carries no target rows. The
+ * create route validates that cross-field rule, so the fixture is written
+ * straight through Prisma - the point is the generation path's behaviour once an
+ * illogical-but-storable state exists, which is a real state after a database
+ * edit or a restored backup. (`generatedWorkOrderStatus` used to model this the
+ * same way, but the status_and_type_check_constraints migration now pins it to
+ * Draft/Planned at the database, so a 'Bogus' value can no longer be stored.)
  */
 
 const stamp = randomUUID().slice(0, 8);
 
 let workCenterId = '';
 let taskListId = '';
-let functionalLocationId = '';
 let userId = '';
 const planIds = new Set<string>();
 
-async function makeInvalidPlan(code: string): Promise<string> {
+async function makeUnGeneratablePlan(code: string): Promise<string> {
   const planId = randomUUID();
   await prisma.maintenancePlan.create({
     data: {
@@ -46,10 +48,11 @@ async function makeInvalidPlan(code: string): Promise<string> {
       startDate: new Date(Date.now() - 86_400_000),
       activeFlag: true,
       priority: 'Medium',
-      generatedWorkOrderStatus: 'Bogus',
+      // No equipmentId, no functionalLocationId, no target rows: generation
+      // cannot resolve a location and fails with NO_FUNCTIONAL_LOCATION.
+      generatedWorkOrderStatus: 'Planned',
       createdBy: userId,
       modifiedBy: userId,
-      targets: { create: [{ functionalLocationId }] },
     },
   });
   planIds.add(planId);
@@ -73,16 +76,14 @@ const failureAlerts = (planId: string) =>
 
 describe('PM generation failure alerts (SOW 3.8, row 71)', () => {
   beforeAll(async () => {
-    const [wc, tl, fl, user] = await Promise.all([
+    const [wc, tl, user] = await Promise.all([
       prisma.workCenter.findFirst({ where: { isDeleted: false } }),
       prisma.taskList.findFirst({ where: { isDeleted: false } }),
-      prisma.functionalLocation.findFirst({ where: { isDeleted: false } }),
       prisma.user.findFirst(),
     ]);
-    if (!wc || !tl || !fl || !user) throw new Error('seeded work center, task list, location or user not found');
+    if (!wc || !tl || !user) throw new Error('seeded work center, task list or user not found');
     workCenterId = wc.workCenterId;
     taskListId = tl.taskListId;
-    functionalLocationId = fl.functionalLocationId;
     userId = user.userId;
   });
 
@@ -93,13 +94,13 @@ describe('PM generation failure alerts (SOW 3.8, row 71)', () => {
   });
 
   it('alerts the triage roles and the caller when a manual generation fails', async () => {
-    const planId = await makeInvalidPlan(`PMALERT-M-${stamp}`);
+    const planId = await makeUnGeneratablePlan(`PMALERT-M-${stamp}`);
 
     const res = await api()
       .post(`/api/maintenance-plans/${planId}/generate-wo`)
       .set(authHeaders(ctx.adminToken));
     expect(res.status).toBe(400);
-    expect(res.body.code).toBe('INVALID_STATUS');
+    expect(res.body.code).toBe('NO_FUNCTIONAL_LOCATION');
 
     const [triage, alerts] = await Promise.all([triageUsers(), failureAlerts(planId)]);
     // The planners and supervisors who triage, plus the caller who pressed the
@@ -110,10 +111,10 @@ describe('PM generation failure alerts (SOW 3.8, row 71)', () => {
   });
 
   it('alerts the triage roles when the scheduler fails a plan', async () => {
-    const planId = await makeInvalidPlan(`PMALERT-S-${stamp}`);
+    const planId = await makeUnGeneratablePlan(`PMALERT-S-${stamp}`);
 
     const result = await runSchedulerOnce({ onlyPlanIds: [planId] });
-    expect(result.errors.some((e) => e.includes('Bogus'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('neither a functional location nor equipment'))).toBe(true);
 
     const [triage, alerts] = await Promise.all([triageUsers(), failureAlerts(planId)]);
     expect(new Set(alerts.map((a) => a.userId))).toEqual(new Set(triage.map((u) => u.userId)));
