@@ -734,7 +734,7 @@ model AuditLogEntry {
 
 model SystemAlert {
   alertId           String   @id @default(uuid())
-  alertType         String   // WO_Assigned, WO_Overdue, PM_Generation, PM_Generation_Failed, High_Priority_Notification
+  alertType         String   // WO_Assigned, WO_Overdue, PM_Generation, PM_Generation_Failed, High_Priority_Notification, Account_Lockout
   userId            String
   title             String
   message           String
@@ -752,7 +752,7 @@ model SystemAlert {
 
 model Comment {
   commentId   String   @id @default(uuid())
-  entityType  String   // WorkOrder, Notification, Equipment
+  entityType  String   // WorkOrder, Notification, Equipment, MaintenancePlan
   entityId    String
   userId      String
   content     String
