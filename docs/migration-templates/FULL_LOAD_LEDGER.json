@@ -1,0 +1,33 @@
+{
+  "source_rows": {
+    "WO&Notf": 2259,
+    "Equip list": 6163,
+    "Materials": 5954
+  },
+  "equipment_excluded": {
+    "blank equipmentCode": 26,
+    "duplicate equipmentCode": 2,
+    "blank/unknown criticality": 5,
+    "blank/#N/A functionalLocation": 3
+  },
+  "equipment_emitted": 6127,
+  "functionalLocations_emitted": 463,
+  "workCenters_emitted": 5,
+  "users_emitted": 2,
+  "materials_merged_rows": 267,
+  "materials_excluded": {},
+  "materials_emitted": 5687,
+  "workOrders_excluded": {
+    "unmapped WO type (E3_Non-Maintenance)": 77,
+    "blank/#N/A functionalLocation": 1
+  },
+  "duplicates_dropped": {
+    "duplicate woNumber": 11,
+    "duplicate notificationNumber": 21
+  },
+  "equipment_fk_blanked_unresolved": 11,
+  "workOrders_emitted": 2170,
+  "notifications_emitted": 2160,
+  "workOrderNotifLinks_emitted": 2170,
+  "comments_emitted": 1549
+}
