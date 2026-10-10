@@ -358,7 +358,7 @@ const isAdmin = hasPermission(['Administrator']);
       setCauseCodes(causeCodesData as CauseCode[]);
       setFailureCodes((failureCodesData as FailureCode[] | null) ?? []);
       setFailureCodesFailed(failureCodesData === null);
-} catch (err) {
+    } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Failed to load work order');
     } finally {
       setLoading(false);
