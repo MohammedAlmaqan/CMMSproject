@@ -26,7 +26,7 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (17)
+## A. Close now — code and data gap (16)
 
 What it is, where it lives, size.
 
@@ -44,7 +44,6 @@ What it is, where it lives, size.
 | C12 | Write-path load measurement: the 200-VU run exercises the read path only, so no transactional-save percentile exists separately from reads (row 253 records the run; `scripts/k6/capacity.js` drives login + two GETs) | Table 2 "Write-path load measurement"; matrix line 253 (§4.1) | M + run window |
 | C13 | Total recovery time: only the database restore is measured (5.35 s, ADMIN_GUIDE); host rebuild and attachment store are not | Table 2 "Total recovery time"; matrix line 263 (§4.3) | M + run window |
 | C14 | Test hygiene: enforce the ban on swallowed teardown errors and clear the existing sites. Re-measured 2026-10-08: **55** exact `.catch(() => {})` sites across 13 test files (the recorded figure of 68 is stale); the enforcement instrument (ESLint rule vs gate grep) is still undecided | Table 2 "Test hygiene"; tracker v1.1-7 | M |
-| C15 | Database constraints for status and type values: they live in zod/API schemas only. Migrations contain no `CREATE TYPE` at all and exactly one `CHECK` (`MaintenancePlanTarget_exactly_one_target`) | Table 2 "Database constraints"; tracker v1.1-4 | M |
 | C19 | Settings screen is mostly static. 6 of the rows shown (session timeout, PM scheduler time, audit retention, upload limit, password policy, language) are hard-coded `SettingItem` markup at `AdministrationPage.tsx:393-398` with nothing enforcing those values; only the two number-prefix rows are backed by `system-config` | Found on my own; `README.md:264` | M |
 | C20 | Lint debt. Re-measured 2026-10-08: backend `npx eslint .` = **43 errors, 0 warnings**; app = **29 errors, 2 warnings**. `README.md:266` records 41 / 28+2 measured 2026-10-02 | Found on my own; `README.md:266` | M |
 | C21 | Dependency advisories with upgrades available. Re-measured 2026-10-08: backend `npm audit --omit=dev` = **10** (1 critical, 6 high, 3 moderate; `qs`/`body-parser`/`express`); app = **4** (3 high, 1 moderate; `react-router-dom`). Both report `npm audit fix`. `README.md:265` says 9 with "no criticals" | Found on my own; `README.md:265` | S/M |
@@ -146,8 +145,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-17 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **33 open items**.
+16 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
+10 decisions-not-gap = **32 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -170,6 +169,7 @@ the SHA and green CI run recorded when the item landed.
 | B2 | 2026-10-09 | `16a02eb` | 238 |
 | B3 | 2026-10-09 | `fede127` | 238 |
 | B4 | 2026-10-09 | `4d2d7c7` | 239 |
+| C15 | 2026-10-10 | `50ff911` | 241 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -205,3 +205,15 @@ to "close now" work, and D1's sweep is still open.
 against the gate/test database (`cmms_gate`), so the table honours the `r9d-orphan-clean`
 commit that shipped the tool and recorded the run, with the register processing at
 `5114d8d`.
+
+**C15** (`50ff911`, run 241) pinned the status/type/priority/role value domains with
+reversible `CHECK` constraints, one migration, 24 constraints across 12 tables — free
+text plus constraints, not native `CREATE TYPE` enums, so every one stays reversible in
+place and the schema keeps its no-native-enum pattern. Two domains corrected against
+the schema comments as part of the pin: `SystemAlert.alertType` admits `Account_Lockout`
+(written on lockout by the auth route) and `Comment.entityType` admits `MaintenancePlan`
+(validation.ts `commentEntityTypeSchema`), which the comments omit. The pin forced the
+PM-generation-failure fixture (`pmGenerationAlerts.test.ts`) to stop storing the `'Bogus'`
+`generatedWorkOrderStatus` the DB now refuses; it is re-anchored to a plan that names no
+equipment, no functional location and no target rows, which is still storable at rest
+and fails generation with `NO_FUNCTIONAL_LOCATION` — same alert paths, same intent.
