@@ -26,7 +26,7 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (16)
+## A. Close now — code and data gap (15)
 
 What it is, where it lives, size.
 
@@ -43,7 +43,6 @@ What it is, where it lives, size.
 | C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
 | C12 | Write-path load measurement: the 200-VU run exercises the read path only, so no transactional-save percentile exists separately from reads (row 253 records the run; `scripts/k6/capacity.js` drives login + two GETs) | Table 2 "Write-path load measurement"; matrix line 253 (§4.1) | M + run window |
 | C13 | Total recovery time: only the database restore is measured (5.35 s, ADMIN_GUIDE); host rebuild and attachment store are not | Table 2 "Total recovery time"; matrix line 263 (§4.3) | M + run window |
-| C14 | Test hygiene: enforce the ban on swallowed teardown errors and clear the existing sites. Re-measured 2026-10-08: **55** exact `.catch(() => {})` sites across 13 test files (the recorded figure of 68 is stale); the enforcement instrument (ESLint rule vs gate grep) is still undecided | Table 2 "Test hygiene"; tracker v1.1-7 | M |
 | C19 | Settings screen is mostly static. 6 of the rows shown (session timeout, PM scheduler time, audit retention, upload limit, password policy, language) are hard-coded `SettingItem` markup at `AdministrationPage.tsx:393-398` with nothing enforcing those values; only the two number-prefix rows are backed by `system-config` | Found on my own; `README.md:264` | M |
 | C20 | Lint debt. Re-measured 2026-10-08: backend `npx eslint .` = **43 errors, 0 warnings**; app = **29 errors, 2 warnings**. `README.md:266` records 41 / 28+2 measured 2026-10-02 | Found on my own; `README.md:266` | M |
 | C21 | Dependency advisories with upgrades available. Re-measured 2026-10-08: backend `npm audit --omit=dev` = **10** (1 critical, 6 high, 3 moderate; `qs`/`body-parser`/`express`); app = **4** (3 high, 1 moderate; `react-router-dom`). Both report `npm audit fix`. `README.md:265` says 9 with "no criticals" | Found on my own; `README.md:265` | S/M |
@@ -145,8 +144,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-16 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **32 open items**.
+15 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
+10 decisions-not-gap = **31 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -170,6 +169,7 @@ the SHA and green CI run recorded when the item landed.
 | B3 | 2026-10-09 | `fede127` | 238 |
 | B4 | 2026-10-09 | `4d2d7c7` | 239 |
 | C15 | 2026-10-10 | `50ff911` | 241 |
+| C14 | 2026-10-10 | `fd86709` | 243 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -217,3 +217,16 @@ PM-generation-failure fixture (`pmGenerationAlerts.test.ts`) to stop storing the
 `generatedWorkOrderStatus` the DB now refuses; it is re-anchored to a plan that names no
 equipment, no functional location and no target rows, which is still storable at rest
 and fails generation with `NO_FUNCTIONAL_LOCATION` — same alert paths, same intent.
+
+**C14** (`fd86709`, run 243) enforced the swallowed-teardown ban and cleared the sites.
+The count the C14 row carried — 55 across 13 — conflated a code site with a comment:
+re-derived from source, there were **54** `.catch(() => {})` teardowns in 12 backend test
+files, and the 13th match was a comment in `helpers.ts` describing the old pattern. All 54
+removed; the delete order was already correct, so the full 1099-test suite passes with every
+swallow gone — the empty handlers had been hiding failures, not preventing them. Enforcement
+is a `no-restricted-syntax` rule in the `tests/**` ESLint override: an empty arrow catch now
+fails lint whether or not it binds a parameter, while production `src` keeps its adjudicated
+parse-fallback catches. The re-measured-figures note above (`68 → 55`) and the tracker's
+`68`/13 figures — including the `:1206` per-file breakdown that still lists
+`notifications.test.ts` (16), a file that no longer holds any — are superseded by 54 in 12.
+
