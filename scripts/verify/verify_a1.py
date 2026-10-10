@@ -312,6 +312,25 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # 5a65ab8 (green CI run 193). Durable anchor: decision D-5, its 2026-09-26
     # owner confirmation, and the row-298 Note in SOW_COMPLIANCE.md.
     ("5.5 oauth2", "Not Met", "Waived", "5a65ab8"),
+
+    # SOW 1.3 "Data migration from legacy Excel/paper records" (row 40),
+    # SOW 5.7 "A data migration runbook and a dry-run report before final
+    # cutover" (row 307) and SOW 6.4 / d "Data migration accuracy > 99.9% for
+    # master data; historical work order statuses correctly mapped" (row 335).
+    # All three moved Not Met -> Met on 2026-10-10 when the B1 full legacy load
+    # landed: the Client's full dataset was extracted by
+    # scripts/migration/extract_full_dataset.py and loaded by the migration-trial
+    # harness at 20,333/20,333 rows correct = 100.00% against the 99.9% target
+    # (TRIAL_RUN_REPORT_FULL.md), every dropped or merged source row is logged
+    # (FULL_LOAD_LEDGER.json), and the migration runbook is delivered
+    # (docs/migration-runbook.md). None of the three is a section 3 row, so this
+    # applies only against the all-rows baseline (EXPECT_ALL). The status change
+    # and this wiring land together, so the commit field is the "this commit"
+    # sentinel; backfill the real SHA once its push-run is in. Durable anchor:
+    # the B1 closure-log row in docs/GAP_REGISTER.md.
+    ("1.3 data-migration", "Not Met", "Met", "this commit"),
+    ("5.7 migration-runbook", "Not Met", "Met", "this commit"),
+    ("6.4 migration-accuracy", "Not Met", "Met", "this commit"),
 ]
 
 

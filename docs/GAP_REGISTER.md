@@ -26,7 +26,7 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (11)
+## A. Close now — code and data gap (10)
 
 What it is, where it lives, size.
 
@@ -42,14 +42,12 @@ What it is, where it lives, size.
 | C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
 | C13 | Total recovery time: only the database restore is measured (5.35 s, ADMIN_GUIDE); host rebuild and attachment store are not | Table 2 "Total recovery time"; matrix line 263 (§4.3) | M + run window |
 | C19 | Settings screen is mostly static. 6 of the rows shown (session timeout, PM scheduler time, audit retention, upload limit, password policy, language) are hard-coded `SettingItem` markup at `AdministrationPage.tsx:393-398` with nothing enforcing those values; only the two number-prefix rows are backed by `system-config` | Found on my own; `README.md:264` | M |
-| B1 | Legacy migration accuracy: the Client dataset **is** held at `docs/migration-templates/dataset/` (2,259 open-WO rows, 6,163 equipment, 5,954 materials), so the full legacy load and the >99.9% accuracy figure on Client data are executable. The 21 unfilled templates are **not** a gap: `FILL_REPORT.md` §Scope records that they have no source rows or are deliberately deferred (meter patch). **Reclassified from "Blocked on owner" 2026-10-09** — nothing is pending from the Client | Matrix lines 40 (§1.3), 307 (§5.7), 335 (§6.4); Table 1 item 5; `migration-templates/TRIAL_RUN_REPORT.md`; `migration-templates/FILL_REPORT.md` §Scope | M + run window |
 
-## B. Close now — documentation gap (5)
+## B. Close now — documentation gap (4)
 
 | ID | Item | Where it lives | Size |
 |---|---|---|---|
 | D1 | Documentation accuracy sweep — one entry, with what it covers: the five stale limitation-register claims named in OWNER_ACTION_SHEET note 8 (no task-list screen — `TaskListsPage.tsx` exists; no meter/combined PM strategy — `scheduler.ts:111` evaluates all three; hard-coded generated status; read-only BOM/cost-split lines — both have write endpoints; no system-generated alerts — all four fire); the stale Table 1 asks (item 1 "no failure field" — `WorkOrder.failureCodeId` exists at `schema.prisma:372`, delivered `1e4b28c`; item 5 "trial-run report missing" — delivered `c81bc3d`; item 6 — decided 2026-10-05, see N9; item 7 — answered by D-7) and the "Seven items need your answer" header; `README.md:262` ("200-user load test remains post-go-live" — the run passed 2026-10-03 and GO was approved), `README.md:265` and `README.md:266` figures; the value-domain comments in `schema.prisma` against the C15 CHECK constraints — closing C15 (`50ff911`, run 241) found two drifts, `SystemAlert.alertType` omitting `Account_Lockout` and `Comment.entityType` omitting `MaintenancePlan`; both comments were corrected at `3ea1b30` (run 242) and all 24 pinned domains now match their comments, so this is the standing re-check rather than an open correction; the tracker's teardown figure — R.9 D3-cleanup-errors and the Phase R close-out still read 68 across 13, but the count re-derived from source and verified by the C14 closure is **54 in 12** (`fd86709`); the stale matrix citations `index.ts:172-192` (line 297) and `workOrders.ts:567` (line 126; declaration is `:752`, applied `:835`) plus the `verify_a1.py` line ranges; and the Table 2 "Migration tooling" wording that reads as if the live importers were done (they are harness-only, see C5); and the unrefreshed `docs/openapi.json` snapshot (a manual re-export, last changed `5aa0094`, still listing the old action set and no `Blocked`, with no gate that regenerates it — a dated stale snapshot to be refreshed, not silently half-patched) | Table 2 "Documentation accuracy sweep"; tracker v1.1-8 (partially exercised `f58e478`) | L |
-| D2 | Migration runbook: no runbook file exists anywhere under `docs/`; the tooling and the trial-run report do | Matrix line 307 (§5.7), line 40 (§1.3); Table 2 "Migration tooling"; Table 1 item 5 | M |
 | D3 | Matrix §2.2 line 62's note ("the Close permission is not enforced server-side") is stale: `requireSupervisorForClose` is declared at `workOrders.ts:752`, applied at `:835` after `validate(...)`, landed `206e1de`, and is asserted by `workOrders.test.ts:224-249` (Technician 403, Supervisor 200); §3.3.2 line 126 is `Met` on that evidence. The note is the only basis for line 62's `Partial`, so the Status is the owner's call | Matrix line 62 (§2.2) | S (edit) |
 | D4 | Matrix §5.4 line 292's limbs are contradicted: BOM lines have `POST`/`PUT`/`DELETE` (`equipment.ts:963`/`:1049`/`:1114`), cost splits are created and soft-deleted (`workOrderCostSplits.ts:256`), and plan meters are written in the plan `PUT` (`maintenancePlans.ts:509-513`) — so "deletes are absent on several entities" and "child collections are read-only" no longer hold for master data or work orders. Residual deletes genuinely absent: `SystemAlert`, checklist templates, meter readings, system config — none of which is master data or a work order. Status is the owner's call | Matrix line 292 (§5.4) | S (edit) |
 | D5 | Tracker v1.1-6's premise is wrong on the current tree: there is no audit-log action filter dropdown in `AdministrationPage.tsx` (only a free-text filter at line 128, which already matches on `action`, so `Blocked` entries are isolable today). What is stale is the v1.1-6 wording itself and the swagger `action` description at `auditLog.ts:37`, which lists Create/Update/Delete/Run while `AuditAction` includes `Blocked` (`middleware/audit.ts:6`) and five routes write it (labor `:152`/`:285`, notifications `:413`, workOrders `:862`/`:900`) | Tracker v1.1-6 | S |
@@ -128,22 +126,24 @@ reclassified to close-now work, B2 and B3 were accepted, and B4 was applied
 
 ## Coverage check
 
-All 34 `Partial`/`Not Met` matrix lines map to exactly one entry above:
+*Updated 2026-10-10 (B1): matrix lines 40 (§1.3), 307 (§5.7) and 335 (§6.4) are now `Met`, so the `Partial`/`Not Met` set is 31 lines, not 34, and entries **B1** and **D2** are closed (see the closure log). The original freeze-time mapping is kept below as the record it was.*
+
+All 34 `Partial`/`Not Met` matrix lines **as at the freeze** map to exactly one entry above:
 line 38→C3, 39→N4, 40→B1+D2, 52→C3, 53→D1, 54→D1, 55→C6, 56→D1, 59→C4, 61→C3, 62→D3,
 63→C9, 175→N1, 253→C12, 255→C11, 259→C1, 261→N9, 263→C13, 264→C6, 265→N2,
 281→C11, 289→C6, 290→C6, 291→N3, 292→D4, 295→C4, 296→C4, 299→C1, 300→C10, 301→C2,
 306→C5, 307→D2+B1, 316→N5, 335→B1.
 
 All 13 Action Sheet Table 2 rows map to one entry: 1→C12, 2→C1, 3→C2, 4→C13, 5→C14,
-6→D1, 7→C3, 8→C4, 9→N8, 10→C6, 11→C5+D2, 12→N2, 13→C15.
+6→D1, 7→C3, 8→C4, 9→N8, 10→C6, 11→C5+D2 (**D2 closed 2026-10-10**), 12→N2, 13→C15.
 
 All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1, 9→N1,
 10→N10, 11…14→N2.
 
 ## Totals
 
-11 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **27 open items**.
+10 code and data gaps · 4 documentation gaps · 0 blocked on owner · 1 blocked on external ·
+10 decisions-not-gap = **25 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -172,6 +172,8 @@ the SHA and green CI run recorded when the item landed.
 | C21 | 2026-10-10 | `ad93610` | 248 |
 | C5 | 2026-10-10 | `eefcff1` | 252 |
 | C12 | 2026-10-10 | `fd86b2b` | 254 |
+| B1 | 2026-10-10 | `this commit` | pending |
+| D2 | 2026-10-10 | `this commit` | pending |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -306,4 +308,21 @@ saturates at p(95) 3.47 s (median 2.6 s, ~46 saves/s from 22,089 saves; solo sav
 is recorded as a **stress bound, not the acceptance number**. The row carries no matrix Status to
 move — the line 253 Status is the owner's call — and its note is refreshed with these figures so
 the "Residual: a write-path save-latency load run" line is discharged.
+
+**B1** (`this commit`, run pending) is the legacy migration full load. The Client's raw
+workbooks were extracted to the trial-run CSV contract by a new
+`scripts/migration/extract_full_dataset.py` and loaded by the `backend/src/migration-trial/run.ts`
+harness (extended with `TRIAL_RUN_CSV_DIR` / `TRIAL_RUN_REPORT_PATH` overrides so a full run
+never touches the reviewed sample). Cleaning policy per the owner's 2026-10-10 decision — keep
+the full sets, cleaned to a loadable set with every exclusion logged — dropped 78 work orders
+(77 `E3_Non-Maintenance`, 1 blank `#N/A` FL), deduplicated 11 `woNumber`s and 21
+`notificationNumber`s, dropped 36 equipment rows (blank/duplicate code, blank criticality or FL),
+merged 267 material rows by code, and blanked 11 unresolved equipment FKs. **Result on the full
+dataset: 20,333 / 20,333 rows correct = 100.00%** against the 99.9% target, 0 rejected; the report
+is `docs/migration-templates/TRIAL_RUN_REPORT_FULL.md` and the ledger
+`docs/migration-templates/FULL_LOAD_LEDGER.json`. On this evidence matrix lines 40 (§1.3), 307
+(§5.7) and 335 (§6.4 / d) moved `Not Met` → `Met`. **D2** (`this commit`, run pending) — the
+migration runbook the register said did not exist anywhere under `docs/` — is discharged by
+`docs/migration-runbook.md`, delivered as part of B1. Backfill both SHAs and runs once the
+closure's push-run is in.
 
