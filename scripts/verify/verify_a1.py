@@ -221,6 +221,19 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     ("2.2 admin-user-management", "Not Met", "Met", "80add36"),
     ("2.2 requester", "Not Met", "Met", "60d4923"),
     ("4.1 concurrency", "Deferred", "Partial", "b278eaa"),
+    # SOW 4.1 "Support up to 200 concurrent users, screen load < 2 s,
+    # transactional save < 1 s" (row 253). Deferred -> Partial recorded the
+    # 200-VU capacity run; the save limb stayed partial because capacity.js
+    # drives the read path only. C12 supplied the missing measurement:
+    # scripts/k6/write.js now drives a PUT /api/work-orders/:id per iteration at
+    # the same 200 concurrent users and records save_latency separately. At a
+    # realistic cadence the save p(95) is 89.4 ms, inside the 1 s budget (the
+    # 3.47 s tight-loop figure is a stress bound, not the acceptance figure).
+    # The owner reviewed that evidence and authorised the promotion on
+    # 2026-10-10; the status change and this wiring land together, so the commit
+    # field is the "this commit" sentinel and the date plus the row-253 note are
+    # the durable anchors. Backfill the real SHA once its push-run is in.
+    ("4.1 concurrency", "Partial", "Met", "this commit"),
     ("4.2 https", "Partial", "Met", "256c8e9"),
     ("4.5 iso-14224", "Not Met", "Met", "a0573bd"),
     ("4.6 availability", "Not Met", "Deferred", "1daa241"),
