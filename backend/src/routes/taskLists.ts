@@ -1,11 +1,16 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
+import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
-import { taskListCreateSchema, taskListUpdateSchema, validate } from '../utils/validation.js';
+import { taskListCreateSchema, taskListUpdateSchema, validate, taskListOperationItemSchema, taskListMaterialItemSchema } from '../utils/validation.js';
 import { isPrismaError, prismaErrorTarget } from '../utils/prismaErrors.js';
+import { z } from 'zod';
 import { logger } from '../utils/logger.js';
+
+type OperationInput = z.infer<typeof taskListOperationItemSchema>;
+type MaterialInput = z.infer<typeof taskListMaterialItemSchema>;
 
 const router = Router();
 
@@ -130,7 +135,7 @@ router.get('/', async (req: Request, res: Response) => {
     const equipmentClass = req.query.equipmentClass as string | undefined;
     const equipmentId = req.query.equipmentId as string | undefined;
     const workCenterId = req.query.workCenterId as string | undefined;
-    const where: any = { isDeleted: false };
+    const where: Prisma.TaskListWhereInput = { isDeleted: false };
 
     if (search) {
       where.OR = [
@@ -257,7 +262,7 @@ router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), 
         modifiedBy: req.user!.userId,
         ...(operations && {
           operations: {
-            create: operations.map((op: any) => ({
+            create: operations.map((op: OperationInput) => ({
               sequenceNumber: op.sequenceNumber,
               description: op.description,
               craftId: op.craftId,
@@ -268,7 +273,7 @@ router.post('/', authorizeMinRole('Requester'), validate(taskListCreateSchema), 
               // SOW 3.1.4 required materials, attached to the step that needs them.
               ...(op.materials?.length && {
                 materials: {
-                  create: op.materials.map((m: any) => ({
+                  create: op.materials.map((m: MaterialInput) => ({
                     materialId: m.materialId,
                     quantity: m.quantity,
                     createdBy: req.user!.userId,
@@ -434,14 +439,14 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
 
         // One create per operation rather than createMany, because a requirement
         // needs the operation's generated id and createMany cannot nest.
-        for (const op of operations as any[]) {
+        for (const op of operations as OperationInput[]) {
           const created = await tx.taskListOperation.create({
             data: {
               taskListId: String(req.params.id),
               sequenceNumber: op.sequenceNumber,
               description: op.description,
               craftId: op.craftId,
-              plannedHours: op.plannedHours,
+              plannedHours: op.plannedHours as number,
               numberOfTechnicians: op.numberOfTechnicians || 1,
               createdBy: req.user!.userId,
               modifiedBy: req.user!.userId,
@@ -450,7 +455,7 @@ router.put('/:id', authorizeMinRole('Requester'), validate(taskListUpdateSchema)
 
           if (op.materials?.length) {
             await tx.taskListMaterial.createMany({
-              data: op.materials.map((m: any) => ({
+              data: op.materials.map((m: MaterialInput) => ({
                 taskOperationId: created.taskOperationId,
                 materialId: m.materialId,
                 quantity: m.quantity,

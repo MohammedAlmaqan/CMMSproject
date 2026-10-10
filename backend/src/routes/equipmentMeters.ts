@@ -1,9 +1,11 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
+import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, equipmentMeterCreateSchema, equipmentMeterUpdateSchema, meterReadingCreateSchema } from '../utils/validation.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
+import { isPrismaError } from '../utils/prismaErrors.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -306,7 +308,7 @@ router.use(authenticate);
 router.get('/', async (req: Request, res: Response) => {
   try {
     const equipmentId = req.query.equipmentId as string | undefined;
-    const where: any = { isDeleted: false };
+    const where: Prisma.EquipmentMeterWhereInput = { isDeleted: false };
 
     if (equipmentId) {
       where.equipmentId = equipmentId;
@@ -374,8 +376,8 @@ router.post('/', authorizeMinRole('Technician'), validate(equipmentMeterCreateSc
     await logAuditAction({ table: 'EquipmentMeter', recordId: meter.meterId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(meter);
-  } catch (error: any) {
-    if (error.code === 'P2003') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced equipment not found' });
     }
     logger.error({ err: error }, 'Error creating meter');
@@ -420,8 +422,8 @@ router.put('/:id', authorizeMinRole('Technician'), validate(equipmentMeterUpdate
     });
 
     res.json(meter);
-  } catch (error: any) {
-    if (error.code === 'P2003') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced equipment not found' });
     }
     logger.error({ err: error }, 'Error updating meter');

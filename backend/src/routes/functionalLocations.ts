@@ -1,9 +1,11 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
+import type { FunctionalLocation, Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, functionalLocationCreateSchema, functionalLocationUpdateSchema } from '../utils/validation.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
+import { isPrismaError } from '../utils/prismaErrors.js';
 import { checkChildAddition, checkLocationMove } from '../utils/locationRules.js';
 import {
   OPEN_WORK_ORDER_STATUSES,
@@ -108,7 +110,7 @@ router.use(authenticate);
 router.get('/', async (req: Request, res: Response) => {
   try {
     const search = req.query.search as string | undefined;
-    const where: any = { isDeleted: false };
+    const where: Prisma.FunctionalLocationWhereInput = { isDeleted: false };
 
     if (search) {
       where.OR = [
@@ -129,9 +131,13 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-function buildTree(flat: any[]): any[] {
-  const map = new Map<string, any>();
-  const roots: any[] = [];
+interface FunctionalLocationTreeNode extends FunctionalLocation {
+  children: FunctionalLocationTreeNode[];
+}
+
+function buildTree(flat: FunctionalLocation[]): FunctionalLocationTreeNode[] {
+  const map = new Map<string, FunctionalLocationTreeNode>();
+  const roots: FunctionalLocationTreeNode[] = [];
 
   for (const item of flat) {
     map.set(item.functionalLocationId, { ...item, children: [] });
@@ -328,8 +334,8 @@ router.post('/', authorizeMinRole('Technician'), validate(functionalLocationCrea
     await logAuditAction({ table: 'FunctionalLocation', recordId: location.functionalLocationId, action: 'Create', userId: userId, ipAddress: req.ip });
 
     res.status(201).json(location);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Location code already exists' });
     }
     logger.error({ err: error }, 'Error creating functional location');
@@ -482,8 +488,8 @@ router.put('/:id', authorizeMinRole('Technician'), validate(functionalLocationUp
     });
 
     res.json(location);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Location code already exists' });
     }
     logger.error({ err: error }, 'Error updating functional location');

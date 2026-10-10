@@ -36,10 +36,6 @@ function check(name: string, ok: boolean, detail = ''): void {
 
 const openOnly = { isDeleted: false, status: { notIn: ['Completed', 'Closed', 'Cancelled'] } };
 
-function dayOf(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 /** Row 60. One open backlog, sliced by status, priority and work centre. */
 async function backlog(): Promise<void> {
   console.log('\n=== Row 60  /backlog ===');

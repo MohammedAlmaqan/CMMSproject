@@ -19,6 +19,10 @@ export default [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      // An underscore-prefixed parameter is conventionally a deliberately
+      // unnamed lambda/error-handler argument (e.g. Express's 4-arity error
+      // middleware keeps `_next` so the signature is detected).
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
   {

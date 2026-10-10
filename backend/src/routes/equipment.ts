@@ -1,4 +1,5 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
+import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
@@ -6,6 +7,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, equipmentCreateSchema, equipmentUpdateSchema, equipmentImportRowSchema, equipmentBomCreateSchema, equipmentBomUpdateSchema } from '../utils/validation.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
+import { isPrismaError } from '../utils/prismaErrors.js';
 import { checkEquipmentPlacement } from '../utils/locationRules.js';
 import { logger } from '../utils/logger.js';
 
@@ -389,7 +391,7 @@ router.get('/', async (req: Request, res: Response) => {
     const functionalLocationId = req.query.functionalLocationId as string | undefined;
     const criticality = req.query.criticality as string | undefined;
     const equipmentClass = req.query.equipmentClass as string | undefined;
-    const where: any = { isDeleted: false };
+    const where: Prisma.EquipmentWhereInput = { isDeleted: false };
 
     if (search) {
       where.OR = [
@@ -670,11 +672,11 @@ router.post('/', authorizeMinRole('Technician'), validate(equipmentCreateSchema)
     await logAuditAction({ table: 'Equipment', recordId: equipment.equipmentId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(equipment);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Equipment code already exists' });
     }
-    if (error.code === 'P2003') {
+    if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced functional location not found' });
     }
     logger.error({ err: error }, 'Error creating equipment');
@@ -802,11 +804,11 @@ router.put('/:id', authorizeMinRole('Technician'), validate(equipmentUpdateSchem
     });
 
     res.json(equipment);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Equipment code already exists' });
     }
-    if (error.code === 'P2003') {
+    if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced functional location not found' });
     }
     logger.error({ err: error }, 'Error updating equipment');

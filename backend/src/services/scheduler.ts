@@ -309,11 +309,9 @@ async function lastReadingAtGeneration(
   return Number.isFinite(value) ? value : null;
 }
 
-let scheduledTask: ReturnType<typeof cron.schedule> | undefined;
-
 export function startScheduler(): void {
   const cronExpr = process.env.PM_SCHEDULER_CRON ?? '0 2 * * *';
-  scheduledTask = cron.schedule(cronExpr, () => {
+  cron.schedule(cronExpr, () => {
     runSchedulerOnce()
       .then((res) => {
         logger.info(`[scheduler] cron run: ${JSON.stringify(res)}`);

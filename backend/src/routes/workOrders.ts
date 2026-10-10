@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
@@ -5,6 +6,7 @@ import { logAuditFieldChange, logAuditAction, logFieldChanges } from '../middlew
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { generateWoNumber, generateNotifNumber } from '../utils/sequence.js';
+import { isPrismaError } from '../utils/prismaErrors.js';
 import { canTransition } from '../utils/transitions.js';
 import { serializeWorkOrderSnapshot } from '../utils/workOrderSnapshots.js';
 import { requiresAtLeastOneOperation, missingOperationMessage, resolveWorkOrderPriority, isCompletionBlockedForMissingCause, BREAKDOWN_CAUSE_REQUIRED_MESSAGE, isCompletionBlockedForMissingCalibrationResult, CALIBRATION_RESULT_REQUIRED_MESSAGE } from '../utils/workOrderRules.js';
@@ -97,7 +99,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { search, type, priority, status, equipmentId, workCenterId, skip, take } = req.query;
-    const where: any = { isDeleted: false };
+    const where: Prisma.WorkOrderWhereInput = { isDeleted: false };
 
     if (search) {
       where.OR = [
@@ -121,12 +123,15 @@ router.get('/', async (req: Request, res: Response) => {
         where: { userId: req.user!.userId },
         select: { workCenterId: true },
       });
-      // workOrder.workCenterId is required, so a null home matches nothing.
+      // workOrder.workCenterId is required, so a null home matches nothing;
+      // an empty OR array is Prisma's way of expressing "match nothing", which
+      // keeps that meaning when the filter is typed instead of `any`.
       const homeWorkCenterId = me?.workCenterId ?? null;
+      const homeFilter: Prisma.WorkOrderWhereInput[] = homeWorkCenterId ? [{ workCenterId: homeWorkCenterId }] : [];
       where.AND = [
         role === 'Technician'
-          ? { workCenterId: homeWorkCenterId }
-          : { OR: [{ workCenterId: homeWorkCenterId }, { supervisorUserId: req.user!.userId }] },
+          ? { OR: homeFilter }
+          : { OR: [...homeFilter, { supervisorUserId: req.user!.userId }] },
       ];
     } else if (role === 'Requester') {
       where.AND = [{ reportedByUserId: req.user!.userId }];
@@ -557,8 +562,8 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
     );
 
     res.status(201).json(workOrder);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Work order number already exists' });
     }
     logger.error({ err: error }, 'Error creating work order');
@@ -981,7 +986,7 @@ router.put(
       return res.status(409).json({ error: CALIBRATION_RESULT_REQUIRED_MESSAGE });
     }
 
-    const updateData: any = {
+    const updateData: Prisma.WorkOrderUpdateInput = {
       status: newStatus,
       modifiedBy: req.user!.userId,
     };

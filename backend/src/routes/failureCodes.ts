@@ -1,18 +1,24 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
+import type { FailureCode, Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { failureCodeCreateSchema, failureCodeUpdateSchema, validate } from '../utils/validation.js';
+import { isPrismaError } from '../utils/prismaErrors.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
 
 router.use(authenticate);
 
-function buildTree(flat: any[]): any[] {
-  const map = new Map<string, any>();
-  const roots: any[] = [];
+interface FailureCodeTreeNode extends FailureCode {
+  children: FailureCodeTreeNode[];
+}
+
+function buildTree(flat: FailureCode[]): FailureCodeTreeNode[] {
+  const map = new Map<string, FailureCodeTreeNode>();
+  const roots: FailureCodeTreeNode[] = [];
 
   for (const item of flat) {
     map.set(item.failureCodeId, { ...item, children: [] });
@@ -110,7 +116,7 @@ function buildTree(flat: any[]): any[] {
 router.get('/', async (req: Request, res: Response) => {
   try {
     const search = req.query.search as string | undefined;
-    const where: any = { isDeleted: false };
+    const where: Prisma.FailureCodeWhereInput = { isDeleted: false };
 
     if (search) {
       where.OR = [
@@ -247,8 +253,8 @@ router.post('/', authorizeMinRole('Requester'), validate(failureCodeCreateSchema
     await logAuditAction({ table: 'FailureCode', recordId: failureCode.failureCodeId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(failureCode);
-  } catch (error: any) {
-    if (error.code === 'P2003') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced parent failure code not found' });
     }
     logger.error({ err: error }, 'Error creating failure code');
@@ -337,8 +343,8 @@ router.put('/:id', authorizeMinRole('Requester'), validate(failureCodeUpdateSche
     });
 
     res.json(failureCode);
-  } catch (error: any) {
-    if (error.code === 'P2003') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced parent failure code not found' });
     }
     logger.error({ err: error }, 'Error updating failure code');

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { prisma } from './prisma.js';
+import { isPrismaError } from './prismaErrors.js';
 
 export async function nextSequence(db: PrismaClient, code: string): Promise<number> {
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -10,8 +11,8 @@ export async function nextSequence(db: PrismaClient, code: string): Promise<numb
         create: { code, value: 1 },
       });
       return row.value;
-    } catch (error: any) {
-      if (error.code !== 'P2002') throw error;
+    } catch (error) {
+      if (!isPrismaError(error) || error.code !== 'P2002') throw error;
     }
   }
   throw new Error(`Unable to allocate sequence for ${code}`);

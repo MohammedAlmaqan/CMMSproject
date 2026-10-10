@@ -1,4 +1,5 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
+import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
@@ -7,6 +8,7 @@ import { validate, schedulerRunSchema, maintenancePlanCreateSchema, maintenanceP
 import { runSchedulerOnce } from '../services/scheduler.js';
 import { generatePmWorkOrder, PmGenerationError } from '../services/pmGeneration.js';
 import { createAlert, emitAlertToRolesSafely, ALERT_TYPE_PM_GENERATION_FAILED, TRIAGE_ROLES } from '../services/alertService.js';
+import { isPrismaError } from '../utils/prismaErrors.js';
 import { isoDay } from '../utils/pmDueRules.js';
 import { logger } from '../utils/logger.js';
 
@@ -152,7 +154,7 @@ function normaliseTargets(
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { strategy, active } = req.query;
-    const where: any = { isDeleted: false };
+    const where: Prisma.MaintenancePlanWhereInput = { isDeleted: false };
 
     if (strategy) where.strategyType = strategy as string;
     if (active !== undefined) where.activeFlag = active === 'true';
@@ -348,11 +350,11 @@ router.post('/', authorizeMinRole('Requester'), validate(maintenancePlanCreateSc
     await logAuditAction({ table: 'MaintenancePlan', recordId: plan.planId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(plan);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Plan code already exists' });
     }
-    if (error.code === 'P2003') {
+    if (isPrismaError(error) && error.code === 'P2003') {
       return res.status(400).json({ error: 'Referenced entity not found (equipment, location, work center, or task list)' });
     }
     logger.error({ err: error }, 'Error creating maintenance plan');

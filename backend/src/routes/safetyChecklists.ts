@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
@@ -364,7 +365,7 @@ router.put('/work-order-checklist/:id', authorizeMinRole('Technician'), validate
       return res.status(404).json({ error: 'Work order checklist not found' });
     }
 
-    const updateData: any = {
+    const updateData: Prisma.WorkOrderChecklistUncheckedUpdateInput = {
       status,
       modifiedBy: req.user!.userId,
     };

@@ -10,6 +10,7 @@ export interface AuthPayload {
 }
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- intentional module augmentation; Express augmentation must use a `declare namespace` block, and removing it would drop `req.user` typing across every route.
   namespace Express {
     interface Request {
       user?: AuthPayload;

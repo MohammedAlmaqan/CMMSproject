@@ -1,4 +1,5 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
+import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
@@ -6,6 +7,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { materialImportRowSchema, materialCreateSchema, materialUpdateSchema, validate } from '../utils/validation.js';
 import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
+import { isPrismaError } from '../utils/prismaErrors.js';
 import { getMaterialAvailability } from '../services/materialAvailability.js';
 import { logger } from '../utils/logger.js';
 
@@ -267,7 +269,7 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
 router.get('/', async (req: Request, res: Response) => {
   try {
     const search = req.query.search as string | undefined;
-    const where: any = { isDeleted: false };
+    const where: Prisma.MaterialWhereInput = { isDeleted: false };
 
     if (search) {
       where.OR = [
@@ -404,8 +406,8 @@ router.post('/', authorizeMinRole('Requester'), validate(materialCreateSchema), 
     await logAuditAction({ table: 'Material', recordId: material.materialId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip });
 
     res.status(201).json(material);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Material code already exists' });
     }
     logger.error({ err: error }, 'Error creating material');
@@ -499,8 +501,8 @@ router.put('/:id', authorizeMinRole('Requester'), validate(materialUpdateSchema)
     });
 
     res.json(material);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Material code already exists' });
     }
     logger.error({ err: error }, 'Error updating material');

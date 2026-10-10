@@ -1,7 +1,9 @@
+import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditFieldChange, logAuditAction } from '../middleware/audit.js';
+import { isPrismaError } from '../utils/prismaErrors.js';
 import { generateNotifNumber, generateWoNumber } from '../utils/sequence.js';
 import {
   canTransition,
@@ -127,7 +129,7 @@ router.use(authenticate);
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { search, type, priority, status, skip, take } = req.query;
-    const where: any = { isDeleted: false };
+    const where: Prisma.NotificationWhereInput = { isDeleted: false };
 
     if (search) {
       where.OR = [
@@ -319,8 +321,8 @@ router.post('/', authorizeMinRole('Requester'), validate(notificationCreateSchem
     }
 
     res.status(201).json(notification);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error) {
+    if (isPrismaError(error) && error.code === 'P2002') {
       return res.status(409).json({ error: 'Notification number already exists' });
     }
     logger.error({ err: error }, 'Error creating notification');

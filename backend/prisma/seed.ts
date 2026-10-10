@@ -61,7 +61,7 @@ async function main() {
   ]);
 
   // Users
-  const users = await Promise.all([
+  await Promise.all([
     prisma.user.create({ data: { userId: uuid(), username: 'admin', passwordHash: hash, fullName: 'Admin User', email: 'admin@cmms.local', role: 'Administrator', isActive: true } }),
     prisma.user.create({ data: { userId: uuid(), username: 'planner', passwordHash: hash, fullName: 'Maintenance Planner', email: 'planner@cmms.local', role: 'Maintenance Planner', isActive: true } }),
     prisma.user.create({ data: { userId: uuid(), username: 'supervisor', passwordHash: hash, fullName: 'Maintenance Supervisor', email: 'supervisor@cmms.local', role: 'Maintenance Supervisor', workCenterId: wc[0].workCenterId, isActive: true } }),
