@@ -11,9 +11,7 @@ import {
   DollarSign,
   Package,
   AlertTriangle,
-  TrendingUp,
   Download,
-  Calendar,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { reportService } from '@/services/reportService';
@@ -24,10 +22,12 @@ import type {
   MTTRReport,
   CostSummaryReport,
   MaterialConsumptionReport,
+  MbtfReportRow,
+  DowntimeReportRow,
 } from '@/services/reportService';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
+  ResponsiveContainer,
 } from 'recharts';
 
 type ReportType =
@@ -38,8 +38,6 @@ type ReportType =
   | 'cost-summary'
   | 'downtime'
   | 'material-consumption';
-
-const COLORS = ['#D97706', '#2563EB', '#059669', '#DC2626', '#7C3AED', '#52525B', '#A1A1AA'];
 
 export default function ReportsPage() {
   const [activeReport, setActiveReport] = useState<ReportType>('backlog');
@@ -54,13 +52,11 @@ export default function ReportsPage() {
   }
 
   const [reportData, setReportData] = useState<Partial<ReportData>>({});
-  const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<Partial<Record<ReportType, string>>>({});
 
   useEffect(() => {
     if (reportData[activeReport] !== undefined) return;
     let cancelled = false;
-    setReportLoading(true);
     const fetchers: Record<ReportType, () => Promise<unknown>> = {
       backlog: () => reportService.getBacklog(),
       'pm-compliance': () => reportService.getPMCompliance(),
@@ -74,13 +70,11 @@ export default function ReportsPage() {
       .then((data) => {
         if (!cancelled) {
           setReportData((prev) => ({ ...prev, [activeReport]: data }));
-          setReportLoading(false);
         }
       })
-      .catch((err) => {
+      .catch(() => {
         if (!cancelled) {
           setReportError((prev) => ({ ...prev, [activeReport]: 'Failed to load report data. Please try again.' }));
-          setReportLoading(false);
         }
       });
     return () => {
@@ -110,11 +104,12 @@ export default function ReportsPage() {
 
   // Report 2: PM compliance (row 61) — scheduled occurrences, not raised orders.
   const pmCompliance = (reportData['pm-compliance'] ?? {}) as Partial<PMComplianceReport>;
+  const pmComplianceSlice = reportData['pm-compliance'] as Partial<PMComplianceReport> | undefined;
 
   // Report 3: MTBF
   const mtbfData = useMemo(() => {
     return Array.isArray(reportData.mtbf)
-      ? (reportData.mtbf as Array<{ equipmentId: string; mtbfHours: number }>).map((r) => ({
+      ? (reportData.mtbf as MbtfReportRow[]).map((r) => ({
           equipment: r.equipmentId,
           mtbf: r.mtbfHours,
         }))
@@ -158,7 +153,7 @@ export default function ReportsPage() {
   // Report 6: Downtime
   const downtimeData = useMemo(() => {
     return Array.isArray(reportData.downtime)
-      ? (reportData.downtime as Array<{ equipmentId: string; totalDowntimeHours: number }>).map((r) => ({
+      ? (reportData.downtime as DowntimeReportRow[]).map((r) => ({
           equipment: r.equipmentId,
           hours: r.totalDowntimeHours,
         }))
@@ -200,15 +195,16 @@ export default function ReportsPage() {
     switch (activeReport) {
       case 'backlog':
         return backlogData;
-      case 'pm-compliance':
+      case 'pm-compliance': {
         return [
           {
-            period: pmCompliance.period ?? '',
-            scheduledPM: pmCompliance.scheduledPM ?? 0,
-            completedPM: pmCompliance.completedPM ?? 0,
-            complianceRate: pmCompliance.complianceRate ?? 0,
+            period: pmComplianceSlice?.period ?? '',
+            scheduledPM: pmComplianceSlice?.scheduledPM ?? 0,
+            completedPM: pmComplianceSlice?.completedPM ?? 0,
+            complianceRate: pmComplianceSlice?.complianceRate ?? 0,
           },
         ];
+      }
       case 'mtbf':
         return mtbfData;
       case 'mttr':
@@ -220,12 +216,13 @@ export default function ReportsPage() {
       case 'material-consumption':
         return materialConsumption;
     }
-  }, [activeReport, backlogData, pmCompliance, mtbfData, mttrData, costData, downtimeData, materialConsumption]);
+  }, [activeReport, backlogData, pmComplianceSlice, mtbfData, mttrData, costData, downtimeData, materialConsumption]);
 
   const exportXlsx = () => {
     void api.download(`/reports/${activeReport}/export.xlsx`, undefined, `${activeReport}-report.xlsx`);
   };
 
+  const reportLoading = reportData[activeReport] === undefined && reportError[activeReport] == null;
   const isLoading = reportLoading;
   const hasError = reportError[activeReport] != null;
   const isEmpty = !reportLoading && reportError[activeReport] == null && (currentRows?.length ?? 0) === 0;

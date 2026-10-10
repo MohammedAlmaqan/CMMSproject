@@ -10,8 +10,8 @@ export interface CsvImportResult {
 }
 
 export const equipmentService = {
-  getAll: (params?: { search?: string; functionalLocationId?: string; criticality?: string; equipmentClass?: string }) =>
-    api.get<Equipment[]>('/equipment', params as any),
+  getAll: (params?: Record<string, string | number | boolean | undefined>) =>
+    api.get<Equipment[]>('/equipment', params),
   getById: (id: string) => api.get<Equipment>(`/equipment/${id}`),
   getHistory: (id: string, params?: { skip?: number; take?: number }) =>
     api.get<{ data: EquipmentHistoryEntry[]; total: number; skip: number; take: number }>(

@@ -3,10 +3,8 @@ import type { PaginatedResponse } from '@/lib/api';
 import type { WorkOrder, WorkOrderCreateInput, WorkOrderSnapshotEntry } from '@/types';
 
 export const workOrderService = {
-  getAll: (params?: {
-    search?: string; status?: string; priority?: string; type?: string;
-    equipmentId?: string; workCenterId?: string; skip?: number; take?: number;
-  }) => api.get<PaginatedResponse<WorkOrder>>('/work-orders', params as any),
+  getAll: (params?: Record<string, string | number | boolean | undefined>) =>
+    api.get<PaginatedResponse<WorkOrder>>('/work-orders', params),
   getById: (id: string) => api.get<WorkOrder>(`/work-orders/${id}`),
   getHistory: (id: string) =>
     api.get<{ data: WorkOrderSnapshotEntry[]; total: number }>(`/work-orders/${id}/history`),

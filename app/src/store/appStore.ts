@@ -18,7 +18,6 @@ import { workCenterService } from '@/services/workCenterService';
 import { maintenancePlanService } from '@/services/maintenancePlanService';
 import { dashboardService } from '@/services/dashboardService';
 import { alertService } from '@/services/alertService';
-import { commentService } from '@/services/commentService';
 import { craftService } from '@/services/craftService';
 import { auditLogService } from '@/services/auditLogService';
 import { taskListService } from '@/services/taskListService';
@@ -313,14 +312,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
         a.alertId === id ? { ...a, isRead: true } : a
       ),
     }));
-    alertService.markRead(id).catch((err) => {});
+    alertService.markRead(id).catch(() => {});
   },
 
   markAllAlertsRead: () => {
     set((s) => ({
       alerts: s.alerts.map((a) => ({ ...a, isRead: true })),
     }));
-    alertService.markAllRead().catch((err) => {});
+    alertService.markAllRead().catch(() => {});
   },
 
   addMaterial: (mat) => {

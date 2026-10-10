@@ -3,7 +3,7 @@
 // ============================================================
 
 import { useState } from 'react';
-import { Users, Clock, DollarSign, ChevronDown, ChevronRight, Wrench } from 'lucide-react';
+import { Clock, DollarSign, ChevronDown, ChevronRight } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import CapacityBoardPanel from '@/components/capacity/CapacityBoardPanel';
 import { useAppStore } from '@/store/appStore';

@@ -5,7 +5,6 @@
 import { useState, useMemo, useRef } from 'react';
 import {
   Search,
-  Package,
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,

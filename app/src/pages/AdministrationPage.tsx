@@ -460,12 +460,16 @@ function EditableSetting({
 }) {
   const [draft, setDraft] = useState(setting.value);
   const [touched, setTouched] = useState(false);
+  const [prevValue, setPrevValue] = useState(setting.value);
 
   // Re-sync when the saved value changes underneath us, so a save that the
   // server normalised is reflected instead of being overwritten on next edit.
-  useEffect(() => {
-    if (!touched) setDraft(setting.value);
-  }, [setting.value, touched]);
+  // Adjusted during render rather than in an effect so the edit state stays
+  // in lockstep with a changed value without a round of cascading state.
+  if (setting.value !== prevValue && !touched) {
+    setPrevValue(setting.value);
+    setDraft(setting.value);
+  }
 
   const dirty = touched && draft !== setting.value;
   const invalid = draft.trim() === '' || !/^[A-Za-z0-9_-]+$/.test(draft.trim());

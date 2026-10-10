@@ -2,8 +2,8 @@ import { api } from '@/lib/api';
 import type { MaintenancePlan, WorkOrder } from '@/types';
 
 export const maintenancePlanService = {
-  getAll: (params?: { strategy?: string; active?: boolean }) =>
-    api.get<MaintenancePlan[]>('/maintenance-plans', params as any),
+  getAll: (params?: Record<string, string | number | boolean | undefined>) =>
+    api.get<MaintenancePlan[]>('/maintenance-plans', params),
   getById: (id: string) => api.get<MaintenancePlan>(`/maintenance-plans/${id}`),
   create: (data: Partial<MaintenancePlan>) =>
     api.post<MaintenancePlan>('/maintenance-plans', data),

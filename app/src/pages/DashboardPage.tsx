@@ -79,8 +79,8 @@ export default function DashboardPage() {
           })
         );
       })
-      .catch((err) => setTrendData([]));
-    dashboardService.getAlerts().then(setDashAlerts).catch((err) => setDashAlerts([]));
+      .catch(() => setTrendData([]));
+    dashboardService.getAlerts().then(setDashAlerts).catch(() => setDashAlerts([]));
 
     // A failed report must not read as a zero. "No backlog" and "the backlog
     // query failed" are different facts, and a maintenance manager acting on the

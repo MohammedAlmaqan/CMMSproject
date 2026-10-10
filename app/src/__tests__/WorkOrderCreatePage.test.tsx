@@ -10,7 +10,6 @@ import { workCenterService } from '@/services/workCenterService';
 import { taskListService } from '@/services/taskListService';
 import { causeCodeService } from '@/services/causeCodeService';
 import { userService } from '@/services/userService';
-import { workOrderService } from '@/services/workOrderService';
 import type {
   CauseCode,
   Equipment,

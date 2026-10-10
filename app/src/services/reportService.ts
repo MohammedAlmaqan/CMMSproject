@@ -113,6 +113,16 @@ export interface MaterialConsumptionReport {
   }>;
 }
 
+export interface MbtfReportRow {
+  equipmentId: string;
+  mtbfHours: number;
+}
+
+export interface DowntimeReportRow {
+  equipmentId: string;
+  totalDowntimeHours: number;
+}
+
 export const reportService = {
   /** SOW 3.7.1 row 60: by status, by priority and by work centre. */
   getBacklog: (params?: Record<string, string>) =>
@@ -121,7 +131,7 @@ export const reportService = {
   getPMCompliance: (params?: Record<string, string>) =>
     api.get<PMComplianceReport>('/reports/pm-compliance', params),
   getMTBF: (params?: Record<string, string>) =>
-    api.get<any[]>('/reports/mtbf', params),
+    api.get<MbtfReportRow[]>('/reports/mtbf', params),
   /** SOW 3.7.1 row 62: per equipment and per location. */
   getMTTR: (params?: Record<string, string>) =>
     api.get<MTTRReport>('/reports/mttr', params),
@@ -129,7 +139,7 @@ export const reportService = {
   getCostSummary: (params?: Record<string, string>) =>
     api.get<CostSummaryReport>('/reports/cost-summary', params),
   getDowntime: (params?: Record<string, string>) =>
-    api.get<any[]>('/reports/downtime', params),
+    api.get<DowntimeReportRow[]>('/reports/downtime', params),
   /** SOW 3.7.1 row 64: by material, by work order and by equipment. */
   getMaterialConsumption: (params?: Record<string, string>) =>
     api.get<MaterialConsumptionReport>('/reports/material-consumption', params),

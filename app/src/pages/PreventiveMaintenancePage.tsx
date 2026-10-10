@@ -3,12 +3,10 @@
 // ============================================================
 
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Clock,
   Gauge,
-  Calendar,
   Play,
   AlertTriangle,
   ChevronLeft,
@@ -28,7 +26,6 @@ import type { MaintenancePlan } from '@/types';
 const PAGE_SIZE = 8;
 
 export default function PreventiveMaintenancePage() {
-  const navigate = useNavigate();
   const maintenancePlans = useAppStore((s) => s.maintenancePlans);
   const equipment = useAppStore((s) => s.equipment);
   const locations = useAppStore((s) => s.locations);
