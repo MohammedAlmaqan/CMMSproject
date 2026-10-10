@@ -72,18 +72,18 @@ describe('functional location tree counts (SOW 3.1.1)', () => {
 
   afterAll(async () => {
     if (notificationId) {
-      await prisma.workOrderNotifLink.deleteMany({ where: { notificationId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: notificationId } }).catch(() => {});
-      await prisma.notification.deleteMany({ where: { notificationId } }).catch(() => {});
+      await prisma.workOrderNotifLink.deleteMany({ where: { notificationId } });
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: notificationId } });
+      await prisma.notification.deleteMany({ where: { notificationId } });
     }
     if (woId) {
-      await prisma.workOrderMaterial.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
-      await prisma.workOrderOperation.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: woId } }).catch(() => {});
-      await prisma.workOrder.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
+      await prisma.workOrderMaterial.deleteMany({ where: { workOrderId: woId } });
+      await prisma.workOrderOperation.deleteMany({ where: { workOrderId: woId } });
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: woId } });
+      await prisma.workOrder.deleteMany({ where: { workOrderId: woId } });
     }
-    await prisma.functionalLocation.deleteMany({ where: { functionalLocationId: childId } }).catch(() => {});
-    await prisma.functionalLocation.deleteMany({ where: { functionalLocationId: parentId } }).catch(() => {});
+    await prisma.functionalLocation.deleteMany({ where: { functionalLocationId: childId } });
+    await prisma.functionalLocation.deleteMany({ where: { functionalLocationId: parentId } });
   });
 
   it('reports the roll-up first: a parent reflects open work under its child', async () => {
@@ -186,7 +186,7 @@ describe('functional location tree counts (SOW 3.1.1)', () => {
     const child = findNode(await tree(), childId);
     expect(child.openWorkOrderCountTotal).toBe(0);
 
-    await prisma.auditLogEntry.deleteMany({ where: { recordId: cancelled.body.workOrderId } }).catch(() => {});
-    await prisma.workOrder.deleteMany({ where: { workOrderId: cancelled.body.workOrderId } }).catch(() => {});
+    await prisma.auditLogEntry.deleteMany({ where: { recordId: cancelled.body.workOrderId } });
+    await prisma.workOrder.deleteMany({ where: { workOrderId: cancelled.body.workOrderId } });
   });
 });

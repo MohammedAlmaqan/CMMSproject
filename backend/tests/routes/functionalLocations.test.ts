@@ -9,8 +9,8 @@ let createdId = '';
 describe('functional locations routes', () => {
   afterAll(async () => {
     if (createdId) {
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: createdId } }).catch(() => {});
-      await prisma.functionalLocation.deleteMany({ where: { functionalLocationId: createdId } }).catch(() => {});
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: createdId } });
+      await prisma.functionalLocation.deleteMany({ where: { functionalLocationId: createdId } });
     }
   });
 

@@ -14,13 +14,13 @@ describe('equipment meters routes', () => {
 
   afterAll(async () => {
     if (readingId) {
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: readingId } }).catch(() => {});
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: readingId } });
     }
     if (meterId) {
-      await prisma.meterReading.deleteMany({ where: { meterId } }).catch(() => {});
-      await prisma.maintenancePlanMeter.deleteMany({ where: { meterId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: meterId } }).catch(() => {});
-      await prisma.equipmentMeter.deleteMany({ where: { meterId } }).catch(() => {});
+      await prisma.meterReading.deleteMany({ where: { meterId } });
+      await prisma.maintenancePlanMeter.deleteMany({ where: { meterId } });
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: meterId } });
+      await prisma.equipmentMeter.deleteMany({ where: { meterId } });
     }
   });
 

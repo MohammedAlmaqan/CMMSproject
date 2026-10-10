@@ -24,8 +24,8 @@ describe('attachments routes', () => {
           fs.rmSync(path.join(UPLOADS_ROOT, storagePath), { force: true });
         } catch { /* ok */ }
       }
-      await prisma.attachment.deleteMany({ where: { attachmentId: createdId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: createdId } }).catch(() => {});
+      await prisma.attachment.deleteMany({ where: { attachmentId: createdId } });
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: createdId } });
     }
   });
 
@@ -161,8 +161,8 @@ describe('attachment type and size rules (SOW 3.3.8 / D-11, row 36)', () => {
           fs.rmSync(path.join(UPLOADS_ROOT, dwgStoragePath), { force: true });
         } catch { /* ok */ }
       }
-      await prisma.attachment.deleteMany({ where: { attachmentId: dwgId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: dwgId } }).catch(() => {});
+      await prisma.attachment.deleteMany({ where: { attachmentId: dwgId } });
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: dwgId } });
     }
   });
 

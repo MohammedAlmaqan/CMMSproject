@@ -35,8 +35,8 @@ describe('equipment routes', () => {
 
   afterAll(async () => {
     if (createdId) {
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: createdId } }).catch(() => {});
-      await prisma.equipment.deleteMany({ where: { equipmentId: createdId } }).catch(() => {});
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: createdId } });
+      await prisma.equipment.deleteMany({ where: { equipmentId: createdId } });
     }
   });
 
@@ -101,12 +101,12 @@ describe('equipment routes', () => {
 
     afterAll(async () => {
       for (const id of waIds) {
-        await prisma.workOrder.deleteMany({ where: { workOrderId: id } }).catch(() => {});
-        await prisma.auditLogEntry.deleteMany({ where: { recordId: id } }).catch(() => {});
+        await prisma.workOrder.deleteMany({ where: { workOrderId: id } });
+        await prisma.auditLogEntry.deleteMany({ where: { recordId: id } });
       }
       if (hisId) {
-        await prisma.auditLogEntry.deleteMany({ where: { recordId: hisId } }).catch(() => {});
-        await prisma.equipment.deleteMany({ where: { equipmentId: hisId } }).catch(() => {});
+        await prisma.auditLogEntry.deleteMany({ where: { recordId: hisId } });
+        await prisma.equipment.deleteMany({ where: { equipmentId: hisId } });
       }
     });
 

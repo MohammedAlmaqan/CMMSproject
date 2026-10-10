@@ -84,11 +84,11 @@ describe('equipment placement at the lowest functional location (SOW 3.1.2)', ()
 
   afterAll(async () => {
     if (equipmentId) {
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: equipmentId } }).catch(() => {});
-      await prisma.equipment.deleteMany({ where: { equipmentId } }).catch(() => {});
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: equipmentId } });
+      await prisma.equipment.deleteMany({ where: { equipmentId } });
     }
     for (const id of [movableId, c2Id, c1Id, parentId]) {
-      await prisma.functionalLocation.deleteMany({ where: { functionalLocationId: id } }).catch(() => {});
+      await prisma.functionalLocation.deleteMany({ where: { functionalLocationId: id } });
     }
   });
 

@@ -181,7 +181,7 @@ afterAll(async () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/no operations/i);
 
-    await prisma.auditLogEntry.deleteMany({ where: { recordId: empty.body.taskListId } }).catch(() => {});
-    await prisma.taskList.deleteMany({ where: { taskListId: empty.body.taskListId } }).catch(() => {});
+    await prisma.auditLogEntry.deleteMany({ where: { recordId: empty.body.taskListId } });
+    await prisma.taskList.deleteMany({ where: { taskListId: empty.body.taskListId } });
   });
 });

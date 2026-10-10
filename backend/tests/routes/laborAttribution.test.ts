@@ -58,19 +58,15 @@ async function createOp(workId: string): Promise<string> {
 }
 
 const cleanBlockedRows = async () => {
-  await prisma.auditLogEntry
-    .deleteMany({ where: { tableName: 'LaborEntry', action: 'Blocked' } })
-    .catch(() => {});
+  await prisma.auditLogEntry.deleteMany({ where: { tableName: 'LaborEntry', action: 'Blocked' } });
 };
 
 afterAll(async () => {
   await cleanBlockedRows();
-  await prisma.auditLogEntry
-    .deleteMany({ where: { recordId: { in: [...laborIds, opId, woId, wo2Id] } } })
-    .catch(() => {});
-  await prisma.laborEntry.deleteMany({ where: { laborEntryId: { in: laborIds } } }).catch(() => {});
-  await prisma.workOrderOperation.deleteMany({ where: { workOrderId: { in: [woId, wo2Id] } } }).catch(() => {});
-  await prisma.workOrder.deleteMany({ where: { workOrderId: { in: [woId, wo2Id] } } }).catch(() => {});
+  await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: [...laborIds, opId, woId, wo2Id] } } });
+  await prisma.laborEntry.deleteMany({ where: { laborEntryId: { in: laborIds } } });
+  await prisma.workOrderOperation.deleteMany({ where: { workOrderId: { in: [woId, wo2Id] } } });
+  await prisma.workOrder.deleteMany({ where: { workOrderId: { in: [woId, wo2Id] } } });
 });
 
 beforeAll(async () => {

@@ -124,9 +124,9 @@ describe('safety checklists routes', () => {
     const tmpId = created.body.woChecklistId;
     const res = await api().delete(`/api/safety-checklists/work-order-checklist/${tmpId}`).set(authHeaders(ctx.adminToken));
     expect(res.status).toBe(200);
-    await prisma.workOrderChecklistItem.deleteMany({ where: { woChecklistId: tmpId } }).catch(() => {});
-    await prisma.workOrderChecklist.deleteMany({ where: { woChecklistId: tmpId } }).catch(() => {});
-    await prisma.auditLogEntry.deleteMany({ where: { recordId: tmpId } }).catch(() => {});
+    await prisma.workOrderChecklistItem.deleteMany({ where: { woChecklistId: tmpId } });
+    await prisma.workOrderChecklist.deleteMany({ where: { woChecklistId: tmpId } });
+    await prisma.auditLogEntry.deleteMany({ where: { recordId: tmpId } });
   });
 });
 

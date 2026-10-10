@@ -12,8 +12,8 @@ describe('comments routes', () => {
 
   afterAll(async () => {
     if (commentId) {
-      await prisma.comment.deleteMany({ where: { commentId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: commentId } }).catch(() => {});
+      await prisma.comment.deleteMany({ where: { commentId } });
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: commentId } });
     }
   });
 

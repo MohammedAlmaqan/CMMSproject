@@ -33,15 +33,15 @@ describe('external service costs routes', () => {
 
   afterAll(async () => {
     if (svcId) {
-      await prisma.externalServiceCost.deleteMany({ where: { serviceCostId: svcId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: svcId } }).catch(() => {});
+      await prisma.externalServiceCost.deleteMany({ where: { serviceCostId: svcId } });
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: svcId } });
     }
     if (extraIds.length) {
-      await prisma.externalServiceCost.deleteMany({ where: { serviceCostId: { in: extraIds } } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: extraIds } } }).catch(() => {});
+      await prisma.externalServiceCost.deleteMany({ where: { serviceCostId: { in: extraIds } } });
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: extraIds } } });
     }
-    await prisma.auditLogEntry.deleteMany({ where: { recordId: woId } }).catch(() => {});
-    await prisma.workOrder.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
+    await prisma.auditLogEntry.deleteMany({ where: { recordId: woId } });
+    await prisma.workOrder.deleteMany({ where: { workOrderId: woId } });
   });
 
   it('returns the external services for a work order', async () => {

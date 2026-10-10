@@ -44,12 +44,12 @@ describe('labor routes', () => {
 
   afterAll(async () => {
     if (laborId) {
-      await prisma.laborEntry.deleteMany({ where: { laborEntryId: laborId } }).catch(() => {});
-      await prisma.auditLogEntry.deleteMany({ where: { recordId: laborId } }).catch(() => {});
+      await prisma.laborEntry.deleteMany({ where: { laborEntryId: laborId } });
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: laborId } });
     }
-    await prisma.workOrderOperation.deleteMany({ where: { operationId: opId } }).catch(() => {});
-    await prisma.auditLogEntry.deleteMany({ where: { recordId: woId } }).catch(() => {});
-    await prisma.workOrder.deleteMany({ where: { workOrderId: woId } }).catch(() => {});
+    await prisma.workOrderOperation.deleteMany({ where: { operationId: opId } });
+    await prisma.auditLogEntry.deleteMany({ where: { recordId: woId } });
+    await prisma.workOrder.deleteMany({ where: { workOrderId: woId } });
   });
 
   it('returns the labor entries for a work order', async () => {
