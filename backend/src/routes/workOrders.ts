@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditFieldChange, logAuditAction, logFieldChanges } from '../middleware/audit.js';
@@ -19,10 +20,117 @@ import {
   workOrderUpdateSchema,
   workOrderStatusBodySchema,
 } from '../utils/validation.js';
+import { workOrderImporter } from '../migration-trial/importers/workOrder.js';
+import { parseCsv as parseTrialCsv } from '../migration-trial/importers/csv.js';
+import { persistDataset } from '../migration-trial/liveImport.js';
 
 const router = Router();
 
 router.use(authenticate);
+
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype !== 'text/csv') {
+      return cb(new Error('Unsupported file type: only text/csv is allowed'));
+    }
+    cb(null, true);
+  },
+});
+
+const WORK_ORDER_IMPORT_REQUIRED = [
+  'woNumber',
+  'type',
+  'priority',
+  'status',
+  'functionalLocationId',
+  'description',
+  'workCenterId',
+  'reportedByUserId',
+  'createdBy',
+  'createdDate',
+] as const;
+
+/**
+ * @openapi
+ * /api/work-orders/import.csv:
+ *   post:
+ *     summary: Bulk import work orders from CSV
+ *     description: >
+ *       Multipart upload with a single `file` part, mapped by the same rules as the
+ *       migration trial importers. Requires the Maintenance Planner role. Foreign keys
+ *       are given as natural keys - `functionalLocationId` is a location code,
+ *       `equipmentId` an equipment code, `workCenterId` a work-centre code,
+ *       `reportedByUserId` a username - and are resolved against live master data. A
+ *       row is created, or updated when `woNumber` already exists among live rows. A
+ *       row naming a natural key that does not exist live, or whose supervisor cannot
+ *       be resolved, is rejected with a reason. A blank `supervisorUserId` is
+ *       backfilled to the reporter, mirroring notification conversion.
+ *     tags: [Work Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       '200':
+ *         description: Import completed; per-row outcome reported
+ *       '400':
+ *         description: Malformed CSV, missing header columns, or no importable rows
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.single('file'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const text = req.file.buffer.toString('utf8');
+    let parsed;
+    try {
+      parsed = parseTrialCsv(text);
+    } catch {
+      return res.status(400).json({ error: 'Malformed CSV' });
+    }
+    if (parsed.rows.length === 0) {
+      return res.status(400).json({ error: 'CSV is empty' });
+    }
+
+    const header = parsed.headers.map((h) => h.trim().toLowerCase());
+    const missing = WORK_ORDER_IMPORT_REQUIRED.filter((c) => !header.includes(c.toLowerCase()));
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `CSV header is missing: ${missing.join(', ')}` });
+    }
+
+    const mapped = workOrderImporter.parse(parsed.rows);
+    if (mapped.rows.length === 0) {
+      return res.status(400).json({
+        error: `No importable rows: ${mapped.rejected.map((r) => `row ${r.row}: ${r.reason}`).join('; ') || 'CSV has no data rows'}`,
+      });
+    }
+
+    const result = await prisma.$transaction((tx) =>
+      persistDataset(tx, workOrderImporter, mapped, { userId: req.user!.userId, ipAddress: req.ip })
+    );
+
+    res.json({ created: result.created, updated: result.updated, rejected: result.rejected });
+  } catch (error) {
+    logger.error({ err: error }, 'Error importing work orders');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   Draft: ['Planned', 'Cancelled'],
