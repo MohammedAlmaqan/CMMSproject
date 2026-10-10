@@ -26,7 +26,7 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (15)
+## A. Close now — code and data gap (14)
 
 What it is, where it lives, size.
 
@@ -44,7 +44,6 @@ What it is, where it lives, size.
 | C12 | Write-path load measurement: the 200-VU run exercises the read path only, so no transactional-save percentile exists separately from reads (row 253 records the run; `scripts/k6/capacity.js` drives login + two GETs) | Table 2 "Write-path load measurement"; matrix line 253 (§4.1) | M + run window |
 | C13 | Total recovery time: only the database restore is measured (5.35 s, ADMIN_GUIDE); host rebuild and attachment store are not | Table 2 "Total recovery time"; matrix line 263 (§4.3) | M + run window |
 | C19 | Settings screen is mostly static. 6 of the rows shown (session timeout, PM scheduler time, audit retention, upload limit, password policy, language) are hard-coded `SettingItem` markup at `AdministrationPage.tsx:393-398` with nothing enforcing those values; only the two number-prefix rows are backed by `system-config` | Found on my own; `README.md:264` | M |
-| C20 | Lint debt. Re-measured 2026-10-08: backend `npx eslint .` = **43 errors, 0 warnings**; app = **29 errors, 2 warnings**. `README.md:266` records 41 / 28+2 measured 2026-10-02 | Found on my own; `README.md:266` | M |
 | C21 | Dependency advisories with upgrades available. Re-measured 2026-10-08: backend `npm audit --omit=dev` = **10** (1 critical, 6 high, 3 moderate; `qs`/`body-parser`/`express`); app = **4** (3 high, 1 moderate; `react-router-dom`). Both report `npm audit fix`. `README.md:265` says 9 with "no criticals" | Found on my own; `README.md:265` | S/M |
 | B1 | Legacy migration accuracy: the Client dataset **is** held at `docs/migration-templates/dataset/` (2,259 open-WO rows, 6,163 equipment, 5,954 materials), so the full legacy load and the >99.9% accuracy figure on Client data are executable. The 21 unfilled templates are **not** a gap: `FILL_REPORT.md` §Scope records that they have no source rows or are deliberately deferred (meter patch). **Reclassified from "Blocked on owner" 2026-10-09** — nothing is pending from the Client | Matrix lines 40 (§1.3), 307 (§5.7), 335 (§6.4); Table 1 item 5; `migration-templates/TRIAL_RUN_REPORT.md`; `migration-templates/FILL_REPORT.md` §Scope | M + run window |
 
@@ -144,8 +143,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-15 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **31 open items**.
+14 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
+10 decisions-not-gap = **30 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -170,6 +169,7 @@ the SHA and green CI run recorded when the item landed.
 | B4 | 2026-10-09 | `4d2d7c7` | 239 |
 | C15 | 2026-10-10 | `50ff911` | 241 |
 | C14 | 2026-10-10 | `fd86709` | 243 |
+| C20 | 2026-10-10 | `cfc6108` | 246 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -229,4 +229,26 @@ fails lint whether or not it binds a parameter, while production `src` keeps its
 parse-fallback catches. The re-measured-figures note above (`68 → 55`) and the tracker's
 `68`/13 figures — including the `:1206` per-file breakdown that still lists
 `notifications.test.ts` (16), a file that no longer holds any — are superseded by 54 in 12.
+
+**C20** (`cfc6108`, run 246) cleared the lint debt in two packages, landed as three commits
+so the backend and app halves stay separately revertable. **`40f91b3`** (run 245) took
+backend `npx eslint .` from **43 errors / 0 warnings** to **0 / 0**: 38 `no-explicit-any`
+replaced with `Prisma.*WhereInput` and node-tree types plus `isPrismaError`-guarded
+`catch (error)` rewrites, 4 `no-unused-vars` removed, and 1 `no-namespace` isolated behind a
+scoped disable on the Express `Request` augmentation. **`c0ff7de`** (run 245) took the app
+from **29 errors / 2 warnings** to **0 / 0**: 21 unused vars/imports removed, 6 `any` typed
+(getAll params widened to `Record<string, string | number | boolean | undefined>` over
+object-literal call sites; MTBF/downtime reports given `MbtfReportRow`/`DowntimeReportRow`),
+and the two `react-hooks` v7 rule sites fixed behaviour-preservingly — the settings row
+resyncs its draft during render instead of in an effect, and the Reports loading flag is
+derived from `reportData`/`reportError` with the pm-compliance memo keyed on a stable slice.
+**`cfc6108`** (run 246) restores the indentation `c0ff7de` had dropped on the
+`WorkOrderDetailPage` reload `catch` brace — a cosmetic slip that tsc, eslint and tests pass
+either way, corrected rather than silently carried. The item left no `SOW_COMPLIANCE.md`
+Status to move and is not a tracker `v1.1` row: it was found on my own and recorded only
+here. The pre-sweep baselines re-derived from source were **43** (backend) and **29 + 2
+warnings** (app) on 2026-10-08; `README.md:266`'s `41 / 28 + 2` (measured 2026-10-02) was
+already stale, and is now corrected to the cleared state with the superseded figures kept in
+the line. That correction discharges the `README.md:266` limb of **D1**'s figure sweep; D1
+stays open on its remaining items.
 
