@@ -9,6 +9,10 @@
  * then writes the trial-run report to docs/migration-templates/
  * TRIAL_RUN_REPORT.md.
  *
+ * The CSV directory and report path honour TRIAL_RUN_CSV_DIR and
+ * TRIAL_RUN_REPORT_PATH so a full-dataset run reads an extracted CSV set and
+ * writes its own report without touching the reviewed sample or its report.
+ *
  * Safety: this is a local-runner, opt-in harness exactly like the gate's DB
  * step. It refuses to run unless the host is localhost and TRIAL_RUN_ALLOW_DB=1
  * is set, never prints a connection string, and drops the throwaway schema it
@@ -43,6 +47,16 @@ import {
 } from './report.js';
 
 const docsDir = path.resolve(backendDir, '..', 'docs', 'migration-templates');
+// The reviewed sample lives in docsDir. A full-dataset run points TRIAL_RUN_CSV_DIR
+// at an extracted CSV set and TRIAL_RUN_REPORT_PATH at a separate report, so the
+// sample files and their trial-run report are never overwritten. Both default to
+// the sample behaviour.
+const csvDir = process.env.TRIAL_RUN_CSV_DIR
+  ? path.resolve(process.env.TRIAL_RUN_CSV_DIR)
+  : docsDir;
+const reportPath = process.env.TRIAL_RUN_REPORT_PATH
+  ? path.resolve(process.env.TRIAL_RUN_REPORT_PATH)
+  : path.join(docsDir, 'TRIAL_RUN_REPORT.md');
 const ACCURACY_TARGET = 99.9;
 
 
@@ -94,7 +108,11 @@ function summarizeColumns(
   headers: string[],
   rows: Array<{ provenance: Record<string, ImportedCell> }>,
 ): { columns: ColumnRule[]; unmapped: string[] } {
-  const rules = new Map<string, string>();
+  // One entry per distinct rule a column exhibited. A Set, not a concatenated
+  // string: a column that alternates between two rules across thousands of rows
+  // (e.g. serialNumber blank on most rows, mapped on some) would otherwise grow
+  // a single table cell without bound.
+  const rules = new Map<string, Set<string>>();
   for (const header of headers) {
     for (const row of rows) {
       const cell = row.provenance[header];
@@ -120,14 +138,19 @@ function summarizeColumns(
           rule = `FK reference - resolved to the ${cell.dataset} row by ${cell.column}`;
           break;
       }
-      const present = rules.get(header);
-      if (present === undefined) rules.set(header, rule);
-      else if (present !== rule) rules.set(header, `${present}; ${rule}`);
+      let observed = rules.get(header);
+      if (observed === undefined) {
+        observed = new Set<string>();
+        rules.set(header, observed);
+      }
+      observed.add(rule);
     }
   }
   const columns: ColumnRule[] = headers.map((h) => ({
     name: h,
-    rule: rules.get(h) ?? 'not carried (server-generated or blank-on-import default)',
+    rule: rules.has(h)
+      ? [...(rules.get(h) as Set<string>)].join('; ')
+      : 'not carried (server-generated or blank-on-import default)',
   }));
   const unmapped = headers.filter((h) => !rules.has(h));
   return { columns, unmapped };
@@ -276,7 +299,7 @@ async function run(): Promise<number> {
     const datasets: DatasetReport[] = [];
 
     for (const importer of DATASET_IMPORTERS) {
-      const file = path.join(docsDir, `${importer.name}.filled.csv`);
+      const file = path.join(csvDir, `${importer.name}.filled.csv`);
       let text: string;
       try {
         text = readFileSync(file, 'utf8');
@@ -323,7 +346,7 @@ async function run(): Promise<number> {
     };
 
     const markdown = renderReport(reportInput);
-    const outPath = path.join(docsDir, 'TRIAL_RUN_REPORT.md');
+    const outPath = reportPath;
     await writeFile(outPath, markdown, 'utf8');
     process.stdout.write(`report: wrote ${outPath}\n`);
 
