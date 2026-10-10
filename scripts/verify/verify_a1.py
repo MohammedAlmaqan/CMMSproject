@@ -230,10 +230,10 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # realistic cadence the save p(95) is 89.4 ms, inside the 1 s budget (the
     # 3.47 s tight-loop figure is a stress bound, not the acceptance figure).
     # The owner reviewed that evidence and authorised the promotion on
-    # 2026-10-10; the status change and this wiring land together, so the commit
-    # field is the "this commit" sentinel and the date plus the row-253 note are
-    # the durable anchors. Backfill the real SHA once its push-run is in.
-    ("4.1 concurrency", "Partial", "Met", "this commit"),
+    # 2026-10-10; the status change and this wiring landed together, and the
+    # real SHA (3b44914) is now recorded here. The date plus the row-253 note
+    # are the durable anchors.
+    ("4.1 concurrency", "Partial", "Met", "3b44914"),
     ("4.2 https", "Partial", "Met", "256c8e9"),
     ("4.5 iso-14224", "Not Met", "Met", "a0573bd"),
     ("4.6 availability", "Not Met", "Deferred", "1daa241"),
@@ -325,12 +325,11 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # (FULL_LOAD_LEDGER.json), and the migration runbook is delivered
     # (docs/migration-runbook.md). None of the three is a section 3 row, so this
     # applies only against the all-rows baseline (EXPECT_ALL). The status change
-    # and this wiring land together, so the commit field is the "this commit"
-    # sentinel; backfill the real SHA once its push-run is in. Durable anchor:
-    # the B1 closure-log row in docs/GAP_REGISTER.md.
-    ("1.3 data-migration", "Not Met", "Met", "this commit"),
-    ("5.7 migration-runbook", "Not Met", "Met", "this commit"),
-    ("6.4 migration-accuracy", "Not Met", "Met", "this commit"),
+    # and the verifier wiring landed together in 1971686, which is recorded here.
+    # Durable anchor: the B1 closure-log row in docs/GAP_REGISTER.md.
+    ("1.3 data-migration", "Not Met", "Met", "1971686"),
+    ("5.7 migration-runbook", "Not Met", "Met", "1971686"),
+    ("6.4 migration-accuracy", "Not Met", "Met", "1971686"),
 ]
 
 

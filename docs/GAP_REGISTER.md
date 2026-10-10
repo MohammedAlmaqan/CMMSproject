@@ -172,8 +172,8 @@ the SHA and green CI run recorded when the item landed.
 | C21 | 2026-10-10 | `ad93610` | 248 |
 | C5 | 2026-10-10 | `eefcff1` | 252 |
 | C12 | 2026-10-10 | `fd86b2b` | 254 |
-| B1 | 2026-10-10 | `this commit` | pending |
-| D2 | 2026-10-10 | `this commit` | pending |
+| B1 | 2026-10-10 | `1971686` | pending |
+| D2 | 2026-10-10 | `1971686` | pending |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -309,7 +309,7 @@ is recorded as a **stress bound, not the acceptance number**. The row carries no
 move — the line 253 Status is the owner's call — and its note is refreshed with these figures so
 the "Residual: a write-path save-latency load run" line is discharged.
 
-**B1** (`this commit`, run pending) is the legacy migration full load. The Client's raw
+**B1** (`1971686`, run pending) is the legacy migration full load. The Client's raw
 workbooks were extracted to the trial-run CSV contract by a new
 `scripts/migration/extract_full_dataset.py` and loaded by the `backend/src/migration-trial/run.ts`
 harness (extended with `TRIAL_RUN_CSV_DIR` / `TRIAL_RUN_REPORT_PATH` overrides so a full run
@@ -321,8 +321,8 @@ merged 267 material rows by code, and blanked 11 unresolved equipment FKs. **Res
 dataset: 20,333 / 20,333 rows correct = 100.00%** against the 99.9% target, 0 rejected; the report
 is `docs/migration-templates/TRIAL_RUN_REPORT_FULL.md` and the ledger
 `docs/migration-templates/FULL_LOAD_LEDGER.json`. On this evidence matrix lines 40 (§1.3), 307
-(§5.7) and 335 (§6.4 / d) moved `Not Met` → `Met`. **D2** (`this commit`, run pending) — the
+(§5.7) and 335 (§6.4 / d) moved `Not Met` → `Met`. **D2** (`1971686`, run pending) — the
 migration runbook the register said did not exist anywhere under `docs/` — is discharged by
-`docs/migration-runbook.md`, delivered as part of B1. Backfill both SHAs and runs once the
-closure's push-run is in.
+`docs/migration-runbook.md`, delivered as part of B1. Backfill both runs once the
+closure's push-run is confirmed.
 
