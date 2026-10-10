@@ -26,7 +26,7 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (12)
+## A. Close now — code and data gap (11)
 
 What it is, where it lives, size.
 
@@ -40,7 +40,6 @@ What it is, where it lives, size.
 | C9 | "View assigned" not enforced: `GET /api/work-orders` builds `where` with no assignment scoping (`workOrders.ts:97-131`), so every holder sees every work order | Matrix line 63 (§2.2) | M |
 | C10 | Unauthenticated `/api/health/scheduler` exposes plan counts and last-run state; the handler carries no `authenticate` and `apiRouter` has no global auth middleware (`index.ts:225`) | Matrix line 300 (§5.5) | S |
 | C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
-| C12 | Write-path load measurement: the 200-VU run exercises the read path only, so no transactional-save percentile exists separately from reads (row 253 records the run; `scripts/k6/capacity.js` drives login + two GETs) | Table 2 "Write-path load measurement"; matrix line 253 (§4.1) | M + run window |
 | C13 | Total recovery time: only the database restore is measured (5.35 s, ADMIN_GUIDE); host rebuild and attachment store are not | Table 2 "Total recovery time"; matrix line 263 (§4.3) | M + run window |
 | C19 | Settings screen is mostly static. 6 of the rows shown (session timeout, PM scheduler time, audit retention, upload limit, password policy, language) are hard-coded `SettingItem` markup at `AdministrationPage.tsx:393-398` with nothing enforcing those values; only the two number-prefix rows are backed by `system-config` | Found on my own; `README.md:264` | M |
 | B1 | Legacy migration accuracy: the Client dataset **is** held at `docs/migration-templates/dataset/` (2,259 open-WO rows, 6,163 equipment, 5,954 materials), so the full legacy load and the >99.9% accuracy figure on Client data are executable. The 21 unfilled templates are **not** a gap: `FILL_REPORT.md` §Scope records that they have no source rows or are deliberately deferred (meter patch). **Reclassified from "Blocked on owner" 2026-10-09** — nothing is pending from the Client | Matrix lines 40 (§1.3), 307 (§5.7), 335 (§6.4); Table 1 item 5; `migration-templates/TRIAL_RUN_REPORT.md`; `migration-templates/FILL_REPORT.md` §Scope | M + run window |
@@ -143,8 +142,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-12 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **28 open items**.
+11 code and data gaps · 5 documentation gaps · 0 blocked on owner · 1 blocked on external ·
+10 decisions-not-gap = **27 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -172,6 +171,7 @@ the SHA and green CI run recorded when the item landed.
 | C20 | 2026-10-10 | `cfc6108` | 246 |
 | C21 | 2026-10-10 | `ad93610` | 248 |
 | C5 | 2026-10-10 | `eefcff1` | 252 |
+| C12 | 2026-10-10 | `fd86b2b` | 254 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -292,4 +292,18 @@ unknown references. The item left no matrix Status to move — the matrix line 3
 the owner's call — and the line 306 note and the Table 2 "Migration tooling" wording that
 still read as harness-only are **D1**'s remaining sweep, named here so closing C5 does not
 silently leave them stale.
+
+**C12** (`fd86b2b`, run 254) added the missing write-path measurement — `scripts/k6/write.js`,
+a 200-VU single-scenario load that logs in once per VU, resolves existing work orders once, then
+saves in a loop via `PUT /api/work-orders/:id` (`completionRemarks` set to a fixed probe, so no
+rows are created and audit growth is bounded) and records the save percentile in its own
+`save_latency` trend. Run on 2026-10-10 against a disposable clone of `cmms` (229 work orders;
+the live `cmms` was not touched — verified back at 9 WOs). **At a realistic cadence — one save
+per user per 20 s (`THINK_TIME=20`) — the save limb is p(95) 89.4 ms**, median 26.3 ms, max
+836 ms over 3,790 saves, `http_req_failed` 0.00%, 0 P2028 / 0×429 / 0×500: **within the §4.1
+< 1 s budget**, so this is the acceptance figure. A tight loop (one save per user per second)
+saturates at p(95) 3.47 s (median 2.6 s, ~46 saves/s from 22,089 saves; solo saves ~50 ms), and
+is recorded as a **stress bound, not the acceptance number**. The row carries no matrix Status to
+move — the line 253 Status is the owner's call — and its note is refreshed with these figures so
+the "Residual: a write-path save-latency load run" line is discharged.
 
