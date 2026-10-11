@@ -84,6 +84,19 @@ export default function EquipmentDetailPage() {
   const [bomError, setBomError] = useState<string | null>(null);
   const [bomSuccess, setBomSuccess] = useState<string | null>(null);
 
+  // Meters write floors: create/update Technician+, delete Supervisor+ (delete exists)
+  const canEditMeter = hasPermission(['Technician', 'Maintenance Supervisor', 'Maintenance Planner', 'Administrator']);
+  const canDeleteMeter = hasPermission(['Maintenance Supervisor', 'Maintenance Planner', 'Administrator']);
+  const [meterFormOpen, setMeterFormOpen] = useState(false);
+  const [meterEditingId, setMeterEditingId] = useState<string | null>(null);
+  const [meterName, setMeterName] = useState('');
+  const [meterUnit, setMeterUnit] = useState('');
+  const [meterLastReading, setMeterLastReading] = useState('');
+  const [meterLastReadingDate, setMeterLastReadingDate] = useState('');
+  const [meterBusy, setMeterBusy] = useState<string | null>(null);
+  const [meterError, setMeterError] = useState<string | null>(null);
+  const [meterSuccess, setMeterSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     // The material picker needs the catalog; a failure only empties the
     // picker, so it must not take the page down.
@@ -251,6 +264,85 @@ export default function EquipmentDetailPage() {
       setBomError(err instanceof ApiError ? err.message : 'Delete failed');
     } finally {
       setBomBusy(null);
+    }
+  };
+
+  const openMeterCreate = () => {
+    setMeterEditingId(null);
+    setMeterName('');
+    setMeterUnit('');
+    setMeterLastReading('');
+    setMeterLastReadingDate('');
+    setMeterError(null);
+    setMeterSuccess(null);
+    setMeterFormOpen(true);
+  };
+
+  const openMeterEdit = (m: EquipmentMeter) => {
+    setMeterEditingId(m.meterId);
+    setMeterName(m.meterName);
+    setMeterUnit(m.unitOfMeasure);
+    setMeterLastReading(m.lastReading?.toString() ?? '');
+    setMeterLastReadingDate(m.lastReadingDate ? m.lastReadingDate.slice(0, 10) : '');
+    setMeterError(null);
+    setMeterSuccess(null);
+    setMeterFormOpen(true);
+  };
+
+  const saveMeter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!meterName.trim() || !meterUnit.trim()) {
+      setMeterError('Meter name and unit are required');
+      return;
+    }
+    const lastReadingVal = meterLastReading === '' ? undefined : Number(meterLastReading);
+    if (meterLastReading !== '' && (!Number.isFinite(lastReadingVal) || lastReadingVal < 0)) {
+      setMeterError('Last reading must be zero or greater');
+      return;
+    }
+    setMeterBusy('save');
+    setMeterError(null);
+    setMeterSuccess(null);
+    try {
+      if (meterEditingId) {
+        await equipmentService.updateMeter(meterEditingId, {
+          meterName: meterName.trim(),
+          unitOfMeasure: meterUnit.trim(),
+          lastReading: meterLastReading === '' ? undefined : (lastReadingVal as number),
+          lastReadingDate: meterLastReadingDate || null,
+        });
+        setMeterSuccess('Meter updated');
+      } else {
+        await equipmentService.createMeter({
+          equipmentId: eq.equipmentId,
+          meterName: meterName.trim(),
+          unitOfMeasure: meterUnit.trim(),
+          lastReading: meterLastReading === '' ? undefined : (lastReadingVal as number),
+          lastReadingDate: meterLastReadingDate || null,
+        });
+        setMeterSuccess('Meter added');
+      }
+      setMeterFormOpen(false);
+      await reload();
+    } catch (err) {
+      setMeterError(err instanceof ApiError ? err.message : 'Save failed');
+    } finally {
+      setMeterBusy(null);
+    }
+  };
+
+  const removeMeter = async (m: EquipmentMeter) => {
+    setMeterBusy(`del:${m.meterId}`);
+    setMeterError(null);
+    setMeterSuccess(null);
+    try {
+      await equipmentService.deleteMeter(m.meterId);
+      setMeterSuccess('Meter removed');
+      await reload();
+    } catch (err) {
+      setMeterError(err instanceof ApiError ? err.message : 'Delete failed');
+    } finally {
+      setMeterBusy(null);
     }
   };
 
