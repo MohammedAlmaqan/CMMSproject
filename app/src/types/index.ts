@@ -464,6 +464,22 @@ export interface MaintenancePlan extends Auditable {
   startDate: string;
   endDate: string | null;
   activeFlag: boolean;
+  priority: Priority;
+  generatedWorkOrderStatus: 'Draft' | 'Planned';
+  notificationId: string | null;
+  // D-10: the target list is what the plan actually covers; the legacy single
+  // columns mirror its first entry. SOW 3.4.2: meter thresholds per plan.
+  targets?: MaintenancePlanTarget[];
+  planMeters?: MaintenancePlanMeter[];
+}
+
+export interface MaintenancePlanTarget {
+  planTargetId: string;
+  planId: string;
+  equipmentId: string | null;
+  functionalLocationId: string | null;
+  equipment?: { equipmentId: string; equipmentCode: string; name: string } | null;
+  functionalLocation?: { functionalLocationId: string; locationCode: string; description: string } | null;
 }
 
 export interface MaintenancePlanMeter {
@@ -471,6 +487,38 @@ export interface MaintenancePlanMeter {
   planId: string;
   meterId: string;
   meterInterval: number;
+  meter?: EquipmentMeter | null;
+}
+
+/** One asset a plan covers; exactly one of the two ids is set (D-10). */
+export interface MaintenancePlanTargetInput {
+  equipmentId: string | null;
+  functionalLocationId: string | null;
+}
+
+export interface MaintenancePlanMeterInput {
+  meterId: string;
+  meterInterval: number;
+}
+
+/** What the create and update endpoints accept for a plan. */
+export interface MaintenancePlanInput {
+  planCode?: string;
+  description: string;
+  workCenterId: string;
+  taskListId: string;
+  strategyType: StrategyType;
+  intervalValue: number;
+  intervalUnit: IntervalUnit;
+  callHorizonValue?: number;
+  callHorizonUnit?: 'Days' | 'Units';
+  startDate: string;
+  endDate?: string | null;
+  activeFlag?: boolean;
+  priority?: Priority;
+  generatedWorkOrderStatus?: 'Draft' | 'Planned';
+  targets?: MaintenancePlanTargetInput[];
+  planMeters?: MaintenancePlanMeterInput[];
 }
 
 // ─── Audit Log (§3.6) ───
