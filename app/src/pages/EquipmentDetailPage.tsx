@@ -22,13 +22,16 @@ import {
   Trash2,
   AlertTriangle,
   CheckCircle,
+  Plus,
+  Pencil,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { equipmentService } from '@/services/equipmentService';
+import { materialService } from '@/services/materialService';
 import { attachmentService } from '@/services/attachmentService';
 import { ApiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import type { Equipment, FunctionalLocation, EquipmentMeter, EquipmentHistoryEntry, Attachment } from '@/types';
+import type { Equipment, FunctionalLocation, EquipmentMeter, EquipmentHistoryEntry, Attachment, EquipmentBOM, Material } from '@/types';
 
 type EqTab = 'general' | 'parameters' | 'history' | 'meters' | 'documents';
 
@@ -67,6 +70,25 @@ export default function EquipmentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<EqTab>('general');
+
+  // BOM write floors mirror the API: create/update need Technician, delete
+  // needs a Supervisor.
+  const canEditBom = hasPermission(['Technician', 'Maintenance Supervisor', 'Maintenance Planner', 'Administrator']);
+  const canDeleteBom = hasPermission(['Maintenance Supervisor', 'Maintenance Planner', 'Administrator']);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [bomFormOpen, setBomFormOpen] = useState(false);
+  const [bomEditingId, setBomEditingId] = useState<string | null>(null);
+  const [bomMaterialId, setBomMaterialId] = useState('');
+  const [bomQuantity, setBomQuantity] = useState('1');
+  const [bomBusy, setBomBusy] = useState<string | null>(null);
+  const [bomError, setBomError] = useState<string | null>(null);
+  const [bomSuccess, setBomSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    // The material picker needs the catalog; a failure only empties the
+    // picker, so it must not take the page down.
+    materialService.getAll().then(setMaterials).catch(() => setMaterials([]));
+  }, []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -164,6 +186,74 @@ export default function EquipmentDetailPage() {
   const eqMeters: EquipmentMeter[] = eq.meters || [];
   const eqBom = eq.bomItems || [];
 
+  const inputCls =
+    'px-2.5 py-1.5 rounded text-xs text-primary outline-none border border-subtle focus:border-highlight transition-colors w-full';
+  const labelCls = 'block text-tertiary mb-1';
+
+  const openBomCreate = () => {
+    setBomEditingId(null);
+    setBomMaterialId('');
+    setBomQuantity('1');
+    setBomError(null);
+    setBomSuccess(null);
+    setBomFormOpen(true);
+  };
+
+  const openBomEdit = (item: EquipmentBOM) => {
+    setBomEditingId(item.bomId);
+    setBomMaterialId(item.materialId);
+    setBomQuantity(String(item.quantity));
+    setBomError(null);
+    setBomSuccess(null);
+    setBomFormOpen(true);
+  };
+
+  const saveBom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const qty = Number(bomQuantity);
+    if (!bomEditingId && !bomMaterialId) {
+      setBomError('Select a material');
+      return;
+    }
+    if (!Number.isFinite(qty) || qty <= 0) {
+      setBomError('Quantity must be greater than zero');
+      return;
+    }
+    setBomBusy('save');
+    setBomError(null);
+    setBomSuccess(null);
+    try {
+      if (bomEditingId) {
+        await equipmentService.updateBom(eq.equipmentId, bomEditingId, { quantity: qty });
+        setBomSuccess('BOM item updated');
+      } else {
+        await equipmentService.createBom(eq.equipmentId, { materialId: bomMaterialId, quantity: qty });
+        setBomSuccess('BOM item added');
+      }
+      setBomFormOpen(false);
+      await reload();
+    } catch (err) {
+      setBomError(err instanceof ApiError ? err.message : 'Save failed');
+    } finally {
+      setBomBusy(null);
+    }
+  };
+
+  const removeBom = async (item: EquipmentBOM) => {
+    setBomBusy(`del:${item.bomId}`);
+    setBomError(null);
+    setBomSuccess(null);
+    try {
+      await equipmentService.deleteBom(eq.equipmentId, item.bomId);
+      setBomSuccess('BOM item removed');
+      await reload();
+    } catch (err) {
+      setBomError(err instanceof ApiError ? err.message : 'Delete failed');
+    } finally {
+      setBomBusy(null);
+    }
+  };
+
   const tabs: { id: EqTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'general', label: 'General', icon: Settings },
     { id: 'parameters', label: 'Parameters', icon: FileText },
@@ -250,14 +340,108 @@ export default function EquipmentDetailPage() {
                   </div>
                 </div>
                 <div className="industrial-card rounded p-4">
-                  <h3 className="text-primary text-sm font-semibold mb-3">BOM Items ({eqBom.length})</h3>
-                  {eqBom.length === 0 ? (
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-primary text-sm font-semibold">BOM Items ({eqBom.length})</h3>
+                    {canEditBom && !bomFormOpen && (
+                      <button
+                        onClick={openBomCreate}
+                        className="flex items-center gap-1 text-xs text-amber hover:underline"
+                      >
+                        <Plus className="w-3 h-3" /> Add item
+                      </button>
+                    )}
+                  </div>
+                  {bomError && <p className="text-red-status text-xs mb-2">{bomError}</p>}
+                  {bomSuccess && <p className="text-emerald-400 text-xs mb-2">{bomSuccess}</p>}
+
+                  {bomFormOpen && (
+                    <form onSubmit={saveBom} className="mb-3 space-y-2 border border-subtle rounded p-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={labelCls} htmlFor="bom-material">Material</label>
+                          <select
+                            id="bom-material"
+                            value={bomMaterialId}
+                            onChange={(e) => setBomMaterialId(e.target.value)}
+                            disabled={!!bomEditingId}
+                            className={`${inputCls} disabled:opacity-60`}
+                          >
+                            <option value="">Select...</option>
+                            {materials.map((m) => (
+                              <option key={m.materialId} value={m.materialId}>
+                                {m.materialCode} — {m.description}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={labelCls} htmlFor="bom-quantity">Quantity</label>
+                          <input
+                            id="bom-quantity"
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={bomQuantity}
+                            onChange={(e) => setBomQuantity(e.target.value)}
+                            className={inputCls}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setBomFormOpen(false)}
+                          className="px-2.5 py-1 rounded text-xs text-secondary border border-subtle hover:border-highlight"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={bomBusy === 'save'}
+                          className="px-2.5 py-1 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                          style={{ backgroundColor: '#D97706', color: '#111113' }}
+                        >
+                          {bomBusy === 'save' ? <Loader2 className="w-3 h-3 animate-spin" /> : bomEditingId ? 'Save' : 'Add'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {eqBom.length === 0 && !bomFormOpen ? (
                     <p className="text-tertiary text-xs">No BOM items</p>
                   ) : (
                     eqBom.map((item) => (
                       <div key={item.bomId} className="flex items-center justify-between py-1.5 border-t border-subtle">
                         <span className="text-xs text-secondary">{item.material?.materialCode || item.materialId}</span>
-                        <span className="font-mono text-xs text-primary">{item.quantity}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-xs text-primary">{item.quantity}</span>
+                          {(canEditBom || canDeleteBom) && (
+                            <div className="flex items-center gap-1">
+                              {canEditBom && (
+                                <button
+                                  onClick={() => openBomEdit(item)}
+                                  disabled={bomBusy !== null}
+                                  className="p-0.5 text-tertiary hover:text-primary transition-colors disabled:opacity-40"
+                                  title="Edit quantity"
+                                  aria-label={`Edit BOM ${item.material?.materialCode || item.materialId}`}
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                              )}
+                              {canDeleteBom && (
+                                <button
+                                  onClick={() => removeBom(item)}
+                                  disabled={bomBusy !== null}
+                                  className="p-0.5 text-tertiary hover:text-red-status transition-colors disabled:opacity-40"
+                                  title="Remove item"
+                                  aria-label={`Remove BOM ${item.material?.materialCode || item.materialId}`}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
