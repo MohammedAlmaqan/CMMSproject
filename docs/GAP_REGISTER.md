@@ -41,7 +41,7 @@ What it is, where it lives, size.
 | C10 | Unauthenticated `/api/health/scheduler` exposes plan counts and last-run state; the handler carries no `authenticate` and `apiRouter` has no global auth middleware (`index.ts:225`) | Matrix line 300 (§5.5) | S |
 | C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
 | C13 | Total recovery time: measured. DB restore + attachments + app layer = 9.11 s (app 0.36 s) on live stack using backup cmms-2026-09-29-1659.sql with paired uploads; WorkOrder 189, attachment snapshot verified, drill DB dropped. Script ready and exercised. | Table 2 "Total recovery time"; matrix line 263 (§4.3) | Done |
-| C19 | Settings screen is mostly static. 6 of the rows shown (session timeout, PM scheduler time, audit retention, upload limit, password policy, language) are hard-coded `SettingItem` markup at `AdministrationPage.tsx:393-398` with nothing enforcing those values; only the two number-prefix rows are backed by `system-config` | Found on my own; `README.md:264` | M |
+| C19 | Settings screen made accurate. The duplicate "Audit Log Retention" static row is removed (the value is shown once, as the editable `audit_retention_years` setting); the "PM Scheduler" row no longer claims 06:00 - it states the server cron default (02:00, `PM_SCHEDULER_CRON`) and that it is not configurable here; and the remaining fixed rows (session timeout, upload limit, password policy, language) carry accurate descriptions under a "Read-only (fixed configuration)" label. No values are newly enforced. | Found on my own; `README.md:264` | Done |
 
 ## B. Close now — documentation gap (4)
 
@@ -175,6 +175,7 @@ the SHA and green CI run recorded when the item landed.
 | C12 | 2026-10-10 | `fd86b2b` | 254 |
 | B1 | 2026-10-10 | `1971686` | 257 |
 | D2 | 2026-10-10 | `1971686` | 257 |
+| C19 | 2026-10-11 | `7174597` | 263 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
