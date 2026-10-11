@@ -37,6 +37,18 @@ export interface FunctionalLocation extends Auditable {
   openNotificationCountTotal?: number;
 }
 
+/** What POST /functional-locations accepts; update takes a partial of this. */
+export interface FunctionalLocationInput {
+  locationCode: string;
+  description: string;
+  parentLocationId?: string | null;
+  locationType: 'Plant' | 'Area' | 'Unit' | 'Sub-unit' | 'System';
+  operationalStatus?: 'Active' | 'Inactive';
+  installationDate?: string | null;
+  gpsCoordinates?: string | null;
+  safetyCritical?: boolean;
+}
+
 // ─── Equipment (§3.1.2) ───
 export interface Equipment extends Auditable {
   equipmentId: string;

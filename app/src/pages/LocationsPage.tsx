@@ -15,12 +15,18 @@ import {
   Loader2,
   RefreshCw,
   AlertTriangle,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  CheckCircle,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { functionalLocationService } from '@/services/functionalLocationService';
 import { equipmentService } from '@/services/equipmentService';
+import { useAuthStore } from '@/store/authStore';
 import { ApiError } from '@/lib/api';
-import type { FunctionalLocation, Equipment } from '@/types';
+import type { FunctionalLocation, Equipment, FunctionalLocationInput } from '@/types';
 
 const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   Plant: Factory,
@@ -31,6 +37,7 @@ const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 export default function LocationsPage() {
+  const hasPermission = useAuthStore((s) => s.hasPermission);
   const [locations, setLocations] = useState<FunctionalLocation[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   // SOW 3.1.1 counts, keyed by location id, taken from the tree endpoint rather
@@ -44,6 +51,33 @@ export default function LocationsPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
+
+  // Backend floors: POST/PUT need Technician, DELETE needs Maintenance
+  // Supervisor. Controls the API would reject are hidden, not disabled.
+  const canWrite = hasPermission(['Technician', 'Maintenance Supervisor', 'Maintenance Planner', 'Administrator']);
+  const canDelete = hasPermission(['Maintenance Supervisor', 'Maintenance Planner', 'Administrator']);
+
+  const [formCode, setFormCode] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formType, setFormType] = useState<FunctionalLocation['locationType']>('Plant');
+  const [formParent, setFormParent] = useState('');
+  const [formStatus, setFormStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [formSafetyCritical, setFormSafetyCritical] = useState(false);
+  const [formInstalled, setFormInstalled] = useState('');
+  const [formGps, setFormGps] = useState('');
+
+  const notify = useCallback((text: string, error = false) => setToast({ text, error }), []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -81,6 +115,88 @@ export default function LocationsPage() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  const inputCls =
+    'px-2.5 py-1.5 rounded text-xs text-primary outline-none border border-subtle focus:border-highlight transition-colors w-full';
+  const labelCls = 'block text-tertiary mb-1';
+
+  const resetForm = () => {
+    setEditingId(null);
+    setFormCode('');
+    setFormDescription('');
+    setFormType('Plant');
+    setFormParent('');
+    setFormStatus('Active');
+    setFormSafetyCritical(false);
+    setFormInstalled('');
+    setFormGps('');
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
+  const openEdit = (loc: FunctionalLocation) => {
+    setEditingId(loc.functionalLocationId);
+    setFormCode(loc.locationCode);
+    setFormDescription(loc.description);
+    setFormType(loc.locationType);
+    setFormParent(loc.parentLocationId ?? '');
+    setFormStatus(loc.operationalStatus);
+    setFormSafetyCritical(loc.safetyCritical);
+    setFormInstalled(loc.installationDate ? loc.installationDate.slice(0, 10) : '');
+    setFormGps(loc.gpsCoordinates ?? '');
+    setShowForm(true);
+  };
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formCode.trim() || !formDescription.trim()) {
+      notify('Location code and description are required', true);
+      return;
+    }
+    const body: FunctionalLocationInput = {
+      locationCode: formCode.trim(),
+      description: formDescription.trim(),
+      locationType: formType,
+      parentLocationId: formParent || null,
+      operationalStatus: formStatus,
+      safetyCritical: formSafetyCritical,
+      installationDate: formInstalled || null,
+      gpsCoordinates: formGps.trim() || null,
+    };
+    setBusy('save');
+    try {
+      if (editingId) {
+        await functionalLocationService.update(editingId, body);
+        notify(`Location ${body.locationCode} updated`);
+      } else {
+        await functionalLocationService.create(body);
+        notify(`Location ${body.locationCode} created`);
+      }
+      setShowForm(false);
+      resetForm();
+      await reload();
+    } catch (err) {
+      notify(err instanceof ApiError ? err.message : 'Save failed', true);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const remove = async (loc: FunctionalLocation) => {
+    setBusy(`del:${loc.functionalLocationId}`);
+    try {
+      await functionalLocationService.delete(loc.functionalLocationId);
+      notify(`Location ${loc.locationCode} deleted`);
+      await reload();
+    } catch (err) {
+      notify(err instanceof ApiError ? err.message : 'Delete failed', true);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const rootLocations = locations.filter((l) => l.parentLocationId === null);
 
@@ -126,6 +242,30 @@ export default function LocationsPage() {
     );
   }, [locations, searchQuery]);
 
+  // Reparenting a node beneath itself or one of its descendants would create a
+  // cycle the API rejects, so those are removed from the picker on edit.
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const l of locations) {
+      if (!l.parentLocationId) continue;
+      map.set(l.parentLocationId, [...(map.get(l.parentLocationId) ?? []), l.functionalLocationId]);
+    }
+    return map;
+  }, [locations]);
+
+  const parentCandidates = useMemo(() => {
+    if (!editingId) return locations;
+    const excluded = new Set<string>([editingId]);
+    const stack = [...(childrenByParent.get(editingId) ?? [])];
+    while (stack.length) {
+      const id = stack.pop()!;
+      if (excluded.has(id)) continue;
+      excluded.add(id);
+      stack.push(...(childrenByParent.get(id) ?? []));
+    }
+    return locations.filter((l) => !excluded.has(l.functionalLocationId));
+  }, [locations, editingId, childrenByParent]);
+
   const renderTree = (nodes: FunctionalLocation[], depth = 0) => {
     return nodes.map((node) => {
       const children = getChildren(node.functionalLocationId);
@@ -168,6 +308,32 @@ export default function LocationsPage() {
                 </span>
               )}
             </div>
+            {(canWrite || canDelete) && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {canWrite && (
+                  <button
+                    onClick={() => openEdit(node)}
+                    disabled={busy !== null}
+                    className="p-1 text-tertiary hover:text-primary transition-colors disabled:opacity-40"
+                    title="Edit location"
+                    aria-label={`Edit ${node.locationCode}`}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={() => remove(node)}
+                    disabled={busy !== null}
+                    className="p-1 text-tertiary hover:text-red-status transition-colors disabled:opacity-40"
+                    title="Delete location"
+                    aria-label={`Delete ${node.locationCode}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           {isExpanded && children.length > 0 && renderTree(children, depth + 1)}
         </div>
@@ -178,6 +344,21 @@ export default function LocationsPage() {
   return (
     <>
       <Header title="FUNCTIONAL LOCATIONS" showActions={false} />
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded border px-4 py-2 ${
+            toast.error ? 'border-red-500/50 bg-red-500/10' : 'border-emerald-500/50 bg-emerald-500/10'
+          }`}
+        >
+          {toast.error ? (
+            <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+          ) : (
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+          )}
+          <span className="text-xs text-primary">{toast.text}</span>
+          <button onClick={() => setToast(null)} aria-label="Dismiss message" className="text-tertiary hover:text-primary"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1 max-w-xs">
@@ -202,7 +383,115 @@ export default function LocationsPage() {
               <RefreshCw className="w-3 h-3" /> Retry
             </button>
           )}
+          {canWrite && (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110"
+              style={{ backgroundColor: '#D97706', color: '#111113' }}
+            >
+              <Plus className="w-3.5 h-3.5" /> New Location
+            </button>
+          )}
         </div>
+
+        {showForm && (
+          <form onSubmit={save} className="industrial-card rounded p-4 mb-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-primary text-sm font-semibold">
+                {editingId ? 'Edit Functional Location' : 'New Functional Location'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); resetForm(); }}
+                className="text-tertiary hover:text-primary"
+                aria-label="Cancel"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <label className={labelCls} htmlFor="fl-code">Location Code</label>
+                <input
+                  id="fl-code"
+                  value={formCode}
+                  onChange={(e) => setFormCode(e.target.value)}
+                  placeholder={editingId ? undefined : 'e.g. PL-A-001'}
+                  className={inputCls}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className={labelCls} htmlFor="fl-desc">Description</label>
+                <input id="fl-desc" value={formDescription} onChange={(e) => setFormDescription(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="fl-type">Location Type</label>
+                <select id="fl-type" value={formType} onChange={(e) => setFormType(e.target.value as FunctionalLocation['locationType'])} className={inputCls}>
+                  <option value="Plant">Plant</option>
+                  <option value="Area">Area</option>
+                  <option value="Unit">Unit</option>
+                  <option value="Sub-unit">Sub-unit</option>
+                  <option value="System">System</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <label className={labelCls} htmlFor="fl-parent">Parent Location</label>
+                <select id="fl-parent" value={formParent} onChange={(e) => setFormParent(e.target.value)} className={inputCls}>
+                  <option value="">None (root)</option>
+                  {parentCandidates.map((l) => (
+                    <option key={l.functionalLocationId} value={l.functionalLocationId}>
+                      {l.locationCode} — {l.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="fl-status">Operational Status</label>
+                <select id="fl-status" value={formStatus} onChange={(e) => setFormStatus(e.target.value as 'Active' | 'Inactive')} className={inputCls}>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="fl-installed">Installation Date</label>
+                <input id="fl-installed" type="date" value={formInstalled} onChange={(e) => setFormInstalled(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 mt-5 text-tertiary text-xs" htmlFor="fl-safety">
+                  <input id="fl-safety" type="checkbox" checked={formSafetyCritical} onChange={(e) => setFormSafetyCritical(e.target.checked)} />
+                  Safety Critical
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className={labelCls} htmlFor="fl-gps">GPS Coordinates (optional)</label>
+              <input id="fl-gps" value={formGps} onChange={(e) => setFormGps(e.target.value)} placeholder="e.g. 24.7136, 46.6753" className={inputCls} />
+            </div>
+
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); resetForm(); }}
+                className="px-3 py-1.5 rounded text-xs text-secondary border border-subtle hover:border-highlight"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={busy === 'save'}
+                className="px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                style={{ backgroundColor: '#D97706', color: '#111113' }}
+              >
+                {busy === 'save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : editingId ? 'Save Changes' : 'Create Location'}
+              </button>
+            </div>
+          </form>
+        )}
 
         {loading ? (
           <div className="flex-1 flex items-center justify-center py-24">
