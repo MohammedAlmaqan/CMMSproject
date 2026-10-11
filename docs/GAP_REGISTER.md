@@ -34,7 +34,7 @@ What it is, where it lives, size.
 |---|---|---|---|
 | C1 | Session security end to end: server-side idle expiry, refresh rotation, logout that revokes the presented token, technician identity taken from the session rather than the request. `backend/src/routes/auth.ts` exposes only `POST /login` and `GET /me`; there is no refresh or logout route at all, so the `RefreshToken` model is unused for rotation and the JWT stays valid for its full 8 hours | OWNER_ACTION_SHEET Table 2 "Session security"; matrix lines 259 (§4.2), 299 (§5.5); `README.md:263` | L |
 | C2 | Frontend access control: navigation and routes are not filtered by role. `app/src/components/layout/Sidebar.tsx` renders all 11 items for every role (matrix line 301), and `ProtectedRoute` checks authentication only (`app/src/App.tsx:24-27`); role is used only to gate data fetches (`appStore.ts:153-166`) | OWNER_ACTION_SHEET Table 2 "Frontend access control"; matrix line 301 (§5.5) | M |
-| C3 | Planning and intake screens. `PreventiveMaintenancePage.tsx` exists with a plan list, filters and per-plan generate, and the APIs exist (`maintenancePlans.ts:292` `POST`, `:420` `PUT`, `:226` `POST /run-scheduler`), but there is no plan create/edit UI (`maintenancePlanService.ts` calls only list + generate), no on-demand scheduler control, and no notification-intake form anywhere in `app/src` (matrix line 64 names it) | Table 2 "Planning and intake screens"; matrix lines 38 (§1.3), 52 (§2.1), 61 (§2.2) | L |
+| C3 | Planning and intake screens — closed. `PreventiveMaintenancePage.tsx` now drives plan create/edit/delete (multi-target rows per D-10 and meter-threshold rows for Meter/Combined per SOW 3.4.2), plus a role-gated on-demand scheduler control; `NotificationsPage.tsx` gained the notification-intake form over the existing `POST /notifications`. Delivered `40cb3c3`, `8ed6f70`, `cf2f9c5` | Table 2 "Planning and intake screens"; matrix lines 38 (§1.3), 52 (§2.1), 61 (§2.2) | Done |
 | C4 | Master-data editing and bulk access. The write APIs exist — BOM `POST`/`PUT`/`DELETE` (`equipment.ts:963`, `:1049`, `:1114`), cost splits (`workOrderCostSplits.ts`), meters (`equipmentMeters.ts`), plan meters written inside the plan `PUT` (`maintenancePlans.ts:509-513`) — but no screen drives them; there is no JSON bulk endpoint for functional locations (`functionalLocations.ts:275`/`:394` are single-row) and no OData-style query grammar (no `$filter`/`$top` anywhere; conventional `skip`/`take` only) | Table 2 "Master-data editing and bulk access"; matrix lines 295, 296 (§5.4), 59 (§2.2) | L |
 | C6 | Audit completeness: per-column old/new values on the handlers that lack them, enforced at the middleware boundary, plus the configurable 7-year purge job. Measured 2026-10-08: 5 route files with `PUT` routes import neither `logFieldChanges` nor `logAuditFieldChange` (alerts, externalServiceCosts, safetyChecklists, workOrderCostSplits, workOrderMaterials — 7 handlers), `auditMiddleware` is exported at `backend/src/middleware/audit.ts:119` and never used, and no purge/retention job exists (matrix line 264: the 7-year default is a seed comment only) | Table 2 "Audit completeness"; matrix lines 55 (§2.1), 264 (§4.3), 289, 290 (§5.3) | L |
 | C9 | "View assigned" not enforced: `GET /api/work-orders` builds `where` with no assignment scoping (`workOrders.ts:97-131`), so every holder sees every work order | Matrix line 63 (§2.2) | M |
@@ -176,6 +176,7 @@ the SHA and green CI run recorded when the item landed.
 | B1 | 2026-10-10 | `1971686` | 257 |
 | D2 | 2026-10-10 | `1971686` | 257 |
 | C19 | 2026-10-11 | `7174597` | 263 |
+| C3 | 2026-10-12 | `cf2f9c5` | 267 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -327,4 +328,19 @@ is `docs/migration-templates/TRIAL_RUN_REPORT_FULL.md` and the ledger
 migration runbook the register said did not exist anywhere under `docs/` — is discharged by
 `docs/migration-runbook.md`, delivered as part of B1. Both runs are confirmed against the
 closure's push-run (257, green).
+
+**C3** (`40cb3c3`, `8ed6f70`, `cf2f9c5`; runs 265–267) closed the three limbs the entry
+named. **C3.1** (`40cb3c3`, run 265) added the plan CRUD UI — an inline create/edit/delete
+form with `planCode` create-only, multi-target equipment/location rows (D-10) and
+meter-threshold rows for the Meter and Combined strategies (SOW 3.4.2) — plus a new
+`equipmentMeterService` and `MaintenancePlanInput` types; the plan UI edits from the store
+list object rather than `GET /maintenance-plans/:id`, which omits `targets`. **C3.2**
+(`8ed6f70`, run 266) added the Administrator-only on-demand "Run Scheduler" control over
+`POST /maintenance-plans/run-scheduler`, whose real response is `SchedulerRunResult`
+(`{ranAt, plansEvaluated, wosCreated, wosSkipped, errors}`), not the `{generated}` the
+OpenAPI snapshot still claims. **C3.3** (`cf2f9c5`, run 267) added the notification-intake
+form on `NotificationsPage.tsx` over `notificationService.create`, added `NotificationInput`,
+and derives the functional location from a chosen equipment (the route rejects a
+contradicting location). The row carries the tip; the item left no `SOW_COMPLIANCE.md`
+Status to move — matrix lines 38, 52 and 61 are the owner's call.
 
