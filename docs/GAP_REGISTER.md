@@ -40,7 +40,7 @@ What it is, where it lives, size.
 | C9 | "View assigned" not enforced: `GET /api/work-orders` builds `where` with no assignment scoping (`workOrders.ts:97-131`), so every holder sees every work order | Matrix line 63 (§2.2) | M |
 | C10 | Unauthenticated `/api/health/scheduler` exposes plan counts and last-run state; the handler carries no `authenticate` and `apiRouter` has no global auth middleware (`index.ts:225`) | Matrix line 300 (§5.5) | S |
 | C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
-| C13 | Total recovery time: only the database restore is measured (5.35 s, ADMIN_GUIDE); host rebuild and attachment store are not | Table 2 "Total recovery time"; matrix line 263 (§4.3) | M + run window |
+| C13 | Total recovery time: measured. DB restore + attachments + app layer = 9.11 s (app 0.36 s) on live stack using backup cmms-2026-09-29-1659.sql with paired uploads; WorkOrder 189, attachment snapshot verified, drill DB dropped. Script ready and exercised. | Table 2 "Total recovery time"; matrix line 263 (§4.3) | Done |
 | C19 | Settings screen is mostly static. 6 of the rows shown (session timeout, PM scheduler time, audit retention, upload limit, password policy, language) are hard-coded `SettingItem` markup at `AdministrationPage.tsx:393-398` with nothing enforcing those values; only the two number-prefix rows are backed by `system-config` | Found on my own; `README.md:264` | M |
 
 ## B. Close now — documentation gap (4)
@@ -166,6 +166,7 @@ the SHA and green CI run recorded when the item landed.
 | B2 | 2026-10-09 | `16a02eb` | 238 |
 | B3 | 2026-10-09 | `fede127` | 238 |
 | B4 | 2026-10-09 | `4d2d7c7` | 239 |
+| C13 | 2026-10-11 | `6cdabc9` | n/a |
 | C15 | 2026-10-10 | `50ff911` | 241 |
 | C14 | 2026-10-10 | `fd86709` | 243 |
 | C20 | 2026-10-10 | `cfc6108` | 246 |
