@@ -390,12 +390,17 @@ export default function AdministrationPage() {
                   {settings.length === 0 && !settingsError && (
                     <p className="text-xs text-tertiary">Loading settings...</p>
                   )}
-                  <SettingItem label="Session Timeout" value="30 minutes" description="User session timeout for inactivity" />
-                  <SettingItem label="PM Scheduler" value="Daily at 06:00" description="When the PM generation scheduler runs" />
-                  <SettingItem label="Audit Log Retention" value="7 years" description="How long audit logs are retained" />
-                  <SettingItem label="File Upload Limit" value="10 MB" description="Maximum file size for attachments" />
-                  <SettingItem label="Password Policy" value="bcrypt + lockout" description="Account lockout after 5 failed attempts" />
-                  <SettingItem label="Multi-language" value="English" description="Current system language" />
+
+                  <div className="pt-1">
+                    <div className="text-tertiary mb-1" style={{ fontSize: '10px' }}>
+                      Read-only (fixed configuration)
+                    </div>
+                    <SettingItem label="Session Timeout" value="30 minutes" description="Client-side inactivity timeout; the server session continues until the token expires" />
+                    <SettingItem label="PM Scheduler" value="Server cron (default 02:00)" description="PM generation runs on the server's cron (PM_SCHEDULER_CRON); not configurable from this screen" />
+                    <SettingItem label="File Upload Limit" value="10 MB" description="Maximum file size for attachments" />
+                    <SettingItem label="Password Policy" value="bcrypt + lockout" description="Account lockout after 5 failed attempts in a 15-minute window" />
+                    <SettingItem label="Multi-language" value="English" description="Single-language build; multilingual support is not delivered" />
+                  </div>
                 </div>
               </div>
 
