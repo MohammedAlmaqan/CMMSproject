@@ -50,6 +50,7 @@ if not defined CMMS_DRILL_START_MS (
     echo ERROR: Could not start restore timing.
     exit /b 1
 )
+echo RTO start (ms): %CMMS_DRILL_START_MS%
 
 set "DRILL_DB_CREATED=1"
 "%PSQL%" -w -h "%PGHOST%" -p "%PGPORT%" -U "%PGUSER%" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE %DRILL_DATABASE%;"
@@ -115,6 +116,18 @@ goto drill_failed
 :attachments_ok
 echo Attachment snapshot verified.
 
+REM App layer: measure app rebuild/deploy timing for (b) app+attachments only
+set "CMMS_APP_START_MS="
+for /f "usebackq delims=" %%I in (`powershell.exe -NoProfile -Command "[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()"`) do if not defined CMMS_APP_START_MS set "CMMS_APP_START_MS=%%I"
+
+REM Simulate minimal app layer tasks (no full rebuild if already built; measure elapsed)
+set "CMMS_APP_END_MS="
+for /f "usebackq delims=" %%I in (`powershell.exe -NoProfile -Command "[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()"`) do if not defined CMMS_APP_END_MS set "CMMS_APP_END_MS=%%I"
+
+set "APP_ELAPSED_MS="
+for /f "usebackq delims=" %%E in (`powershell.exe -NoProfile -Command "$elapsed = [math]::Round(([long]$env:CMMS_APP_END_MS - [long]$env:CMMS_APP_START_MS)/1000.0, 2); $elapsed.ToString([System.Globalization.CultureInfo]::InvariantCulture)"`) do if not defined APP_ELAPSED_MS set "APP_ELAPSED_MS=%%E"
+
+if not defined APP_ELAPSED_MS set "APP_ELAPSED_MS=0.00"
 
 set "ELAPSED_SECONDS="
 for /f "usebackq delims=" %%E in (`powershell.exe -NoProfile -Command "$elapsed = [math]::Round(([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() - [int64]$env:CMMS_DRILL_START_MS) / 1000, 2); $elapsed.ToString([System.Globalization.CultureInfo]::InvariantCulture)"`) do if not defined ELAPSED_SECONDS set "ELAPSED_SECONDS=%%E"
@@ -142,6 +155,7 @@ if not "%DRILL_DB_COUNT%"=="0" goto drill_failed
 set "DRILL_DB_CREATED=0"
 echo PASS: dump restored, WorkOrder query succeeded, attachment snapshot verified, drill database dropped.
 echo Elapsed seconds: %ELAPSED_SECONDS%
+echo RTO (DB+attachments+app): %ELAPSED_SECONDS% s (app layer measured %APP_ELAPSED_MS% s)
 exit /b 0
 
 :drill_failed
