@@ -252,6 +252,18 @@ export interface Notification extends Auditable {
   workOrderIds?: string[];
 }
 
+/** What POST /notifications accepts (SOW 3.2.2). */
+export interface NotificationInput {
+  type: NotificationType;
+  priority: Priority;
+  description: string;
+  functionalLocationId?: string | null;
+  equipmentId?: string | null;
+  reportedByUserId: string;
+  damagesObservations?: string | null;
+  breakdownFlag?: boolean;
+}
+
 // ─── Work Order (§3.3) ───
 export type WorkOrderType = 'CM' | 'PM' | 'PdM' | 'EM' | 'CAL';
 export type WorkOrderStatus =

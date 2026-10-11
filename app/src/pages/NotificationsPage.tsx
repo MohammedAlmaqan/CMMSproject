@@ -13,11 +13,16 @@ import {
   ChevronRight,
   Loader2,
   RefreshCw,
+  Plus,
+  X,
+  CheckCircle,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { notificationService } from '@/services/notificationService';
+import { useAppStore } from '@/store/appStore';
+import { useAuthStore } from '@/store/authStore';
 import { ApiError } from '@/lib/api';
-import type { Notification, NotificationType, Priority } from '@/types';
+import type { Notification, NotificationInput, NotificationType, Priority } from '@/types';
 
 const typeConfig: Record<NotificationType, { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string; label: string }> = {
   M1: { icon: AlertTriangle, color: '#DC2626', label: 'Malfunction' },
@@ -35,6 +40,10 @@ const PAGE_SIZE = 8;
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
+  const equipment = useAppStore((s) => s.equipment);
+  const locations = useAppStore((s) => s.locations);
+  const user = useAuthStore((s) => s.user);
+  const hasPermission = useAuthStore((s) => s.hasPermission);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +54,29 @@ export default function NotificationsPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [page, setPage] = useState(0);
+
+  const [showForm, setShowForm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
+  const [formType, setFormType] = useState<NotificationType>('M1');
+  const [formPriority, setFormPriority] = useState<Priority>('Medium');
+  const [formLocationId, setFormLocationId] = useState('');
+  const [formEquipmentId, setFormEquipmentId] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formDamages, setFormDamages] = useState('');
+  const [formBreakdown, setFormBreakdown] = useState(false);
+
+  // The API allows Requester and above to raise a notification; the screen
+  // hides the control from roles the API would reject.
+  const canWrite = hasPermission(['Requester', 'Technician', 'Maintenance Supervisor', 'Administrator']);
+
+  const notify = useCallback((text: string, error = false) => setToast({ text, error }), []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -83,9 +115,95 @@ export default function NotificationsPage() {
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
 
+  const resetForm = () => {
+    setFormType('M1');
+    setFormPriority('Medium');
+    setFormLocationId('');
+    setFormEquipmentId('');
+    setFormDescription('');
+    setFormDamages('');
+    setFormBreakdown(false);
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
+  // A fault against a machine already determines its location, and the API
+  // rejects a location that contradicts the chosen equipment — so the location
+  // follows the equipment rather than being a second, editable claim.
+  const onEquipmentChange = (equipmentId: string) => {
+    setFormEquipmentId(equipmentId);
+    if (equipmentId) {
+      const eq = equipment.find((e) => e.equipmentId === equipmentId);
+      setFormLocationId(eq?.functionalLocationId ?? '');
+    }
+  };
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (formDescription.trim().length < 3) {
+      notify('Description must be at least 3 characters', true);
+      return;
+    }
+    if (!formLocationId && !formEquipmentId) {
+      notify('Select a functional location or an equipment', true);
+      return;
+    }
+    if (!user) {
+      notify('No signed-in user to record as reporter', true);
+      return;
+    }
+
+    const body: NotificationInput = {
+      type: formType,
+      priority: formPriority,
+      description: formDescription.trim(),
+      functionalLocationId: formLocationId || null,
+      equipmentId: formEquipmentId || null,
+      reportedByUserId: user.userId,
+      damagesObservations: formDamages.trim() || null,
+      breakdownFlag: formBreakdown,
+    };
+
+    setBusy(true);
+    try {
+      const created = await notificationService.create(body);
+      notify(`Notification ${created.notificationNumber} raised`);
+      setShowForm(false);
+      resetForm();
+      await reload();
+    } catch (err) {
+      notify(err instanceof ApiError ? err.message : 'Could not raise the notification', true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const inputCls =
+    'px-2.5 py-1.5 rounded text-xs text-primary outline-none border border-subtle focus:border-highlight transition-colors w-full';
+  const labelCls = 'block text-tertiary mb-1';
+
   return (
     <>
       <Header title="NOTIFICATIONS" showActions={false} />
+
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded border px-4 py-2 ${
+            toast.error ? 'border-red-500/50 bg-red-500/10' : 'border-emerald-500/50 bg-emerald-500/10'
+          }`}
+        >
+          {toast.error ? (
+            <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+          ) : (
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+          )}
+          <span className="text-xs text-primary">{toast.text}</span>
+          <button onClick={() => setToast(null)} aria-label="Dismiss message" className="text-tertiary hover:text-primary"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-6">
         {/* Filters */}
@@ -149,7 +267,116 @@ export default function NotificationsPage() {
               <RefreshCw className="w-3 h-3" /> Retry
             </button>
           )}
+          {canWrite && (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110"
+              style={{ backgroundColor: '#D97706', color: '#111113' }}
+            >
+              <Plus className="w-3.5 h-3.5" /> New Notification
+            </button>
+          )}
         </div>
+
+        {showForm && (
+          <form onSubmit={save} className="industrial-card rounded p-4 mb-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-primary text-sm font-semibold">New Notification</h2>
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); resetForm(); }}
+                className="text-tertiary hover:text-primary"
+                aria-label="Cancel"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <label className={labelCls} htmlFor="ntf-type">Type</label>
+                <select id="ntf-type" value={formType} onChange={(e) => setFormType(e.target.value as NotificationType)} className={inputCls}>
+                  <option value="M1">M1 — Malfunction</option>
+                  <option value="M2">M2 — Request</option>
+                  <option value="M3">M3 — Completion</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="ntf-priority">Priority</label>
+                <select id="ntf-priority" value={formPriority} onChange={(e) => setFormPriority(e.target.value as Priority)} className={inputCls}>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="ntf-eq">Equipment (optional)</label>
+                <select id="ntf-eq" value={formEquipmentId} onChange={(e) => onEquipmentChange(e.target.value)} className={inputCls}>
+                  <option value="">No specific asset</option>
+                  {equipment.map((eq) => (
+                    <option key={eq.equipmentId} value={eq.equipmentId}>{eq.equipmentCode} — {eq.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="ntf-loc">Functional Location</label>
+                <select
+                  id="ntf-loc"
+                  value={formLocationId}
+                  onChange={(e) => setFormLocationId(e.target.value)}
+                  disabled={!!formEquipmentId}
+                  className={`${inputCls} disabled:opacity-60`}
+                >
+                  <option value="">Select...</option>
+                  {locations.map((l) => (
+                    <option key={l.functionalLocationId} value={l.functionalLocationId}>{l.locationCode} — {l.description}</option>
+                  ))}
+                </select>
+                {formEquipmentId && (
+                  <p className="text-tertiary mt-1" style={{ fontSize: '10px' }}>Derived from the selected equipment.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3">
+              <div className="col-span-2">
+                <label className={labelCls} htmlFor="ntf-desc">Description</label>
+                <input id="ntf-desc" value={formDescription} onChange={(e) => setFormDescription(e.target.value)} className={inputCls} />
+              </div>
+              <div className="col-span-2">
+                <label className={labelCls} htmlFor="ntf-damages">Damages / Observations (optional)</label>
+                <input id="ntf-damages" value={formDamages} onChange={(e) => setFormDamages(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2 text-xs text-secondary">
+                <input type="checkbox" checked={formBreakdown} onChange={(e) => setFormBreakdown(e.target.checked)} />
+                Breakdown
+              </label>
+              <span className="text-tertiary text-xs">Reported by: {user?.fullName ?? '—'}</span>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); resetForm(); }}
+                className="px-3 py-1.5 rounded text-xs text-secondary border border-subtle hover:text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={busy}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                style={{ backgroundColor: '#D97706', color: '#111113' }}
+              >
+                {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Raise notification
+              </button>
+            </div>
+          </form>
+        )}
 
         {loading ? (
           <div className="flex-1 flex items-center justify-center py-24">
