@@ -313,6 +313,21 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # owner confirmation, and the row-298 Note in SOW_COMPLIANCE.md.
     ("5.5 oauth2", "Not Met", "Waived", "5a65ab8"),
 
+    # SOW 4.3 "RTO < 4 hours" (row 263). The blocker this row named was that
+    # only the database leg had been measured (5.35 s full restore), leaving the
+    # host rebuild and the attachment store unmeasured. C13 closed both. The
+    # restore drill - scripts/restore-drill.bat - now times the whole recovery
+    # sequence (database restore, paired attachment store, and the application
+    # layer coming back up), and the run on 2026-10-11 measured 9.11 s end to
+    # end against the four-hour budget, app layer 0.36 s, with 189 work orders
+    # restored and the paired attachment snapshot verified. The owner scoped the
+    # "host rebuild" limb to application-plus-attachments (no OS/IIS reinstall)
+    # and authorised the promotion on 2026-10-11; the date and the C13
+    # closure-log row in docs/GAP_REGISTER.md are the durable anchors. The
+    # status change and this wiring land together, so "this commit" is used here
+    # and the real SHA is backfilled once its push-run is green.
+    ("4.3 RTO", "Partial", "Met", "this commit"),
+
     # SOW 1.3 "Data migration from legacy Excel/paper records" (row 40),
     # SOW 5.7 "A data migration runbook and a dry-run report before final
     # cutover" (row 307) and SOW 6.4 / d "Data migration accuracy > 99.9% for
