@@ -71,6 +71,7 @@ export default function PreventiveMaintenancePage() {
   const loadFromApi = useAppStore((s) => s.loadFromApi);
   const [errorDismissed, setErrorDismissed] = useState(false);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [runningScheduler, setRunningScheduler] = useState(false);
   const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
 
   const [meters, setMeters] = useState<EquipmentMeter[]>([]);
@@ -100,6 +101,7 @@ export default function PreventiveMaintenancePage() {
   // offering a button that always fails.
   const canWrite = hasPermission(['Requester', 'Technician', 'Maintenance Supervisor', 'Administrator']);
   const canDelete = hasPermission(['Maintenance Supervisor', 'Administrator']);
+  const canRunScheduler = hasPermission(['Administrator']);
 
   const notify = useCallback((text: string, error = false) => setToast({ text, error }), []);
 
@@ -220,6 +222,23 @@ export default function PreventiveMaintenancePage() {
       notify(err instanceof ApiError ? err.message : 'Failed to generate work order', true);
     } finally {
       setGeneratingId(null);
+    }
+  };
+
+  const runScheduler = async () => {
+    setRunningScheduler(true);
+    try {
+      const result = await maintenancePlanService.runScheduler();
+      const n = result.wosCreated ?? 0;
+      notify(
+        n === 0 ? 'Scheduler ran — no work orders were due' : `Scheduler generated ${n} work order${n === 1 ? '' : 's'}`,
+        (result.errors?.length ?? 0) > 0
+      );
+      await loadFromApi();
+    } catch (err) {
+      notify(err instanceof ApiError ? err.message : 'Scheduler run failed', true);
+    } finally {
+      setRunningScheduler(false);
     }
   };
 
@@ -434,6 +453,16 @@ export default function PreventiveMaintenancePage() {
             <option value="Inactive">Inactive</option>
           </select>
           <span className="text-tertiary text-xs ml-auto">{filtered.length} plans</span>
+          {canRunScheduler && (
+            <button
+              onClick={runScheduler}
+              disabled={runningScheduler}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-primary border border-subtle hover:border-highlight disabled:opacity-50"
+            >
+              {runningScheduler ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Run Scheduler
+            </button>
+          )}
           {canWrite && (
             <button
               onClick={openCreate}

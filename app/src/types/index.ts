@@ -521,6 +521,15 @@ export interface MaintenancePlanInput {
   planMeters?: MaintenancePlanMeterInput[];
 }
 
+/** Result of an on-demand PM scheduler run (POST /maintenance-plans/run-scheduler). */
+export interface SchedulerRunResult {
+  ranAt: string;
+  plansEvaluated: number;
+  wosCreated: number;
+  wosSkipped: number;
+  errors: string[];
+}
+
 // ─── Audit Log (§3.6) ───
 export interface AuditLogEntry {
   auditId: string;

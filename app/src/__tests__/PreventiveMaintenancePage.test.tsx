@@ -25,6 +25,7 @@ vi.mock('@/services/maintenancePlanService', () => ({
     update: vi.fn(),
     delete: vi.fn(),
     generateWorkOrder: vi.fn(),
+    runScheduler: vi.fn(),
   },
 }));
 
@@ -235,6 +236,36 @@ describe('PreventiveMaintenancePage plan management (SOW 2.2 / D-10 / 3.4.2)', (
     expect(id).toBe('plan-1');
     expect(body.description).toBe('Updated description');
     expect(body).not.toHaveProperty('planCode');
+  }, 20000);
+
+  it('runs the scheduler on demand and reports the generated count', async () => {
+    const user = userEvent.setup();
+    vi.mocked(maintenancePlanService.runScheduler).mockResolvedValue({
+      ranAt: '2026-10-12T00:00:00.000Z',
+      plansEvaluated: 3,
+      wosCreated: 2,
+      wosSkipped: 1,
+      errors: [],
+    });
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: /run scheduler/i }));
+
+    await waitFor(() => expect(maintenancePlanService.runScheduler).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/scheduler generated 2 work orders/i)).toBeInTheDocument();
+  }, 20000);
+
+  it('does not offer the scheduler control to a non-Administrator', () => {
+    useAuthStore.setState({
+      user: { ...adminUser, role: 'Maintenance Planner' },
+      isAuthenticated: true,
+      loading: false,
+      error: null,
+    });
+    renderPage();
+
+    expect(screen.queryByRole('button', { name: /run scheduler/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /new plan/i })).toBeInTheDocument();
   }, 20000);
 
   it('hides write controls from a View-Only user', () => {
