@@ -1,5 +1,5 @@
 import { api, getAuthToken, ApiError, notifyApiActivity } from '@/lib/api';
-import type { Equipment, EquipmentHistoryEntry, EquipmentBOM } from '@/types';
+import type { Equipment, EquipmentHistoryEntry, EquipmentBOM, EquipmentMeter } from '@/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -29,6 +29,13 @@ export const equipmentService = {
     api.put<EquipmentBOM>(`/equipment/${equipmentId}/bom/${bomId}`, data),
   deleteBom: (equipmentId: string, bomId: string) =>
     api.delete(`/equipment/${equipmentId}/bom/${bomId}`),
+
+  // ── Meters (SOW 3.1.2) ──
+  createMeter: (data: { equipmentId: string; meterName: string; unitOfMeasure: string; lastReading?: number; lastReadingDate?: string | null }) =>
+    api.post<EquipmentMeter>('/equipment-meters', data),
+  updateMeter: (meterId: string, data: Partial<Pick<EquipmentMeter, 'meterName' | 'unitOfMeasure' | 'lastReading' | 'lastReadingDate'>>) =>
+    api.put<EquipmentMeter>(`/equipment-meters/${meterId}`, data),
+  deleteMeter: (meterId: string) => api.delete(`/equipment-meters/${meterId}`),
 
   exportCsv: async () => {
     const res = await fetch(`${API_BASE}/equipment/export.csv`, {
