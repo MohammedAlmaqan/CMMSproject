@@ -324,9 +324,9 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # "host rebuild" limb to application-plus-attachments (no OS/IIS reinstall)
     # and authorised the promotion on 2026-10-11; the date and the C13
     # closure-log row in docs/GAP_REGISTER.md are the durable anchors. The
-    # status change and this wiring land together, so "this commit" is used here
-    # and the real SHA is backfilled once its push-run is green.
-    ("4.3 RTO", "Partial", "Met", "this commit"),
+    # status change and this wiring landed together, and the real SHA (502ae97)
+    # is now recorded here (green CI run 261).
+    ("4.3 RTO", "Partial", "Met", "502ae97"),
 
     # SOW 1.3 "Data migration from legacy Excel/paper records" (row 40),
     # SOW 5.7 "A data migration runbook and a dry-run report before final
