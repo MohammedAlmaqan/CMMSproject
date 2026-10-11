@@ -26,7 +26,7 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (10)
+## A. Close now — code and data gap (12)
 
 What it is, where it lives, size.
 
@@ -35,7 +35,9 @@ What it is, where it lives, size.
 | C1 | Session security end to end: server-side idle expiry, refresh rotation, logout that revokes the presented token, technician identity taken from the session rather than the request. `backend/src/routes/auth.ts` exposes only `POST /login` and `GET /me`; there is no refresh or logout route at all, so the `RefreshToken` model is unused for rotation and the JWT stays valid for its full 8 hours | OWNER_ACTION_SHEET Table 2 "Session security"; matrix lines 259 (§4.2), 299 (§5.5); `README.md:263` | L |
 | C2 | Frontend access control: navigation and routes are not filtered by role. `app/src/components/layout/Sidebar.tsx` renders all 11 items for every role (matrix line 301), and `ProtectedRoute` checks authentication only (`app/src/App.tsx:24-27`); role is used only to gate data fetches (`appStore.ts:153-166`) | OWNER_ACTION_SHEET Table 2 "Frontend access control"; matrix line 301 (§5.5) | M |
 | C3 | Planning and intake screens — closed. `PreventiveMaintenancePage.tsx` now drives plan create/edit/delete (multi-target rows per D-10 and meter-threshold rows for Meter/Combined per SOW 3.4.2), plus a role-gated on-demand scheduler control; `NotificationsPage.tsx` gained the notification-intake form over the existing `POST /notifications`. Delivered `40cb3c3`, `8ed6f70`, `cf2f9c5` | Table 2 "Planning and intake screens"; matrix lines 38 (§1.3), 52 (§2.1), 61 (§2.2) | Done |
-| C4 | Master-data editing and bulk access. The write APIs exist — BOM `POST`/`PUT`/`DELETE` (`equipment.ts:963`, `:1049`, `:1114`), cost splits (`workOrderCostSplits.ts`), meters (`equipmentMeters.ts`), plan meters written inside the plan `PUT` (`maintenancePlans.ts:509-513`) — but no screen drives them; there is no JSON bulk endpoint for functional locations (`functionalLocations.ts:275`/`:394` are single-row) and no OData-style query grammar (no `$filter`/`$top` anywhere; conventional `skip`/`take` only) | Table 2 "Master-data editing and bulk access"; matrix lines 295, 296 (§5.4), 59 (§2.2) | L |
+| C4a | Master-data editing screens. The write APIs exist — BOM `POST`/`PUT`/`DELETE` (`equipment.ts:963`, `:1049`, `:1114`), cost splits (`workOrderCostSplits.ts`), meters (`equipmentMeters.ts`), plan meters written inside the plan `PUT` (`maintenancePlans.ts:509-513`) — but no screen drives them. This pass closes the screens only | Table 2 "Master-data editing and bulk access"; matrix line 59 (§2.2) | L |
+| C4b | JSON bulk endpoint for Functional Locations: `functionalLocations.ts:275`/`:394` are single-row, so there is no bulk import/export path | Matrix line 295 (§5.4) | M |
+| C4c | OData-style query grammar: no `$filter`/`$top` anywhere, conventional `skip`/`take` only | Matrix line 296 (§5.4) | M |
 | C6 | Audit completeness: per-column old/new values on the handlers that lack them, enforced at the middleware boundary, plus the configurable 7-year purge job. Measured 2026-10-08: 5 route files with `PUT` routes import neither `logFieldChanges` nor `logAuditFieldChange` (alerts, externalServiceCosts, safetyChecklists, workOrderCostSplits, workOrderMaterials — 7 handlers), `auditMiddleware` is exported at `backend/src/middleware/audit.ts:119` and never used, and no purge/retention job exists (matrix line 264: the 7-year default is a seed comment only) | Table 2 "Audit completeness"; matrix lines 55 (§2.1), 264 (§4.3), 289, 290 (§5.3) | L |
 | C9 | "View assigned" not enforced: `GET /api/work-orders` builds `where` with no assignment scoping (`workOrders.ts:97-131`), so every holder sees every work order | Matrix line 63 (§2.2) | M |
 | C10 | Unauthenticated `/api/health/scheduler` exposes plan counts and last-run state; the handler carries no `authenticate` and `apiRouter` has no global auth middleware (`index.ts:225`) | Matrix line 300 (§5.5) | S |
@@ -124,26 +126,35 @@ reclassified to close-now work, B2 and B3 were accepted, and B4 was applied
   the target. Not a blocker; placeholder where in the phases fits was the
   closure log.
 
+## Splits (2026-10-12)
+
+- **C4 → C4a / C4b / C4c (owner decision, 2026-10-12).** The single L-sized entry
+  bundled three independent concerns: the master-data *screens* the existing write
+  APIs lack (C4a), a JSON bulk endpoint for Functional Locations (C4b), and an
+  OData-style query grammar (C4c). Only C4a is in scope this pass; C4b and C4c stay
+  open, and matrix lines 295/296 stay `Partial` until they close. Category A goes
+  10 → 12 entries.
+
 ## Coverage check
 
 *Updated 2026-10-10 (B1): matrix lines 40 (§1.3), 307 (§5.7) and 335 (§6.4) are now `Met`, so the `Partial`/`Not Met` set is 31 lines, not 34, and entries **B1** and **D2** are closed (see the closure log). The original freeze-time mapping is kept below as the record it was.*
 
 All 34 `Partial`/`Not Met` matrix lines **as at the freeze** map to exactly one entry above:
-line 38→C3, 39→N4, 40→B1+D2, 52→C3, 53→D1, 54→D1, 55→C6, 56→D1, 59→C4, 61→C3, 62→D3,
+line 38→C3, 39→N4, 40→B1+D2, 52→C3, 53→D1, 54→D1, 55→C6, 56→D1, 59→C4a, 61→C3, 62→D3,
 63→C9, 175→N1, 253→C12, 255→C11, 259→C1, 261→N9, 263→C13, 264→C6, 265→N2,
-281→C11, 289→C6, 290→C6, 291→N3, 292→D4, 295→C4, 296→C4, 299→C1, 300→C10, 301→C2,
+281→C11, 289→C6, 290→C6, 291→N3, 292→D4, 295→C4b, 296→C4c, 299→C1, 300→C10, 301→C2,
 306→C5, 307→D2+B1, 316→N5, 335→B1.
 
 All 13 Action Sheet Table 2 rows map to one entry: 1→C12, 2→C1, 3→C2, 4→C13, 5→C14,
-6→D1, 7→C3, 8→C4, 9→N8, 10→C6, 11→C5+D2 (**D2 closed 2026-10-10**), 12→N2, 13→C15.
+6→D1, 7→C3, 8→C4a, 9→N8, 10→C6, 11→C5+D2 (**D2 closed 2026-10-10**), 12→N2, 13→C15.
 
 All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1, 9→N1,
 10→N10, 11…14→N2.
 
 ## Totals
 
-10 code and data gaps · 4 documentation gaps · 0 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **25 open items**.
+12 code and data gaps · 4 documentation gaps · 0 blocked on owner · 1 blocked on external ·
+10 decisions-not-gap = **27 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
