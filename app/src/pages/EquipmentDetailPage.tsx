@@ -613,6 +613,62 @@ export default function EquipmentDetailPage() {
 
           {activeTab === 'meters' && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-primary text-sm font-semibold">Meters</h3>
+                {canEditMeter && !meterFormOpen && (
+                  <button
+                    onClick={openMeterCreate}
+                    className="flex items-center gap-1 text-xs text-amber hover:underline"
+                  >
+                    <Plus className="w-3 h-3" /> Add meter
+                  </button>
+                )}
+              </div>
+              {meterError && <p className="text-red-status text-xs mb-2">{meterError}</p>}
+              {meterSuccess && <p className="text-emerald-400 text-xs mb-2">{meterSuccess}</p>}
+
+              {meterFormOpen && (
+                <form onSubmit={saveMeter} className="industrial-card rounded p-4 space-y-3">
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="col-span-2">
+                      <label className={labelCls} htmlFor="meter-name">Meter Name</label>
+                      <input id="meter-name" value={meterName} onChange={(e) => setMeterName(e.target.value)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls} htmlFor="meter-unit">Unit of Measure</label>
+                      <input id="meter-unit" value={meterUnit} onChange={(e) => setMeterUnit(e.target.value)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls} htmlFor="meter-last">Last Reading</label>
+                      <input id="meter-last" type="number" min="0" step="any" value={meterLastReading} onChange={(e) => setMeterLastReading(e.target.value)} className={inputCls} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div>
+                      <label className={labelCls} htmlFor="meter-last-date">Last Reading Date</label>
+                      <input id="meter-last-date" type="date" value={meterLastReadingDate} onChange={(e) => setMeterLastReadingDate(e.target.value)} className={inputCls} />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setMeterFormOpen(false)}
+                      className="px-2.5 py-1 rounded text-xs text-secondary border border-subtle hover:border-highlight"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={meterBusy === 'save'}
+                      className="px-2.5 py-1 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                      style={{ backgroundColor: '#D97706', color: '#111113' }}
+                    >
+                      {meterBusy === 'save' ? <Loader2 className="w-3 h-3 animate-spin" /> : meterEditingId ? 'Save' : 'Add'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
               {eqMeters.length === 0 ? (
                 <div className="industrial-card rounded p-8 text-center">
                   <Gauge className="w-10 h-10 text-tertiary mx-auto mb-3" />
@@ -636,6 +692,32 @@ export default function EquipmentDetailPage() {
                             Last reading: {meter.lastReadingDate ? new Date(meter.lastReadingDate).toLocaleDateString() : '-'}
                           </div>
                         </div>
+                        {(canEditMeter || canDeleteMeter) && (
+                          <div className="flex items-center gap-1">
+                            {canEditMeter && (
+                              <button
+                                onClick={() => openMeterEdit(meter)}
+                                disabled={meterBusy !== null}
+                                className="p-0.5 text-tertiary hover:text-primary transition-colors disabled:opacity-40"
+                                title="Edit meter"
+                                aria-label={`Edit meter ${meter.meterName}`}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                            {canDeleteMeter && (
+                              <button
+                                onClick={() => removeMeter(meter)}
+                                disabled={meterBusy !== null}
+                                className="p-0.5 text-tertiary hover:text-red-status transition-colors disabled:opacity-40"
+                                title="Remove meter"
+                                aria-label={`Remove meter ${meter.meterName}`}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="border-t border-subtle pt-3">
                         <h4 className="text-secondary text-xs font-medium mb-2">Recent Readings</h4>
