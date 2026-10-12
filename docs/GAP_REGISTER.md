@@ -1,4 +1,4 @@
-# Gap register — every open item at 2026-10-08
+﻿# Gap register â€” every open item at 2026-10-08
 
 One line per item, one category per item, and for anything under "Close now" a size
 so the owner can see what closing it costs. Every entry was re-derived from source on
@@ -7,56 +7,56 @@ the decision register contradicted was reclassified and keeps an entry under its
 category. Nothing was dropped.
 
 **Status changes are the owner's.** Where an entry implies a `SOW_COMPLIANCE.md` Status
-should move (for example §2.2 line 62, §5.4 line 292), the register records the finding;
+should move (for example Â§2.2 line 62, Â§5.4 line 292), the register records the finding;
 it does not rewrite the matrix.
 
 **Citations.** Entries cite `docs/SOW_COMPLIANCE.md` by **line number** plus clause, not
-by the "row N" numbering used in `verify_a1.py` and `OWNER_ACTION_SHEET.md` — those two
-numberings differ (the dispositions log's "row 8" is §3.1.4, which sits at line 91).
+by the "row N" numbering used in `verify_a1.py` and `OWNER_ACTION_SHEET.md` â€” those two
+numberings differ (the dispositions log's "row 8" is Â§3.1.4, which sits at line 91).
 Line numbers are unambiguous.
 
-**Sizes.** S = half a day or less; M = 1–3 days; L = 4+ days or a cross-cutting
+**Sizes.** S = half a day or less; M = 1â€“3 days; L = 4+ days or a cross-cutting
 workstream. "Run window" means the work needs a target environment and a scheduled run,
 not only desk time.
 
-**Sources read.** `OWNER_ACTION_SHEET.md` (Tables 1–2, notes, footnote), the open v1.1
-backlog in `CMMS_FINALIZATION_TRACKER.md` (v1.1-1…14), all 34 `Partial`/`Not Met` matrix
-lines, `DECISION_REGISTER.md` (D-2…D-19), `README.md` known issues, `FILL_REPORT.md`,
+**Sources read.** `OWNER_ACTION_SHEET.md` (Tables 1â€“2, notes, footnote), the open v1.1
+backlog in `CMMS_FINALIZATION_TRACKER.md` (v1.1-1â€¦14), all 34 `Partial`/`Not Met` matrix
+lines, `DECISION_REGISTER.md` (D-2â€¦D-19), `README.md` known issues, `FILL_REPORT.md`,
 plus the backend routes/schema/middleware and the frontend pages/routes/services.
 
 ---
 
-## A. Close now — code and data gap (12)
+## A. Close now â€” code and data gap (12)
 
 What it is, where it lives, size.
 
 | ID | Item | Where it lives | Size |
 |---|---|---|---|
-| C1 | Session security end to end: server-side idle expiry, refresh rotation, logout that revokes the presented token, technician identity taken from the session rather than the request. `backend/src/routes/auth.ts` exposes only `POST /login` and `GET /me`; there is no refresh or logout route at all, so the `RefreshToken` model is unused for rotation and the JWT stays valid for its full 8 hours | OWNER_ACTION_SHEET Table 2 "Session security"; matrix lines 259 (§4.2), 299 (§5.5); `README.md:263` | L |
-| C2 | Frontend access control: navigation and routes are not filtered by role. `app/src/components/layout/Sidebar.tsx` renders all 11 items for every role (matrix line 301), and `ProtectedRoute` checks authentication only (`app/src/App.tsx:24-27`); role is used only to gate data fetches (`appStore.ts:153-166`) | OWNER_ACTION_SHEET Table 2 "Frontend access control"; matrix line 301 (§5.5) | M |
-| C3 | Planning and intake screens — closed. `PreventiveMaintenancePage.tsx` now drives plan create/edit/delete (multi-target rows per D-10 and meter-threshold rows for Meter/Combined per SOW 3.4.2), plus a role-gated on-demand scheduler control; `NotificationsPage.tsx` gained the notification-intake form over the existing `POST /notifications`. Delivered `40cb3c3`, `8ed6f70`, `cf2f9c5` | Table 2 "Planning and intake screens"; matrix lines 38 (§1.3), 52 (§2.1), 61 (§2.2) | Done |
-| C4a | Master-data editing screens. The write APIs exist — BOM `POST`/`PUT`/`DELETE` (`equipment.ts:963`, `:1049`, `:1114`), cost splits (`workOrderCostSplits.ts`), meters (`equipmentMeters.ts`), plan meters written inside the plan `PUT` (`maintenancePlans.ts:509-513`) — but no screen drives them. This pass closes the screens only | Table 2 "Master-data editing and bulk access"; matrix line 59 (§2.2) | L |
-| C4b | JSON bulk endpoint for Functional Locations: `functionalLocations.ts:275`/`:394` are single-row, so there is no bulk import/export path | Matrix line 295 (§5.4) | M |
-| C4c | OData-style query grammar: no `$filter`/`$top` anywhere, conventional `skip`/`take` only | Matrix line 296 (§5.4) | M |
-| C6 | Audit completeness: per-column old/new values on the handlers that lack them, enforced at the middleware boundary, plus the configurable 7-year purge job. Measured 2026-10-08: 5 route files with `PUT` routes import neither `logFieldChanges` nor `logAuditFieldChange` (alerts, externalServiceCosts, safetyChecklists, workOrderCostSplits, workOrderMaterials — 7 handlers), `auditMiddleware` is exported at `backend/src/middleware/audit.ts:119` and never used, and no purge/retention job exists (matrix line 264: the 7-year default is a seed comment only) | Table 2 "Audit completeness"; matrix lines 55 (§2.1), 264 (§4.3), 289, 290 (§5.3) | L |
-| C9 | "View assigned" not enforced: `GET /api/work-orders` builds `where` with no assignment scoping (`workOrders.ts:97-131`), so every holder sees every work order | Matrix line 63 (§2.2) | M |
-| C10 | Unauthenticated `/api/health/scheduler` exposes plan counts and last-run state; the handler carries no `authenticate` and `apiRouter` has no global auth middleware (`index.ts:225`) | Matrix line 300 (§5.5) | S |
-| C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
-| C13 | Total recovery time: measured. DB restore + attachments + app layer = 9.11 s (app 0.36 s) on live stack using backup cmms-2026-09-29-1659.sql with paired uploads; WorkOrder 189, attachment snapshot verified, drill DB dropped. Script ready and exercised. | Table 2 "Total recovery time"; matrix line 263 (§4.3) | Done |
+| C1 | Session security end to end: server-side idle expiry, refresh rotation, logout that revokes the presented token, technician identity taken from the session rather than the request. `backend/src/routes/auth.ts` exposes only `POST /login` and `GET /me`; there is no refresh or logout route at all, so the `RefreshToken` model is unused for rotation and the JWT stays valid for its full 8 hours | OWNER_ACTION_SHEET Table 2 "Session security"; matrix lines 259 (Â§4.2), 299 (Â§5.5); `README.md:263` | L |
+| C2 | Frontend access control: navigation and routes are not filtered by role. `app/src/components/layout/Sidebar.tsx` renders all 11 items for every role (matrix line 301), and `ProtectedRoute` checks authentication only (`app/src/App.tsx:24-27`); role is used only to gate data fetches (`appStore.ts:153-166`) | OWNER_ACTION_SHEET Table 2 "Frontend access control"; matrix line 301 (Â§5.5) | M |
+| C3 | Planning and intake screens â€” closed. `PreventiveMaintenancePage.tsx` now drives plan create/edit/delete (multi-target rows per D-10 and meter-threshold rows for Meter/Combined per SOW 3.4.2), plus a role-gated on-demand scheduler control; `NotificationsPage.tsx` gained the notification-intake form over the existing `POST /notifications`. Delivered `40cb3c3`, `8ed6f70`, `cf2f9c5` | Table 2 "Planning and intake screens"; matrix lines 38 (Â§1.3), 52 (Â§2.1), 61 (Â§2.2) | Done |
+| C4a | Master-data editing screens. The write APIs exist â€” BOM `POST`/`PUT`/`DELETE` (`equipment.ts:963`, `:1049`, `:1114`), cost splits (`workOrderCostSplits.ts`), meters (`equipmentMeters.ts`), plan meters written inside the plan `PUT` (`maintenancePlans.ts:509-513`) â€” but no screen drives them. This pass closes the screens only | Table 2 "Master-data editing and bulk access"; matrix line 59 (Â§2.2) | Done |
+| C4b | JSON bulk endpoint for Functional Locations: `functionalLocations.ts:275`/`:394` are single-row, so there is no bulk import/export path | Matrix line 295 (Â§5.4) | M |
+| C4c | OData-style query grammar: no `$filter`/`$top` anywhere, conventional `skip`/`take` only | Matrix line 296 (Â§5.4) | M |
+| C6 | Audit completeness: per-column old/new values on the handlers that lack them, enforced at the middleware boundary, plus the configurable 7-year purge job. Measured 2026-10-08: 5 route files with `PUT` routes import neither `logFieldChanges` nor `logAuditFieldChange` (alerts, externalServiceCosts, safetyChecklists, workOrderCostSplits, workOrderMaterials â€” 7 handlers), `auditMiddleware` is exported at `backend/src/middleware/audit.ts:119` and never used, and no purge/retention job exists (matrix line 264: the 7-year default is a seed comment only) | Table 2 "Audit completeness"; matrix lines 55 (Â§2.1), 264 (Â§4.3), 289, 290 (Â§5.3) | L |
+| C9 | "View assigned" not enforced: `GET /api/work-orders` builds `where` with no assignment scoping (`workOrders.ts:97-131`), so every holder sees every work order | Matrix line 63 (Â§2.2) | M |
+| C10 | Unauthenticated `/api/health/scheduler` exposes plan counts and last-run state; the handler carries no `authenticate` and `apiRouter` has no global auth middleware (`index.ts:225`) | Matrix line 300 (Â§5.5) | S |
+| C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the Â§5.1 report-generation limb is also absent | Matrix lines 255 (Â§4.1), 281 (Â§5.1) | L |
+| C13 | Total recovery time: measured. DB restore + attachments + app layer = 9.11 s (app 0.36 s) on live stack using backup cmms-2026-09-29-1659.sql with paired uploads; WorkOrder 189, attachment snapshot verified, drill DB dropped. Script ready and exercised. | Table 2 "Total recovery time"; matrix line 263 (Â§4.3) | Done |
 | C19 | Settings screen made accurate. The duplicate "Audit Log Retention" static row is removed (the value is shown once, as the editable `audit_retention_years` setting); the "PM Scheduler" row no longer claims 06:00 - it states the server cron default (02:00, `PM_SCHEDULER_CRON`) and that it is not configurable here; and the remaining fixed rows (session timeout, upload limit, password policy, language) carry accurate descriptions under a "Read-only (fixed configuration)" label. No values are newly enforced. | Found on my own; `README.md:264` | Done |
 
-## B. Close now — documentation gap (4)
+## B. Close now â€” documentation gap (4)
 
 | ID | Item | Where it lives | Size |
 |---|---|---|---|
-| D1 | Documentation accuracy sweep — one entry, with what it covers: the five stale limitation-register claims named in OWNER_ACTION_SHEET note 8 (no task-list screen — `TaskListsPage.tsx` exists; no meter/combined PM strategy — `scheduler.ts:111` evaluates all three; hard-coded generated status; read-only BOM/cost-split lines — both have write endpoints; no system-generated alerts — all four fire); the stale Table 1 asks (item 1 "no failure field" — `WorkOrder.failureCodeId` exists at `schema.prisma:372`, delivered `1e4b28c`; item 5 "trial-run report missing" — delivered `c81bc3d`; item 6 — decided 2026-10-05, see N9; item 7 — answered by D-7) and the "Seven items need your answer" header; `README.md:262` ("200-user load test remains post-go-live" — the run passed 2026-10-03 and GO was approved), `README.md:265` and `README.md:266` figures; the value-domain comments in `schema.prisma` against the C15 CHECK constraints — closing C15 (`50ff911`, run 241) found two drifts, `SystemAlert.alertType` omitting `Account_Lockout` and `Comment.entityType` omitting `MaintenancePlan`; both comments were corrected at `3ea1b30` (run 242) and all 24 pinned domains now match their comments, so this is the standing re-check rather than an open correction; the tracker's teardown figure — R.9 D3-cleanup-errors and the Phase R close-out still read 68 across 13, but the count re-derived from source and verified by the C14 closure is **54 in 12** (`fd86709`); the stale matrix citations `index.ts:172-192` (line 297) and `workOrders.ts:567` (line 126; declaration is `:752`, applied `:835`) plus the `verify_a1.py` line ranges; and the Table 2 "Migration tooling" wording that reads as if the live importers were done (they are harness-only, see C5); and the unrefreshed `docs/openapi.json` snapshot (a manual re-export, last changed `5aa0094`, still listing the old action set and no `Blocked`, with no gate that regenerates it — a dated stale snapshot to be refreshed, not silently half-patched) | Table 2 "Documentation accuracy sweep"; tracker v1.1-8 (partially exercised `f58e478`) | L |
-| D3 | Matrix §2.2 line 62's note ("the Close permission is not enforced server-side") is stale: `requireSupervisorForClose` is declared at `workOrders.ts:752`, applied at `:835` after `validate(...)`, landed `206e1de`, and is asserted by `workOrders.test.ts:224-249` (Technician 403, Supervisor 200); §3.3.2 line 126 is `Met` on that evidence. The note is the only basis for line 62's `Partial`, so the Status is the owner's call | Matrix line 62 (§2.2) | S (edit) |
-| D4 | Matrix §5.4 line 292's limbs are contradicted: BOM lines have `POST`/`PUT`/`DELETE` (`equipment.ts:963`/`:1049`/`:1114`), cost splits are created and soft-deleted (`workOrderCostSplits.ts:256`), and plan meters are written in the plan `PUT` (`maintenancePlans.ts:509-513`) — so "deletes are absent on several entities" and "child collections are read-only" no longer hold for master data or work orders. Residual deletes genuinely absent: `SystemAlert`, checklist templates, meter readings, system config — none of which is master data or a work order. Status is the owner's call | Matrix line 292 (§5.4) | S (edit) |
+| D1 | Documentation accuracy sweep â€” one entry, with what it covers: the five stale limitation-register claims named in OWNER_ACTION_SHEET note 8 (no task-list screen â€” `TaskListsPage.tsx` exists; no meter/combined PM strategy â€” `scheduler.ts:111` evaluates all three; hard-coded generated status; read-only BOM/cost-split lines â€” both have write endpoints; no system-generated alerts â€” all four fire); the stale Table 1 asks (item 1 "no failure field" â€” `WorkOrder.failureCodeId` exists at `schema.prisma:372`, delivered `1e4b28c`; item 5 "trial-run report missing" â€” delivered `c81bc3d`; item 6 â€” decided 2026-10-05, see N9; item 7 â€” answered by D-7) and the "Seven items need your answer" header; `README.md:262` ("200-user load test remains post-go-live" â€” the run passed 2026-10-03 and GO was approved), `README.md:265` and `README.md:266` figures; the value-domain comments in `schema.prisma` against the C15 CHECK constraints â€” closing C15 (`50ff911`, run 241) found two drifts, `SystemAlert.alertType` omitting `Account_Lockout` and `Comment.entityType` omitting `MaintenancePlan`; both comments were corrected at `3ea1b30` (run 242) and all 24 pinned domains now match their comments, so this is the standing re-check rather than an open correction; the tracker's teardown figure â€” R.9 D3-cleanup-errors and the Phase R close-out still read 68 across 13, but the count re-derived from source and verified by the C14 closure is **54 in 12** (`fd86709`); the stale matrix citations `index.ts:172-192` (line 297) and `workOrders.ts:567` (line 126; declaration is `:752`, applied `:835`) plus the `verify_a1.py` line ranges; and the Table 2 "Migration tooling" wording that reads as if the live importers were done (they are harness-only, see C5); and the unrefreshed `docs/openapi.json` snapshot (a manual re-export, last changed `5aa0094`, still listing the old action set and no `Blocked`, with no gate that regenerates it â€” a dated stale snapshot to be refreshed, not silently half-patched) | Table 2 "Documentation accuracy sweep"; tracker v1.1-8 (partially exercised `f58e478`) | L |
+| D3 | Matrix Â§2.2 line 62's note ("the Close permission is not enforced server-side") is stale: `requireSupervisorForClose` is declared at `workOrders.ts:752`, applied at `:835` after `validate(...)`, landed `206e1de`, and is asserted by `workOrders.test.ts:224-249` (Technician 403, Supervisor 200); Â§3.3.2 line 126 is `Met` on that evidence. The note is the only basis for line 62's `Partial`, so the Status is the owner's call | Matrix line 62 (Â§2.2) | S (edit) |
+| D4 | Matrix Â§5.4 line 292's limbs are contradicted: BOM lines have `POST`/`PUT`/`DELETE` (`equipment.ts:963`/`:1049`/`:1114`), cost splits are created and soft-deleted (`workOrderCostSplits.ts:256`), and plan meters are written in the plan `PUT` (`maintenancePlans.ts:509-513`) â€” so "deletes are absent on several entities" and "child collections are read-only" no longer hold for master data or work orders. Residual deletes genuinely absent: `SystemAlert`, checklist templates, meter readings, system config â€” none of which is master data or a work order. Status is the owner's call | Matrix line 292 (Â§5.4) | S (edit) |
 | D5 | Tracker v1.1-6's premise is wrong on the current tree: there is no audit-log action filter dropdown in `AdministrationPage.tsx` (only a free-text filter at line 128, which already matches on `action`, so `Blocked` entries are isolable today). What is stale is the v1.1-6 wording itself and the swagger `action` description at `auditLog.ts:37`, which lists Create/Update/Delete/Run while `AuditAction` includes `Blocked` (`middleware/audit.ts:6`) and five routes write it (labor `:152`/`:285`, notifications `:413`, workOrders `:862`/`:900`) | Tracker v1.1-6 | S |
 
 ## C. Blocked on owner (0)
 
-Empty since 2026-10-09 — all four owner items (B1–B4) are resolved. B1 was
+Empty since 2026-10-09 â€” all four owner items (B1â€“B4) are resolved. B1 was
 reclassified to close-now work, B2 and B3 were accepted, and B4 was applied
 (see the closure log and Reclassifications).
 
@@ -64,61 +64,61 @@ reclassified to close-now work, B2 and B3 were accepted, and B4 was applied
 
 | ID | Item | Where it lives |
 |---|---|---|
-| E1 | TLS termination and reverse-proxy configuration, and the IIS reverse-proxy deployment executed end to end — needs a host matching production, which is not held | `README.md:267`, `README.md:268` |
+| E1 | TLS termination and reverse-proxy configuration, and the IIS reverse-proxy deployment executed end to end â€” needs a host matching production, which is not held | `README.md:267`, `README.md:268` |
 
 ## E. Decision, not gap (10)
 
 | ID | Item | Where it lives | Decision |
 |---|---|---|---|
-| N1 | Cost-split editor screen (allocation is implemented, tested and reachable by API) | Tracker v1.1-9; matrix line 175 (§3.5.2); Table 1 item 2 | Owner, 2026-10-04 |
-| N2 | Accessibility remediation: command-palette focus trap, repeated aria-labels on the work-order detail rows, chart tick contrast, title-only icon names | Tracker v1.1-11…14; matrix line 265 (§4.4); Table 2 "Accessibility polish" | Owner acceptance 2026-10-05 |
-| N3 | `MaintenancePlan.functionalLocationId` remains a plain scalar with no relation/FK, mitigated not removed | Matrix line 291 (§5.3) | D-10 / F3 (`638dbd6`) |
-| N4 | Mobile/tablet viewport and ERP integration not delivered | Matrix lines 39 (§1.3), 38 mobile limb | D-6; Client decision (ERP, line 39) |
-| N5 | Deployable container artifacts excluded — delivery is a source-and-pipeline handoff | Matrix line 316 (§6.1) | Client decision recorded at line 316 |
+| N1 | Cost-split editor screen (allocation is implemented, tested and reachable by API) | Tracker v1.1-9; matrix line 175 (Â§3.5.2); Table 1 item 2 | Owner, 2026-10-04 |
+| N2 | Accessibility remediation: command-palette focus trap, repeated aria-labels on the work-order detail rows, chart tick contrast, title-only icon names | Tracker v1.1-11â€¦14; matrix line 265 (Â§4.4); Table 2 "Accessibility polish" | Owner acceptance 2026-10-05 |
+| N3 | `MaintenancePlan.functionalLocationId` remains a plain scalar with no relation/FK, mitigated not removed | Matrix line 291 (Â§5.3) | D-10 / F3 (`638dbd6`) |
+| N4 | Mobile/tablet viewport and ERP integration not delivered | Matrix lines 39 (Â§1.3), 38 mobile limb | D-6; Client decision (ERP, line 39) |
+| N5 | Deployable container artifacts excluded â€” delivery is a source-and-pipeline handoff | Matrix line 316 (Â§6.1) | Client decision recorded at line 316 |
 | N6 | Meter readings and meter columns out of scope for the sample | `FILL_REPORT.md` meter patch section | Owner decision recorded there |
 | N7 | Availability monitoring / 99.5% and agreed maintenance windows carried as owned operational obligations | `DECISION_REGISTER.md` D-14, D-19 | D-14, D-19 |
-| N8 | Per-user opt-out of specific alert types (and email delivery) is waived, so Table 2's "add per-user opt-out" is not fresh work | Matrix line 222 (§3.8) — register row 74, phase H (email is row 73, line 221) | Waived, register rows 73/74 |
-| N9 | Differential backup will not be built; transaction-log recovery is accepted as the mechanism and §4.3 stays `Partial` as the direct consequence | Matrix line 261 (§4.3); Table 1 item 6 | Owner, 2026-10-05 |
-| N10 | Cause/failure code on a Notification: no §3 clause requires it — matrix line 91 (§3.1.4) records that treating it as a residual was an over-attribution, so building it needs a new owner decision | Tracker v1.1-10 | Needs a new owner decision |
+| N8 | Per-user opt-out of specific alert types (and email delivery) is waived, so Table 2's "add per-user opt-out" is not fresh work | Matrix line 222 (Â§3.8) â€” register row 74, phase H (email is row 73, line 221) | Waived, register rows 73/74 |
+| N9 | Differential backup will not be built; transaction-log recovery is accepted as the mechanism and Â§4.3 stays `Partial` as the direct consequence | Matrix line 261 (Â§4.3); Table 1 item 6 | Owner, 2026-10-05 |
+| N10 | Cause/failure code on a Notification: no Â§3 clause requires it â€” matrix line 91 (Â§3.1.4) records that treating it as a residual was an over-attribution, so building it needs a new owner decision | Tracker v1.1-10 | Needs a new owner decision |
 
 ---
 
 ## Corrections made while verifying (2026-10-08)
 
-- **C7 → D4.** "Deletes absent on several entities" did not survive contact with the
+- **C7 â†’ D4.** "Deletes absent on several entities" did not survive contact with the
   routes; the write paths exist for every master-data child collection named.
-- **C16 → D5.** The audit action filter dropdown that v1.1-6 describes does not exist;
+- **C16 â†’ D5.** The audit action filter dropdown that v1.1-6 describes does not exist;
   free-text search already isolates `Blocked`.
-- **C17 → N10.** Matrix line 91 states plainly that the notification cause/failure limb
+- **C17 â†’ N10.** Matrix line 91 states plainly that the notification cause/failure limb
   is not required by any clause; it needs a new decision, not engineering.
-- **B2 → N9.** Row 261 records the owner's 2026-10-05 decision; the Action Sheet's item 6
+- **B2 â†’ N9.** Row 261 records the owner's 2026-10-05 decision; the Action Sheet's item 6
   is the stale artefact.
-- **C8 → D3** and **C18 → N8**, agreed earlier in this session.
-- **Re-measured figures:** teardown sites 68 → 55 (**superseded by the C14 closure** —
+- **C8 â†’ D3** and **C18 â†’ N8**, agreed earlier in this session.
+- **Re-measured figures:** teardown sites 68 â†’ 55 (**superseded by the C14 closure** â€”
   the count re-derived from source was **54** in 12 files; the 55th match was a comment,
-  not a code site. See the closure log); lint 41 / 28+2 → 43 / 29+2;
-  advisories 9 / "no criticals" → 10 / 1 critical; Settings static rows "5 of 7" → 6 of 8.
+  not a code site. See the closure log); lint 41 / 28+2 â†’ 43 / 29+2;
+  advisories 9 / "no criticals" â†’ 10 / 1 critical; Settings static rows "5 of 7" â†’ 6 of 8.
 
 ## Reclassifications (2026-10-09)
 
-- **B1 → A.** Nothing is pending from the Client: the legacy dataset is held at
+- **B1 â†’ A.** Nothing is pending from the Client: the legacy dataset is held at
   `docs/migration-templates/dataset/`, and the 21 unfilled templates have no source
-  rows (`migration-templates/FILL_REPORT.md` §Scope). Not a blocker — executable
+  rows (`migration-templates/FILL_REPORT.md` Â§Scope). Not a blocker â€” executable
   migration-and-measurement work. Category A retitled "code and data gap".
-- **B2 → accepted and closed.** The owner accepted the §3.5.2 cost-split-screen
+- **B2 â†’ accepted and closed.** The owner accepted the Â§3.5.2 cost-split-screen
   deferral for go-live on 2026-10-09, formalising the 2026-10-04 decision (matrix
   row 331). The screen itself remains v1.1 work (N1); nothing is added.
-- **B3 → accepted and closed.** The owner accepted the defect position (the four
+- **B3 â†’ accepted and closed.** The owner accepted the defect position (the four
   accessibility items, named and carried) for go-live on 2026-10-09, formalising
   the 2026-10-05 decision (matrix row 334). The items remain v1.1 work (N2);
   nothing is added.
-- **B4 → applied and closed.** The authorized orphan cleanup ran on 2026-10-09
+- **B4 â†’ applied and closed.** The authorized orphan cleanup ran on 2026-10-09
   against the gate/test database (`cmms_gate`, the database a gate is evidence
   about) via `backend/scripts/r9d-orphan-clean.ts`, after a `pg_dump` backup of
   both `cmms` and `cmms_gate`. Deleted: 38 soft-deleted `TL-T*` fixture task
   lists (unreferenced by any plan) with the 114 `TaskList` audit rows that name
   them, plus 198/83/35 orphan audit rows on `WorkOrder`/`WorkOrderOperation`/
-  `MaintenancePlan`. The register said 61 task lists; 38 remained — the count
+  `MaintenancePlan`. The register said 61 task lists; 38 remained â€” the count
   was re-derived from the database, not copied from earlier prose. Zero deleted
   ids are named by any test, script, or gate; the db-invariance check named
   exactly the 468 removed rows and nothing else, and the baseline was
@@ -128,32 +128,32 @@ reclassified to close-now work, B2 and B3 were accepted, and B4 was applied
 
 ## Splits (2026-10-12)
 
-- **C4 → C4a / C4b / C4c (owner decision, 2026-10-12).** The single L-sized entry
+- **C4 â†’ C4a / C4b / C4c (owner decision, 2026-10-12).** The single L-sized entry
   bundled three independent concerns: the master-data *screens* the existing write
   APIs lack (C4a), a JSON bulk endpoint for Functional Locations (C4b), and an
   OData-style query grammar (C4c). Only C4a is in scope this pass; C4b and C4c stay
   open, and matrix lines 295/296 stay `Partial` until they close. Category A goes
-  10 → 12 entries.
+  10 â†’ 12 entries.
 
 ## Coverage check
 
-*Updated 2026-10-10 (B1): matrix lines 40 (§1.3), 307 (§5.7) and 335 (§6.4) are now `Met`, so the `Partial`/`Not Met` set is 31 lines, not 34, and entries **B1** and **D2** are closed (see the closure log). The original freeze-time mapping is kept below as the record it was.*
+*Updated 2026-10-10 (B1): matrix lines 40 (Â§1.3), 307 (Â§5.7) and 335 (Â§6.4) are now `Met`, so the `Partial`/`Not Met` set is 31 lines, not 34, and entries **B1** and **D2** are closed (see the closure log). The original freeze-time mapping is kept below as the record it was.*
 
 All 34 `Partial`/`Not Met` matrix lines **as at the freeze** map to exactly one entry above:
-line 38→C3, 39→N4, 40→B1+D2, 52→C3, 53→D1, 54→D1, 55→C6, 56→D1, 59→C4a, 61→C3, 62→D3,
-63→C9, 175→N1, 253→C12, 255→C11, 259→C1, 261→N9, 263→C13, 264→C6, 265→N2,
-281→C11, 289→C6, 290→C6, 291→N3, 292→D4, 295→C4b, 296→C4c, 299→C1, 300→C10, 301→C2,
-306→C5, 307→D2+B1, 316→N5, 335→B1.
+line 38â†’C3, 39â†’N4, 40â†’B1+D2, 52â†’C3, 53â†’D1, 54â†’D1, 55â†’C6, 56â†’D1, 59â†’C4a, 61â†’C3, 62â†’D3,
+63â†’C9, 175â†’N1, 253â†’C12, 255â†’C11, 259â†’C1, 261â†’N9, 263â†’C13, 264â†’C6, 265â†’N2,
+281â†’C11, 289â†’C6, 290â†’C6, 291â†’N3, 292â†’D4, 295â†’C4b, 296â†’C4c, 299â†’C1, 300â†’C10, 301â†’C2,
+306â†’C5, 307â†’D2+B1, 316â†’N5, 335â†’B1.
 
-All 13 Action Sheet Table 2 rows map to one entry: 1→C12, 2→C1, 3→C2, 4→C13, 5→C14,
-6→D1, 7→C3, 8→C4a, 9→N8, 10→C6, 11→C5+D2 (**D2 closed 2026-10-10**), 12→N2, 13→C15.
+All 13 Action Sheet Table 2 rows map to one entry: 1â†’C12, 2â†’C1, 3â†’C2, 4â†’C13, 5â†’C14,
+6â†’D1, 7â†’C3, 8â†’C4a, 9â†’N8, 10â†’C6, 11â†’C5+D2 (**D2 closed 2026-10-10**), 12â†’N2, 13â†’C15.
 
-All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1, 9→N1,
-10→N10, 11…14→N2.
+All 10 open v1.1 backlog rows map to one entry: 4â†’C15, 6â†’D5, 7â†’C14, 8â†’D1, 9â†’N1,
+10â†’N10, 11â€¦14â†’N2.
 
 ## Totals
 
-12 code and data gaps · 4 documentation gaps · 0 blocked on owner · 1 blocked on external ·
+12 code and data gaps Â· 4 documentation gaps Â· 0 blocked on owner Â· 1 blocked on external Â·
 10 decisions-not-gap = **27 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
@@ -211,8 +211,8 @@ and to named-id params (`:woId`) was considered and **deferred as a v1.1 candida
 overlooked**.
 
 **B2** and **B3** are owner acceptances recorded as register edits, not code. B2 accepts
-the §3.5.2 cost-split-screen deferral for go-live (matrix row 331); B3 accepts the defect
-position — the four accessibility items, named and carried (matrix row 334). Both
+the Â§3.5.2 cost-split-screen deferral for go-live (matrix row 331); B3 accepts the defect
+position â€” the four accessibility items, named and carried (matrix row 334). Both
 formalise earlier decisions (2026-10-04 and 2026-10-05) and add no work; the underlying
 screen and accessibility items remain v1.1 (`N1`, `N2`). They share run 238, the first
 green tip carrying them, pushed together with **B1**'s reclassification (`1310340`) and
@@ -225,7 +225,7 @@ commit that shipped the tool and recorded the run, with the register processing 
 `5114d8d`.
 
 **C15** (`50ff911`, run 241) pinned the status/type/priority/role value domains with
-reversible `CHECK` constraints, one migration, 24 constraints across 12 tables — free
+reversible `CHECK` constraints, one migration, 24 constraints across 12 tables â€” free
 text plus constraints, not native `CREATE TYPE` enums, so every one stays reversible in
 place and the schema keeps its no-native-enum pattern. Two domains corrected against
 the schema comments as part of the pin: `SystemAlert.alertType` admits `Account_Lockout`
@@ -234,19 +234,19 @@ the schema comments as part of the pin: `SystemAlert.alertType` admits `Account_
 PM-generation-failure fixture (`pmGenerationAlerts.test.ts`) to stop storing the `'Bogus'`
 `generatedWorkOrderStatus` the DB now refuses; it is re-anchored to a plan that names no
 equipment, no functional location and no target rows, which is still storable at rest
-and fails generation with `NO_FUNCTIONAL_LOCATION` — same alert paths, same intent.
+and fails generation with `NO_FUNCTIONAL_LOCATION` â€” same alert paths, same intent.
 
 **C14** (`fd86709`, run 243) enforced the swallowed-teardown ban and cleared the sites.
-The count the C14 row carried — 55 across 13 — conflated a code site with a comment:
+The count the C14 row carried â€” 55 across 13 â€” conflated a code site with a comment:
 re-derived from source, there were **54** `.catch(() => {})` teardowns in 12 backend test
 files, and the 13th match was a comment in `helpers.ts` describing the old pattern. All 54
 removed; the delete order was already correct, so the full 1099-test suite passes with every
-swallow gone — the empty handlers had been hiding failures, not preventing them. Enforcement
+swallow gone â€” the empty handlers had been hiding failures, not preventing them. Enforcement
 is a `no-restricted-syntax` rule in the `tests/**` ESLint override: an empty arrow catch now
 fails lint whether or not it binds a parameter, while production `src` keeps its adjudicated
-parse-fallback catches. The re-measured-figures note above (`68 → 55`) and the tracker's
-`68`/13 figures — including the `:1206` per-file breakdown that still lists
-`notifications.test.ts` (16), a file that no longer holds any — are superseded by 54 in 12.
+parse-fallback catches. The re-measured-figures note above (`68 â†’ 55`) and the tracker's
+`68`/13 figures â€” including the `:1206` per-file breakdown that still lists
+`notifications.test.ts` (16), a file that no longer holds any â€” are superseded by 54 in 12.
 
 **C20** (`cfc6108`, run 246) cleared the lint debt in two packages, landed as three commits
 so the backend and app halves stay separately revertable. **`40f91b3`** (run 245) took
@@ -257,11 +257,11 @@ scoped disable on the Express `Request` augmentation. **`c0ff7de`** (run 245) to
 from **29 errors / 2 warnings** to **0 / 0**: 21 unused vars/imports removed, 6 `any` typed
 (getAll params widened to `Record<string, string | number | boolean | undefined>` over
 object-literal call sites; MTBF/downtime reports given `MbtfReportRow`/`DowntimeReportRow`),
-and the two `react-hooks` v7 rule sites fixed behaviour-preservingly — the settings row
+and the two `react-hooks` v7 rule sites fixed behaviour-preservingly â€” the settings row
 resyncs its draft during render instead of in an effect, and the Reports loading flag is
 derived from `reportData`/`reportError` with the pm-compliance memo keyed on a stable slice.
 **`cfc6108`** (run 246) restores the indentation `c0ff7de` had dropped on the
-`WorkOrderDetailPage` reload `catch` brace — a cosmetic slip that tsc, eslint and tests pass
+`WorkOrderDetailPage` reload `catch` brace â€” a cosmetic slip that tsc, eslint and tests pass
 either way, corrected rather than silently carried. The item left no `SOW_COMPLIANCE.md`
 Status to move and is not a tracker `v1.1` row: it was found on my own and recorded only
 here. The pre-sweep baselines re-derived from source were **43** (backend) and **29 + 2
@@ -272,21 +272,21 @@ stays open on its remaining items.
 
 **C21** (`ad93610`, run 248) cleared every production dependency advisory that had a fix
 available, and closed as **reduced** rather than forcing the last one. Re-derived from
-source on 2026-10-10, `npm audit --omit=dev` reported backend **10** — 1 critical
-(`proxy-addr` IP-spoofing), 6 high, 3 moderate — and app **4** (3 high, 1 moderate). The
-row's re-measure was right and `README.md:265`'s "9 … no criticals" understated it. Two
+source on 2026-10-10, `npm audit --omit=dev` reported backend **10** â€” 1 critical
+(`proxy-addr` IP-spoofing), 6 high, 3 moderate â€” and app **4** (3 high, 1 moderate). The
+row's re-measure was right and `README.md:265`'s "9 â€¦ no criticals" understated it. Two
 commits, one per package, changing **only the lockfiles** (`package.json` untouched,
 `@prisma/client`/`prisma` still 6.19.3). `89585f8` refreshed the patched set inside its
-declared ranges (`express` 4.22.2→4.22.3, `body-parser` 1.20.6→1.20.8, `qs` 6.15.3→6.16.0,
-`proxy-addr` 2.0.7→2.0.8, plus `brace-expansion`, `fast-uri`, `js-yaml`, `source-map-js`)
+declared ranges (`express` 4.22.2â†’4.22.3, `body-parser` 1.20.6â†’1.20.8, `qs` 6.15.3â†’6.16.0,
+`proxy-addr` 2.0.7â†’2.0.8, plus `brace-expansion`, `fast-uri`, `js-yaml`, `source-map-js`)
 leaving **3**; `ad93610` took the app from **4** to **0** (`lodash`, `react-router` /
-`react-router-dom`, `fflate`). The 3 that remain are a single advisory — `deepmerge-ts <8`,
-reached through `@prisma/config` → `prisma` — and are left open deliberately: no stable
+`react-router-dom`, `fflate`). The 3 that remain are a single advisory â€” `deepmerge-ts <8`,
+reached through `@prisma/config` â†’ `prisma` â€” and are left open deliberately: no stable
 Prisma fixes them (`@prisma/config@7.10.0` still pins `deepmerge-ts@7.1.5`; only an 8.x dev
 build bumps it), the package is a **devDependency** and only an *optional* peer of
 `@prisma/client`, this repo has no `prisma.config.*` for the vulnerable path to run, and so
 the advisory is unreachable at runtime. An npm `overrides` pin to `deepmerge-ts@^8.0.2` was
-**considered and declined** — it would clear the number but diverge from `@prisma/config`'s
+**considered and declined** â€” it would clear the number but diverge from `@prisma/config`'s
 declared version and accept a behaviour-changing release (`deepmerge-ts` 8.0.0 altered Map
 merging and stopped mutating its target) on the migration toolchain, untested. Re-examine
 when Prisma ships a stable bump. The dev-only Tailwind 3 / PostCSS advisories that remain in
@@ -295,8 +295,8 @@ not counted by `--omit=dev`. `README.md:265` is corrected to this state with the
 figures kept in the line; the item left no `SOW_COMPLIANCE.md` Status to move and, like C20,
 was found on my own and recorded only here, with no tracker `v1.1` row.
 
-**C5** (`eefcff1`, run 252) added the two missing live importers —
-`POST /api/functional-locations/import.csv` and `POST /api/work-orders/import.csv` — both
+**C5** (`eefcff1`, run 252) added the two missing live importers â€”
+`POST /api/functional-locations/import.csv` and `POST /api/work-orders/import.csv` â€” both
 Maintenance Planner-only, on the same mapping rules as the trial harness so a live load and
 the accuracy trial cannot diverge. A new helper (`backend/src/migration-trial/liveImport.ts`)
 resolves the importers' FK refs against live master data (plus rows created earlier in the
@@ -304,46 +304,46 @@ same file, so a location's parent can come from the same upload), then upserts b
 with an audit row; an unresolved ref, a malformed row or a Prisma failure is reported per row
 rather than aborting the run. Nine route tests cover the auth/role/header guards, parent and
 child resolution within one file, idempotent re-import as update, and per-row rejection of
-unknown references. The item left no matrix Status to move — the matrix line 306 Status is
-the owner's call — and the line 306 note and the Table 2 "Migration tooling" wording that
+unknown references. The item left no matrix Status to move â€” the matrix line 306 Status is
+the owner's call â€” and the line 306 note and the Table 2 "Migration tooling" wording that
 still read as harness-only are **D1**'s remaining sweep, named here so closing C5 does not
 silently leave them stale.
 
-**C12** (`fd86b2b`, run 254) added the missing write-path measurement — `scripts/k6/write.js`,
+**C12** (`fd86b2b`, run 254) added the missing write-path measurement â€” `scripts/k6/write.js`,
 a 200-VU single-scenario load that logs in once per VU, resolves existing work orders once, then
 saves in a loop via `PUT /api/work-orders/:id` (`completionRemarks` set to a fixed probe, so no
 rows are created and audit growth is bounded) and records the save percentile in its own
 `save_latency` trend. Run on 2026-10-10 against a disposable clone of `cmms` (229 work orders;
-the live `cmms` was not touched — verified back at 9 WOs). **At a realistic cadence — one save
-per user per 20 s (`THINK_TIME=20`) — the save limb is p(95) 89.4 ms**, median 26.3 ms, max
-836 ms over 3,790 saves, `http_req_failed` 0.00%, 0 P2028 / 0×429 / 0×500: **within the §4.1
+the live `cmms` was not touched â€” verified back at 9 WOs). **At a realistic cadence â€” one save
+per user per 20 s (`THINK_TIME=20`) â€” the save limb is p(95) 89.4 ms**, median 26.3 ms, max
+836 ms over 3,790 saves, `http_req_failed` 0.00%, 0 P2028 / 0Ã—429 / 0Ã—500: **within the Â§4.1
 < 1 s budget**, so this is the acceptance figure. A tight loop (one save per user per second)
 saturates at p(95) 3.47 s (median 2.6 s, ~46 saves/s from 22,089 saves; solo saves ~50 ms), and
 is recorded as a **stress bound, not the acceptance number**. The row carries no matrix Status to
-move — the line 253 Status is the owner's call — and its note is refreshed with these figures so
+move â€” the line 253 Status is the owner's call â€” and its note is refreshed with these figures so
 the "Residual: a write-path save-latency load run" line is discharged.
 
 **B1** (`1971686`, run 257) is the legacy migration full load. The Client's raw
 workbooks were extracted to the trial-run CSV contract by a new
 `scripts/migration/extract_full_dataset.py` and loaded by the `backend/src/migration-trial/run.ts`
 harness (extended with `TRIAL_RUN_CSV_DIR` / `TRIAL_RUN_REPORT_PATH` overrides so a full run
-never touches the reviewed sample). Cleaning policy per the owner's 2026-10-10 decision — keep
-the full sets, cleaned to a loadable set with every exclusion logged — dropped 78 work orders
+never touches the reviewed sample). Cleaning policy per the owner's 2026-10-10 decision â€” keep
+the full sets, cleaned to a loadable set with every exclusion logged â€” dropped 78 work orders
 (77 `E3_Non-Maintenance`, 1 blank `#N/A` FL), deduplicated 11 `woNumber`s and 21
 `notificationNumber`s, dropped 36 equipment rows (blank/duplicate code, blank criticality or FL),
 merged 267 material rows by code, and blanked 11 unresolved equipment FKs. **Result on the full
 dataset: 20,333 / 20,333 rows correct = 100.00%** against the 99.9% target, 0 rejected; the report
 is `docs/migration-templates/TRIAL_RUN_REPORT_FULL.md` and the ledger
-`docs/migration-templates/FULL_LOAD_LEDGER.json`. On this evidence matrix lines 40 (§1.3), 307
-(§5.7) and 335 (§6.4 / d) moved `Not Met` → `Met`. **D2** (`1971686`, run 257) — the
-migration runbook the register said did not exist anywhere under `docs/` — is discharged by
+`docs/migration-templates/FULL_LOAD_LEDGER.json`. On this evidence matrix lines 40 (Â§1.3), 307
+(Â§5.7) and 335 (Â§6.4 / d) moved `Not Met` â†’ `Met`. **D2** (`1971686`, run 257) â€” the
+migration runbook the register said did not exist anywhere under `docs/` â€” is discharged by
 `docs/migration-runbook.md`, delivered as part of B1. Both runs are confirmed against the
 closure's push-run (257, green).
 
-**C3** (`40cb3c3`, `8ed6f70`, `cf2f9c5`; runs 265–267) closed the three limbs the entry
-named. **C3.1** (`40cb3c3`, run 265) added the plan CRUD UI — an inline create/edit/delete
+**C3** (`40cb3c3`, `8ed6f70`, `cf2f9c5`; runs 265â€“267) closed the three limbs the entry
+named. **C3.1** (`40cb3c3`, run 265) added the plan CRUD UI â€” an inline create/edit/delete
 form with `planCode` create-only, multi-target equipment/location rows (D-10) and
-meter-threshold rows for the Meter and Combined strategies (SOW 3.4.2) — plus a new
+meter-threshold rows for the Meter and Combined strategies (SOW 3.4.2) â€” plus a new
 `equipmentMeterService` and `MaintenancePlanInput` types; the plan UI edits from the store
 list object rather than `GET /maintenance-plans/:id`, which omits `targets`. **C3.2**
 (`8ed6f70`, run 266) added the Administrator-only on-demand "Run Scheduler" control over
@@ -353,5 +353,5 @@ OpenAPI snapshot still claims. **C3.3** (`cf2f9c5`, run 267) added the notificat
 form on `NotificationsPage.tsx` over `notificationService.create`, added `NotificationInput`,
 and derives the functional location from a chosen equipment (the route rejects a
 contradicting location). The row carries the tip; the item left no `SOW_COMPLIANCE.md`
-Status to move — matrix lines 38, 52 and 61 are the owner's call.
+Status to move â€” matrix lines 38, 52 and 61 are the owner's call.
 
