@@ -1,5 +1,5 @@
-// ============================================================
-// Equipment Detail Page — Live API
+﻿// ============================================================
+// Equipment Detail Page â€” Live API
 // ============================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -296,7 +296,7 @@ export default function EquipmentDetailPage() {
       return;
     }
     const lastReadingVal = meterLastReading === '' ? undefined : Number(meterLastReading);
-    if (meterLastReading !== '' && (!Number.isFinite(lastReadingVal) || lastReadingVal < 0)) {
+    if (meterLastReading !== '' && lastReadingVal !== undefined && (!Number.isFinite(lastReadingVal) || lastReadingVal < 0)) {
       setMeterError('Last reading must be zero or greater');
       return;
     }
@@ -461,7 +461,7 @@ export default function EquipmentDetailPage() {
                             <option value="">Select...</option>
                             {materials.map((m) => (
                               <option key={m.materialId} value={m.materialId}>
-                                {m.materialCode} — {m.description}
+                                {m.materialCode} â€” {m.description}
                               </option>
                             ))}
                           </select>
@@ -788,7 +788,7 @@ export default function EquipmentDetailPage() {
                         <div className="min-w-0">
                           <p className="text-primary text-xs font-mono truncate">{att.originalName}</p>
                           <p className="text-tertiary text-xs mt-0.5">
-                            {formatBytes(att.sizeBytes)} · {att.createdBy} · {new Date(att.createdDate).toLocaleString()}
+                            {formatBytes(att.sizeBytes)} Â· {att.createdBy} Â· {new Date(att.createdDate).toLocaleString()}
                           </p>
                         </div>
                       </div>
