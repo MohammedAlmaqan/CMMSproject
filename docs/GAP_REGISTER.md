@@ -347,3 +347,23 @@ and derives the functional location from a chosen equipment (the route rejects a
 contradicting location). The row carries the tip; the item left no `SOW_COMPLIANCE.md`
 Status to move — matrix lines 38, 52 and 61 are the owner's call.
 
+**C13** (`6cdabc9`, run n/a; corrected `this commit`). C13 closed §4.3/RTO on a
+full-sequence measurement that did not actually measure its limbs. Re-derived from
+`scripts/restore-drill.bat`, the "application layer" timer bracketed an **empty
+block** — two comment lines between the `CMMS_APP_START_MS` and `CMMS_APP_END_MS`
+timestamps — so its reported app-layer time (0.36 s) was `powershell.exe` invocation
+overhead, and the attachment limb only **counted** files in the paired `-uploads`
+folder rather than restoring bytes. The "9.11 s total" was therefore database create
++ restore + `WorkOrder` count + a recursive file count + an empty timer + drop.
+`this commit` corrects the drill so the attachment limb copies the paired snapshot
+into a scratch tree and reads a file back, and the app limb stops the backend on
+`:4000`, rebuilds the backend and frontend, restarts the API and requires
+`GET /api/health` to return 200 before the timer stops. Re-run on this host
+2026-10-14: **PASS**, **85.82 s total** (app layer 79.65 s) against the four-hour
+budget. The status stays `Met` — the requirement is met; only the measurement was
+wrong — so no section-table row, header count or Totals changes. This note and matrix
+line 263 (`docs/SOW_COMPLIANCE.md`) supersede the "9.11 s total (app layer 0.36 s)"
+figure; `docs/ADMIN_GUIDE.md` §7.6 and `docs/ARCHITECTURE.md` now carry the corrected
+figure. The matching comment in `scripts/verify/verify_a1.py` repeats the 9.11 s
+figure and is left unchanged pending an owner call.
+

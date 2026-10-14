@@ -462,8 +462,8 @@ This is deliberately non-destructive. It:
 1. Picks the **newest** `cmms-*.sql` in `backups\`.
 2. Drops and recreates a scratch database, **`cmms_restore_test`** - never the live database.
 3. Restores the dump into it and runs a `WorkOrder` count query to prove the data is readable.
-4. Asserts the paired `-uploads` snapshot exists and is non-empty whenever the live tree has attachments. A dataset with no attachments correctly does not fail here.
-5. Drops the scratch database, confirms it is gone, and prints the elapsed seconds.
+4. Restores the paired `-uploads` snapshot into a scratch tree and reads a file back, failing if the restored file count differs from the snapshot's or a file cannot be read. A dataset with no attachments correctly does not fail here.
+5. Stops the backend on `:4000`, rebuilds the backend and frontend, restarts the API, and requires `GET /api/health` to return 200 - then drops the scratch database, confirms it is gone, and prints the elapsed seconds for the whole sequence.
 
 It prints `PASS` only if all of that succeeded, and cleans up the scratch database even on failure.
 
@@ -472,7 +472,7 @@ It prints `PASS` only if all of that succeeded, and cleans up the scratch databa
 ### 7.6 Recovery objectives
 
 - **RPO - measured at 5 minutes with WAL archiving on, 24 hours without it.** The daily `pg_dump` alone gives an RPO of up to 24 hours, because a failure between runs loses a day of work. With the WAL archiving configuration in [7.8](#78-wal-archiving-configuration-d-4) enabled, the objective is met and no longer asserted: measured on this host 2026-10-05 at an observed commit-to-archive lag of **1 s** with `archive_timeout=300`, which bounds worst-case loss to **5 minutes**. That bound only holds once `archive_mode=on` is actually set on the running host.
-- **RTO - measured, not designed.** The installation guide records a 5.35 second restore measured on 2026-09-25 against a local dataset of 84 work orders and a 306,826-byte dump. That is a restore of the *database into a scratch database on the same host*; it excludes application rebuild time, IIS configuration, and the attachment restore. Re-measure after meaningful database growth or any infrastructure change, and record the new figure rather than quoting the old one.
+- **RTO - measured, not designed.** The installation guide records a 5.35 second restore measured on 2026-09-25 against a local dataset of 84 work orders and a 306,826-byte dump. That is a restore of the *database into a scratch database on the same host*; it excludes application rebuild time, IIS configuration, and the attachment restore. The drill now also times the **full recovery sequence** - database restore, the paired attachment store restored into a scratch tree and read back, and the application layer stopped, rebuilt and brought back up on `/api/health`. Measured on this host **2026-10-14** against the 189-work-order dump: **85.82 s total** (app layer 79.65 s; the database-plus-attachment half is ~6.2 s), against the four-hour budget. That figure includes a from-source rebuild (backend `tsc` plus frontend `vite`); it excludes IIS configuration and OS reinstall, which the owner scoped out. Re-measure after meaningful database growth or any infrastructure change, and record the new figure rather than quoting the old one.
 
 The two together mean a nightly backup gives you a working system again within minutes, but potentially a day of data loss. If the plant cannot accept a day of loss, either enable WAL archiving per [7.8](#78-wal-archiving-configuration-d-4) or schedule `backup.bat` more often - the tooling supports a more frequent run, because retention and naming are time-based.
 
