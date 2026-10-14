@@ -303,6 +303,31 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
  *       - in: query
  *         name: equipmentClass
  *         schema: { type: string }
+ *       - in: query
+ *         name: $filter
+ *         schema:
+ *           type: string
+ *         description: OData-style filter (SOW 5.4); comparisons eq, ne, gt, ge, lt, le, contains joined by and/or with parentheses; string values are single-quoted. Invalid expressions return 400.
+ *       - in: query
+ *         name: $orderby
+ *         schema:
+ *           type: string
+ *         description: Comma-separated sort fields, each optionally asc or desc (default asc).
+ *       - in: query
+ *         name: $select
+ *         schema:
+ *           type: string
+ *         description: Comma-separated top-level scalar fields to project onto each row.
+ *       - in: query
+ *         name: $top
+ *         schema:
+ *           type: integer
+ *         description: Page size between 0 and 500; overrides take when present.
+ *       - in: query
+ *         name: $skip
+ *         schema:
+ *           type: integer
+ *         description: Offset; overrides skip when present.
  *     responses:
  *       '200':
  *         description: Array of equipment
