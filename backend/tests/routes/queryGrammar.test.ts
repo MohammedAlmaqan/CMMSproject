@@ -1,10 +1,16 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { api, authHeaders, ctx } from '../helpers.js';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { api, authHeaders, ctx, purgeWorkOrders } from '../helpers.js';
 
 // SOW 5.4: the bounded OData-style grammar. The unit suite pins the parser; this
 // suite pins the wiring — that the parameters reach the collection handlers, that
 // a malformed query is refused rather than silently ignored, and that the grammar
 // is served on both the unversioned and versioned prefixes.
+//
+// The seed leaves no work orders (SEED_DEMO=1 seeds master data only), and the
+// suite runs against a fresh database in CI, so this file creates the work orders
+// it needs and purges them afterwards rather than borrowing rows that may not be
+// there. The bare-array checks use seeded equipment and materials, which the seed
+// does provide.
 
 interface WorkOrderRow {
   workOrderId: string;
@@ -13,6 +19,7 @@ interface WorkOrderRow {
   priority: string;
 }
 
+const createdIds: string[] = [];
 let sample: WorkOrderRow | undefined;
 
 async function listWorkOrders(query: Record<string, string>) {
@@ -21,8 +28,36 @@ async function listWorkOrders(query: Record<string, string>) {
 
 describe('OData-style query grammar on GET collections (SOW 5.4)', () => {
   beforeAll(async () => {
+    const [fls, wcs] = await Promise.all([
+      api().get('/api/functional-locations').set(authHeaders(ctx.adminToken)),
+      api().get('/api/work-centers').set(authHeaders(ctx.adminToken)),
+    ]);
+    const flat = fls.body[0]?.functionalLocationId;
+    const wc = wcs.body[0]?.workCenterId;
+    const body = (overrides: Record<string, unknown> = {}) => ({
+      type: 'CM',
+      priority: 'Medium',
+      description: 'query grammar fixture',
+      functionalLocationId: flat,
+      workCenterId: wc,
+      supervisorUserId: ctx.adminId,
+      ...overrides,
+    });
+    for (let i = 0; i < 3; i++) {
+      const res = await api()
+        .post('/api/work-orders')
+        .set(authHeaders(ctx.adminToken))
+        .send(body({ description: `query grammar fixture ${i}` }));
+      expect(res.status).toBe(201);
+      createdIds.push(res.body.workOrderId);
+    }
+
     const res = await listWorkOrders({ $orderby: 'woNumber asc', $top: '1' });
     sample = Array.isArray(res.body?.data) ? res.body.data[0] : undefined;
+  });
+
+  afterAll(async () => {
+    await purgeWorkOrders(createdIds);
   });
 
   it('rejects a malformed $filter with 400 and names the problem', async () => {
@@ -61,6 +96,7 @@ describe('OData-style query grammar on GET collections (SOW 5.4)', () => {
   it('projects the response to the selected fields with $select', async () => {
     const res = await listWorkOrders({ $select: 'woNumber,status', $top: '3' });
     expect(res.status).toBe(200);
+    expect(res.body.data.length).toBeGreaterThan(0);
     for (const row of res.body.data) {
       expect(Object.keys(row).sort()).toEqual(['status', 'woNumber']);
     }
@@ -79,6 +115,7 @@ describe('OData-style query grammar on GET collections (SOW 5.4)', () => {
     const fragment = sample.woNumber.slice(0, 4);
     const res = await listWorkOrders({ $filter: `woNumber contains '${fragment.toLowerCase()}'` });
     expect(res.status).toBe(200);
+    expect(res.body.data.length).toBeGreaterThan(0);
     for (const row of res.body.data) {
       expect(row.woNumber.toLowerCase()).toContain(fragment.toLowerCase());
     }
@@ -126,6 +163,7 @@ describe('OData-style query grammar on GET collections (SOW 5.4)', () => {
       .query({ $select: 'equipmentCode,criticality', $top: '2', $orderby: 'equipmentCode asc' });
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThan(0);
     expect(res.body.length).toBeLessThanOrEqual(2);
     for (const row of res.body) {
       expect(Object.keys(row).sort()).toEqual(['criticality', 'equipmentCode']);
