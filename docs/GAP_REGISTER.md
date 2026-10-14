@@ -181,7 +181,7 @@ landed.
 | C4a | 2026-10-12 | `8add8d7` | 279 |
 | E1 | 2026-10-14 | `574d006` | 289 |
 | C4b | 2026-10-14 | `fdf0303` | 290 |
-| C4c | 2026-10-14 | `this commit` | n/a |
+| C4c | 2026-10-14 | `b31900c` | 292 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
