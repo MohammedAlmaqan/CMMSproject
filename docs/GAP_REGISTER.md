@@ -26,33 +26,22 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (12)
+## A. Close now — code and data gap (4)
 
 What it is, where it lives, size.
 
 | ID | Item | Where it lives | Size |
 |---|---|---|---|
 | C1 | Session security end to end: server-side idle expiry, refresh rotation, logout that revokes the presented token, technician identity taken from the session rather than the request. `backend/src/routes/auth.ts` exposes only `POST /login` and `GET /me`; there is no refresh or logout route at all, so the `RefreshToken` model is unused for rotation and the JWT stays valid for its full 8 hours | OWNER_ACTION_SHEET Table 2 "Session security"; matrix lines 259 (§4.2), 299 (§5.5); `README.md:263` | L |
-| C2 | Frontend access control: navigation and routes are not filtered by role. `app/src/components/layout/Sidebar.tsx` renders all 11 items for every role (matrix line 301), and `ProtectedRoute` checks authentication only (`app/src/App.tsx:24-27`); role is used only to gate data fetches (`appStore.ts:153-166`) | OWNER_ACTION_SHEET Table 2 "Frontend access control"; matrix line 301 (§5.5) | M |
-| C3 | Planning and intake screens — closed. `PreventiveMaintenancePage.tsx` now drives plan create/edit/delete (multi-target rows per D-10 and meter-threshold rows for Meter/Combined per SOW 3.4.2), plus a role-gated on-demand scheduler control; `NotificationsPage.tsx` gained the notification-intake form over the existing `POST /notifications`. Delivered `40cb3c3`, `8ed6f70`, `cf2f9c5` | Table 2 "Planning and intake screens"; matrix lines 38 (§1.3), 52 (§2.1), 61 (§2.2) | Done |
-| C4a | Master-data editing screens. The write APIs exist — BOM `POST`/`PUT`/`DELETE` (`equipment.ts:963`, `:1049`, `:1114`), cost splits (`workOrderCostSplits.ts`), meters (`equipmentMeters.ts`), plan meters written inside the plan `PUT` (`maintenancePlans.ts:509-513`) — but no screen drives them. This pass closes the screens only | Table 2 "Master-data editing and bulk access"; matrix line 59 (§2.2) | Done |
 | C4b | JSON bulk endpoint for Functional Locations: `functionalLocations.ts:275`/`:394` are single-row, so there is no bulk import/export path | Matrix line 295 (§5.4) | M |
 | C4c | OData-style query grammar: no `$filter`/`$top` anywhere, conventional `skip`/`take` only | Matrix line 296 (§5.4) | M |
-| C6 | Audit completeness: per-column old/new values on the handlers that lack them, enforced at the middleware boundary, plus the configurable 7-year purge job. Measured 2026-10-08: 5 route files with `PUT` routes import neither `logFieldChanges` nor `logAuditFieldChange` (alerts, externalServiceCosts, safetyChecklists, workOrderCostSplits, workOrderMaterials — 7 handlers), `auditMiddleware` is exported at `backend/src/middleware/audit.ts:119` and never used, and no purge/retention job exists (matrix line 264: the 7-year default is a seed comment only) | Table 2 "Audit completeness"; matrix lines 55 (§2.1), 264 (§4.3), 289, 290 (§5.3) | L |
-| C9 | "View assigned" not enforced: `GET /api/work-orders` builds `where` with no assignment scoping (`workOrders.ts:97-131`), so every holder sees every work order | Matrix line 63 (§2.2) | M |
-| C10 | Unauthenticated `/api/health/scheduler` exposes plan counts and last-run state; the handler carries no `authenticate` and `apiRouter` has no global auth middleware (`index.ts:225`) | Matrix line 300 (§5.5) | S |
 | C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
-| C13 | Total recovery time: measured. DB restore + attachments + app layer = 9.11 s (app 0.36 s) on live stack using backup cmms-2026-09-29-1659.sql with paired uploads; WorkOrder 189, attachment snapshot verified, drill DB dropped. Script ready and exercised. | Table 2 "Total recovery time"; matrix line 263 (§4.3) | Done |
-| C19 | Settings screen made accurate. The duplicate "Audit Log Retention" static row is removed (the value is shown once, as the editable `audit_retention_years` setting); the "PM Scheduler" row no longer claims 06:00 - it states the server cron default (02:00, `PM_SCHEDULER_CRON`) and that it is not configurable here; and the remaining fixed rows (session timeout, upload limit, password policy, language) carry accurate descriptions under a "Read-only (fixed configuration)" label. No values are newly enforced. | Found on my own; `README.md:264` | Done |
 
-## B. Close now — documentation gap (4)
+## B. Close now — documentation gap (1)
 
 | ID | Item | Where it lives | Size |
 |---|---|---|---|
 | D1 | Documentation accuracy sweep — one entry, with what it covers: the five stale limitation-register claims named in OWNER_ACTION_SHEET note 8 (no task-list screen — `TaskListsPage.tsx` exists; no meter/combined PM strategy — `scheduler.ts:111` evaluates all three; hard-coded generated status; read-only BOM/cost-split lines — both have write endpoints; no system-generated alerts — all four fire); the stale Table 1 asks (item 1 "no failure field" — `WorkOrder.failureCodeId` exists at `schema.prisma:372`, delivered `1e4b28c`; item 5 "trial-run report missing" — delivered `c81bc3d`; item 6 — decided 2026-10-05, see N9; item 7 — answered by D-7) and the "Seven items need your answer" header; `README.md:262` ("200-user load test remains post-go-live" — the run passed 2026-10-03 and GO was approved), `README.md:265` and `README.md:266` figures; the value-domain comments in `schema.prisma` against the C15 CHECK constraints — closing C15 (`50ff911`, run 241) found two drifts, `SystemAlert.alertType` omitting `Account_Lockout` and `Comment.entityType` omitting `MaintenancePlan`; both comments were corrected at `3ea1b30` (run 242) and all 24 pinned domains now match their comments, so this is the standing re-check rather than an open correction; the tracker's teardown figure — R.9 D3-cleanup-errors and the Phase R close-out still read 68 across 13, but the count re-derived from source and verified by the C14 closure is **54 in 12** (`fd86709`); the stale matrix citations `index.ts:172-192` (line 297) and `workOrders.ts:567` (line 126; declaration is `:752`, applied `:835`) plus the `verify_a1.py` line ranges; and the Table 2 "Migration tooling" wording that reads as if the live importers were done (they are harness-only, see C5); and the unrefreshed `docs/openapi.json` snapshot (a manual re-export, last changed `5aa0094`, still listing the old action set and no `Blocked`, with no gate that regenerates it — a dated stale snapshot to be refreshed, not silently half-patched) | Table 2 "Documentation accuracy sweep"; tracker v1.1-8 (partially exercised `f58e478`) | L |
-| D3 | Matrix §2.2 line 62's note ("the Close permission is not enforced server-side") is stale: `requireSupervisorForClose` is declared at `workOrders.ts:752`, applied at `:835` after `validate(...)`, landed `206e1de`, and is asserted by `workOrders.test.ts:224-249` (Technician 403, Supervisor 200); §3.3.2 line 126 is `Met` on that evidence. The note is the only basis for line 62's `Partial`, so the Status is the owner's call | Matrix line 62 (§2.2) | S (edit) |
-| D4 | Matrix §5.4 line 292's limbs are contradicted: BOM lines have `POST`/`PUT`/`DELETE` (`equipment.ts:963`/`:1049`/`:1114`), cost splits are created and soft-deleted (`workOrderCostSplits.ts:256`), and plan meters are written in the plan `PUT` (`maintenancePlans.ts:509-513`) — so "deletes are absent on several entities" and "child collections are read-only" no longer hold for master data or work orders. Residual deletes genuinely absent: `SystemAlert`, checklist templates, meter readings, system config — none of which is master data or a work order. Status is the owner's call | Matrix line 292 (§5.4) | S (edit) |
-| D5 | Tracker v1.1-6's premise is wrong on the current tree: there is no audit-log action filter dropdown in `AdministrationPage.tsx` (only a free-text filter at line 128, which already matches on `action`, so `Blocked` entries are isolable today). What is stale is the v1.1-6 wording itself and the swagger `action` description at `auditLog.ts:37`, which lists Create/Update/Delete/Run while `AuditAction` includes `Blocked` (`middleware/audit.ts:6`) and five routes write it (labor `:152`/`:285`, notifications `:413`, workOrders `:862`/`:900`) | Tracker v1.1-6 | S |
 
 ## C. Blocked on owner (0)
 
@@ -153,8 +142,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-12 code and data gaps · 4 documentation gaps · 0 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **27 open items**.
+4 code and data gaps · 1 documentation gap · 0 blocked on owner · 1 blocked on external ·
+10 decisions-not-gap = **16 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
