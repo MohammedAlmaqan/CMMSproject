@@ -26,6 +26,7 @@
   - Limitation: the full `backup.bat` / restore-drill was never executed against live PostgreSQL because that needs `PGPASSWORD` and `.env` must not be read. The new upload logic was verified with isolated batch harnesses (20-file snapshot, 16→14 retention, restore-drill 0/20, 20/20, 0/0). **A first real run on the target server is still owed.**
 - **6.3 Security** — account lockout after 5 failed logins `6d983d3`; 30-min idle session timeout `bd8faeb`; HTTPS/TLS reverse-proxy steps `3380466`.
   - **Idle timeout is client-side only** — clears local state and redirects, but the JWT stays valid server-side for its full 8-hour expiry. Documented honestly in `7448f93`; do not describe it as server-side session termination.
+    **Superseded 2026-10-15 (C1):** the idle window is now enforced server-side and the JWT is short-lived (15 minutes) with a rotating refresh cookie, so this note no longer holds. See the C1 closure-log row in `docs/GAP_REGISTER.md`.
   - **Follow-ups:** `app.set('trust proxy', 1)` + `PM_SCHEDULER_CRON` documented `bcb7b1f`; `BIND_HOST` env + Windows Firewall guidance `fbbfd87`.
 - **6.4 Logging** — structured pino logging + PM2 rotation `e890a92`.
 - **6.5 k6 smoke** — 50 VU smoke + `K6_MODE` login-limiter override `96abd8a`; P2028 deferred to post-go-live `16a16d7`; `K6_MODE` guard hardened against production `703ad77`.
@@ -100,6 +101,7 @@ the section above.
     `/api-docs.json` paths non-empty (3 paths), `/api/work-orders` group present, swagger-ui renders. tnc 20 routers deferred (Phase 3 note).
   - 2.12 Refresh decision recorded 2026-09-24: fixed 8h session retained; RefreshToken model unwired/reserved.
     Proved live: token `exp-iat=28800`; `JWT_EXPIRES_IN=28800` in `.env.example`. No refresh endpoints built.
+    **Superseded 2026-10-15 (C1):** the fixed 8-hour session was replaced by a short access token (15 minutes by default) plus a rotating httpOnly refresh cookie, with `POST /api/auth/refresh` and `POST /api/auth/logout`. `JWT_EXPIRES_IN` is now only a legacy fallback for `ACCESS_TOKEN_TTL`. See the C1 closure-log row in `docs/GAP_REGISTER.md`.
   - Proof: `verify_g6b.py` PASS exit 0 — login UI+API, sidebar asserts, click-through both routes, direct renders,
     swagger gates, `PAGE_ERRORS=[]`. Screenshots `screenshots/g6b_01..06`.
 - **Phase 4 — COMPLETE.** DB & Build Hygiene.

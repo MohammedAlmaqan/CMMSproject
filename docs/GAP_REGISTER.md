@@ -26,13 +26,12 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (2)
+## A. Close now — code and data gap (1)
 
 What it is, where it lives, size.
 
 | ID | Item | Where it lives | Size |
 |---|---|---|---|
-| C1 | Session security end to end: server-side idle expiry, refresh rotation, logout that revokes the presented token, technician identity taken from the session rather than the request. `backend/src/routes/auth.ts` exposes only `POST /login` and `GET /me`; there is no refresh or logout route at all, so the `RefreshToken` model is unused for rotation and the JWT stays valid for its full 8 hours | OWNER_ACTION_SHEET Table 2 "Session security"; matrix lines 259 (§4.2), 299 (§5.5); `README.md:263` | L |
 | C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
 
 ## B. Close now — documentation gap (1)
@@ -141,8 +140,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-2 code and data gaps · 1 documentation gap · 0 blocked on owner · 0 blocked on external ·
-10 decisions-not-gap = **13 open items**.
+1 code and data gap · 1 documentation gap · 0 blocked on owner · 0 blocked on external ·
+10 decisions-not-gap = **12 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -182,6 +181,7 @@ landed.
 | E1 | 2026-10-14 | `574d006` | 289 |
 | C4b | 2026-10-14 | `fdf0303` | 290 |
 | C4c | 2026-10-14 | `b31900c` | 292 |
+| C1 | 2026-10-15 | this commit | this commit |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -421,4 +421,29 @@ C4b's cited surface are not swept here and are carried for the **D1** documentat
 sweep: `SOW_COMPLIANCE.md:59` (§2.2 "CSV for 2 entities only"),
 `OWNER_ACTION_SHEET.md:28` ("JSON bulk endpoints for locations"), and the
 `API_REFERENCE.md` importer rows.
+
+**C1** (`this commit`, 2026-10-15). C1 was the session-security workstream:
+server-side idle expiry, refresh-token rotation, a logout that revokes the
+presented token, and a technician identity taken from the session rather than the
+request. The identity limb was already delivered earlier — `backend/src/utils/attribution.ts`
+with `backend/src/routes/labor.ts:145` (matrix line 140) — so C1 covered the other
+three. The access token is now short-lived (15 minutes by default) and carries a
+`sid` claim naming a `RefreshToken` session row; `schema.prisma` gained
+`RefreshToken.lastUsedAt` (migration `20261014120000_refresh_token_last_used`), and
+`backend/src/middleware/auth.ts` rejects any token whose session is missing,
+revoked, expired or idle past `SESSION_IDLE_MS` (30 minutes), touching `lastUsedAt`
+on a throttle. `POST /api/auth/login` now also sets an httpOnly `cmms_refresh`
+cookie (sameSite strict, `path=/api`, `secure` in production) stored only as a
+sha256 hash, and `POST /api/auth/refresh` rotates it single-use while inheriting the
+session's absolute `expiresAt`; replaying a rotated or revoked token revokes every
+live session for the user. `POST /api/auth/logout` revokes the presented token and
+is idempotent. The frontend (`app/src/lib/api.ts`) does a single-flight refresh on a
+401 and retries once, with a registered auth-failure handler that logs out and
+redirects. Matrix line 259 (§4.2 30-minute session timeout) and line 299 (§5.5 JWT
+refresh rotation) both move `Partial` → `Met`, so category A drops to 1 (C11) and
+the Totals line to 12 open items. Limitation row L8 is marked resolved. The verifier
+promotion entries (`"4.2 session-timeout"`, `"5.5 jwt-refresh"`, `Partial` → `Met`,
+`this commit`) land in the same commit. All work ran against the throwaway
+`cmms_c1` database; the operational `cmms` database was not seeded, migrated or
+written.
 

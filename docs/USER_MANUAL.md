@@ -74,7 +74,7 @@ Note that a correct password entered inside the lockout window still returns the
 
 If you do not move the mouse, click, type, scroll, or touch the screen for **30 minutes**, a warning appears for 60 seconds and then you are signed out and returned to the sign-in screen. Any of those actions counts as activity, so working normally will not trigger it.
 
-This timeout runs in your browser only. It reduces the risk of an unattended left-open screen, but it is not a server-side session control: if someone bypasses the browser, the token itself remains valid until it expires (8 hours by default). See [Security posture](ADMIN_GUIDE.md#12-security-posture).
+The 30-minute limit is enforced by the system, not only by your browser: the sign-in token is short-lived (15 minutes) and the server refuses a session that has been idle, so bypassing the browser no longer keeps a session alive. Signing out also ends the session on the server. See [Security posture](ADMIN_GUIDE.md#12-security-posture).
 
 ---
 

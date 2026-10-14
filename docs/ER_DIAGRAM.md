@@ -40,6 +40,7 @@ erDiagram
         string userId FK
         datetime expiresAt
         boolean revoked
+        datetime lastUsedAt
     }
 
     %% ============================================================

@@ -88,7 +88,9 @@ Configuration is mostly by environment variable. The backend reads `backend/.env
 |---|---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string | **Required**, no default | When the database host, port, database name, or credentials change. See the pool guidance in [14.3](#143-prisma-p2028---connection-pool-exhaustion) |
 | `JWT_SECRET` | Secret used to sign session tokens | **Required**, no default | Generate a new long random value at install. Rotate only with a plan: every issued token becomes invalid and all users must sign in again |
-| `JWT_EXPIRES_IN` | Token lifetime in **seconds** | `28800` (8 hours) | Lower it to shorten exposure on a shared workstation; raise it for long shifts. Changing it does not revoke tokens already issued |
+| `ACCESS_TOKEN_TTL` | Access-token lifetime in **seconds** | `900` (15 minutes) | Short by design — a session is kept alive by the refresh cookie, so this can stay small. Raise it only if a client cannot refresh. `JWT_EXPIRES_IN` is still read as a legacy alias. Changing it does not revoke tokens already issued |
+| `REFRESH_TOKEN_TTL` | Absolute session lifetime in **seconds** | `28800` (8 hours) | The longest a session can live, across refreshes. Lower it to cap a working day |
+| `SESSION_IDLE_MS` | Server-side idle window in **milliseconds** | `1800000` (30 minutes) | The server refuses a session idle longer than this, independently of the browser. Keep it in step with the browser idle timeout |
 | `PORT` | TCP port the API listens on | `4000` | When another service already owns 4000. The frontend's `VITE_API_URL` and the IIS proxy rule must be changed to match |
 | `CORS_ORIGINS` | Comma-separated list of browser origins permitted to call the API | `http://localhost:3000` | **Always**, when the frontend is served from anywhere other than `http://localhost:3000`. Use full origins including scheme, host, and port, with no trailing slash. A mismatch produces a blank screen with no data and a CORS error in the browser console |
 | `BIND_HOST` | Interface the API binds to | `0.0.0.0` | Set to `127.0.0.1` whenever the API sits behind IIS on the same host. This is what keeps port 4000 off the network. See [12.1](#121-network-exposure) |
@@ -327,7 +329,7 @@ To re-enable, send `"isActive": true`. Both directions are written to the audit 
 
 Two things to know:
 
-- Disabling takes effect at the user's **next** sign-in attempt. It does not terminate a session already in progress, and there is no server-side session revocation in this system - see [13](#13-deferred-and-not-implemented).
+- Disabling takes effect at the user's **next** sign-in attempt. It does not by itself terminate a session already in progress: server-side revocation exists from C1 (logout and rotation-reuse), but disabling a user does not trigger it, so an in-progress session ends on the idle window or at its absolute cap. See [13](#13-deferred-and-not-implemented).
 - A disabled account returns the same generic `Invalid credentials` as a wrong password. This is deliberate, to avoid confirming which usernames exist. When a user insists their password is right, check the active flag.
 
 SQL fallback for re-enabling, if the API is unreachable (bypasses the audit log):
@@ -614,11 +616,13 @@ Stated plainly, including the gaps. This is a defensible baseline for an interna
 | Password storage | bcrypt |
 | Sign-in rate limit | 20 requests per 15 minutes per IP, returning `429` |
 | Account lockout | 5 failures within 15 minutes locks the account for 30 minutes, returning `423` |
-| Token lifetime | `JWT_EXPIRES_IN`, default 8 hours |
-| Idle timeout | 30 minutes with a 60-second warning, **in the browser only** |
+| Access-token lifetime | `ACCESS_TOKEN_TTL`, default 15 minutes (`JWT_EXPIRES_IN` is still read as a legacy alias) |
+| Session lifetime | `REFRESH_TOKEN_TTL`, default 8 hours — the absolute cap across rotations |
+| Idle timeout | 30 minutes, enforced **server-side** (`SESSION_IDLE_MS`) as well as warned in the browser with a 60-second toast |
+| Session revocation | Logout revokes the presented refresh token; replaying a rotated token revokes every live session for that user |
 | Generic failure message | A wrong password, and a disabled or deleted account, both return `Invalid credentials`, so the endpoint does not confirm which usernames exist |
 
-Not implemented, and material to a security review: server-side session revocation, multi-factor authentication, forced password rotation, and a "must change password" flag. See [13](#13-deferred-and-not-implemented).
+Not implemented, and material to a security review: multi-factor authentication, forced password rotation, and a "must change password" flag. (Server-side session revocation *is* implemented from C1: logout, rotation-reuse and the idle window all revoke the session server-side.) See [13](#13-deferred-and-not-implemented).
 
 ### 12.3 Proxy trust and recorded IP addresses
 
@@ -658,7 +662,7 @@ Recorded here so that nobody plans an operation around a feature that does not e
 | Manual scheduler trigger screen | No UI. `POST /api/maintenance-plans/run-scheduler` only |
 | System settings screen | Partly editable. Only `wo_number_prefix` and `notif_number_prefix` write via `PUT /api/system-config`; the other displayed values are environment-only |
 | Content-Security-Policy | Disabled. See [12.1](#121-network-exposure) |
-| Server-side session revocation | Not implemented. Disabling a user takes effect at their next sign-in only |
+| Server-side session revocation | Implemented from C1 (logout, rotation-reuse, idle window). Disabling a user still takes effect at their next sign-in, not by revoking an in-progress session |
 | Multi-factor authentication | Not implemented |
 | Forced password change / expiry | Not implemented. A reset password stays in force |
 | Read logging | Not implemented. The audit log cannot answer who viewed a record |

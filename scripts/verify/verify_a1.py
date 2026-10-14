@@ -372,6 +372,31 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # closure-log row in docs/GAP_REGISTER.md and the row-296/L22 notes in
     # docs/SOW_COMPLIANCE.md.
     ("5.4 odata", "Partial", "Met", "this commit"),
+
+    # SOW 4.2 "Session timeout after 30 minutes of inactivity" (row 259).
+    # C1 replaced the browser-only idle timer with server-side enforcement. The
+    # access token now carries a `sid` claim naming a RefreshToken session row
+    # and the auth middleware refuses a token whose session is missing, revoked,
+    # expired or idle past SESSION_IDLE_MS (default 30 minutes), touching
+    # `lastUsedAt` on a throttle; the 8-hour JWT is therefore no longer valid on
+    # its own, which was the residual this clause carried. Not a section 3 row,
+    # so this moves EXPECT_ALL only. The status change and this wiring land
+    # together, so "this commit" is the sentinel; backfill the SHA. Durable
+    # anchor: the C1 closure-log row in docs/GAP_REGISTER.md and the row-259/L8
+    # notes in docs/SOW_COMPLIANCE.md.
+    ("4.2 session-timeout", "Partial", "Met", "this commit"),
+
+    # SOW 5.5 "JWT access tokens with refresh token rotation" (row 299).
+    # C1 added POST /api/auth/refresh (single-use rotation: the presented token
+    # is revoked and a new one issued, inheriting the session's absolute
+    # expiresAt) and POST /api/auth/logout (revokes the presented token). The
+    # refresh token is an httpOnly cookie stored only as a sha256 hash, so a
+    # rotated token replayed again revokes every live session for the user. The
+    # string `refreshToken` is no longer absent from backend/src. Not a section
+    # 3 row, so this moves EXPECT_ALL only. "this commit" is the sentinel;
+    # backfill the SHA. Durable anchor: the C1 closure-log row in
+    # docs/GAP_REGISTER.md and the row-299 note in docs/SOW_COMPLIANCE.md.
+    ("5.5 jwt-refresh", "Partial", "Met", "this commit"),
 ]
 
 

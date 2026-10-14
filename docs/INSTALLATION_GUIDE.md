@@ -215,14 +215,16 @@ The command must return HTTP 200 with the health payload. `-k` is required only 
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | Required |
 | `JWT_SECRET` | JWT signing secret | Required |
-| `JWT_EXPIRES_IN` | Token lifetime (seconds) | 28800 (8h) |
+| `ACCESS_TOKEN_TTL` | Access-token lifetime (seconds). Short by design; sessions are renewed by the rotating refresh cookie. `JWT_EXPIRES_IN` is still accepted as a legacy alias | 900 (15m) |
+| `REFRESH_TOKEN_TTL` | Absolute session lifetime (seconds), inherited across rotations | 28800 (8h) |
+| `SESSION_IDLE_MS` | Server-side idle window (milliseconds); a session idle longer is refused | 1800000 (30m) |
 | `PORT` | API server port | 4000 |
 | `CORS_ORIGINS` | Comma-separated browser origins allowed to call the API | http://localhost:3000 |
 | `LOG_LEVEL` | Pino log level | info |
 | `BIND_HOST` | Interface the API listens on | 0.0.0.0 |
 | `PM_SCHEDULER_CRON` | Cron expression driving the PM scheduler | 0 2 * * * |
 
-These eight are every variable the API reads, and they match
+These ten are every variable the API reads, and they match
 `backend\.env.example` line for line. `backend\.env` is loaded by Node's own
 `--env-file` flag at launch rather than by a dotenv library, so a missing
 variable silently falls back to its default, except `JWT_SECRET`, which
@@ -452,7 +454,7 @@ cd C:\CMMSproject
 scripts\k6\k6.exe run scripts\k6\smoke.js
 ```
 
-The script drives 50 VUs through a 2-minute ramp, 5 minutes at steady state, and a 1-minute ramp-down, exercising login → `GET /api/work-orders?take=10` → `GET /api/work-orders/:id`. Each VU signs in once and then loops the read path; signing in on every iteration would exceed even the 200/15min ceiling. There is no server-side logout endpoint because access tokens are stateless JWTs, so the session ends client-side in `teardown()`. Override the target and credentials with `BASE_URL`, `CMMS_USER`, `CMMS_PASS`, and `THINK_TIME`.
+The script drives 50 VUs through a 2-minute ramp, 5 minutes at steady state, and a 1-minute ramp-down, exercising login → `GET /api/work-orders?take=10` → `GET /api/work-orders/:id`. Each VU signs in once and then loops the read path; signing in on every iteration would exceed even the 200/15min ceiling. The script does not call a logout endpoint and simply stops driving the read path in `teardown()`; the sessions it created expire on their own. (A logout endpoint was added in C1, after this script was written.) Override the target and credentials with `BASE_URL`, `CMMS_USER`, `CMMS_PASS`, and `THINK_TIME`.
 
 The **100-VU acceptance run** (SOW §6.4.3) is the same login → list → detail path at 100 VUs — `scripts\k6\k6.exe run scripts\k6\acceptance.js`. It executes 2026-09-29 as **one ramp-hold-down scenario** (2-minute ramp to 100, 5-minute hold, 1-minute ramp-down) so only ~100 VUs exist and the run stays inside the 200/15-min `K6_MODE` login ceiling without tripping it; **do not** re-add a multi-scenario layout, as three fresh 100-VU pools sign in ~300 times and trip that limiter. The post-fix (G.6) run passed cleanly: `http_req_failed` 0.00%, p(95) 235.65 ms, 0 P2028. Ensure the target database schema is current (`npx prisma migrate deploy`) before treating the read results as authoritative.
 

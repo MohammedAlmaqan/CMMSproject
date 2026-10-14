@@ -39,7 +39,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | Table | Purpose | Key fields | Foreign keys | Delete |
 | --- | --- | --- | --- | --- |
 | `User` | Login identity, role and lockout state. | `userId` PK; `username` (partial unique); `passwordHash`; `fullName`; `email`; `role` free text — Administrator, Maintenance Planner, Maintenance Supervisor, Technician, Requester, View-Only; `workCenterId?`; `isActive`; `failedLoginCount` (default 0); `lockedUntil?`; `lastLogin?` | `workCenterId` → `WorkCenter.workCenterId`, nullable | Soft (`isDeleted`) |
-| `RefreshToken` | Issued refresh tokens for session renewal. | `tokenId` PK; `token` `@unique`; `expiresAt`; `revoked` (default false); `createdAt` | `userId` → `User.userId`, required | Hard |
+| `RefreshToken` | Issued refresh tokens for session renewal; one row is one server-side session. | `tokenId` PK; `token` `@unique` (sha256 hash of the cookie value); `expiresAt` (absolute session cap); `revoked` (default false); `lastUsedAt` (default now; touched on a throttle to enforce the idle window); `createdAt` | `userId` → `User.userId`, required | Hard |
 
 ## Location & Assets
 

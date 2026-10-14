@@ -6,11 +6,11 @@ Reference documentation for the CMMS REST API, version 1.0.0.
 - **Interactive UI:** `/api-docs` (Swagger UI)
 - **Machine-readable spec:** [`openapi.json`](./openapi.json) (OpenAPI 3.0.0, also served live at `/api-docs.json`)
 
-The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The repository routers and the live spec agree at **141 operations across 87 paths and 27 routers**. The checked-in `docs/openapi.json` is an exported snapshot of the live spec, refreshed from a running server on 2026-10-06 (141 operations / 87 paths — earlier exports lagged; the 2026-10-02 export showed 114 operations / 71 paths). Re-export it after a fresh build by saving `/api-docs.json`.
+The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The repository routers and the live spec agreed at **141 operations across 87 paths and 27 routers** as of the 2026-10-06 snapshot. **That figure is stale:** re-derived from the route annotations on 2026-10-15 the live spec is **146 operations across 92 paths** — the five later operations are `POST /api/auth/refresh` and `POST /api/auth/logout` (C1, 2026-10-15), plus `POST /api/audit-log/purge`, `POST /api/functional-locations/import.csv` and `POST /api/work-orders/import.csv`. Correcting the figure everywhere it appears and re-exporting `docs/openapi.json` is tracked under the `v1.1-8` audit and is not done here. The checked-in `docs/openapi.json` is an exported snapshot of the live spec, refreshed from a running server on 2026-10-06 (141 operations / 87 paths — earlier exports lagged; the 2026-10-02 export showed 114 operations / 71 paths). Re-export it after a fresh build by saving `/api-docs.json`.
 
 ## Authentication
 
-All endpoints require a bearer token **except** `POST /api/auth/login`.
+All business endpoints require a bearer token. The auth endpoints that do not read it are `POST /api/auth/login` (public, also sets the refresh cookie) and `POST /api/auth/refresh` / `POST /api/auth/logout`, which read the httpOnly `cmms_refresh` cookie instead.
 
 Obtain a token by posting credentials:
 
@@ -26,6 +26,8 @@ The response carries a JWT plus the user profile. Send it on every subsequent re
 ```
 Authorization: Bearer <token>
 ```
+
+`POST /api/auth/login` also sets an httpOnly `cmms_refresh` cookie (path `/api`, `SameSite=Strict`; `Secure` in production). It holds a single-use refresh token whose sha256 hash is stored on the `RefreshToken` row. When the short-lived access token expires, `POST /api/auth/refresh` reads that cookie and returns a new access token, rotating the cookie; replaying an already-rotated token revokes the session family. `POST /api/auth/logout` revokes the session and clears the cookie. The frontend sends the cookie automatically (`credentials: 'include'`).
 
 The login route is rate limited. A missing or invalid token returns `401`; a token whose role is too low for the endpoint returns `403`.
 
@@ -61,7 +63,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 
 ## Endpoint groups
 
-141 operations across 87 paths and 27 routers, counted against the running server's `/api-docs.json` on 2026-10-06. The repository routers and the live spec agree at 141 (`POST /api/cause-codes` was the last un-annotated handler; it now carries an `@openapi` block). The previous 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
+141 operations across 87 paths and 27 routers, counted against the running server's `/api-docs.json` on 2026-10-06 (stale — see the introductory note above; the re-derived live count is 146 operations across 92 paths, tracked under `v1.1-8`). The repository routers and the live spec agree at 141 (`POST /api/cause-codes` was the last un-annotated handler; it now carries an `@openapi` block). The previous 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
 
 | Group | Base path | Operations |
 | --- | --- | --- |
@@ -97,8 +99,10 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| POST | `/api/auth/login` | Sign in and obtain a JWT (public) |
+| POST | `/api/auth/login` | Sign in and obtain a JWT; also sets the rotating refresh cookie (public) |
 | GET | `/api/auth/me` | Return the current user's profile |
+| POST | `/api/auth/refresh` | Rotate the refresh cookie and issue a new access token (reads the httpOnly cookie, not the Bearer header) |
+| POST | `/api/auth/logout` | Revoke the session named by the refresh cookie and clear it; idempotent, returns 204 |
 
 ### Functional Locations
 

@@ -20,7 +20,7 @@ A Vite 7 + TypeScript single-page app. In development the Vite dev server listen
 
 ### Express + TypeScript API (`backend/`)
 
-An ESM Node application (`"type": "module"` in `backend/package.json`) built with `tsc` to `backend/dist/` and run as plain Node. It listens on port 4000 (`process.env.PORT`, default `4000`). Data access goes through Prisma ORM against PostgreSQL. The API is stateless with respect to sessions: it validates a bearer JWT and holds no session store. It mounts 27 route groups plus a Swagger UI (previously cited here as 26, before `routes/causeCodes.ts` was added in `9b1758c` on 2026-10-03; counted 2026-10-08), and every router except `auth.ts` applies `router.use(authenticate)` so authentication is enforced per router rather than globally. Cross-cutting concerns are deliberately separated: `src/middleware/` (auth, RBAC, validation, audit), `src/services/` (domain logic and the scheduler), `src/utils/` (config, logger, CSV, sequencing).
+An ESM Node application (`"type": "module"` in `backend/package.json`) built with `tsc` to `backend/dist/` and run as plain Node. It listens on port 4000 (`process.env.PORT`, default `4000`). Data access goes through Prisma ORM against PostgreSQL. The API keeps no in-memory session store and scales horizontally, but since C1 it is not session-free: a request whose access token carries a `sid` claim is checked against the `RefreshToken` session row in PostgreSQL, so a revoked or idle session is refused even while its JWT would still verify. It mounts 27 route groups plus a Swagger UI (previously cited here as 26, before `routes/causeCodes.ts` was added in `9b1758c` on 2026-10-03; counted 2026-10-08), and every router except `auth.ts` applies `router.use(authenticate)` so authentication is enforced per router rather than globally. Cross-cutting concerns are deliberately separated: `src/middleware/` (auth, RBAC, validation, audit), `src/services/` (domain logic and the scheduler), `src/utils/` (config, logger, CSV, sequencing).
 
 ### PostgreSQL 15+
 
@@ -121,8 +121,10 @@ Ordering is enforced by construction, not convention: `authenticate` is register
 |---|---|---|
 | JWT bearer tokens | HS256 via `jsonwebtoken`; `jwt.verify` per request | `middleware/auth.ts` |
 | Secret fail-closed | `JWT_SECRET` missing ⇒ throw at boot, no default | `utils/config.ts` |
-| Token lifetime | Fixed absolute expiry, default 28800 s (8 h) | `utils/config.ts` |
-| Idle timeout | 30 min + 60 s warning, **client-side only** | `app/src/hooks/useIdleTimeout.ts` |
+| Access-token lifetime | Absolute expiry, default 900 s (15 min); `JWT_EXPIRES_IN` is a legacy alias | `utils/config.ts` |
+| Idle timeout | 30 min + 60 s browser warning, **enforced server-side** by `SESSION_IDLE_MS` | `app/src/hooks/useIdleTimeout.ts`; `middleware/auth.ts` |
+| Refresh rotation | Single-use rotation; replay revokes the whole session family; httpOnly `cmms_refresh` cookie, sha256-hashed | `routes/auth.ts`; `utils/session.ts` |
+| Session lifetime | Absolute cap across rotations, default 28800 s (8 h) | `utils/config.ts` |
 | RBAC | 6-rank hierarchy, `authorizeMinRole` | `middleware/auth.ts` |
 | Exact-role guard | `authorize(...)` for Administrator-only routes | `middleware/auth.ts` |
 | CORS | Comma-separated allow-list, default `http://localhost:3000` | `index.ts:40` |
@@ -152,12 +154,11 @@ Both conditions are required. Since PM2 pins `NODE_ENV: 'production'`, **any pro
 | unset | `production` | 20 |
 | unset | `development` | 20 |
 
-### Controls that are absent
+### Security controls
 
 Stating these plainly matters more than the table above:
 
-- **The idle timeout is client-side only.** A 30-minute idle timeout with a 60-second warning does exist and is wired into `AppLayout` (`app/src/hooks/useIdleTimeout.ts`, 3 passing tests), keyed on `mousemove`, `mousedown`, `keydown`, `scroll`, and `touchstart` plus API activity. On expiry it calls the client-side `logout()` store action and redirects to `/login`. **It invalidates nothing server-side.** There is no logout endpoint and no token revocation, so the JWT stays cryptographically valid for its full 8 hours; a client that discards its token does not stop anyone else from replaying a captured one. Treat this as a convenience logout, not a session control.
-- **No refresh tokens and no logout endpoint.** `auth.ts` exposes only `POST /login` and `GET /me`. A `RefreshToken` model exists in the schema and is unused. Because auth is stateless, a logout cannot invalidate an already-issued token; the 30-minute account lockout and the 8-hour expiry are the only server-side brakes.
+- **Session controls are server-side from C1 (2026-10-15).** The 30-minute idle timeout still runs in the browser as the UX warning (`app/src/hooks/useIdleTimeout.ts`, wired into `AppLayout`, keyed on `mousemove`, `mousedown`, `keydown`, `scroll`, `touchstart` plus API activity), but the server enforces the same window independently: the access token is short-lived (15 minutes by default) and carries a `sid` claim naming a `RefreshToken` session row, and `backend/src/middleware/auth.ts` refuses a token whose session is missing, revoked, expired or idle past `SESSION_IDLE_MS`. `POST /api/auth/refresh` rotates the refresh token single-use (reuse revokes the whole family) and `POST /api/auth/logout` revokes the presented token, so a logout is no longer advisory. *These two bullets previously read, under a heading "Controls that are absent": "The idle timeout is client-side only ... It invalidates nothing server-side" and "No refresh tokens and no logout endpoint. `auth.ts` exposes only `POST /login` and `GET /me` ... a logout cannot invalidate an already-issued token". Both are superseded by C1.*
 - **Proxy trust is one hop, so direct access must be impossible.** `app.set('trust proxy', 1)` makes the API trust one hop of `X-Forwarded-For`, which is what lets `req.ip` and `express-rate-limit` see the real client behind IIS. The measured consequence: with the limiter active, direct requests carrying no header were capped at 20 then 429, while the same 24 requests each supplying a distinct `X-Forwarded-For` were **all accepted**. Three deployment controls close that route, and all three are required:
   1. **`BIND_HOST=127.0.0.1`** in `backend\.env` behind IIS. The default is `0.0.0.0` so a fresh dev checkout works without extra steps; it is a development convenience, not a production value.
   2. **A Windows Firewall rule blocking inbound TCP 4000 from any non-loopback address.** Defense-in-depth that holds even if `BIND_HOST` is later mis-set or IIS is removed.
@@ -245,7 +246,9 @@ Names and purposes only. No values are reproduced here, and no `.env` file was r
 |---|---|---|---|
 | `DATABASE_URL` | Prisma (`schema.prisma`) | PostgreSQL connection string for database `cmms` | none — required |
 | `JWT_SECRET` | `utils/config.ts` | HS256 signing secret. Absent ⇒ boot fails | none — required |
-| `JWT_EXPIRES_IN` | `utils/config.ts` | Token lifetime in **seconds** | `28800` (8 h) |
+| `ACCESS_TOKEN_TTL` | `utils/config.ts` | Access-token lifetime in **seconds** (`JWT_EXPIRES_IN` is a legacy alias) | `900` (15 min) |
+| `REFRESH_TOKEN_TTL` | `utils/config.ts` | Absolute session lifetime in **seconds**, inherited across rotations | `28800` (8 h) |
+| `SESSION_IDLE_MS` | `utils/config.ts` | Server-side idle window in **milliseconds** | `1800000` (30 min) |
 | `PORT` | `index.ts` | API listen port | `4000` |
 | `LOG_LEVEL` | `utils/logger.ts` | pino level; validated against the 7 pino levels | `info` |
 | `CORS_ORIGINS` | `index.ts` | Comma-separated browser origin allow-list | `http://localhost:3000` |
