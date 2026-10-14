@@ -26,14 +26,13 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (4)
+## A. Close now — code and data gap (3)
 
 What it is, where it lives, size.
 
 | ID | Item | Where it lives | Size |
 |---|---|---|---|
 | C1 | Session security end to end: server-side idle expiry, refresh rotation, logout that revokes the presented token, technician identity taken from the session rather than the request. `backend/src/routes/auth.ts` exposes only `POST /login` and `GET /me`; there is no refresh or logout route at all, so the `RefreshToken` model is unused for rotation and the JWT stays valid for its full 8 hours | OWNER_ACTION_SHEET Table 2 "Session security"; matrix lines 259 (§4.2), 299 (§5.5); `README.md:263` | L |
-| C4b | JSON bulk endpoint for Functional Locations: `functionalLocations.ts:275`/`:394` are single-row, so there is no bulk import/export path | Matrix line 295 (§5.4) | M |
 | C4c | OData-style query grammar: no `$filter`/`$top` anywhere, conventional `skip`/`take` only | Matrix line 296 (§5.4) | M |
 | C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
 
@@ -143,8 +142,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-4 code and data gaps · 1 documentation gap · 0 blocked on owner · 0 blocked on external ·
-10 decisions-not-gap = **15 open items**.
+3 code and data gaps · 1 documentation gap · 0 blocked on owner · 0 blocked on external ·
+10 decisions-not-gap = **14 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -182,6 +181,7 @@ landed.
 | C3 | 2026-10-12 | `cf2f9c5` | 267 |
 | C4a | 2026-10-12 | `8add8d7` | 279 |
 | E1 | 2026-10-14 | `this commit` | n/a |
+| C4b | 2026-10-14 | `this commit` | n/a |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -383,4 +383,25 @@ drops to 0 (shown empty) and the Totals line to 15 open items. The item left no
 `SOW_COMPLIANCE.md` Status to move — §4.2 was already `Met` and is unchanged by
 this closure. The closure row records `this commit`; the green run for the push
 is backfilled once confirmed.
+
+**C4b** (`this commit`, 2026-10-14). C4b was filed as "JSON bulk endpoint for
+Functional Locations … there is no bulk import/export path". Half of that premise
+had already gone: C5 added `POST /api/functional-locations/import.csv`
+(`functionalLocations.ts:75`), so Functional Locations did have a bulk path, and
+Materials and Work Orders have CSV importers too. What remained was a
+clause-vs-form question — SOW 5.4 names `POST /api/v1/equipment/bulk` *with a JSON
+array*, and no `/bulk` JSON route exists anywhere in `backend/src`; all bulk is CSV
+multipart. The owner reviewed that difference on 2026-10-14 and accepted the CSV
+form as meeting the clause for both SOW-named entities (Equipment and Functional
+Locations), so matrix line 295 moves `Partial` → `Met`, category A drops to 3 and
+the Totals line to 14 open items. That is the same reasoning already accepted for
+§3.10 bulk master-data, which was waived as redundant with the SOW 5.7 CSV
+importers. The limitation-register row L21 ("no bulk endpoint for functional
+locations") is marked resolved to match, and the verifier promotion entry lands in
+the same commit. The clause's JSON-array form was not built and is not required,
+so this is a status move, not a build or a waiver. Adjacent bulk-form claims outside
+C4b's cited surface are not swept here and are carried for the **D1** documentation
+sweep: `SOW_COMPLIANCE.md:59` (§2.2 "CSV for 2 entities only"),
+`OWNER_ACTION_SHEET.md:28` ("JSON bulk endpoints for locations"), and the
+`API_REFERENCE.md` importer rows.
 

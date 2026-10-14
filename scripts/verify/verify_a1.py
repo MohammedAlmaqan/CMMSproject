@@ -345,6 +345,21 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     ("1.3 data-migration", "Not Met", "Met", "1971686"),
     ("5.7 migration-runbook", "Not Met", "Met", "1971686"),
     ("6.4 migration-accuracy", "Not Met", "Met", "1971686"),
+
+    # SOW 5.4 "Bulk endpoints for Equipment and Functional Locations
+    # (`POST /api/v1/equipment/bulk` with JSON array)" (row 295). The clause
+    # names a JSON-array bulk endpoint; the system ships CSV multipart bulk
+    # importers instead - Equipment (equipment.ts:156), Functional Locations
+    # (functionalLocations.ts:75, added at C5), Materials (materials.ts:134) and
+    # Work Orders (workOrders.ts:94). Both SOW-named entities therefore have a
+    # bulk importer. The owner reviewed the clause-vs-form difference on
+    # 2026-10-14 and accepted the CSV form as meeting the clause; the
+    # parenthetical JSON-array form is a different API contract, not an unmet
+    # capability. Not a section 3 row, so this moves EXPECT_ALL only. The status
+    # change and this wiring land together, so "this commit" is the sentinel;
+    # backfill the SHA. Durable anchor: the C4b closure-log row in
+    # docs/GAP_REGISTER.md and the row-295 note in SOW_COMPLIANCE.md.
+    ("5.4 bulk-endpoints", "Partial", "Met", "this commit"),
 ]
 
 
