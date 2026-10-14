@@ -8,6 +8,7 @@ import { taskListCreateSchema, taskListUpdateSchema, validate, taskListOperation
 import { isPrismaError, prismaErrorTarget } from '../utils/prismaErrors.js';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
+import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 
 type OperationInput = z.infer<typeof taskListOperationItemSchema>;
 type MaterialInput = z.infer<typeof taskListMaterialItemSchema>;
@@ -153,9 +154,18 @@ router.get('/', async (req: Request, res: Response) => {
       where.workCenterId = workCenterId;
     }
 
+    const grammar = parseCollectionQuery(req.query as Record<string, unknown>, QUERY_FIELDS.taskList);
+    if (!grammar.ok) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
+    }
+
     const taskLists = await prisma.taskList.findMany({
-      where,
-      orderBy: { code: 'asc' },
+      where: mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.TaskListWhereInput,
+      orderBy: grammar.query.orderBy
+        ? (grammar.query.orderBy as unknown as Prisma.TaskListOrderByWithRelationInput[])
+        : { code: 'asc' },
+      ...(grammar.query.skip !== null ? { skip: grammar.query.skip } : {}),
+      ...(grammar.query.take !== null ? { take: grammar.query.take } : {}),
       include: {
         operations: {
           where: { isDeleted: false },
@@ -175,7 +185,7 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
 
-    res.json(taskLists);
+    res.json(selectRows(taskLists, grammar.query.select));
   } catch (error) {
     logger.error({ err: error }, 'Error fetching task lists');
     res.status(500).json({ error: 'Internal server error' });

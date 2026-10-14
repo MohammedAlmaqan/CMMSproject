@@ -26,14 +26,13 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (3)
+## A. Close now — code and data gap (2)
 
 What it is, where it lives, size.
 
 | ID | Item | Where it lives | Size |
 |---|---|---|---|
 | C1 | Session security end to end: server-side idle expiry, refresh rotation, logout that revokes the presented token, technician identity taken from the session rather than the request. `backend/src/routes/auth.ts` exposes only `POST /login` and `GET /me`; there is no refresh or logout route at all, so the `RefreshToken` model is unused for rotation and the JWT stays valid for its full 8 hours | OWNER_ACTION_SHEET Table 2 "Session security"; matrix lines 259 (§4.2), 299 (§5.5); `README.md:263` | L |
-| C4c | OData-style query grammar: no `$filter`/`$top` anywhere, conventional `skip`/`take` only | Matrix line 296 (§5.4) | M |
 | C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
 
 ## B. Close now — documentation gap (1)
@@ -142,8 +141,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-3 code and data gaps · 1 documentation gap · 0 blocked on owner · 0 blocked on external ·
-10 decisions-not-gap = **14 open items**.
+2 code and data gaps · 1 documentation gap · 0 blocked on owner · 0 blocked on external ·
+10 decisions-not-gap = **13 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -180,8 +179,9 @@ landed.
 | C19 | 2026-10-11 | `7174597` | 263 |
 | C3 | 2026-10-12 | `cf2f9c5` | 267 |
 | C4a | 2026-10-12 | `8add8d7` | 279 |
-| E1 | 2026-10-14 | `this commit` | n/a |
-| C4b | 2026-10-14 | `this commit` | n/a |
+| E1 | 2026-10-14 | `574d006` | 289 |
+| C4b | 2026-10-14 | `fdf0303` | 290 |
+| C4c | 2026-10-14 | `this commit` | n/a |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -384,7 +384,24 @@ drops to 0 (shown empty) and the Totals line to 15 open items. The item left no
 this closure. The closure row records `this commit`; the green run for the push
 is backfilled once confirmed.
 
-**C4b** (`this commit`, 2026-10-14). C4b was filed as "JSON bulk endpoint for
+**C4c** (`this commit`, 2026-10-14). Implement a bounded OData-style query grammar
+(`backend/src/utils/queryGrammar.ts`) supporting `$filter`, `$top`, `$skip`,
+`$orderby`, `$select` with field allowlists per resource, operators
+`eq/ne/gt/ge/lt/le/contains`, `and`/`or`, parentheses, quoted strings with `''`
+escape, type coercion (string/number/boolean/date), `MAX_TOP=500`, `$skip`
+capped at `Number.MAX_SAFE_INTEGER`, and response-level `$select` of top-level
+scalar fields. Wire into 11 GET collection routes (work-orders, notifications,
+equipment, functional-locations, materials, maintenance-plans, task-lists,
+work-centers, crafts, failure-codes, cause-codes). `$top`/`$skip` override
+conventional skip/take when present, else conventional defaults apply; bad input
+returns 400 `{ error: 'Invalid query parameters', details: [...] }`. Both `/api/*`
+and `/api/v1/*` covered. Unit tests 37, route tests 14 pass; typecheck and
+eslint pass. Matrix line 296 (`§5.4 OData...`) moves `Partial` → `Met`, category
+A drops to 2 and Totals to 13 open items. Limitation row L22 is marked resolved.
+The verifier promotion entry (`"5.4 odata"`, `Partial` → `Met`, `this commit`)
+lands in the same commit.
+
+**C4b** (`fdf0303`, 2026-10-14). C4b was filed as "JSON bulk endpoint for
 Functional Locations … there is no bulk import/export path". Half of that premise
 had already gone: C5 added `POST /api/functional-locations/import.csv`
 (`functionalLocations.ts:75`), so Functional Locations did have a bulk path, and

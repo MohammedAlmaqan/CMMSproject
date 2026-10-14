@@ -1,4 +1,5 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
+import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
@@ -6,6 +7,7 @@ import { validate, craftCreateSchema, craftUpdateSchema } from '../utils/validat
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { recomputeWorkOrderCosts } from '../utils/costs.js';
 import { logger } from '../utils/logger.js';
+import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 
 const router = Router();
 
@@ -54,14 +56,23 @@ router.use(authenticate);
  *       '500':
  *         description: Internal server error
  */
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
+    const grammar = parseCollectionQuery(req.query as Record<string, unknown>, QUERY_FIELDS.craft);
+    if (!grammar.ok) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
+    }
+
     const crafts = await prisma.craft.findMany({
-      where: { isDeleted: false },
-      orderBy: { craftCode: 'asc' },
+      where: mergeWhere({ isDeleted: false }, grammar.query.where) as Prisma.CraftWhereInput,
+      orderBy: grammar.query.orderBy
+        ? (grammar.query.orderBy as unknown as Prisma.CraftOrderByWithRelationInput[])
+        : { craftCode: 'asc' },
+      ...(grammar.query.skip !== null ? { skip: grammar.query.skip } : {}),
+      ...(grammar.query.take !== null ? { take: grammar.query.take } : {}),
     });
 
-    res.json(crafts);
+    res.json(selectRows(crafts, grammar.query.select));
   } catch (error) {
     logger.error({ err: error }, 'Error fetching crafts');
     res.status(500).json({ error: 'Internal server error' });

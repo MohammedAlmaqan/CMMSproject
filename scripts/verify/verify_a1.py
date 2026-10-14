@@ -360,6 +360,18 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # backfill the SHA. Durable anchor: the C4b closure-log row in
     # docs/GAP_REGISTER.md and the row-295 note in SOW_COMPLIANCE.md.
     ("5.4 bulk-endpoints", "Partial", "Met", "this commit"),
+
+    # SOW 5.4 OData-style query grammar for GET collections (row 296).
+    # Implemented bounded OData grammar ($filter, $top, $skip, $orderby, $select)
+    # with field allowlists, type coercion, MAX_TOP 500, response-level $select,
+    # AND-composition with existing role-scoped where clauses, 400 on invalid
+    # queries. Wired into 11 collection routes; both /api and /api/v1 covered.
+    # Unit tests (37) and route tests (14) pass. Not a section 3 row, so moves
+    # EXPECT_ALL only. The status change and this wiring land together, so
+    # "this commit" is the sentinel; backfill the SHA. Durable anchor: the C4c
+    # closure-log row in docs/GAP_REGISTER.md and the row-296/L22 notes in
+    # docs/SOW_COMPLIANCE.md.
+    ("5.4 odata", "Partial", "Met", "this commit"),
 ]
 
 

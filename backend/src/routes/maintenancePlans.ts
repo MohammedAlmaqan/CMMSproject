@@ -11,6 +11,7 @@ import { createAlert, emitAlertToRolesSafely, ALERT_TYPE_PM_GENERATION_FAILED, T
 import { isPrismaError } from '../utils/prismaErrors.js';
 import { isoDay } from '../utils/pmDueRules.js';
 import { logger } from '../utils/logger.js';
+import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 
 const router = Router();
 
@@ -159,8 +160,13 @@ router.get('/', async (req: Request, res: Response) => {
     if (strategy) where.strategyType = strategy as string;
     if (active !== undefined) where.activeFlag = active === 'true';
 
+    const grammar = parseCollectionQuery(req.query as Record<string, unknown>, QUERY_FIELDS.maintenancePlan);
+    if (!grammar.ok) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
+    }
+
     const plans = await prisma.maintenancePlan.findMany({
-      where,
+      where: mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.MaintenancePlanWhereInput,
       include: {
         equipment: { select: { equipmentId: true, equipmentCode: true, name: true } },
         workCenter: { select: { workCenterId: true, code: true, name: true } },
@@ -176,10 +182,14 @@ router.get('/', async (req: Request, res: Response) => {
         },
         planMeters: { where: { isDeleted: false } },
       },
-      orderBy: { createdDate: 'desc' },
+      orderBy: grammar.query.orderBy
+        ? (grammar.query.orderBy as unknown as Prisma.MaintenancePlanOrderByWithRelationInput[])
+        : { createdDate: 'desc' },
+      ...(grammar.query.skip !== null ? { skip: grammar.query.skip } : {}),
+      ...(grammar.query.take !== null ? { take: grammar.query.take } : {}),
     });
 
-    res.json(plans);
+    res.json(selectRows(plans, grammar.query.select));
   } catch (error) {
     logger.error({ err: error }, 'Error fetching maintenance plans');
     res.status(500).json({ error: 'Internal server error' });

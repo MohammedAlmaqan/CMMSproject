@@ -7,6 +7,7 @@ import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { failureCodeCreateSchema, failureCodeUpdateSchema, validate } from '../utils/validation.js';
 import { isPrismaError } from '../utils/prismaErrors.js';
 import { logger } from '../utils/logger.js';
+import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 
 const router = Router();
 
@@ -125,12 +126,21 @@ router.get('/', async (req: Request, res: Response) => {
       ];
     }
 
+    const grammar = parseCollectionQuery(req.query as Record<string, unknown>, QUERY_FIELDS.failureCode);
+    if (!grammar.ok) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
+    }
+
     const codes = await prisma.failureCode.findMany({
-      where,
-      orderBy: { code: 'asc' },
+      where: mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.FailureCodeWhereInput,
+      orderBy: grammar.query.orderBy
+        ? (grammar.query.orderBy as unknown as Prisma.FailureCodeOrderByWithRelationInput[])
+        : { code: 'asc' },
+      ...(grammar.query.skip !== null ? { skip: grammar.query.skip } : {}),
+      ...(grammar.query.take !== null ? { take: grammar.query.take } : {}),
     });
 
-    res.json(codes);
+    res.json(selectRows(codes, grammar.query.select));
   } catch (error) {
     logger.error({ err: error }, 'Error fetching failure codes');
     res.status(500).json({ error: 'Internal server error' });

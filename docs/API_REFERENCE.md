@@ -51,6 +51,13 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 - **Audit log.** Create, update and delete operations on master data and work orders write an `AuditLogEntry` recording the user and originating IP.
 - **Costs.** Work order `plannedCost` and `actualCost` are recomputed server-side from the child records whenever an operation, material line, labor entry or external service cost changes. Clients send quantities and rates, never totals. A craft's `hourlyRate` is one of those rate inputs: editing it re-costs every live work order carrying that craft in the same transaction (soft-deleted work orders are left untouched).
 - **Not-found handling.** Missing referenced records return `400` (a Prisma foreign-key error translated at the boundary) or `404` depending on the endpoint; the applicable code is listed per operation.
+- **Collection query grammar (SOW 5.4).** GET collection endpoints accept a bounded OData-style grammar alongside their conventional filters:
+  - `$filter` — comparisons `eq`, `ne`, `gt`, `ge`, `lt`, `le`, `contains`, joined by `and` / `or` and grouped with parentheses; string values are single-quoted with `''` for an embedded quote. Example: `$filter=priority eq 'High' and status ne 'Closed'`, `$filter=description contains 'pump'`.
+  - `$orderby` — comma-separated fields, each with an optional `asc` / `desc` (default `asc`). Example: `$orderby=createdDate desc,priority`.
+  - `$select` — comma-separated top-level scalar fields, projected onto each returned row. Example: `$select=woNumber,status`.
+  - `$top` — page size, a non-negative integer, **maximum 500**.
+  - `$skip` — offset, a non-negative integer.
+  - Field names are validated against a per-resource allowlist; an unknown field, a value that does not match the field's type, or a malformed expression is rejected with `400 { "error": "Invalid query parameters", "details": [ ... ] }` rather than silently ignored. `$top` / `$skip` override the conventional `skip` / `take` when supplied; the conventional defaults apply otherwise. Available on the collection GET of: work-orders, notifications, equipment, functional-locations, materials, maintenance-plans, task-lists, work-centers, crafts, failure-codes and cause-codes, under both `/api` and `/api/v1`.
 
 ## Endpoint groups
 

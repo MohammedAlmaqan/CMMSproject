@@ -10,6 +10,7 @@ import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
 import { isPrismaError } from '../utils/prismaErrors.js';
 import { checkEquipmentPlacement } from '../utils/locationRules.js';
 import { logger } from '../utils/logger.js';
+import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 
 const router = Router();
 
@@ -411,15 +412,24 @@ router.get('/', async (req: Request, res: Response) => {
       where.equipmentClass = equipmentClass;
     }
 
+    const grammar = parseCollectionQuery(req.query as Record<string, unknown>, QUERY_FIELDS.equipment);
+    if (!grammar.ok) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
+    }
+
     const equipment = await prisma.equipment.findMany({
-      where,
-      orderBy: { equipmentCode: 'asc' },
+      where: mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.EquipmentWhereInput,
+      orderBy: grammar.query.orderBy
+        ? (grammar.query.orderBy as unknown as Prisma.EquipmentOrderByWithRelationInput[])
+        : { equipmentCode: 'asc' },
+      ...(grammar.query.skip !== null ? { skip: grammar.query.skip } : {}),
+      ...(grammar.query.take !== null ? { take: grammar.query.take } : {}),
       include: {
         functionalLocation: true,
       },
     });
 
-    res.json(equipment);
+    res.json(selectRows(equipment, grammar.query.select));
   } catch (error) {
     logger.error({ err: error }, 'Error fetching equipment');
     res.status(500).json({ error: 'Internal server error' });

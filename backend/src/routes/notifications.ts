@@ -13,6 +13,7 @@ import {
 import { resolveWorkOrderPriority, highestPriority } from '../utils/workOrderRules.js';
 import { emitAlertToRolesSafely, ALERT_TYPE_HIGH_PRIORITY_NOTIFICATION, TRIAGE_ROLES } from '../services/alertService.js';
 import { logger } from '../utils/logger.js';
+import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 import {
   validate,
   notificationCreateSchema,
@@ -150,25 +151,33 @@ router.get('/', async (req: Request, res: Response) => {
       where.reportedByUserId = req.user!.userId;
     }
 
-    const skipNum = skip ? parseInt(skip as string, 10) || 0 : 0;
-    const takeNum = take ? parseInt(take as string, 10) || 50 : 50;
+    const grammar = parseCollectionQuery(req.query as Record<string, unknown>, QUERY_FIELDS.notification);
+    if (!grammar.ok) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
+    }
+
+    const finalWhere = mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.NotificationWhereInput;
+    const skipNum = grammar.query.skip ?? (skip ? parseInt(skip as string, 10) || 0 : 0);
+    const takeNum = grammar.query.take ?? (take ? parseInt(take as string, 10) || 50 : 50);
 
     const [notifications, total] = await Promise.all([
       prisma.notification.findMany({
-        where,
+        where: finalWhere,
         include: {
           functionalLocation: { select: { functionalLocationId: true, locationCode: true, description: true } },
           equipment: { select: { equipmentId: true, equipmentCode: true, name: true } },
           reportedBy: { select: { userId: true, fullName: true, username: true } },
         },
-        orderBy: { createdDate: 'desc' },
+        orderBy: grammar.query.orderBy
+          ? (grammar.query.orderBy as unknown as Prisma.NotificationOrderByWithRelationInput[])
+          : { createdDate: 'desc' },
         skip: skipNum,
         take: takeNum,
       }),
-      prisma.notification.count({ where }),
+      prisma.notification.count({ where: finalWhere }),
     ]);
 
-    res.json({ data: notifications, total, skip: skipNum, take: takeNum });
+    res.json({ data: selectRows(notifications, grammar.query.select), total, skip: skipNum, take: takeNum });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching notifications');
     res.status(500).json({ error: 'Internal server error' });

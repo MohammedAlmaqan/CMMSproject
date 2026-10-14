@@ -1,4 +1,5 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
+import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
@@ -7,6 +8,7 @@ import { workCenterCreateSchema, workCenterUpdateSchema, capacityQuerySchema, va
 import { buildCapacityBoard, CAPACITY_CONSUMING_STATUSES } from '../utils/capacity.js';
 import { isPrismaError } from '../utils/prismaErrors.js';
 import { logger } from '../utils/logger.js';
+import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 
 const router = Router();
 
@@ -81,11 +83,20 @@ router.use(authenticate);
  *       '500':
  *         description: Internal server error
  */
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
+    const grammar = parseCollectionQuery(req.query as Record<string, unknown>, QUERY_FIELDS.workCenter);
+    if (!grammar.ok) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
+    }
+
     const workCenters = await prisma.workCenter.findMany({
-      where: { isDeleted: false },
-      orderBy: { code: 'asc' },
+      where: mergeWhere({ isDeleted: false }, grammar.query.where) as Prisma.WorkCenterWhereInput,
+      orderBy: grammar.query.orderBy
+        ? (grammar.query.orderBy as unknown as Prisma.WorkCenterOrderByWithRelationInput[])
+        : { code: 'asc' },
+      ...(grammar.query.skip !== null ? { skip: grammar.query.skip } : {}),
+      ...(grammar.query.take !== null ? { take: grammar.query.take } : {}),
       include: {
         crafts: {
           where: { isDeleted: false },
@@ -94,7 +105,7 @@ router.get('/', async (_req: Request, res: Response) => {
       },
     });
 
-    res.json(workCenters);
+    res.json(selectRows(workCenters, grammar.query.select));
   } catch (error) {
     logger.error({ err: error }, 'Error fetching work centers');
     res.status(500).json({ error: 'Internal server error' });

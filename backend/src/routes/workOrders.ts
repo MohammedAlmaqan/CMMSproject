@@ -14,6 +14,7 @@ import { requiresAtLeastOneOperation, missingOperationMessage, resolveWorkOrderP
 import { findBlockingChecklist, describeBlockedChecklist } from '../utils/checklistRules.js';
 import { ALERT_TYPE_WO_ASSIGNED, emitWorkOrderAlertSafely } from '../services/alertService.js';
 import { logger } from '../utils/logger.js';
+import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 import {
   validate,
   workOrderCreateSchema,
@@ -245,12 +246,18 @@ router.get('/', async (req: Request, res: Response) => {
       where.AND = [{ reportedByUserId: req.user!.userId }];
     }
 
-    const skipNum = skip ? parseInt(skip as string, 10) || 0 : 0;
-    const takeNum = take ? parseInt(take as string, 10) || 50 : 50;
+    const grammar = parseCollectionQuery(req.query as Record<string, unknown>, QUERY_FIELDS.workOrder);
+    if (!grammar.ok) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
+    }
+
+    const finalWhere = mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.WorkOrderWhereInput;
+    const skipNum = grammar.query.skip ?? (skip ? parseInt(skip as string, 10) || 0 : 0);
+    const takeNum = grammar.query.take ?? (take ? parseInt(take as string, 10) || 50 : 50);
 
     const [workOrders, total] = await Promise.all([
       prisma.workOrder.findMany({
-        where,
+        where: finalWhere,
         include: {
           functionalLocation: { select: { functionalLocationId: true, locationCode: true, description: true } },
           equipment: { select: { equipmentId: true, equipmentCode: true, name: true } },
@@ -258,14 +265,16 @@ router.get('/', async (req: Request, res: Response) => {
           causeCode: { select: { causeCodeId: true, code: true, description: true } },
           failureCode: { select: { failureCodeId: true, code: true, description: true } },
         },
-        orderBy: { createdDate: 'desc' },
+        orderBy: grammar.query.orderBy
+          ? (grammar.query.orderBy as unknown as Prisma.WorkOrderOrderByWithRelationInput[])
+          : { createdDate: 'desc' },
         skip: skipNum,
         take: takeNum,
       }),
-      prisma.workOrder.count({ where }),
+      prisma.workOrder.count({ where: finalWhere }),
     ]);
 
-    res.json({ data: workOrders, total, skip: skipNum, take: takeNum });
+    res.json({ data: selectRows(workOrders, grammar.query.select), total, skip: skipNum, take: takeNum });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching work orders');
     res.status(500).json({ error: 'Internal server error' });

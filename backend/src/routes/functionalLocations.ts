@@ -18,6 +18,7 @@ import {
   attachCounts,
 } from '../utils/locationCounts.js';
 import { logger } from '../utils/logger.js';
+import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 
 const router = Router();
 
@@ -213,12 +214,21 @@ router.get('/', async (req: Request, res: Response) => {
       ];
     }
 
+    const grammar = parseCollectionQuery(req.query as Record<string, unknown>, QUERY_FIELDS.functionalLocation);
+    if (!grammar.ok) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
+    }
+
     const locations = await prisma.functionalLocation.findMany({
-      where,
-      orderBy: { locationCode: 'asc' },
+      where: mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.FunctionalLocationWhereInput,
+      orderBy: grammar.query.orderBy
+        ? (grammar.query.orderBy as unknown as Prisma.FunctionalLocationOrderByWithRelationInput[])
+        : { locationCode: 'asc' },
+      ...(grammar.query.skip !== null ? { skip: grammar.query.skip } : {}),
+      ...(grammar.query.take !== null ? { take: grammar.query.take } : {}),
     });
 
-    res.json(locations);
+    res.json(selectRows(locations, grammar.query.select));
   } catch (error) {
     logger.error({ err: error }, 'Error fetching functional locations');
     res.status(500).json({ error: 'Internal server error' });
