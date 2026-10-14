@@ -49,11 +49,12 @@ Empty since 2026-10-09 — all four owner items (B1–B4) are resolved. B1 was
 reclassified to close-now work, B2 and B3 were accepted, and B4 was applied
 (see the closure log and Reclassifications).
 
-## D. Blocked on external (1)
+## D. Blocked on external (0)
 
-| ID | Item | Where it lives |
-|---|---|---|
-| E1 | TLS termination and reverse-proxy configuration, and the IIS reverse-proxy deployment executed end to end — needs a host matching production, which is not held | `README.md:267`, `README.md:268` |
+Empty since 2026-10-14 — the sole item (E1) is resolved: the TLS-terminating
+IIS/ARR front end was executed and verified against the live site on 2026-10-03
+(matrix §4.2, line 256), and `README.md:267`–`README.md:268` are corrected to
+that state (see the closure log).
 
 ## E. Decision, not gap (10)
 
@@ -142,8 +143,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-4 code and data gaps · 1 documentation gap · 0 blocked on owner · 1 blocked on external ·
-10 decisions-not-gap = **16 open items**.
+4 code and data gaps · 1 documentation gap · 0 blocked on owner · 0 blocked on external ·
+10 decisions-not-gap = **15 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -180,6 +181,7 @@ landed.
 | C19 | 2026-10-11 | `7174597` | 263 |
 | C3 | 2026-10-12 | `cf2f9c5` | 267 |
 | C4a | 2026-10-12 | `8add8d7` | 279 |
+| E1 | 2026-10-14 | `this commit` | n/a |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -366,4 +368,19 @@ line 263 (`docs/SOW_COMPLIANCE.md`) supersede the "9.11 s total (app layer 0.36 
 figure; `docs/ADMIN_GUIDE.md` §7.6 and `docs/ARCHITECTURE.md` now carry the corrected
 figure. The matching comment in `scripts/verify/verify_a1.py` repeats the 9.11 s
 figure and is left unchanged pending an owner call.
+
+**E1** (`this commit`, 2026-10-14). E1 was the only "blocked on external" item:
+TLS termination and the IIS reverse-proxy deployment, said to need a host matching
+production that is not held. The host was not missing — the owner deployed the
+site live and re-verified both limbs over HTTPS on 2026-10-03 (`curl -k
+https://cmms.local/api/health` → 200 JSON, `/dashboard` → 200 SPA), which is what
+had already promoted §4.2 to `Met` (matrix line 256). `README.md:267`/`:268` still
+carried the pre-deployment claims ("HTTPS/TLS termination is not configured";
+"has not been executed end to end. Treat it as untested"), so both are corrected
+to the verified state, keeping the old wording in the line and retaining the local
+`sslmode=disable` database fact and the internet-exposure caution. Category D
+drops to 0 (shown empty) and the Totals line to 15 open items. The item left no
+`SOW_COMPLIANCE.md` Status to move — §4.2 was already `Met` and is unchanged by
+this closure. The closure row records `this commit`; the green run for the push
+is backfilled once confirmed.
 
