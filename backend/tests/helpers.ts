@@ -51,6 +51,18 @@ export async function purgeAudit(recordIds: (string | null | undefined)[]): Prom
   await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: ids } } });
 }
 
+/**
+ * Refresh tokens are the one child of User besides audit, and unlike audit they
+ * carry a foreign key with `ON DELETE RESTRICT`, so a hard-deleted test account
+ * is blocked until its sessions are gone. Pass account ids, not tokens: a test
+ * that signed in as a user it created must call this before deleting the user.
+ */
+export async function purgeRefreshTokens(userIds: (string | null | undefined)[]): Promise<void> {
+  const ids = clean(userIds);
+  if (ids.length === 0) return;
+  await prisma.refreshToken.deleteMany({ where: { userId: { in: ids } } });
+}
+
 /* Some activity the suite performs is a real change to a real row: logging in
  * updates the account's login state, and "mark every alert read" is a bulk event
  * that audits under the acting user instead of under a fixture. Neither can be

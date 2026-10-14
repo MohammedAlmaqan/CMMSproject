@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import bcrypt from 'bcryptjs';
-import { api, ctx, auditIdsMatching, purgeNewAudit } from '../helpers.js';
+import { api, ctx, auditIdsMatching, purgeNewAudit, purgeRefreshTokens } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 describe('auth routes', () => {
@@ -10,9 +10,16 @@ describe('auth routes', () => {
   // Taken in `beforeAll`, before the first login below, so the teardown can tell
   // the logins this file performed from the ones already in the baseline.
   let loginAuditBaseline: string[] = [];
+  // A successful login now opens a server-side session (a RefreshToken row). The
+  // seed and the harness mint tokens without one, so the only sessions here are
+  // this file's; snapshot the admin's so teardown removes exactly what it added.
+  let adminSessionBaseline: string[] = [];
 
   beforeAll(async () => {
     loginAuditBaseline = await auditIdsMatching({ tableName: 'User', action: { in: ['Update', 'Run'] } });
+    adminSessionBaseline = (
+      await prisma.refreshToken.findMany({ where: { userId: ctx.adminId }, select: { tokenId: true } })
+    ).map((r) => r.tokenId);
     const passwordHash = await bcrypt.hash(validPassword, 10);
     const user = await prisma.user.create({
       data: {
@@ -46,6 +53,12 @@ describe('auth routes', () => {
     // in the baseline and must stay.
     await purgeNewAudit(loginAuditBaseline, { tableName: 'User', action: { in: ['Update', 'Run'] } });
     await prisma.auditLogEntry.deleteMany({ where: { userId: tempUserId } });
+    // The admin session from the first login, and the temp user's from the
+    // successful login: the latter restricts the account row, so it goes first.
+    await prisma.refreshToken.deleteMany({
+      where: { userId: ctx.adminId, tokenId: { notIn: adminSessionBaseline } },
+    });
+    await purgeRefreshTokens([tempUserId]);
     await prisma.user.deleteMany({ where: { userId: tempUserId } });
   });
 

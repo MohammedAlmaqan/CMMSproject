@@ -44,6 +44,10 @@ model RefreshToken {
   userId     String
   expiresAt  DateTime
   createdAt  DateTime @default(now())
+  // Server-side idle clock (§4.2): advanced on authenticated requests so a
+  // session untouched for longer than SESSION_IDLE_MS can be detected and
+  // revoked. Distinct from expiresAt, which is the absolute session cap.
+  lastUsedAt DateTime @default(now())
   revoked    Boolean  @default(false)
 
   user User @relation(fields: [userId], references: [userId])

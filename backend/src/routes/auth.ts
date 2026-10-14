@@ -3,9 +3,16 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
-import { JWT_SECRET, JWT_EXPIRES_IN } from '../utils/config.js';
+import { JWT_SECRET, ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL, SESSION_IDLE_MS } from '../utils/config.js';
 import { logger } from '../utils/logger.js';
 import { createAlert } from '../services/alertService.js';
+import {
+  generateRefreshToken,
+  hashRefreshToken,
+  readRefreshCookie,
+  setRefreshCookie,
+  clearRefreshCookie,
+} from '../utils/session.js';
 
 const router = Router();
 
@@ -14,6 +21,21 @@ const FAILED_LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const ACCOUNT_LOCK_MS = 30 * 60 * 1000;
 const INVALID_CREDENTIALS = { error: 'Invalid credentials' };
 const ACCOUNT_LOCKED = { error: 'Account temporarily locked. Try again later.' };
+
+// The access token carries the id of the session (refresh) row it belongs to, so
+// `authenticate` can confirm the session is still live - not revoked, not idle,
+// not past its absolute expiry - on every request instead of trusting a
+// self-contained JWT until it expires.
+function signAccessToken(
+  user: { userId: string; username: string; role: string },
+  sessionId: string
+): string {
+  return jwt.sign(
+    { userId: user.userId, username: user.username, role: user.role, sid: sessionId },
+    JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_TTL }
+  );
+}
 
 /**
  * @openapi
@@ -26,7 +48,9 @@ const ACCOUNT_LOCKED = { error: 'Account temporarily locked. Try again later.' }
  *       account for 30 minutes (HTTP 423) and raise a SystemAlert. A successful login resets
  *       the failure counter, clears any lock, and records an AuditLogEntry for lastLogin.
  *       Rate limited per IP by express-rate-limit; the limit is raised by the k6 smoke run
- *       via K6_MODE.
+ *       via K6_MODE. A successful login also opens a server-side session: an opaque refresh
+ *       token is set in the httpOnly `cmms_refresh` cookie and the returned access token
+ *       carries the session id, so logout and idle expiry can revoke it before it expires.
  *     tags: [Authentication]
  *     security: []
  *     requestBody:
@@ -45,6 +69,13 @@ const ACCOUNT_LOCKED = { error: 'Account temporarily locked. Try again later.' }
  *     responses:
  *       '200':
  *         description: Authenticated. Returns the signed JWT and the user profile.
+ *         headers:
+ *           Set-Cookie:
+ *             schema:
+ *               type: string
+ *             description: >
+ *               cmms_refresh=<opaque token>; HttpOnly; SameSite=Strict; Path=/api - the
+ *               rotating refresh token that keeps this session alive.
  *         content:
  *           application/json:
  *             schema:
@@ -52,7 +83,10 @@ const ACCOUNT_LOCKED = { error: 'Account temporarily locked. Try again later.' }
  *               properties:
  *                 token:
  *                   type: string
- *                   description: JWT bearer token (expires per JWT_EXPIRES_IN, 8h by default)
+ *                   description: >
+ *                     Short-lived JWT bearer token (lifetime per ACCESS_TOKEN_TTL, 15m by
+ *                     default). It carries the session id, so the server rejects it once the
+ *                     session is logged out or idle for longer than SESSION_IDLE_MS.
  *                 user:
  *                   type: object
  *                   properties:
@@ -197,7 +231,27 @@ router.post('/login', async (req: Request, res: Response) => {
             timestamp: loginTime,
           },
         });
-        return { status: 200 as const, user: currentUser, loginTime };
+        // The session row is created inside the same transaction that records the
+        // login, so a successful sign-in cannot leave an audit row with no session
+        // (or a session with no record of how it started). The raw refresh token is
+        // returned to the caller and set as a cookie; only its hash is stored.
+        const refreshToken = generateRefreshToken();
+        const session = await tx.refreshToken.create({
+          data: {
+            token: hashRefreshToken(refreshToken),
+            userId: currentUser.userId,
+            expiresAt: new Date(loginTime.getTime() + REFRESH_TOKEN_TTL * 1000),
+            lastUsedAt: loginTime,
+          },
+        });
+        return {
+          status: 200 as const,
+          user: currentUser,
+          loginTime,
+          refreshToken,
+          sessionId: session.tokenId,
+          sessionExpiresAt: session.expiresAt,
+        };
       }
 
       const latestSuccessfulLogin = await tx.auditLogEntry.findFirst({
@@ -273,11 +327,8 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json(INVALID_CREDENTIALS);
     }
 
-    const token = jwt.sign(
-      { userId: outcome.user.userId, username: outcome.user.username, role: outcome.user.role },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    const token = signAccessToken(outcome.user, outcome.sessionId);
+    setRefreshCookie(res, outcome.refreshToken, outcome.sessionExpiresAt);
 
     return res.json({
       token,
@@ -312,6 +363,162 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
     res.json(user);
   } catch {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Rotate the refresh token and issue a new access token
+ *     description: >
+ *       Public endpoint - no bearer token required. Reads the httpOnly `cmms_refresh`
+ *       cookie, verifies the session is live (not revoked, not past its absolute
+ *       expiry, not idle for longer than SESSION_IDLE_MS), then revokes the presented
+ *       token and issues a replacement. The replacement inherits the original absolute
+ *       expiry, so rotation cannot extend a session past its cap. Presenting a token
+ *       that was already rotated away or logged out is treated as compromise: every
+ *       live session for the account is revoked. A missing or unrecognised cookie is
+ *       rejected with 401.
+ *     tags: [Authentication]
+ *     security: []
+ *     responses:
+ *       '200':
+ *         description: A fresh access token. A new refresh token is set in Set-Cookie.
+ *         headers:
+ *           Set-Cookie:
+ *             schema:
+ *               type: string
+ *             description: The rotated cmms_refresh cookie.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                   description: New short-lived JWT bearer token.
+ *                 expiresAt:
+ *                   type: string
+ *                   format: date-time
+ *                   description: Absolute expiry of the renewed session.
+ *       '401':
+ *         description: No session cookie, or the session is expired, idle, revoked or reused
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/refresh', async (req: Request, res: Response) => {
+  try {
+    const presented = readRefreshCookie(req);
+    if (!presented) {
+      return res.status(401).json({ error: 'No active session' });
+    }
+
+    const now = new Date();
+    const session = await prisma.refreshToken.findUnique({
+      where: { token: hashRefreshToken(presented) },
+      include: { user: true },
+    });
+
+    if (!session) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: 'Invalid session' });
+    }
+
+    if (session.revoked) {
+      // The token was already rotated away or logged out and is being presented
+      // again. That is either a replay or a stolen cookie, so the whole account is
+      // signed out rather than just this one row.
+      await prisma.refreshToken.updateMany({
+        where: { userId: session.userId, revoked: false },
+        data: { revoked: true },
+      });
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: 'Session no longer valid' });
+    }
+
+    if (session.expiresAt.getTime() <= now.getTime()) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
+    if (now.getTime() - session.lastUsedAt.getTime() > SESSION_IDLE_MS) {
+      await prisma.refreshToken.update({
+        where: { tokenId: session.tokenId },
+        data: { revoked: true },
+      });
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
+    if (!session.user.isActive || session.user.isDeleted) {
+      await prisma.refreshToken.updateMany({
+        where: { userId: session.userId, revoked: false },
+        data: { revoked: true },
+      });
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: 'Account is not active' });
+    }
+
+    const rotatedToken = generateRefreshToken();
+    const rotated = await prisma.$transaction(async (tx) => {
+      await tx.refreshToken.update({
+        where: { tokenId: session.tokenId },
+        data: { revoked: true, lastUsedAt: now },
+      });
+      return tx.refreshToken.create({
+        data: {
+          token: hashRefreshToken(rotatedToken),
+          userId: session.userId,
+          // Inherited, not extended: rotation must not push the session past its cap.
+          expiresAt: session.expiresAt,
+          lastUsedAt: now,
+        },
+      });
+    });
+
+    setRefreshCookie(res, rotatedToken, rotated.expiresAt);
+    const token = signAccessToken(session.user, rotated.tokenId);
+    return res.json({ token, expiresAt: rotated.expiresAt.toISOString() });
+  } catch (error) {
+    logger.error({ err: error }, 'Refresh error');
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/logout:
+ *   post:
+ *     summary: Revoke the presented session and clear the refresh cookie
+ *     description: >
+ *       Public endpoint - no bearer token required. Revokes the session identified by
+ *       the httpOnly `cmms_refresh` cookie and clears it. It is idempotent: a request
+ *       with no cookie, or with one already revoked, still returns 204. Because the
+ *       session is checked on every authenticated request, the access token that
+ *       belonged to the session stops working immediately after this call.
+ *     tags: [Authentication]
+ *     security: []
+ *     responses:
+ *       '204':
+ *         description: Session revoked (whether or not a live session was presented)
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/logout', async (req: Request, res: Response) => {
+  try {
+    const presented = readRefreshCookie(req);
+    if (presented) {
+      await prisma.refreshToken.updateMany({
+        where: { token: hashRefreshToken(presented), revoked: false },
+        data: { revoked: true },
+      });
+    }
+    clearRefreshCookie(res);
+    return res.status(204).end();
+  } catch (error) {
+    logger.error({ err: error }, 'Logout error');
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

@@ -8,7 +8,7 @@ import { Toaster, toast } from 'sonner';
 import Sidebar from './Sidebar';
 import CommandPalette from './CommandPalette';
 import { useIdleTimeout } from '@/hooks/useIdleTimeout';
-import { registerApiActivityHandler } from '@/lib/api';
+import { registerApiActivityHandler, registerAuthFailureHandler } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 
 const IDLE_TIMEOUT_TOAST_ID = 'idle-timeout-warning';
@@ -23,6 +23,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
 
   const handleTimeout = useCallback(() => {
+    logout();
+    navigate('/login', { replace: true });
+  }, [logout, navigate]);
+
+  // A request that cannot authenticate even after a refresh means the server-side
+  // session is gone (revoked, idle or expired); leave the now-dead screen.
+  const handleAuthFailure = useCallback(() => {
     logout();
     navigate('/login', { replace: true });
   }, [logout, navigate]);
@@ -45,6 +52,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }, []);
 
   useEffect(() => registerApiActivityHandler(bump), [bump]);
+
+  useEffect(() => registerAuthFailureHandler(handleAuthFailure), [handleAuthFailure]);
 
   useEffect(() => {
     if (!showWarning) {

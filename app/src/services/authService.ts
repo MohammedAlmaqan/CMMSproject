@@ -12,7 +12,18 @@ export const authService = {
     setAuthToken(res.token);
     return res.user;
   },
-  logout: () => {
+  /**
+   * Sign out. The client token is dropped first so the UI is signed out
+   * immediately, then the server is asked to revoke the session behind the
+   * httpOnly refresh cookie. If that call fails the user is still signed out
+   * locally and the session expires on its own at the idle/absolute limit.
+   */
+  logout: async () => {
     setAuthToken(null);
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Best-effort: local sign-out above is the guarantee.
+    }
   },
 };

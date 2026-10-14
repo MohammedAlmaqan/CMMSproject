@@ -82,6 +82,9 @@ app.use(cors({
     }
     return callback(null, false);
   },
+  // The refresh token travels in an httpOnly cookie, so browsers must be allowed
+  // to send and receive credentials on the API's cross-origin calls.
+  credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import bcrypt from 'bcryptjs';
-import { api, authHeaders, ctx, auditIdsMatching, purgeAudit, purgeNewAudit } from '../helpers.js';
+import { api, authHeaders, ctx, auditIdsMatching, purgeAudit, purgeNewAudit, purgeRefreshTokens } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 let tempUserId = '';
@@ -38,6 +38,9 @@ describe('users routes', () => {
       // seeded user and therefore not this file's to delete - only the row the
       // refusal produced is.
       await purgeNewAudit(seedUserAuditBaseline, { tableName: 'User', recordId: ctx.adminId, action: 'Blocked' });
+      // Row 60's created account signs in, which opens a session row that would
+      // otherwise restrict the hard delete below.
+      await purgeRefreshTokens(ids);
       await prisma.user.deleteMany({ where: { userId: { in: ids } } });
     }
   });
