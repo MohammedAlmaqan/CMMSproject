@@ -181,7 +181,7 @@ landed.
 | E1 | 2026-10-14 | `574d006` | 289 |
 | C4b | 2026-10-14 | `fdf0303` | 290 |
 | C4c | 2026-10-14 | `b31900c` | 292 |
-| C1 | 2026-10-15 | this commit | this commit |
+| C1 | 2026-10-15 | `a9b5326` | 294 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -422,7 +422,7 @@ sweep: `SOW_COMPLIANCE.md:59` (§2.2 "CSV for 2 entities only"),
 `OWNER_ACTION_SHEET.md:28` ("JSON bulk endpoints for locations"), and the
 `API_REFERENCE.md` importer rows.
 
-**C1** (`this commit`, 2026-10-15). C1 was the session-security workstream:
+**C1** (`a9b5326`, run 294, 2026-10-15). C1 was the session-security workstream:
 server-side idle expiry, refresh-token rotation, a logout that revokes the
 presented token, and a technician identity taken from the session rather than the
 request. The identity limb was already delivered earlier — `backend/src/utils/attribution.ts`
