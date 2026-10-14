@@ -183,7 +183,7 @@ landed.
 | C4b | 2026-10-14 | `fdf0303` | 290 |
 | C4c | 2026-10-14 | `b31900c` | 292 |
 | C1 | 2026-10-15 | `a9b5326` | 294 |
-| C11 | 2026-10-15 | this commit | this commit |
+| C11 | 2026-10-15 | `e59e9a1` | 296 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -449,7 +449,7 @@ promotion entries (`"4.2 session-timeout"`, `"5.5 jwt-refresh"`, `Partial` → `
 `cmms_c1` database; the operational `cmms` database was not seeded, migrated or
 written.
 
-**C11** (`this commit`, 2026-10-15). C11 was the process-separation item: the PM,
+**C11** (`e59e9a1`, run 296, 2026-10-15). C11 was the process-separation item: the PM,
 overdue and audit-retention schedulers ran inside the API process behind an advisory
 lock, which is the §4.1 scaling blocker. They now run in a dedicated worker process,
 `backend/src/worker.ts` (`npm run worker`, i.e. `dist/worker.js`), started by PM2 as
