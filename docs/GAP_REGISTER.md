@@ -151,8 +151,10 @@ Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4,
 
 ## Closure log
 
-Snapshot tables above stay frozen. Rows are appended as each item closes, and carry
-the SHA and green CI run recorded when the item landed.
+Section tables list only open items. When an item closes, its row is removed from its
+category table and the header count and Totals decrement; the Closure log below is the
+append-only record, and each row carries the SHA and green CI run recorded when the item
+landed.
 
 | ID | Closed | SHA | Run |
 |---|---|---|---|
