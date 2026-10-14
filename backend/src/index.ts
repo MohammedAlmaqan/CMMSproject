@@ -33,9 +33,6 @@ import attachmentRoutes from './routes/attachments.js';
 import auditLogRoutes from './routes/auditLog.js';
 import userRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
-import { acquireStartupLock, runSchedulerOnce, startScheduler } from './services/scheduler.js';
-import { startOverdueScheduler } from './services/overdueSweep.js';
-import { startAuditRetentionScheduler } from './services/auditRetention.js';
 import { createAlert } from './services/alertService.js';
 import { prisma } from './utils/prisma.js';
 import { logger } from './utils/logger.js';
@@ -297,27 +294,14 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// The scheduler startup wiring and the HTTP listener are skipped under tests so
-// supertest can import `app` without binding :4000 or taking the scheduler lock.
+// The HTTP listener is skipped under tests so supertest can import `app` without
+// binding :4000. Background jobs (PM, overdue, audit retention) run in the separate
+// worker process (`backend/src/worker.ts`), not here: this tier is stateless and can
+// be scaled without multiplying scheduled work.
 if (process.env.NODE_ENV !== 'test') {
   app.listen(Number(PORT), BIND_HOST, () => {
     logger.info(`CMMS API server running on port ${PORT} (bound to ${BIND_HOST})`);
     logger.info(`API docs: http://localhost:${PORT}/api-docs`);
-    setImmediate(async () => {
-      try {
-        const acquired = await acquireStartupLock();
-        if (!acquired) {
-          logger.info('[scheduler] startup skipped — lock refused; API serving without scheduler');
-          return;
-        }
-        await runSchedulerOnce().catch((err) => logger.error({ err }, '[scheduler] startup run failed'));
-        startScheduler();
-        startOverdueScheduler();
-        startAuditRetentionScheduler();
-      } catch (err) {
-        logger.error({ err }, '[scheduler] startup wiring failed');
-      }
-    });
   });
 }
 

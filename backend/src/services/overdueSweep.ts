@@ -88,12 +88,14 @@ export async function runOverdueSweepOnce(now: Date = new Date()): Promise<Overd
   return result;
 }
 
-export function startOverdueScheduler(): void {
+// Returns the scheduled task so the worker process can stop it on shutdown.
+export function startOverdueScheduler(): ReturnType<typeof cron.schedule> {
   const cronExpr = process.env.OVERDUE_SWEEP_CRON ?? '0 3 * * *';
-  cron.schedule(cronExpr, () => {
+  const task = cron.schedule(cronExpr, () => {
     runOverdueSweepOnce()
       .then((res) => logger.info(`[overdue] cron run: ${JSON.stringify(res)}`))
       .catch((err) => logger.error({ err }, '[overdue] cron run failed'));
   });
   logger.info(`[overdue] started cron="${cronExpr}"`);
+  return task;
 }

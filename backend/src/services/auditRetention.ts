@@ -84,12 +84,14 @@ export async function purgeAuditLogOnce(
 }
 
 /** Daily by default, at 04:00 after the PM (02:00) and overdue (03:00) jobs. */
-export function startAuditRetentionScheduler(): void {
+// Returns the scheduled task so the worker process can stop it on shutdown.
+export function startAuditRetentionScheduler(): ReturnType<typeof cron.schedule> {
   const cronExpr = process.env.AUDIT_RETENTION_CRON ?? '0 4 * * *';
-  cron.schedule(cronExpr, () => {
+  const task = cron.schedule(cronExpr, () => {
     purgeAuditLogOnce()
       .then((res) => logger.info(`[audit-retention] cron run: ${JSON.stringify(res)}`))
       .catch((err) => logger.error({ err }, '[audit-retention] cron run failed'));
   });
   logger.info(`[audit-retention] started cron="${cronExpr}"`);
+  return task;
 }

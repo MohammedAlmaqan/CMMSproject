@@ -309,9 +309,10 @@ async function lastReadingAtGeneration(
   return Number.isFinite(value) ? value : null;
 }
 
-export function startScheduler(): void {
+// Returns the scheduled task so the worker process can stop it on shutdown.
+export function startScheduler(): ReturnType<typeof cron.schedule> {
   const cronExpr = process.env.PM_SCHEDULER_CRON ?? '0 2 * * *';
-  cron.schedule(cronExpr, () => {
+  const task = cron.schedule(cronExpr, () => {
     runSchedulerOnce()
       .then((res) => {
         logger.info(`[scheduler] cron run: ${JSON.stringify(res)}`);
@@ -321,4 +322,5 @@ export function startScheduler(): void {
       });
   });
   logger.info(`[scheduler] started cron="${cronExpr}"`);
+  return task;
 }
