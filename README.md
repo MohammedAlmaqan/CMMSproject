@@ -85,7 +85,7 @@ silently overwritten.*
 - System alerts and account lockout after repeated failed logins.
 - Read-only Administration screens for users and audit log. The **Settings** tab edits runtime configuration through `GET`/`PUT /api/system-config`.
 - Rate limiting on the login route.
-- Structured JSON logging (pino) to `logs/api-out.log` and `logs/api-err.log` under PM2.
+- Structured JSON logging (pino) to `logs/api-out.log` / `logs/api-err.log` (API) and `logs/worker-out.log` / `logs/worker-err.log` (scheduler worker) under PM2.
 
 ## Not implemented
 
@@ -135,6 +135,17 @@ The API listens on `http://localhost:4000`. Confirm it is alive:
 ```cmd
 curl http://localhost:4000/api/health
 ```
+
+The background scheduler (PM generation, overdue sweep, audit retention) is a **separate
+process** since C11, so `npm run dev` alone does not run it. To run the job worker beside
+the API in development:
+
+```cmd
+npm run worker:dev
+```
+
+In production both processes are started together from `ecosystem.config.cjs` (apps
+`cmms-api` and `cmms-worker`); see the Installation Guide.
 
 > In PowerShell, `copy .env.example .env` is `Copy-Item .env.example .env`.
 

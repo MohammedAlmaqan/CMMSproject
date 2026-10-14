@@ -397,6 +397,19 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # backfill the SHA. Durable anchor: the C1 closure-log row in
     # docs/GAP_REGISTER.md and the row-299 note in docs/SOW_COMPLIANCE.md.
     ("5.5 jwt-refresh", "Partial", "Met", "this commit"),
+
+    # SOW 4.1 "Architecture allows horizontal scaling with stateless web and API
+    # tiers" (row 255). C11 moved the PM/overdue/audit schedulers out of the API
+    # into the separate worker process (`backend/src/worker.ts`, `npm run worker`),
+    # so `backend/src/index.ts` no longer starts any scheduler and the startup lock
+    # now guards only the single-instance worker. The web/API tiers therefore hold
+    # no in-process session or scheduler state and scale; the residual (an
+    # in-process login rate limiter) is recorded, not blocking. Not a section 3
+    # row, so this moves EXPECT_ALL only. The status change and this wiring land
+    # together, so "this commit" is the sentinel; backfill the SHA. Durable anchor:
+    # the C11 closure-log row in docs/GAP_REGISTER.md and the row-255 note in
+    # docs/SOW_COMPLIANCE.md.
+    ("4.1 horizontal-scaling", "Partial", "Met", "this commit"),
 ]
 
 

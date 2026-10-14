@@ -28,15 +28,15 @@ The system of record, database name `cmms`. The schema is **migration-managed** 
 
 ### PM2 process manager (`backend/ecosystem.config.cjs`)
 
-Runs the API in **fork mode with `instances: 1`**. This is mandatory, not incidental: the PM scheduler runs in-process, so cluster mode would start one scheduler per worker and multiply work-order generation. The config also sets `max_memory_restart: 512M` and forces `NODE_ENV: 'production'`, which has a direct security consequence described under [K6_MODE](#k6_mode-production-guard). `merge_logs: true` keeps stdout and stderr in one stream for `pm2-logrotate`; `log_date_format` is deliberately omitted because plain-text prefixes would break JSON-lines parsing, since pino already stamps an ISO `time` on every record.
+Runs **two apps**: `cmms-api` (`dist/index.js`, the HTTP tier) and, since C11, `cmms-worker` (`dist/worker.js`, the background jobs). Both use **fork mode with `instances: 1`**. *Before C11 the single API instance was mandatory because the PM scheduler ran in-process, so cluster mode would have started one scheduler per worker and multiplied work-order generation.* The scheduler now lives in `cmms-worker`, so the API tier is stateless and free to scale — a second worker would simply fail to take the startup lock and exit cleanly. `cmms-api` is nonetheless still pinned to one instance in this deployment, because the login rate limiter is an in-process store (see [Security boundaries](#security-boundaries)), not because of the scheduler. The config also sets `max_memory_restart: 512M` and forces `NODE_ENV: 'production'`, which has a direct security consequence described under [K6_MODE](#k6_mode-production-guard). `merge_logs: true` keeps stdout and stderr in one stream for `pm2-logrotate`; `log_date_format` is deliberately omitted because plain-text prefixes would break JSON-lines parsing, since pino already stamps an ISO `time` on every record.
 
 ### IIS reverse proxy (documented only)
 
 Described in `INSTALLATION_GUIDE.md` §"Enable HTTPS / TLS". IIS terminates TLS and forwards plaintext to `http://localhost:4000`; the API performs no TLS itself and holds no certificate. IIS serves `app/dist/` as static content and proxies only `/api/*` to the API via ARR plus URL Rewrite. **This deployment has not been executed end to end.** The API does set Express `trust proxy = 1`, so `req.ip` and the login rate limiter see the real client behind IIS; what that setting makes load-bearing, and what is still unverified, is recorded under [Security boundaries](#security-boundaries).
 
-### PM scheduler (node-cron, in-process)
+### PM scheduler (node-cron, separate worker process)
 
-A single in-process `node-cron` job (`backend/src/services/scheduler.ts`) that generates preventive-maintenance work orders. Its schedule comes from `PM_SCHEDULER_CRON`, defaulting to `0 2 * * *` (daily 02:00). Only `strategyType: 'Time'` plans are processed; `Meter` and `Combined` plans are counted and logged as deferred, because the meter strategy is not implemented. Full behaviour is in [PM scheduler data flow](#pm-scheduler-data-flow).
+The scheduler code is `backend/src/services/scheduler.ts` (PM generation) plus `overdueSweep.ts` (overdue work-order alerts) and `auditRetention.ts` (audit-log purging). Since C11 the three `node-cron` jobs are started by the separate worker entry `backend/src/worker.ts` (`npm run worker`, i.e. `dist/worker.js`), not by the API: `backend/src/index.ts` no longer starts any scheduler. At boot the worker takes the `SchedulerRun` startup lock, runs one PM catch-up pass (`runSchedulerOnce()`), then schedules the PM job (`PM_SCHEDULER_CRON`, default `0 2 * * *`, daily 02:00), the overdue sweep (`OVERDUE_SWEEP_CRON`, default `0 3 * * *`) and audit retention (`AUDIT_RETENTION_CRON`, default `0 4 * * *`); `SIGINT`/`SIGTERM` stop the jobs. Only `strategyType: 'Time'` plans are processed; `Meter` and `Combined` plans are counted and logged as deferred, because the meter strategy is not implemented. Full behaviour is in [PM scheduler data flow](#pm-scheduler-data-flow).
 
 ## Deployment topology
 
@@ -53,8 +53,9 @@ flowchart TB
     subgraph HOST["Windows host"]
         direction TB
         PM2["PM2 'cmms-api'<br/>fork, instances=1<br/>NODE_ENV=production<br/>max_memory_restart=512M"]
-        API["Express API :4000<br/>+ in-process PM scheduler<br/>(node-cron, 0 2 * * *)"]
-        LOGS["logs/api-out.log<br/>logs/api-err.log<br/>(JSON lines)"]
+        API["Express API :4000<br/>(stateless HTTP tier)"]
+        WORKER["PM2 'cmms-worker'<br/>fork, instances=1<br/>dist/worker.js<br/>(PM + overdue + audit cron)"]
+        LOGS["logs/api-*.log<br/>logs/worker-*.log<br/>(JSON lines)"]
         UPL["backend/uploads/<br/>attachment files on disk<br/>snapshotted alongside the SQL dump"]
         BK["backups/<br/>cmms-YYYY-MM-DD-HHmm.sql<br/>+ matching -uploads folder<br/>newest 14 of each kept"]
     end
@@ -68,6 +69,8 @@ flowchart TB
     API -->|Prisma| DB
     API --> UPL
     API --> LOGS
+    WORKER -->|Prisma| DB
+    WORKER --> LOGS
     TASKSCHED -->|pg_dump| BK
     BK -.->|restore drill| DB
 ```
@@ -169,13 +172,13 @@ Stating these plainly matters more than the table above:
 
 ## PM scheduler data flow
 
-`runSchedulerOnce()` in `backend/src/services/scheduler.ts`, plus `startScheduler()` which wraps it in `cron.schedule(PM_SCHEDULER_CRON ?? '0 2 * * *')`.
+`runSchedulerOnce()` in `backend/src/services/scheduler.ts`, plus `startScheduler()` which wraps it in `cron.schedule(PM_SCHEDULER_CRON ?? '0 2 * * *')`. Since C11 the worker process (`backend/src/worker.ts`) sequences the boot: `acquireStartupLock()` → one `runSchedulerOnce()` catch-up → the cron jobs; the API no longer runs any of it.
 
 ```
-acquireStartupLock()                       startup, before any scheduling
+acquireStartupLock()                       worker boot, before any scheduling
   │  SchedulerRun row carrying pid@hostname + heartbeatAt
   │  LOCK_FRESH_MS = 5 min
-  ├─ foreign lock with heartbeatAt > now-5min → REFUSE to start, log, exit
+  ├─ foreign lock with heartbeatAt > now-5min → REFUSE to start, log, worker exits 0
   └─ otherwise create own row, remember schedulerRunId
   ▼
 count plans where strategyType IN ('Meter','Combined')   → log deferral count
@@ -211,7 +214,7 @@ log summary: plansEvaluated / wosCreated / wosSkipped / errors
 
 **Idempotency** is enforced by the database, not by application logic. The partial unique index on `(sourcePlanId, sourcePlanCycle) WHERE isDeleted = false` makes a second insert for the same plan-day impossible; the resulting `P2002` is caught and counted as a skip, so a retried or overlapping run creates nothing extra.
 
-**The startup lock** lives in `acquireStartupLock()` and is backed by the `SchedulerRun` table, not by memory — a process restart on a different host is still excluded. It is a lease: a lock whose heartbeat is older than 5 minutes is considered stale and may be taken over, so a hard crash cannot wedge the scheduler permanently. `GET /api/health/scheduler` reports the stalest-run state and raises a `SystemAlert` when the last successful run is too old.
+**The startup lock** lives in `acquireStartupLock()` and is backed by the `SchedulerRun` table, not by memory — a process restart on a different host is still excluded. Since C11 it is taken by the worker process (`backend/src/worker.ts`) at boot; if it is refused the worker logs the holder and exits 0 without scheduling, so a duplicate worker starts nothing. It is a lease: a lock whose heartbeat is older than 5 minutes is considered stale and may be taken over, so a hard crash cannot wedge the scheduler permanently. `GET /api/health/scheduler` reports the stalest-run state and raises a `SystemAlert` when the last successful run is too old.
 
 The safeguards, in the order they engage: startup lease lock, mid-run heartbeat, database-level cycle idempotency, bounded batches with an event-loop yield, per-plan error isolation, explicit accounting for deferred meter plans, and a persisted run record with success/error status.
 
@@ -257,6 +260,8 @@ Names and purposes only. No values are reproduced here, and no `.env` file was r
 | `PM_SCHEDULER_CRON` | `services/scheduler.ts` | node-cron expression for PM generation | `0 2 * * *` |
 | `SEED_DEMO` | `prisma/seed.ts` only | `1` permits the destructive demo wipe. Never read by the API | unset (seed exits 0) |
 
+`PM_SCHEDULER_CRON`, `OVERDUE_SWEEP_CRON` (`services/overdueSweep.ts`, default `0 3 * * *`) and `AUDIT_RETENTION_CRON` (`services/auditRetention.ts`, default `0 4 * * *`) are read by the scheduler **worker** process (`worker.ts`), not by the API.
+
 Two gaps in this table's own coverage:
 
 - `PM_SCHEDULER_CRON` is now present in `backend/.env.example`. Note that the unquoted value `0 2 * * *` is parsed correctly by Node's `--env-file`, but any tooling that treats spaces as value separators will mangle it; quote it if you introduce such a tool.
@@ -275,7 +280,7 @@ The batch scripts use a separate set of PostgreSQL client variables — `PGHOST`
 - **IIS HTTPS documented but not executed.** The reverse-proxy path, including the ARR rewrite and the TLS binding, has never been run end to end. `trust proxy = 1` is already set in code, so what remains unverified is the deployment around it: that ARR overwrites rather than appends `X-Forwarded-For`, and that port 4000 is unreachable except through the proxy. Until that is exercised, treat the path as untested.
 - **Attachment backup is paired, and the pair is only as good as the restore.** `backup.bat` snapshots `backend/uploads/` next to every dump and `restore-drill.bat` asserts the pair, so attachment durability is no longer unprotected. The remaining risk is procedural: restoring only the SQL half leaves every attachment 404ing. See [Attachments are backed up as a paired snapshot](#attachments-are-backed-up-as-a-paired-snapshot).
 - **Meter and Combined PM strategies are unimplemented.** Such plans are stored, counted, and logged as deferred on every run, but never generate work orders.
-- **In-memory rate limiting.** The login limiter uses the default in-process store, so limits reset on restart and are not shared across instances. This is acceptable only because PM2 is pinned to one instance.
+- **In-memory rate limiting.** The login limiter uses the default in-process store, so limits reset on restart and are not shared across instances. Since C11 the API tier is stateless and the scheduler no longer forces a single instance, so running more than one `cmms-api` would let each instance allow the full 20-per-15-minute budget; a shared store (for example `rate-limit-redis`) is required before that. The deployment therefore still pins `cmms-api` to one instance — for the limiter, not the scheduler.
 
 ## Cross-references
 

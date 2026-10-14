@@ -26,13 +26,14 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (1)
+## A. Close now — code and data gap (0)
 
-What it is, where it lives, size.
-
-| ID | Item | Where it lives | Size |
-|---|---|---|---|
-| C11 | Scheduler runs as an in-process singleton (`index.ts:308-309` starts it; advisory-lock startup), so tier scaling and scheduler correctness are unreconciled; the §5.1 report-generation limb is also absent | Matrix lines 255 (§4.1), 281 (§5.1) | L |
+Empty since 2026-10-15 — the sole item (C11) is resolved: the PM/overdue/audit
+schedulers now run in a separate worker process (`backend/src/worker.ts`,
+`npm run worker`) instead of inside the API, so the API tier is stateless and scales.
+Matrix line 255 (§4.1 horizontal scaling) moves `Partial` → `Met`; line 281 (§5.1
+separate background service) keeps its `Partial` status because its email-notification
+and report-generation limbs are still absent (see the closure log).
 
 ## B. Close now — documentation gap (1)
 
@@ -140,8 +141,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-1 code and data gap · 1 documentation gap · 0 blocked on owner · 0 blocked on external ·
-10 decisions-not-gap = **12 open items**.
+0 code and data gap · 1 documentation gap · 0 blocked on owner · 0 blocked on external ·
+10 decisions-not-gap = **11 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -182,6 +183,7 @@ landed.
 | C4b | 2026-10-14 | `fdf0303` | 290 |
 | C4c | 2026-10-14 | `b31900c` | 292 |
 | C1 | 2026-10-15 | `a9b5326` | 294 |
+| C11 | 2026-10-15 | this commit | this commit |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -446,4 +448,25 @@ promotion entries (`"4.2 session-timeout"`, `"5.5 jwt-refresh"`, `Partial` → `
 `this commit`) land in the same commit. All work ran against the throwaway
 `cmms_c1` database; the operational `cmms` database was not seeded, migrated or
 written.
+
+**C11** (`this commit`, 2026-10-15). C11 was the process-separation item: the PM,
+overdue and audit-retention schedulers ran inside the API process behind an advisory
+lock, which is the §4.1 scaling blocker. They now run in a dedicated worker process,
+`backend/src/worker.ts` (`npm run worker`, i.e. `dist/worker.js`), started by PM2 as
+`cmms-worker` (fork, `instances: 1`). `backend/src/index.ts` no longer starts any
+scheduler, so the HTTP tier holds no in-process job state and a duplicate worker simply
+fails to take the `SchedulerRun` startup lock and exits 0. The three `start*Scheduler`
+functions now return their `node-cron` task so the worker can stop them on
+`SIGINT`/`SIGTERM`; `backend/tests/unit/worker.test.ts` pins the lock-refused,
+cron-started and catch-up-failure branches without a database. Matrix line 255 (§4.1)
+moves `Partial` → `Met` — the web/API tiers are stateless and scaling the API no longer
+multiplies scheduled work. Line 281 (§5.1) stays `Partial`: the separate-process limb
+for PM scheduling is now delivered, but the email-notification and report-generation
+services the same clause names do not exist. The one residual is recorded, not used to
+hold the row: the login rate limiter is still an in-process store, so running more than
+one API instance would need a shared limiter store for the per-IP budget to hold
+cluster-wide. Category A drops to 0 and the Totals line to 11 open items. The verifier
+promotion entry (`"4.1 horizontal-scaling"`, `Partial` → `Met`, `this commit`) lands in
+the same commit. All suite work ran against the throwaway `cmms_c11` database; the
+operational `cmms` database was not seeded, migrated or written.
 

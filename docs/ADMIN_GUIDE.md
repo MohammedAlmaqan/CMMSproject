@@ -63,16 +63,17 @@ The deployment has three processes:
 
 ![API docs](images/g6b_06_api_docs.png)
 
-### 2.1 Only one backend instance may run the scheduler
+### 2.1 The scheduler runs in a separate worker process
 
-The preventive maintenance scheduler takes a database-backed startup lock on boot. If a second instance finds a live lock - a `SchedulerRun` row in `running` state with a heartbeat newer than 5 minutes, from a different host or process - it **refuses to start the scheduler** and logs a message, but it keeps serving the API normally.
+Since C11 the preventive maintenance, overdue and audit-retention jobs run in a dedicated worker process, `cmms-worker` (`backend/dist/worker.js`, started by `npm run worker` or PM2), not inside the API. At boot the worker takes a database-backed startup lock. If a live lock exists - a `SchedulerRun` row in `running` state with a heartbeat newer than 5 minutes, from a different host or process - the worker **refuses to start the jobs and exits 0**, leaving the API untouched.
 
 Consequences you must plan for:
 
-- Running two API instances behind a load balancer is supported for API traffic, but **only one of them will generate preventive maintenance work orders**. The other is harmless but idle.
-- This is deliberate. It prevents duplicate work orders if a second instance is ever started.
-- If an instance is killed hard, the lock is considered stale after 5 minutes and a new instance may take over.
-- A rolling restart will briefly have one instance refusing the lock. That is expected; do not "fix" it by deleting `SchedulerRun` rows.
+- The API (`cmms-api`) no longer holds the scheduler, so it may be restarted freely. This deployment still runs one API instance, but for the in-process login rate limiter (see [12.1](#121-network-exposure)), not the scheduler.
+- Run **exactly one** `cmms-worker`. A second worker finds the live lock and exits; it is harmless but generates no work orders.
+- This is deliberate. It prevents duplicate work orders if a second worker is ever started.
+- If the worker is killed hard, the lock is considered stale after 5 minutes and a replacement may take over.
+- A rolling restart will briefly have the new worker refuse the lock while the old one's heartbeat is still fresh. That is expected; do not "fix" it by deleting `SchedulerRun` rows.
 
 ---
 
@@ -80,7 +81,7 @@ Consequences you must plan for:
 
 Configuration is mostly by environment variable. The backend reads `backend/.env`; the frontend is compiled with `app/.env.local`. The Administration screen's **Settings** tab edits the two runtime-configurable values (`wo_number_prefix`, `notif_number_prefix`) through `GET`/`PUT /api/system-config` (Administrator only); every other value here still requires an edit and a restart.
 
-> The configuration tables in this section and in the [Installation Guide](INSTALLATION_GUIDE.md#3-configuration) match; both list every variable the API reads.
+> The configuration tables in this section and in the [Installation Guide](INSTALLATION_GUIDE.md#3-configuration) match; both list the variables `backend\.env.example` documents. The scheduler worker also reads two cron variables omitted here because they have safe defaults: `OVERDUE_SWEEP_CRON` (default `0 3 * * *`) and `AUDIT_RETENTION_CRON` (default `0 4 * * *`).
 
 ### 3.1 Backend variables - `backend/.env`
 
@@ -95,7 +96,7 @@ Configuration is mostly by environment variable. The backend reads `backend/.env
 | `CORS_ORIGINS` | Comma-separated list of browser origins permitted to call the API | `http://localhost:3000` | **Always**, when the frontend is served from anywhere other than `http://localhost:3000`. Use full origins including scheme, host, and port, with no trailing slash. A mismatch produces a blank screen with no data and a CORS error in the browser console |
 | `BIND_HOST` | Interface the API binds to | `0.0.0.0` | Set to `127.0.0.1` whenever the API sits behind IIS on the same host. This is what keeps port 4000 off the network. See [12.1](#121-network-exposure) |
 | `LOG_LEVEL` | Log verbosity. One of `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` | `info` | Raise to `debug` only while diagnosing. `silent` disables logging entirely. An unrecognised value is ignored and falls back to `info` rather than failing to start |
-| `PM_SCHEDULER_CRON` | Cron expression for the nightly PM generation run | `0 2 * * *` (02:00 daily, **server local time**) | When the plant's maintenance window differs from 02:00, or to run more or less often. Five-field `node-cron` syntax. **The scheduler evaluates due dates, not a rolling window, so changing this does not backfill missed runs** - see [5.4](#54-when-a-run-is-missed) |
+| `PM_SCHEDULER_CRON` | Cron expression for the nightly PM generation run (read by `cmms-worker`) | `0 2 * * *` (02:00 daily, **server local time**) | When the plant's maintenance window differs from 02:00, or to run more or less often. Five-field `node-cron` syntax. **The scheduler evaluates due dates, not a rolling window, so changing this does not backfill missed runs** - see [5.4](#54-when-a-run-is-missed). Restart `cmms-worker` after the change |
 
 ### 3.2 Runtime-only variables
 
@@ -192,7 +193,7 @@ The last query lists attachments the database believes in. Cross-check it agains
 
 ## 5. Scheduler operations
 
-The scheduler generates work orders from preventive maintenance plans whose due date has arrived. It is the only part of the system that writes data on a timer.
+The scheduler generates work orders from preventive maintenance plans whose due date has arrived. Since C11 it runs in the `cmms-worker` process, and it is the only part of the system that writes data on a timer.
 
 ### 5.1 Check the scheduler is actually running
 
@@ -234,9 +235,9 @@ Use a manual run to confirm a new plan produces a work order before waiting for 
 
 Work through these in order:
 
-1. **Is the API running?** `curl -s http://localhost:4000/api/health`. If this fails, the problem is the service, not the scheduler.
-2. **Is the instance that owns the lock alive?** Check the logs for `startup lock acquired` versus `disabled - lock held by`. If every instance reports a lock held by another process, a hard-killed instance may have left a lock that has not yet aged past 5 minutes. Wait and restart; do not delete `SchedulerRun` rows by hand.
-3. **Has a run been attempted at all?** Query `SchedulerRun` as in [4.4](#44-useful-read-only-queries). No row at all means cron never fired, so check `PM_SCHEDULER_CRON` syntax and that the process has been up across the trigger time. Note the expression is evaluated in **server local time** - a daylight-saving change or a server in another time zone will shift the run.
+1. **Is the worker running?** `pm2 status` should list `cmms-worker` as `online`. `curl -s http://localhost:4000/api/health` checks the API, which is a different process - a healthy API does not mean the scheduler is running.
+2. **Is the worker that owns the lock alive?** Check the worker log (`backend\logs\worker-out.log`) for `startup lock acquired` versus `lock held by`. If the worker reports a lock held by another process, a hard-killed worker may have left a lock that has not yet aged past 5 minutes. Wait and restart; do not delete `SchedulerRun` rows by hand.
+3. **Has a run been attempted at all?** Query `SchedulerRun` as in [4.4](#44-useful-read-only-queries). No row at all means cron never fired, so check `PM_SCHEDULER_CRON` syntax and that the worker has been up across the trigger time. Note the expression is evaluated in **server local time** - a daylight-saving change or a server in another time zone will shift the run.
 4. **Did runs fail?** A `SchedulerRun` with `status = 'error'` has the reason in `errorMessage`.
 5. **Do the plans have everything they need?** A plan missing an equipment record, a work center, or a task list can fail per-plan without failing the run. The `errors` array in the manual run response names them.
 
@@ -249,9 +250,9 @@ The scheduler evaluates each plan's due date at the moment it runs. It does **no
 Recovery is either:
 
 - Trigger a manual run as in [5.2](#52-running-the-scheduler-manually) - the plans are due by their date, so they are generated then; or
-- Restart the service close to the scheduled time on the following night.
+- Restart the worker close to the scheduled time on the following night (`pm2 restart cmms-worker`). The worker also runs one catch-up pass at start, so a plan still due when the worker comes back is generated immediately.
 
-This matters for a plant that takes the API down overnight for maintenance: move the window with `PM_SCHEDULER_CRON`, or accept that a missed night requires a manual run.
+This matters for a plant that takes the worker down overnight for maintenance: move the window with `PM_SCHEDULER_CRON`, or accept that a missed night requires a manual run.
 
 ---
 
@@ -559,8 +560,8 @@ The log has no automatic purge, so it grows indefinitely. Because it is the lock
 
 The backend logs through Pino, at the level set by `LOG_LEVEL`.
 
-- **Under PM2**, logs go to `backend\logs\api-out.log` and `backend\logs\api-err.log` (per `ecosystem.config.cjs`).
-- Useful startup lines: `startup lock acquired (pid@host, run <id>)`, `[scheduler] started cron="<expression>"`, and `listening on <host>:<port>`.
+- **Under PM2**, the API logs go to `backend\logs\api-out.log` and `backend\logs\api-err.log`, and the scheduler worker logs go to `backend\logs\worker-out.log` and `backend\logs\worker-err.log` (per `ecosystem.config.cjs`).
+- Useful startup lines: `startup lock acquired (pid@host, run <id>)` and `[scheduler] started cron="<expression>"` (both in the **worker** log), and `listening on <host>:<port>` (in the **API** log).
 - `ecosystem.config.cjs` references `pm2-logrotate` only in a comment; rotation is **not** actually configured there. Confirm rotation is active on a long-running host; an unrotated log will eventually fill the disk, and the failure then looks like an application fault.
 - Stale-scheduler health conditions are logged with `[scheduler] stale health detected - SystemAlert created`.
 
@@ -738,7 +739,7 @@ If a user is signing in correctly and is still refused, check for a lockout **fi
 
 ### 14.6 No work orders are being generated from PM plans
 
-1. `curl -s http://localhost:4000/api/health/scheduler` - see [5.3](#53-when-the-scheduler-reports-stale).
+1. `curl -s http://localhost:4000/api/health/scheduler` - and confirm `cmms-worker` is `online` in `pm2 status`; see [5.3](#53-when-the-scheduler-reports-stale).
 2. Is the plan's **Next Due** date actually reached? Generation is driven by the due date, not by the plan's age.
 3. Is the plan active?
 4. Does the plan have the equipment, work center, and task list it needs? A missing reference fails that plan and appears in the manual run's `errors` array.

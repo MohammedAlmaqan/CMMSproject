@@ -80,6 +80,7 @@ the section above.
     `GET /api/health/scheduler` (200 ok / 503 stale + SystemAlert dedup);
     non-blocking batches (BATCH_SIZE=50 + setImmediate);
     PM2 fork config (`instances: 1`, `exec_mode: 'fork'`, register.js + env_file removed).
+  - **Superseded 2026-10-15 (C11):** the scheduler no longer runs in-process. It was extracted to a separate `cmms-worker` process (`backend/src/worker.ts`, `npm run worker`; PM2 `cmms-worker` app), so the API tier is stateless and scales, and the startup lock now guards only the worker. See the C11 closure-log row in `docs/GAP_REGISTER.md`.
   - Proof: `verify_g4b2.py` PASS — 2nd backend locked out; stale→503→alert→restore; batch markers present.
 - **Phase 3.1 (PM scheduler) — COMPLETE.**
 - **G5** — COMPLETE. Dashboard + Reports (`e047a40`).

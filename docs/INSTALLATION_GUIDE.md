@@ -89,6 +89,10 @@ database instead, skip that line.
 
 ### Step 5: Start the Application
 
+Since C11 the backend is two processes: the API (`dist/index.js`) and the background
+scheduler worker (`dist/worker.js`) that generates preventive-maintenance work orders,
+runs the daily overdue sweep and purges old audit rows. Run exactly **one** worker.
+
 **Option A: Using PM2 (Recommended)**
 
 ```cmd
@@ -98,16 +102,23 @@ pm2 save
 pm2 startup
 ```
 
+`ecosystem.config.cjs` defines both apps - `cmms-api` and `cmms-worker` - so this one
+command starts both.
+
 **Option B: Using Windows Services**
 
 Create two Windows services (using NSSM - Non-Sucking Service Manager):
 
 ```cmd
-REM Backend service
+REM API service
 nssm install CMMS-API "C:\Program Files\nodejs\node.exe" "C:\CMMSproject\backend\dist\index.js"
 
-REM Start service
+REM Scheduler worker service (exactly one)
+nssm install CMMS-Worker "C:\Program Files\nodejs\node.exe" "C:\CMMSproject\backend\dist\worker.js"
+
+REM Start services
 nssm start CMMS-API
+nssm start CMMS-Worker
 ```
 
 ### Step 6: Serve Frontend
@@ -222,10 +233,12 @@ The command must return HTTP 200 with the health payload. `-k` is required only 
 | `CORS_ORIGINS` | Comma-separated browser origins allowed to call the API | http://localhost:3000 |
 | `LOG_LEVEL` | Pino log level | info |
 | `BIND_HOST` | Interface the API listens on | 0.0.0.0 |
-| `PM_SCHEDULER_CRON` | Cron expression driving the PM scheduler | 0 2 * * * |
+| `PM_SCHEDULER_CRON` | Cron expression driving the PM scheduler worker | 0 2 * * * |
 
-These ten are every variable the API reads, and they match
-`backend\.env.example` line for line. `backend\.env` is loaded by Node's own
+These ten are the variables `backend\.env.example` documents, and the table matches it
+line for line. The scheduler worker additionally reads two cron variables omitted here
+only because they have safe defaults: `OVERDUE_SWEEP_CRON` (default `0 3 * * *`) and
+`AUDIT_RETENTION_CRON` (default `0 4 * * *`). `backend\.env` is loaded by Node's own
 `--env-file` flag at launch rather than by a dotenv library, so a missing
 variable silently falls back to its default, except `JWT_SECRET`, which
 fails fast rather than starting insecurely.
@@ -356,8 +369,8 @@ cd CMMSproject\app
 npm install
 npm run build
 
-REM 4. Restart services
-pm2 restart cmms-api
+REM 4. Restart both processes (API + scheduler worker)
+pm2 restart ecosystem.config.cjs
 ```
 
 ### Logs
@@ -371,15 +384,19 @@ The API logs structured JSON. Every access line carries the HTTP method, full pa
 Levels are `info` (30) for 2xx, `warn` (40) for 4xx, and `error` (50) for 5xx. Application code uses the shared `backend\src\utils\logger.ts` instance instead of `console.*`, so the whole stream is machine-parseable. Set `LOG_LEVEL` to `debug` or `trace` for more detail; it defaults to `info` and an unrecognised value falls back to `info` rather than failing to boot. Authorization headers, cookies, and password fields are redacted before a line is written, and query strings are dropped from the logged path, so tokens must never be passed in a URL.
 
 ```cmd
-REM Stream logs
-pm2 logs cmms-api
+REM Stream logs (both processes)
+pm2 logs
 
 REM Application logs are in:
 CMMSproject\backend\logs\api-out.log
 CMMSproject\backend\logs\api-err.log
+
+REM Scheduler worker logs are in:
+CMMSproject\backend\logs\worker-out.log
+CMMSproject\backend\logs\worker-err.log
 ```
 
-`ecosystem.config.cjs` sets `merge_logs: true`, so PM2 keeps one combined stream; `api-err.log` only receives entries PM2 itself routes to stderr (for example, crashes before the logger is ready).
+`ecosystem.config.cjs` sets `merge_logs: true`, so PM2 keeps one combined stream per app; the `*-err.log` files only receive entries PM2 itself routes to stderr (for example, crashes before the logger is ready). The scheduler's `[scheduler] …` lines are in the **worker** logs, not the API logs.
 
 ### Log Rotation (pm2-logrotate)
 
