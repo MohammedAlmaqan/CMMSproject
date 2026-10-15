@@ -29,19 +29,21 @@ These counts are the actual current state, not aspirations:
 | Thing | Count |
 |-------|-------|
 | Prisma models | 38 |
-| Prisma migrations | 19 |
+| Prisma migrations | 22 |
 | Backend API route files | 27 |
 | Backend route groups mounted | 27 |
-| Backend test files | 81 `.test.ts` run by vitest (35 unit + 46 routes), 1084 tests executed (`vitest list` prints 1080: it counts each `it.each` template once, the runner expands them); 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 84 |
+| Backend test files | 88 `.test.ts` run by vitest (39 unit + 49 routes), 1180 tests executed (`vitest list` prints 1176: it counts each `it.each` template once, and the runner expands the two 3-case `it.each` templates in `laborAttribution.test.ts` into six); 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 91 |
 | Frontend pages | 17 |
-| Frontend service modules | 25 |
-| Frontend test files | 8 |
+| Frontend service modules | 26 |
+| Frontend test files | 13 |
 
-*Re-derived 2026-10-08 against the repository at `3fbbea1`. The previous
-table - 15 migrations, 26 route files and groups, 70 backend tests (33 + 37)
-and a tracked total of 73, 23 service modules, 7 frontend tests - was written
-before the 2026-10-02 to 2026-10-07 work and is kept here rather than
-silently overwritten.*
+*Re-derived 2026-10-16 against the repository at `9163eda`. This table moved
+from the 2026-10-08 re-derivation: migrations 19→22, backend test files 81→88
+(35 + 46 → 39 + 49), executed tests 1084→1180, frontend service modules 25→26
+and frontend test files 8→13. The 2026-10-08 values, and before them a table
+of 15 migrations, 26 route files and groups, 70 backend tests (33 + 37) with a
+tracked total of 73, 23 service modules and 7 frontend tests, are kept here
+rather than silently overwritten.*
 
 ## Implemented functionality
 
@@ -286,10 +288,10 @@ CMMSproject/
 │   └── src/
 │       ├── components/         # layout, dashboard (incl. the R3F canvas)
 │       ├── pages/              # 17 page components
-│       ├── services/           # 25 API service modules
+│       ├── services/           # 26 API service modules
 │       ├── store/              # Zustand
 │       ├── types/              # TypeScript types
-│       └── __tests__/          # 8 test files
+│       └── __tests__/          # 13 test files
 ├── backend/                    # Express API
 │   ├── src/
 │   │   ├── routes/             # 27 route files
@@ -298,9 +300,9 @@ CMMSproject/
 │   │   └── utils/              # logger, csv, prisma client
 │   ├── prisma/
 │   │   ├── schema.prisma       # 38 models
-│   │   ├── migrations/         # 19 migrations
+│   │   ├── migrations/         # 22 migrations
 │   │   └── seed.ts             # guarded demo seed
-│   └── tests/                  # 81 test files + 3 support = 84 tracked
+│   └── tests/                  # 88 test files + 3 support = 91 tracked
 ├── scripts/                    # Windows batch scripts, k6, verify scripts
 ├── docs/                        # all documentation; README.md is the only .md at the root
 │   ├── CMMS_FINALIZATION_TRACKER.md
