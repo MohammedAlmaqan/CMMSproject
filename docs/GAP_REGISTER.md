@@ -509,3 +509,11 @@ importers (`eefcff1`, run 252); the verifier promotion entry (`"5.7 import-tools
 `Partial` → `Met`, `this commit`) lands in the same commit. §5.7's summary figures move
 to 156 Met / 23 Partial (the §3 total is unchanged at 104 Met / 1 Partial). No database
 was touched — docs, source citations and one verifier comment only.
+
+*Superseded 2026-10-15:* the summary figures moved again after this sweep, when the **D-20**
+owner decision promoted nine non-§3 rows (`docs/SOW_COMPLIANCE.md` §1.3 line 38, §2.1 lines 52/53/54/56,
+§2.2 lines 59/61/62/63) from `Partial` to `Met`. That took the all-clauses count from
+**156 Met / 23 Partial** to **165 Met / 14 Partial**; the §3 total is unchanged at
+**104 Met / 1 Partial**. The paragraph above is kept as the record of what the D1 sweep itself
+moved (§5.7 row 306, 156/23); this pointer records the later move so the figure is not read as
+current. The D-20 promotion commit is `45ea771` (CI run 300).
