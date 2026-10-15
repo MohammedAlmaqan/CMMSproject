@@ -431,8 +431,11 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # aggregate per-axis cost, two-entity export against four-entity import) and
     # are recorded in the Summary D-20 note in docs/SOW_COMPLIANCE.md. None is a
     # section 3 row, so these move EXPECT_ALL only. The status change and this
-    # wiring landed together in 45ea771 (green CI run 300), so that commit is
-    # cited for all nine. Durable anchor: the D-20 owner decision of 2026-10-15.
+    # wiring landed together in 45ea771, an interior commit with no run of its
+    # own (Actions fires one run per push, at the tip), so its content is covered
+    # by green run 300 at its child 1b027dc rather than by a run at this SHA.
+    # That commit is cited for all nine. Durable anchor: owner decision D-20,
+    # 2026-10-15.
     ("1.3 production-module", "Partial", "Met", "45ea771"),
     ("2.1 structured-work-management", "Partial", "Met", "45ea771"),
     ("2.1 proactive-maintenance", "Partial", "Met", "45ea771"),

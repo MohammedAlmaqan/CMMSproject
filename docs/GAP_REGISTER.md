@@ -516,4 +516,5 @@ owner decision promoted nine non-§3 rows (`docs/SOW_COMPLIANCE.md` §1.3 line 3
 **156 Met / 23 Partial** to **165 Met / 14 Partial**; the §3 total is unchanged at
 **104 Met / 1 Partial**. The paragraph above is kept as the record of what the D1 sweep itself
 moved (§5.7 row 306, 156/23); this pointer records the later move so the figure is not read as
-current. The D-20 promotion commit is `45ea771` (CI run 300).
+current. The D-20 promotion commit is `45ea771` — an interior commit with no run of
+its own, covered by green run 300 at its child `1b027dc`.
