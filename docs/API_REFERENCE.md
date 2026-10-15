@@ -6,7 +6,7 @@ Reference documentation for the CMMS REST API, version 1.0.0.
 - **Interactive UI:** `/api-docs` (Swagger UI)
 - **Machine-readable spec:** [`openapi.json`](./openapi.json) (OpenAPI 3.0.0, also served live at `/api-docs.json`)
 
-The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The repository routers and the live spec agreed at **141 operations across 87 paths and 27 routers** as of the 2026-10-06 snapshot. **That figure is stale:** re-derived from the route annotations on 2026-10-15 the live spec is **146 operations across 92 paths** — the five later operations are `POST /api/auth/refresh` and `POST /api/auth/logout` (C1, 2026-10-15), plus `POST /api/audit-log/purge`, `POST /api/functional-locations/import.csv` and `POST /api/work-orders/import.csv`. Correcting the figure everywhere it appears and re-exporting `docs/openapi.json` is tracked under the `v1.1-8` audit and is not done here. The checked-in `docs/openapi.json` is an exported snapshot of the live spec, refreshed from a running server on 2026-10-06 (141 operations / 87 paths — earlier exports lagged; the 2026-10-02 export showed 114 operations / 71 paths). Re-export it after a fresh build by saving `/api-docs.json`.
+The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The repository routers and the live spec agree at **146 operations across 92 paths and 27 routers**, re-derived from the route annotations and re-exported into `docs/openapi.json` on 2026-10-15. The five operations added since the 2026-10-06 reading of 141 operations / 87 paths are `POST /api/auth/refresh` and `POST /api/auth/logout` (C1, 2026-10-15), plus `POST /api/audit-log/purge`, `POST /api/functional-locations/import.csv` and `POST /api/work-orders/import.csv`; the intervening OData query parameters (C4c) also reached the snapshot at this refresh. *Superseded: this note previously read 141 operations across 87 paths as of the 2026-10-06 snapshot and said the correction was tracked under `v1.1-8` and not yet done.* The checked-in `docs/openapi.json` must not be edited by hand: regenerate it with `python scripts/verify/verify_openapi.py --write` (or `npx tsx scripts/openapi.ts --write` from `backend/`), and `scripts/verify/verify_openapi.py` fails when the snapshot and the route annotations drift apart. Earlier exports lagged (the 2026-10-02 export showed 114 operations / 71 paths).
 
 ## Authentication
 
@@ -63,12 +63,12 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 
 ## Endpoint groups
 
-141 operations across 87 paths and 27 routers, counted against the running server's `/api-docs.json` on 2026-10-06 (stale — see the introductory note above; the re-derived live count is 146 operations across 92 paths, tracked under `v1.1-8`). The repository routers and the live spec agree at 141 (`POST /api/cause-codes` was the last un-annotated handler; it now carries an `@openapi` block). The previous 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
+146 operations across 92 paths and 27 routers, re-derived from the running server's `/api-docs.json` on 2026-10-15 (superseding the 2026-10-06 reading of 141 operations / 87 paths). The repository routers and the live spec agree at 146. The previous 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
 
 | Group | Base path | Operations |
 | --- | --- | --- |
-| Authentication | `/api/auth` | 2 |
-| Functional Locations | `/api/functional-locations` | 6 |
+| Authentication | `/api/auth` | 4 |
+| Functional Locations | `/api/functional-locations` | 7 |
 | Equipment | `/api/equipment` | 11 |
 | Equipment Meters | `/api/equipment-meters` | 6 |
 | Work Centers | `/api/work-centers` | 6 |
@@ -77,7 +77,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 | Cause Codes | `/api/cause-codes` | 5 |
 | Task Lists | `/api/task-lists` | 5 |
 | Notifications | `/api/notifications` | 7 |
-| Work Orders | `/api/work-orders` | 7 |
+| Work Orders | `/api/work-orders` | 8 |
 | Work Order Operations | `/api/work-order-operations` | 4 |
 | Work Order Materials | `/api/work-order-materials` | 4 |
 | Work Order Cost Splits | `/api/work-order-cost-splits` | 3 |
@@ -90,7 +90,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 | Alerts | `/api/alerts` | 4 |
 | Comments | `/api/comments` | 3 |
 | Attachments | `/api/attachments` | 4 |
-| Audit Log | `/api/audit-log` | 1 |
+| Audit Log | `/api/audit-log` | 2 |
 | Users | `/api/users` | 7 |
 | Dashboard | `/api/dashboard` | 3 |
 | System Config | `/api/system-config` | 2 |
@@ -114,6 +114,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 | POST | `/api/functional-locations` | Create a functional location |
 | PUT | `/api/functional-locations/{id}` | Update a functional location |
 | DELETE | `/api/functional-locations/{id}` | Soft delete a functional location |
+| POST | `/api/functional-locations/import.csv` | Bulk import functional locations from CSV |
 
 ### Equipment
 
@@ -229,6 +230,7 @@ Raising a notification with `priority: High` also writes an in-app alert (`alert
 | PUT | `/api/work-orders/{id}` | Update a work order |
 | DELETE | `/api/work-orders/{id}` | Soft-delete a work order |
 | PUT | `/api/work-orders/{id}/status` | Transition work order status |
+| POST | `/api/work-orders/import.csv` | Bulk import work orders from CSV |
 
 The list endpoint is paginated with `skip` and `take`. Status changes go through the dedicated status endpoint rather than a general update, so the transition is validated. An `EM` (emergency) work order is always the highest priority: `POST` and `PUT` force `High` whatever the request contains, so an emergency cannot be raised or demoted below the top of the scale. A work order also carries two nullable long-text fields, `safetyNotes` and `completionRemarks` (SOW 3.3.3), accepted on `POST` and `PUT`: multi-line plain text up to 20000 characters each, and send `null` to clear one. A work order may also name a root-cause `causeCodeId` (nullable), accepted on `POST` and `PUT` and returned on the list and detail reads; a breakdown work order cannot move to `Completed` until it names one. A calibration work order (`type: CAL`) carries the full SOW 3.3.1 result set — `calibrationResult` (`Pass` or `Fail`, nullable), `calibrationAsFound`, `calibrationAsLeft` and `calibrationReferenceStandard` (nullable strings), `calibrationDueDate` (nullable date) and `calibrationIntervalValue` (positive integer) with `calibrationIntervalUnit` (`Days`, `Months` or `Years`) — all accepted on `POST` and `PUT` and returned on the list and detail reads; a `CAL` work order cannot move to `Completed` until `calibrationResult` is recorded.
 
@@ -383,6 +385,7 @@ Upload takes a `multipart/form-data` body with a single `file` part. Files are c
 | Method | Path | Summary |
 | --- | --- | --- |
 | GET | `/api/audit-log` | List audit log entries (Administrator only) |
+| POST | `/api/audit-log/purge` | Purge audit entries older than the retention window (Administrator only) |
 
 ### Users
 

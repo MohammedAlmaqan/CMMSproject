@@ -2,10 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import pinoHttp from 'pino-http';
 
+import { swaggerSpec } from './openapi.js';
 import authRoutes from './routes/auth.js';
 import functionalLocationRoutes from './routes/functionalLocations.js';
 import equipmentRoutes from './routes/equipment.js';
@@ -173,26 +173,10 @@ app.use(pinoHttp({
 // prefixes cannot drift; the login limiter is registered for both.
 app.use(['/api/auth/login', '/api/v1/auth/login'], authLimiter);
 
-// Swagger
-const swaggerSpec = swaggerJsdoc({
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'CommandPulse CMMS API',
-      version: '1.0.0',
-      description: 'REST API for Computerized Maintenance Management System',
-    },
-    servers: [{ url: `http://localhost:${PORT}` }],
-    components: {
-      securitySchemes: {
-        bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      },
-    },
-    security: [{ bearerAuth: [] }],
-  },
-  apis: ['./src/routes/*.ts'],
-});
-
+// Swagger: the document itself is built in ./openapi.ts, so the spec served
+// below, the exported docs/openapi.json snapshot and the drift check
+// (scripts/verify/verify_openapi.py) all read one definition and cannot
+// disagree with each other.
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
 
