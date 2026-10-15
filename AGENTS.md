@@ -66,7 +66,8 @@ reviewer correction; see "Commit discipline" below.
 - Every count, clause attribution and line-number citation in the docs is a claim
   that can rot silently. `git log -L` on a Notes line tells you when it was last
   written; cross-check against the commits that touched the behaviour it describes.
-  This is the `v1.1-8` sweep, still open.
+  This was the `v1.1-8` sweep, closed 2026-10-16 (see the `v1.1-8` row in
+  `docs/CMMS_FINALIZATION_TRACKER.md`); the rule remains standing.
 - Preserve history rather than overwriting it. When a figure is superseded, keep the
   original and add a pointer; do not silently restate it.
 - Prefer symbolic references ("the `APPROVED_PROMOTIONS` list") over hardcoded line
