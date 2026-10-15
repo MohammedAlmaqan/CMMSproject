@@ -635,7 +635,7 @@ If you change the topology - a second proxy, a load balancer in front of IIS, or
 
 Authorization is enforced by the server on every endpoint, with a role hierarchy: Administrator > Maintenance Planner > Maintenance Supervisor > Technician > Requester > View-Only. A higher role inherits the permissions of every role below it.
 
-The frontend is **not** consistently role-aware: all eleven navigation items are shown to everyone, most screens render regardless of role, and only a few controls are hidden client-side. Enforcement is the server's job, and a refused write returns `403`. Treat the UI as a convenience, never as the security boundary. A user who can see a Save button is not thereby permitted to save.
+The frontend now mirrors the server's role hierarchy in one place (`app/src/lib/rbac.ts`, C2 `22c3b2e`): the Administration menu item is hidden and its route redirects to the dashboard for anyone below Administrator, the new-work-order page and its create controls require Requester or above, and every other screen is authenticate-only, matching the API's read floors. Most screens still open regardless of role, and enforcement remains the server's job: a refused write returns `403`. Treat the UI as a convenience, never as the security boundary. A user who can see a Save button is not thereby permitted to save.
 
 ### 12.5 Secrets
 
