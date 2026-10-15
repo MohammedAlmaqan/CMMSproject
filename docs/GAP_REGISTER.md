@@ -196,7 +196,7 @@ landed.
 | C4c | 2026-10-14 | `b31900c` | 292 |
 | C1 | 2026-10-15 | `a9b5326` | 294 |
 | C11 | 2026-10-15 | `e59e9a1` | 296 |
-| D1 | 2026-10-15 | `this commit` | n/a |
+| D1 | 2026-10-15 | `7db0d20` | 298 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -483,7 +483,7 @@ promotion entry (`"4.1 horizontal-scaling"`, `Partial` → `Met`, `this commit`)
 the same commit. All suite work ran against the throwaway `cmms_c11` database; the
 operational `cmms` database was not seeded, migrated or written.
 
-**D1** (`this commit`, run n/a, 2026-10-15). D1 was the documentation accuracy sweep.
+**D1** (`7db0d20`, run 298, 2026-10-15). D1 was the documentation accuracy sweep.
 The `docs/SOW_COMPLIANCE.md` citations were its centre: all 154 `file:line` locators were
 re-derived from source and turned into symbolic references (145 rewritten in place, 7
 dropped with the stale claims that carried them, and the 2 `docs/ADMIN_GUIDE.md` section
