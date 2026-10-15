@@ -314,7 +314,7 @@ Notes are populated for `Partial`, `Not Met` and `Waived`. Every row carries an 
 |---|---|---|---|---|
 | §6.1 | Full source code of all components in a Git repository | Met | `backend/`, `app/`, `scripts/`, `docs/` on `main`; database schema and migrations under `backend/prisma/` | — |
 | §6.1 | Compiled/deployable artifacts and CI/CD pipeline scripts | Partial | `.github/workflows/ci.yml` (build, migrate, seed, test on PostgreSQL 15 + Node 24) | CI is in place and green. Deployable container artifacts are excluded by Client decision, so delivery is a source-and-pipeline handoff rather than an image handoff |
-| §6.1 | Database creation and seed data scripts | Met | `backend/prisma/migrations/` (19 migrations; previously cited here as 15); `backend/prisma/seed.ts`; `scripts/seed-demo.bat` | — |
+| §6.1 | Database creation and seed data scripts | Met | `backend/prisma/migrations/` (22 migrations; previously cited here as 19, and before that as 15); `backend/prisma/seed.ts`; `scripts/seed-demo.bat` | — |
 | §6.2 | System Architecture Document with components and deployment diagram | Met | `docs/ARCHITECTURE.md` | — |
 | §6.2 | Database Schema Document — ER diagram and data dictionary | Met | `docs/ER_DIAGRAM.md`; `docs/DATA_DICTIONARY.md` | — |
 | §6.2 | API Documentation — Swagger/OpenAPI and integration guide | Met | live `/api-docs.json` (146 operations across 92 paths and 27 routers, re-counted 2026-10-15 — the 2026-10-06 reading of 87 paths / 141 operations, and the 2026-10-02 reading of 133 operations / 84 paths / 26 routers, are superseded); `/api-docs`; `docs/API_REFERENCE.md` | — |
