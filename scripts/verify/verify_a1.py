@@ -349,9 +349,10 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # SOW 5.4 "Bulk endpoints for Equipment and Functional Locations
     # (`POST /api/v1/equipment/bulk` with JSON array)" (row 295). The clause
     # names a JSON-array bulk endpoint; the system ships CSV multipart bulk
-    # importers instead - Equipment (equipment.ts:156), Functional Locations
-    # (functionalLocations.ts:75, added at C5), Materials (materials.ts:134) and
-    # Work Orders (workOrders.ts:94). Both SOW-named entities therefore have a
+    # importers instead - Equipment (`POST /api/equipment/import.csv`),
+    # Functional Locations (`POST /api/functional-locations/import.csv`, added at
+    # C5), Materials (`POST /api/materials/import.csv`) and Work Orders (`POST
+    # /api/work-orders/import.csv`). Both SOW-named entities therefore have a
     # bulk importer. The owner reviewed the clause-vs-form difference on
     # 2026-10-14 and accepted the CSV form as meeting the clause; the
     # parenthetical JSON-array form is a different API contract, not an unmet
@@ -410,6 +411,16 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # the C11 closure-log row in docs/GAP_REGISTER.md and the row-255 note in
     # docs/SOW_COMPLIANCE.md.
     ("4.1 horizontal-scaling", "Partial", "Met", "this commit"),
+
+    # SOW 5.7 "Import tools to validate and load legacy Excel/CSV data" (row 306).
+    # C5 (eefcff1, run 252) added the functional-locations and work-orders live
+    # importers, so all four legacy entities have a CSV bulk importer. Not a
+    # section 3 row, so this moves EXPECT_ALL only. Owner-authorised 2026-10-15
+    # under the D1 documentation sweep; the status change and this wiring land
+    # together, so "this commit" is the sentinel. Durable anchor: the D1
+    # closure-log row in docs/GAP_REGISTER.md and the row-306 note in
+    # docs/SOW_COMPLIANCE.md.
+    ("5.7 import-tools", "Partial", "Met", "this commit"),
 ]
 
 
