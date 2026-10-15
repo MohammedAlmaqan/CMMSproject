@@ -66,7 +66,7 @@ EXPECT_S3_WAIVED = 11
 EXPECT_S3_WORKSHEET = 77
 GAP_STATUSES = ("Partial", "Not Met")
 PHASES = ("B", "C", "D", "E", "F", "G", "H")
-EXPECT_DECISIONS = [f"D-{n}" for n in range(2, 21)]
+EXPECT_DECISIONS = [f"D-{n}" for n in range(2, 22)]
 
 # ---------------------------------------------------------------------------
 # APPROVED PROMOTIONS

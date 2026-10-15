@@ -6,7 +6,7 @@
 | **Baseline** | `v1.0.0` — tag object `386fe3c`, commit `0d941df`. Shipped and immutable. |
 | **Source of record** | `docs/SOW_COMPLIANCE.md` (214 clause rows) |
 | **Machine check** | `python scripts/verify/verify_a1.py` — re-derives every count in this document from the matrix. |
-| **Status** | ✅ **DECIDED.** All 77 rows dispositioned and all 19 decisions answered. D-2 … D-19 were decided under the delegated authority recorded in §6; **D-18 and D-19 were added after the Phase A freeze on 2026-10-03 and accepted by the SOW owner on 2026-10-04**, and **D-20 is a direct owner decision of 2026-10-15**. |
+| **Status** | ✅ **DECIDED.** All 77 rows dispositioned and all 20 decisions answered. D-2 … D-19 were decided under the delegated authority recorded in §6; **D-18 and D-19 were added after the Phase A freeze on 2026-10-03 and accepted by the SOW owner on 2026-10-04**, and **D-20 and D-21 are direct owner decisions of 2026-10-15**. |
 | **Decision authority** | Delegated to the vendor by the SOW owner on 2026-09-26 (see §6). |
 
 ---
@@ -48,7 +48,7 @@ A `Waive` is not a deletion. Waived rows stay in `docs/SOW_COMPLIANCE.md` and in
 
 > **For each of the 77 rows in §5: Build, or Waive?**
 
-D-1 is answered: **68 Build, 9 Waive** (as first recorded; **superseded by §6.5 → 66 Build / 11 Waive**). Every other decision (D-2 … D-19) narrows the engineering; D-1 fixed its size. **D-20** (2026-10-15) is a later owner decision that promotes nine delivered rows, not a narrowing of the original scope. The dispositions and the reasoning behind them are in §5.
+D-1 is answered: **68 Build, 9 Waive** (as first recorded; **superseded by §6.5 → 66 Build / 11 Waive**). Every other decision (D-2 … D-19) narrows the engineering; D-1 fixed its size. **D-20** (2026-10-15) is a later owner decision that promotes nine delivered rows, not a narrowing of the original scope. **D-21** (2026-10-15) is another later owner decision that declines the N10 notification-cause residual (no §3 clause requires a cause/failure code on a `Notification`), also not a narrowing of the original scope. The dispositions and the reasoning behind them are in §5.
 
 **Consequences of leaving D-1 open**
 
@@ -64,9 +64,9 @@ D-1 is answered: **68 Build, 9 Waive** (as first recorded; **superseded by §6.5
 
 ---
 
-## 4. Decisions D-2 … D-20
+## 4. Decisions D-2 … D-21
 
-Each decision is posed as a **question** with neutral options, so the reasoning is auditable rather than asserted. The **Decision taken** column records what was chosen; §4.1 records why. D-2, D-3, D-15 and D-16 carry positions supplied directly by the SOW owner; the remainder were decided on engineering judgement under the delegated authority in §6. **D-18 and D-19 were added after the Phase A freeze (2026-10-03) and were accepted by the SOW owner on 2026-10-04, so rows 58 and 269 close as `Waived` and `Deferred` with the proposal caveat lifted.** **D-20 was added on 2026-10-15 as a direct owner decision (not a delegated-authority proposal); it promotes nine non-§3 rows to `Met` and is recorded here so the SOW's `D-20` anchor resolves to this register. It is legitimately cited by no worksheet row — the nine rows it touches are in §1.3, §2.1 and §2.2, outside the 77-row §3 worksheet — which the disposition gate reports as an expected orphan rather than a failure.**
+Each decision is posed as a **question** with neutral options, so the reasoning is auditable rather than asserted. The **Decision taken** column records what was chosen; §4.1 records why. D-2, D-3, D-15 and D-16 carry positions supplied directly by the SOW owner; the remainder were decided on engineering judgement under the delegated authority in §6. **D-18 and D-19 were added after the Phase A freeze (2026-10-03) and were accepted by the SOW owner on 2026-10-04, so rows 58 and 269 close as `Waived` and `Deferred` with the proposal caveat lifted.** **D-20 was added on 2026-10-15 as a direct owner decision (not a delegated-authority proposal); it promotes nine non-§3 rows to `Met` and is recorded here so the SOW's `D-20` anchor resolves to this register. It is legitimately cited by no worksheet row — the nine rows it touches are in §1.3, §2.1 and §2.2, outside the 77-row §3 worksheet — which the disposition gate reports as an expected orphan rather than a failure. **D-21** (2026-10-15) is a direct owner decision that waives the notification cause/failure residual because no §3 clause requires it; it is also legitimately cited by no worksheet row and is reported as an expected orphan by the disposition gate.**
 
 > **ID namespace warning.** These `D-n` IDs are Phase A decision IDs and are **not** the same thing as the `D1`–`D8` deferred work items in `docs/SOW_COMPLIANCE.md`. The two sets overlap numerically and mean different things — matrix `D5` is CauseCode wiring, Phase A `D-5` is OAuth2. Matrix items are always cited here as *deferred Dn*.
 
@@ -91,6 +91,7 @@ Each decision is posed as a **question** with neutral options, so the reasoning 
 | **D-18** | §2.2 | §2.2 requires that "additional custom roles must be definable". Six built-in roles ship, encoded as a compile-time `Record<Role, number>`; there is no `Role` or `Permission` entity, route or UI. | (a) Build configurable roles and permissions. (b) Waive the clause — the six built-in roles cover a single-site plant's access model. | **(b)**. A single-site plant with six tiers does not need user-defined roles; configurable RBAC is a multi-site / delegated-administration feature and would add a permission matrix, a migration and an admin surface for no stated operational need. | Client — document owner | **Waive.** Recorded as a formal scope reduction. No code; the six built-in roles stand. **Accepted by the SOW owner on 2026-10-04** ("Custom roles are waived. Six built-in roles are sufficient for a single-site plant"); the proposal caveat is lifted and the row closes as `Waived`. |
 | **D-19** | §4.6 | §4.6 requires 99.5% availability during business hours 07:00–19:00, Sunday–Thursday. The repository has no uptime monitor and has never measured availability; the health routes report process liveness only. | (a) Build uptime monitoring and measure the target. (b) Record the service-level target as an operational obligation owned by Client Operations, effective at go-live, as with the D-14 deferrals. | **(b)**. Availability is a consequence of the deployed host, network and operations, not of application code; the same reasoning that placed the maintenance windows and the warranty with Client Operations in D-14 applies. | Client Operations | **Deferred.** The 99.5% business-hours target is owned by Client Operations and confirmed from go-live. No code; monitoring and measurement live with operations. **Accepted by the SOW owner on 2026-10-04** ("99.5% availability is deferred to Client Operations as an operational obligation from go-live, consistent with D-14"); the proposal caveat is lifted and the row closes as `Deferred`. |
 | **D-20** | §1.3, §2.1, §2.2 | Nine non-§3 rows (§1.3 line 38; §2.1 lines 52, 53, 54, 56; §2.2 lines 59, 61, 62, 63) still read `Partial` although the capability each names is delivered. Promote them to `Met` now, or leave `Partial` until the §6.4 acceptance event? | (a) Promote all nine to `Met` on the evidence already in the matrix, recording the residual caveats. (b) Leave all nine `Partial` until acceptance. | **(a)**. Each recorded gap is closed by delivered capability or is a deliberate scope decision already taken (D-6, X2–X4, D-9's CSV-only export). `Partial` now overstates the work that is open and understates what is built. | Client — SOW owner | **Promote all nine to `Met` on 2026-10-15.** Every affected row Note is rewritten to the closure form naming D-20, with its superseded history kept. Five residual caveats are recorded in the `docs/SOW_COMPLIANCE.md` Summary D-20 note: (1) §1.3 line 38 / §2.2 line 63 mobile limb `Waived` under D-6; (2) the dedicated mobile app is `Excluded`; (3) line 52's board is a status kanban, not a calendar/Gantt scheduler; (4) line 54's cost is aggregate per axis, not split by component; (5) line 59's export remains two entities against four-entity import. Promotion commit `45ea771` — an interior commit with no run of its own, covered by green run 300 at its child `1b027dc`. A **direct owner decision**, not a Phase A delegated-authority proposal. |
+| **D-21** | §3.1.4 / matrix line 91 | Tracker v1.1-10 and N10 record a residual: a cause/failure code on a `Notification`. No §3 clause requires it. Build it, or decline it? | (a) Build it — nullable FKs on `Notification`, screen pickers, migration, tests. (b) Decline it — no §3 clause requires it. | **(b)**. §3.1.4's cause/failure limb as written applies to work orders; §3.2.2 enumerates the notification key fields and names no cause or failure code, so the residual is an over-attribution rather than an unmet requirement. Building it would invent scope. | Client — SOW owner | **Waived 2026-10-15.** No cause or failure code will be added to `Notification`. The residual is explicitly declined, not silently dropped; if the Client later wants it, that is new scope. Matrix line 91's Note records D-21 and the date. No code, no migration. |
 
 **Decisions that gated worksheet rows:** 13 rows were dispositioned on a decision rather than on matrix evidence alone — rows 7, 8, 14, 17, 32, 36, 37, 39, 49, 59, 63, 75, 76. All 13 are resolved. Row 75 was subsequently waived outright and row 24, which was not in this list, was subsequently built; both changes came from the SOW owner's answers in §6.4. The remaining 64 were dispositioned directly on the matrix evidence.
 
@@ -121,6 +122,7 @@ One line per decision, so the reasoning is auditable without re-reading the opti
 | **D-18** | A single-site plant has no need for user-defined roles; the six tiers already express every access distinction the SOW names, and configurable RBAC would add a permission matrix and an admin surface for no stated operational driver. |
 | **D-19** | Availability is a property of the running service, not the codebase; recording it as an owned operational obligation in the D-14 shape makes it visible at go-live instead of leaving it as an unmeasured `Not Met` clause. |
 | **D-20** | The nine rows were frozen `Partial` in Phase A and never re-read after the work that closed each named gap landed; their residuals are decisions already taken (D-6, X2–X4, D-9) rather than open build. Promoting them on the matrix evidence already present, with the caveats named in the Summary note, makes the matrix describe the system that exists rather than the one the freeze assumed. |
+| **D-21** | Recording a residual of a clause that does not require it as open build work makes the matrix describe work that was never in scope; waiver is the honest status, and §3.2.2's notification key-field enumeration is the evidence. |
 
 
 ## 5. The 77-row disposition worksheet
@@ -241,11 +243,11 @@ carries an answer, and the machine check agrees. That is the gate as it now stan
 | Baseline inventory machine-frozen and re-derivable | ✅ `verify_a1.py` exit 0 |
 | All 77 in-scope §3 rows listed with matrix-sourced clause and status | ✅ §5 |
 | Every row carries a proposed phase and any gating decision | ✅ §5 |
-| D-2 … D-20 posed with options, an answer and a rationale | ✅ §4, §4.1 |
+| D-2 … D-21 posed with options, an answer and a rationale | ✅ §4, §4.1 |
 | **Every one of the 77 rows dispositioned `Build` or `Waive`** | ✅ **77 of 77** |
 | **Every waive carries a one-line business reason** | ✅ **10 of 10** |
-| **Every decision answered** | ✅ **19 of 19** |
-| **Rationale recorded for every decision** | ✅ **19 of 19** |
+| **Every decision answered** | ✅ **20 of 20** |
+| **Rationale recorded for every decision** | ✅ **20 of 20** |
 
 **Gate result: PASSED**, subject to one gate that was withdrawn.
 
@@ -258,9 +260,9 @@ closes a go-live blocker, fills a genuine functional gap in the maintenance work
 small and clearly useful; waive what is nice-to-have, redundant with existing capability, or
 costly relative to the value it delivers.
 
-**D-20 is the one decision in §4 that did not come out of that delegation.** It is a direct
-owner decision of 2026-10-15, recorded here because the SOW cites `D-20` as the anchor for the
-nine-row promotion; the count the paragraph above describes is the delegated-authority set,
+**D-20 and D-21 are the decisions in §4 that did not come out of that delegation. They are direct
+owner decisions of 2026-10-15, recorded here because the SOW cites `D-20` as the anchor for the
+nine-row promotion; D-21 is the N10 waiver; the count the paragraph above describes is the delegated-authority set,
 D-2 … D-19.
 
 Stated plainly, because a reader deserves to know what this document is:

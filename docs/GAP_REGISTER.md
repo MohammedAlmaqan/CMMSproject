@@ -21,7 +21,7 @@ not only desk time.
 
 **Sources read.** `OWNER_ACTION_SHEET.md` (Tables 1–2, notes, footnote), the open v1.1
 backlog in `CMMS_FINALIZATION_TRACKER.md` (v1.1-1…14), all 34 `Partial`/`Not Met` matrix
-lines, `DECISION_REGISTER.md` (D-2…D-20), `README.md` known issues, `FILL_REPORT.md`,
+lines, `DECISION_REGISTER.md` (D-2…D-21), `README.md` known issues, `FILL_REPORT.md`,
 plus the backend routes/schema/middleware and the frontend pages/routes/services.
 
 ---
@@ -79,7 +79,7 @@ that state (see the closure log).
 | N7 | Availability monitoring / 99.5% and agreed maintenance windows carried as owned operational obligations | `DECISION_REGISTER.md` D-14, D-19 | D-14, D-19 |
 | N8 | Per-user opt-out of specific alert types (and email delivery) is waived, so Table 2's "add per-user opt-out" is not fresh work | Matrix line 222 (§3.8) — register row 74, phase H (email is row 73, line 221) | Waived, register rows 73/74 |
 | N9 | Differential backup will not be built; transaction-log recovery is accepted as the mechanism and §4.3 stays `Partial` as the direct consequence | Matrix line 261 (§4.3); Table 1 item 6 | Owner, 2026-10-05 |
-| N10 | Cause/failure code on a Notification: no §3 clause requires it — matrix line 91 (§3.1.4) records that treating it as a residual was an over-attribution, so building it needs a new owner decision | Tracker v1.1-10 | Needs a new owner decision |
+| N10 | Cause/failure code on a Notification: no §3 clause requires it — matrix line 91 (§3.1.4) records that treating it as a residual was an over-attribution; **waived by D-21 (2026-10-15)**. If the Client ever wants it, that is new scope. | Tracker v1.1-10 | **Waived — D-21, 2026-10-15** |
 
 ---
 
