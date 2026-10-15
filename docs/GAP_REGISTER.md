@@ -518,3 +518,12 @@ owner decision promoted nine non-§3 rows (`docs/SOW_COMPLIANCE.md` §1.3 line 3
 moved (§5.7 row 306, 156/23); this pointer records the later move so the figure is not read as
 current. The D-20 promotion commit is `45ea771` — an interior commit with no run of
 its own, covered by green run 300 at its child `1b027dc`.
+
+*Superseded 2026-10-15 (after the D-20 pointer above):* the owner promoted one
+further non-§3 row, **§5.5 authorization (line 301)** `Partial` → `Met`, on the C2
+frontend RBAC (`22c3b2e`, run 232) — the clause's frontend limb, delivered by C2 and
+already recorded in the closure-log row above. That took the all-clauses count from
+**165 Met / 14 Partial** to **166 Met / 13 Partial**; the §3 total is unchanged at
+**104 Met / 1 Partial**. No code changed and no decision ID was created: the C2
+closure-log row and the row-301 note are the durable anchor, as with C4b, C1, C11
+and C5.

@@ -445,6 +445,25 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     ("2.2 maintenance-planner", "Partial", "Met", "45ea771"),
     ("2.2 maintenance-supervisor", "Partial", "Met", "45ea771"),
     ("2.2 technician", "Partial", "Met", "45ea771"),
+
+    # SOW 2026-10-15 owner authorisation: §5.5 authorization (row 301) moved
+    # Partial -> Met. The API limb (authorizeMinRole on every protected route)
+    # was already enforced; C2 (22c3b2e, green run 232, 2026-10-09) added the
+    # frontend limb the clause names - app/src/lib/rbac.ts mirrors the backend
+    # role hierarchy in backend/src/utils/roles.ts, Sidebar.tsx and
+    # CommandPalette.tsx filter navigation by routeFloor, App.tsx RoleRoute
+    # redirects under-floored roles to /dashboard, and WorkOrdersPage.tsx hides
+    # the new-order controls below Requester. The clause does not ask for a
+    # per-module minimum-role ceiling on every frontend route: where the API
+    # floors a route the frontend now floors it too, and the rest is
+    # authenticate-only exactly as the API's GET floors are, so the remaining
+    # question was an acceptance call the owner answered on 2026-10-15. No code
+    # changed, so the status change and this wiring land together and "this
+    # commit" is the sentinel. Durable anchor: the C2 closure-log row in
+    # docs/GAP_REGISTER.md and the row-301 note in docs/SOW_COMPLIANCE.md - the
+    # same shape used for the C4b, C1, C11 and C5 promotions. §5.5 is not a
+    # section 3 clause, so this moves EXPECT_ALL only.
+    ("5.5 authorization-frontend", "Partial", "Met", "this commit"),
 ]
 
 
