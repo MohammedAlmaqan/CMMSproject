@@ -9740,7 +9740,7 @@
                       },
                       "alertType": {
                         "type": "string",
-                        "description": "WO_Assigned, WO_Overdue, PM_Generation, High_Priority_Notification, Account_Lockout"
+                        "description": "WO_Assigned, WO_Overdue, PM_Generation, PM_Generation_Failed, High_Priority_Notification, Account_Lockout"
                       },
                       "userId": {
                         "type": "string"
