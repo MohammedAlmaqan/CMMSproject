@@ -91,11 +91,11 @@ Vite dev proxy (:3000 → :4000)          [dev only]
   ▼
 Express
   │
-  ├─ helmet({ contentSecurityPolicy: false })      index.ts:60
-  ├─ cors({ origin: allow-list })                  index.ts:61
-  ├─ /api/auth/login rate limiter only             index.ts:50
+  ├─ helmet({ contentSecurityPolicy: false })      index.ts
+  ├─ cors({ origin: allow-list })                  index.ts
+  ├─ /api/auth/login rate limiter only             index.ts
   ▼
-router.use(authenticate)                            workOrders.ts:17
+router.use(authenticate)                            workOrders.ts
   │  missing/malformed Bearer  → 401
   │  jwt.verify against JWT_SECRET → req.user = { userId, username, role }
   ▼
@@ -116,7 +116,7 @@ pino-http access log (status + responseTime)         index.ts
 Browser
 ```
 
-Ordering is enforced by construction, not convention: `authenticate` is registered with `router.use()` before any route is declared, so it cannot be forgotten per-route, and `authorizeMinRole` independently rejects an absent `req.user` with 401 rather than trusting the caller. The same router-wide pattern holds in all 25 non-`auth` routers.
+Ordering is enforced by construction, not convention: `authenticate` is registered with `router.use()` before any route is declared, so it cannot be forgotten per-route, and `authorizeMinRole` independently rejects an absent `req.user` with 401 rather than trusting the caller. The same router-wide pattern holds in all 26 non-`auth` routers.
 
 ## Security boundaries
 
@@ -130,10 +130,10 @@ Ordering is enforced by construction, not convention: `authenticate` is register
 | Session lifetime | Absolute cap across rotations, default 28800 s (8 h) | `utils/config.ts` |
 | RBAC | 6-rank hierarchy, `authorizeMinRole` | `middleware/auth.ts` |
 | Exact-role guard | `authorize(...)` for Administrator-only routes | `middleware/auth.ts` |
-| CORS | Comma-separated allow-list, default `http://localhost:3000` | `index.ts:40` |
-| Security headers | `helmet()` with **CSP disabled** | `index.ts:60` |
-| Login rate limit | 20 per 15 min per IP | `index.ts:48` |
-| Proxy trust | `trust proxy = 1` (one hop) — see caveat below | `index.ts:60` |
+| CORS | Comma-separated allow-list, default `http://localhost:3000` | `index.ts` (`CORS_ORIGINS`) |
+| Security headers | `helmet()` with **CSP disabled** | `index.ts` (`helmet`) |
+| Login rate limit | 20 per 15 min per IP | `index.ts` (`authLimiter`) |
+| Proxy trust | `trust proxy = 1` (one hop) — see caveat below | `index.ts` (`app.set`) |
 | Account lockout | 5 failures in 15 min ⇒ 30 min lock + `Account_Lockout` alert | `routes/auth.ts` |
 | Audit trail | `logAudit` on mutating handlers | `middleware/audit.ts` |
 
