@@ -431,17 +431,17 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # aggregate per-axis cost, two-entity export against four-entity import) and
     # are recorded in the Summary D-20 note in docs/SOW_COMPLIANCE.md. None is a
     # section 3 row, so these move EXPECT_ALL only. The status change and this
-    # wiring land together, so "this commit" is the sentinel; backfill the SHAs.
-    # Durable anchor: the D-20 owner decision of 2026-10-15.
-    ("1.3 production-module", "Partial", "Met", "this commit"),
-    ("2.1 structured-work-management", "Partial", "Met", "this commit"),
-    ("2.1 proactive-maintenance", "Partial", "Met", "this commit"),
-    ("2.1 cost-transparency", "Partial", "Met", "this commit"),
-    ("2.1 out-of-the-box-reports", "Partial", "Met", "this commit"),
-    ("2.2 administrator-bulk-import", "Partial", "Met", "this commit"),
-    ("2.2 maintenance-planner", "Partial", "Met", "this commit"),
-    ("2.2 maintenance-supervisor", "Partial", "Met", "this commit"),
-    ("2.2 technician", "Partial", "Met", "this commit"),
+    # wiring landed together in 45ea771 (green CI run 300), so that commit is
+    # cited for all nine. Durable anchor: the D-20 owner decision of 2026-10-15.
+    ("1.3 production-module", "Partial", "Met", "45ea771"),
+    ("2.1 structured-work-management", "Partial", "Met", "45ea771"),
+    ("2.1 proactive-maintenance", "Partial", "Met", "45ea771"),
+    ("2.1 cost-transparency", "Partial", "Met", "45ea771"),
+    ("2.1 out-of-the-box-reports", "Partial", "Met", "45ea771"),
+    ("2.2 administrator-bulk-import", "Partial", "Met", "45ea771"),
+    ("2.2 maintenance-planner", "Partial", "Met", "45ea771"),
+    ("2.2 maintenance-supervisor", "Partial", "Met", "45ea771"),
+    ("2.2 technician", "Partial", "Met", "45ea771"),
 ]
 
 
