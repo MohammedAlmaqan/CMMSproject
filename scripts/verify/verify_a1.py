@@ -421,6 +421,27 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # closure-log row in docs/GAP_REGISTER.md and the row-306 note in
     # docs/SOW_COMPLIANCE.md.
     ("5.7 import-tools", "Partial", "Met", "this commit"),
+
+    # SOW 2026-10-15 owner decision D-20: nine Partial non-section-3 rows were
+    # promoted to Met in one authorised sweep - section 1.3 (line 38) and
+    # section 2.1 (lines 52, 53, 54, 56) and section 2.2 (lines 59, 61, 62, 63).
+    # Each row's named gap had already closed and the promotion is a
+    # re-derivation from source, not new code. Five caveats qualify the Met
+    # (waived mobile limb, excluded mobile app, status-kanban Board View,
+    # aggregate per-axis cost, two-entity export against four-entity import) and
+    # are recorded in the Summary D-20 note in docs/SOW_COMPLIANCE.md. None is a
+    # section 3 row, so these move EXPECT_ALL only. The status change and this
+    # wiring land together, so "this commit" is the sentinel; backfill the SHAs.
+    # Durable anchor: the D-20 owner decision of 2026-10-15.
+    ("1.3 production-module", "Partial", "Met", "this commit"),
+    ("2.1 structured-work-management", "Partial", "Met", "this commit"),
+    ("2.1 proactive-maintenance", "Partial", "Met", "this commit"),
+    ("2.1 cost-transparency", "Partial", "Met", "this commit"),
+    ("2.1 out-of-the-box-reports", "Partial", "Met", "this commit"),
+    ("2.2 administrator-bulk-import", "Partial", "Met", "this commit"),
+    ("2.2 maintenance-planner", "Partial", "Met", "this commit"),
+    ("2.2 maintenance-supervisor", "Partial", "Met", "this commit"),
+    ("2.2 technician", "Partial", "Met", "this commit"),
 ]
 
 
