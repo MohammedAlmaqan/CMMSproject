@@ -63,7 +63,7 @@ router.use(authenticate);
  *                 type: object
  *                 properties:
  *                   alertId: { type: string }
- *                   alertType: { type: string, description: "WO_Assigned, WO_Overdue, PM_Generation, PM_Generation_Failed, High_Priority_Notification, Account_Lockout" }
+ *                   alertType: { type: string, description: "WO_Assigned, WO_Overdue, PM_Generation, PM_Generation_Failed, High_Priority_Notification, Account_Lockout, Scheduler_Stale" }
  *                   userId: { type: string }
  *                   title: { type: string }
  *                   message: { type: string }
