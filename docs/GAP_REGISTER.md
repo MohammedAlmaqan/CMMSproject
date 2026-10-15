@@ -527,3 +527,13 @@ already recorded in the closure-log row above. That took the all-clauses count f
 **104 Met / 1 Partial**. No code changed and no decision ID was created: the C2
 closure-log row and the row-301 note are the durable anchor, as with C4b, C1, C11
 and C5.
+
+*Superseded 2026-10-15 (after the §5.5 pointer above):* the owner promoted one
+further non-§3 row, **§4.3 soft delete (line 264)** `Partial` → `Met`, because the
+gap the row named — "the audit purge job itself" not existing, "a seed comment only"
+— was false: the configurable-retention purge was delivered by C6c (`5f11e25`,
+run 236, 2026-10-09) and is recorded as implemented in the closure-log row above and
+in every other doc. That took the all-clauses count from **166 Met / 13 Partial** to
+**167 Met / 12 Partial**; the §3 total is unchanged at **104 Met / 1 Partial**. No
+code changed and no decision ID was created: the C6c closure-log row above and the
+row-264 note are the durable anchor, as with C4b, C1, C11, C5 and §5.5.

@@ -464,6 +464,22 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # same shape used for the C4b, C1, C11 and C5 promotions. §5.5 is not a
     # section 3 clause, so this moves EXPECT_ALL only.
     ("5.5 authorization-frontend", "Partial", "Met", "this commit"),
+
+    # SOW 2026-10-15 owner authorisation: §4.3 soft delete (row 264) moved
+    # Partial -> Met. The row's declared gap was that the audit purge job did
+    # not exist ("a seed comment only"); that is false. C6c (5f11e25, run 236,
+    # 2026-10-09) delivered it - backend/src/services/auditRetention.ts deletes
+    # entries past the configured window (SystemConfig audit_retention_years,
+    # default 7), run nightly by the worker (AUDIT_RETENTION_CRON, default
+    # 0 4 * * *) and on demand via POST /api/audit-log/purge
+    # (backend/src/routes/auditLog.ts, Administrator only). The 34/38 isDeleted
+    # coverage and the four deliberate exceptions are unchanged. No code
+    # changed, so the status change and this wiring land together and "this
+    # commit" is the sentinel. Durable anchor: the C6c closure-log row in
+    # docs/GAP_REGISTER.md and the row-264 note in docs/SOW_COMPLIANCE.md - the
+    # same shape used for the C4b, C1, C11, C5 and §5.5 promotions. §4.3 is not
+    # a section 3 clause, so this moves EXPECT_ALL only.
+    ("4.3 soft-delete-purge", "Partial", "Met", "this commit"),
 ]
 
 
