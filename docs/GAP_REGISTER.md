@@ -364,7 +364,7 @@ and derives the functional location from a chosen equipment (the route rejects a
 contradicting location). The row carries the tip; the item left no `SOW_COMPLIANCE.md`
 Status to move — matrix lines 38, 52 and 61 are the owner's call.
 
-**C13** (`6cdabc9`, run n/a; corrected `this commit`). C13 closed §4.3/RTO on a
+**C13** (`6cdabc9`, run n/a; corrected `b415485`). C13 closed §4.3/RTO on a
 full-sequence measurement that did not actually measure its limbs. Re-derived from
 `scripts/restore-drill.bat`, the "application layer" timer bracketed an **empty
 block** — two comment lines between the `CMMS_APP_START_MS` and `CMMS_APP_END_MS`
@@ -372,7 +372,7 @@ timestamps — so its reported app-layer time (0.36 s) was `powershell.exe` invo
 overhead, and the attachment limb only **counted** files in the paired `-uploads`
 folder rather than restoring bytes. The "9.11 s total" was therefore database create
 + restore + `WorkOrder` count + a recursive file count + an empty timer + drop.
-`this commit` corrects the drill so the attachment limb copies the paired snapshot
+`b415485` corrects the drill so the attachment limb copies the paired snapshot
 into a scratch tree and reads a file back, and the app limb stops the backend on
 `:4000`, rebuilds the backend and frontend, restarts the API and requires
 `GET /api/health` to return 200 before the timer stops. Re-run on this host
@@ -384,7 +384,7 @@ figure; `docs/ADMIN_GUIDE.md` §7.6 and `docs/ARCHITECTURE.md` now carry the cor
 figure. The matching comment in `scripts/verify/verify_a1.py` repeats the 9.11 s
 figure and is left unchanged pending an owner call.
 
-**E1** (`this commit`, 2026-10-14). E1 was the only "blocked on external" item:
+**E1** (`574d006`, 2026-10-14). E1 was the only "blocked on external" item:
 TLS termination and the IIS reverse-proxy deployment, said to need a host matching
 production that is not held. The host was not missing — the owner deployed the
 site live and re-verified both limbs over HTTPS on 2026-10-03 (`curl -k
@@ -396,10 +396,10 @@ to the verified state, keeping the old wording in the line and retaining the loc
 `sslmode=disable` database fact and the internet-exposure caution. Category D
 drops to 0 (shown empty) and the Totals line to 15 open items. The item left no
 `SOW_COMPLIANCE.md` Status to move — §4.2 was already `Met` and is unchanged by
-this closure. The closure row records `this commit`; the green run for the push
+this closure. The closure row records `574d006`; the green run for the push
 is backfilled once confirmed.
 
-**C4c** (`this commit`, 2026-10-14). Implement a bounded OData-style query grammar
+**C4c** (`a859950`, 2026-10-14). Implement a bounded OData-style query grammar
 (`backend/src/utils/queryGrammar.ts`) supporting `$filter`, `$top`, `$skip`,
 `$orderby`, `$select` with field allowlists per resource, operators
 `eq/ne/gt/ge/lt/le/contains`, `and`/`or`, parentheses, quoted strings with `''`
@@ -413,7 +413,7 @@ returns 400 `{ error: 'Invalid query parameters', details: [...] }`. Both `/api/
 and `/api/v1/*` covered. Unit tests 37, route tests 14 pass; typecheck and
 eslint pass. Matrix line 296 (`§5.4 OData...`) moves `Partial` → `Met`, category
 A drops to 2 and Totals to 13 open items. Limitation row L22 is marked resolved.
-The verifier promotion entry (`"5.4 odata"`, `Partial` → `Met`, `this commit`)
+The verifier promotion entry (`"5.4 odata"`, `Partial` → `Met`, `a859950`)
 lands in the same commit.
 
 **C4b** (`fdf0303`, 2026-10-14). C4b was filed as "JSON bulk endpoint for
@@ -458,7 +458,7 @@ redirects. Matrix line 259 (§4.2 30-minute session timeout) and line 299 (§5.5
 refresh rotation) both move `Partial` → `Met`, so category A drops to 1 (C11) and
 the Totals line to 12 open items. Limitation row L8 is marked resolved. The verifier
 promotion entries (`"4.2 session-timeout"`, `"5.5 jwt-refresh"`, `Partial` → `Met`,
-`this commit`) land in the same commit. All work ran against the throwaway
+`a9b5326`) land in the same commit. All work ran against the throwaway
 `cmms_c1` database; the operational `cmms` database was not seeded, migrated or
 written.
 
@@ -479,7 +479,7 @@ services the same clause names do not exist. The one residual is recorded, not u
 hold the row: the login rate limiter is still an in-process store, so running more than
 one API instance would need a shared limiter store for the per-IP budget to hold
 cluster-wide. Category A drops to 0 and the Totals line to 11 open items. The verifier
-promotion entry (`"4.1 horizontal-scaling"`, `Partial` → `Met`, `this commit`) lands in
+promotion entry (`"4.1 horizontal-scaling"`, `Partial` → `Met`, `e59e9a1`) lands in
 the same commit. All suite work ran against the throwaway `cmms_c11` database; the
 operational `cmms` database was not seeded, migrated or written.
 
@@ -506,7 +506,7 @@ document, the snapshot and the gate share one definition) — 141 operations / 8
 snapshot and the route annotations drift. One status move was authorised by the owner
 and landed here: matrix line 306 (§5.7 import tools) `Partial` → `Met`, on the C5 live
 importers (`eefcff1`, run 252); the verifier promotion entry (`"5.7 import-tools"`,
-`Partial` → `Met`, `this commit`) lands in the same commit. §5.7's summary figures move
+`Partial` → `Met`, `7db0d20`) lands in the same commit. §5.7's summary figures move
 to 156 Met / 23 Partial (the §3 total is unchanged at 104 Met / 1 Partial). No database
 was touched — docs, source citations and one verifier comment only.
 

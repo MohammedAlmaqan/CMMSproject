@@ -360,7 +360,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # change and this wiring land together, so "this commit" is the sentinel;
     # backfill the SHA. Durable anchor: the C4b closure-log row in
     # docs/GAP_REGISTER.md and the row-295 note in SOW_COMPLIANCE.md.
-    ("5.4 bulk-endpoints", "Partial", "Met", "this commit"),
+    ("5.4 bulk-endpoints", "Partial", "Met", "fdf0303"),
 
     # SOW 5.4 OData-style query grammar for GET collections (row 296).
     # Implemented bounded OData grammar ($filter, $top, $skip, $orderby, $select)
@@ -372,7 +372,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # "this commit" is the sentinel; backfill the SHA. Durable anchor: the C4c
     # closure-log row in docs/GAP_REGISTER.md and the row-296/L22 notes in
     # docs/SOW_COMPLIANCE.md.
-    ("5.4 odata", "Partial", "Met", "this commit"),
+    ("5.4 odata", "Partial", "Met", "a859950"),
 
     # SOW 4.2 "Session timeout after 30 minutes of inactivity" (row 259).
     # C1 replaced the browser-only idle timer with server-side enforcement. The
@@ -385,7 +385,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # together, so "this commit" is the sentinel; backfill the SHA. Durable
     # anchor: the C1 closure-log row in docs/GAP_REGISTER.md and the row-259/L8
     # notes in docs/SOW_COMPLIANCE.md.
-    ("4.2 session-timeout", "Partial", "Met", "this commit"),
+    ("4.2 session-timeout", "Partial", "Met", "a9b5326"),
 
     # SOW 5.5 "JWT access tokens with refresh token rotation" (row 299).
     # C1 added POST /api/auth/refresh (single-use rotation: the presented token
@@ -397,7 +397,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # 3 row, so this moves EXPECT_ALL only. "this commit" is the sentinel;
     # backfill the SHA. Durable anchor: the C1 closure-log row in
     # docs/GAP_REGISTER.md and the row-299 note in docs/SOW_COMPLIANCE.md.
-    ("5.5 jwt-refresh", "Partial", "Met", "this commit"),
+    ("5.5 jwt-refresh", "Partial", "Met", "a9b5326"),
 
     # SOW 4.1 "Architecture allows horizontal scaling with stateless web and API
     # tiers" (row 255). C11 moved the PM/overdue/audit schedulers out of the API
@@ -410,7 +410,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # together, so "this commit" is the sentinel; backfill the SHA. Durable anchor:
     # the C11 closure-log row in docs/GAP_REGISTER.md and the row-255 note in
     # docs/SOW_COMPLIANCE.md.
-    ("4.1 horizontal-scaling", "Partial", "Met", "this commit"),
+    ("4.1 horizontal-scaling", "Partial", "Met", "e59e9a1"),
 
     # SOW 5.7 "Import tools to validate and load legacy Excel/CSV data" (row 306).
     # C5 (eefcff1, run 252) added the functional-locations and work-orders live
@@ -420,7 +420,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # together, so "this commit" is the sentinel. Durable anchor: the D1
     # closure-log row in docs/GAP_REGISTER.md and the row-306 note in
     # docs/SOW_COMPLIANCE.md.
-    ("5.7 import-tools", "Partial", "Met", "this commit"),
+    ("5.7 import-tools", "Partial", "Met", "8f34985"),
 
     # SOW 2026-10-15 owner decision D-20: nine Partial non-section-3 rows were
     # promoted to Met in one authorised sweep - section 1.3 (line 38) and
@@ -463,7 +463,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # docs/GAP_REGISTER.md and the row-301 note in docs/SOW_COMPLIANCE.md - the
     # same shape used for the C4b, C1, C11 and C5 promotions. §5.5 is not a
     # section 3 clause, so this moves EXPECT_ALL only.
-    ("5.5 authorization-frontend", "Partial", "Met", "this commit"),
+    ("5.5 authorization-frontend", "Partial", "Met", "c4b2bdf"),
 
     # SOW 2026-10-15 owner authorisation: §4.3 soft delete (row 264) moved
     # Partial -> Met. The row's declared gap was that the audit purge job did
@@ -479,7 +479,7 @@ APPROVED_ALL_ONLY_PROMOTIONS: list = [
     # docs/GAP_REGISTER.md and the row-264 note in docs/SOW_COMPLIANCE.md - the
     # same shape used for the C4b, C1, C11, C5 and §5.5 promotions. §4.3 is not
     # a section 3 clause, so this moves EXPECT_ALL only.
-    ("4.3 soft-delete-purge", "Partial", "Met", "this commit"),
+    ("4.3 soft-delete-purge", "Partial", "Met", "f11d820"),
 ]
 
 
