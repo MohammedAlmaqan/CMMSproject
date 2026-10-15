@@ -293,6 +293,12 @@ delegated.
 3. Phases B–H are sized from the Build counts, not from the raw 77.
 4. `v1.0.0` is **not** re-tagged. The next tag is `v1.1.0`, cut only when the §6.4 criteria
    are met or waived.
+   *Superseded 2026-10-15 — a pointer, with the original kept above; the sentence was written
+   2026-09-26 (`fc87e0e`) when no second tag existed. `v1.1.0` was cut 2026-10-11 at `5e2c478`
+   and is unchanged: it is the snapshot that predates C1 and C11. The current
+   deployment anchor is `v1.2.0`, cut 2026-10-15 at `a995e77`, which carries C1, C11, D1 and
+   D-20 on top of that snapshot. The rule in item 4 still stands: `v1.0.0` is not re-tagged,
+   and neither `v1.0.0` nor `v1.1.0` is moved or re-cut.*
 
 ### 6.4 Flagged items - answered 2026-09-26
 
