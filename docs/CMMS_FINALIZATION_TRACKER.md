@@ -921,7 +921,7 @@ The fifth defect is the one worth carrying forward: **every one of these was inv
 
 #### Matrix effect, stated exactly
 
-Phase D moved **nine** rows from open to `Met`, all in §3.4: six from `Partial` (plan fields, strategy choice, time-based intervals, meter-based intervals, task-list copy, idempotency) and three from `Not Met` (call horizon, configurable work-order status, plan notification). §3.4.2's seasonal/exclusion row stays `Waived` — a recorded decision, not a gap.
+Phase D moved **nine** rows from open to `Met`, all in §3.4: six from `Partial` (plan fields, strategy choice, time-based intervals, meter-based intervals, work order created on reaching due, idempotency) and three from `Not Met` (call horizon, configurable work-order status, plan notification). §3.4.2's seasonal/exclusion row stays `Waived` — a recorded decision, not a gap.
 
 Recounted from the Status column rather than transcribed: **all 214 clauses are now 73 Met, 70 Partial, 38 Not Met, 8 Deferred, 15 Excluded, 10 Waived**; **§3's 126 rows are 47 Met, 37 Partial, 21 Not Met, 4 Deferred, 7 Excluded, 10 Waived**. §3.4 is the only §3 subsection with no `Partial` and no `Not Met` row. `docs/DECISION_REGISTER.md` §1 carried the same arithmetic and was corrected in the same commit rather than left contradicting the matrix.
 
