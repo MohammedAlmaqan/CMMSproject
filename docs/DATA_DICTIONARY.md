@@ -14,7 +14,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | Convention | Detail |
 | --- | --- |
 | Table naming | Model name == table name. The schema declares no `@@map`. |
-| Primary keys | `String @id @default(uuid())`, named `<model>Id`. Two exceptions noted per table: `WorkOrderNotifLink` (composite `@@id([workOrderId, notificationId])`, no generated pk) and `SequenceCounter` (`code` is a business-key `String @id`, not a generated uuid). |
+| Primary keys | `String @id @default(uuid())`, named after the entity the table holds — usually `<entity>Id` (`userId`, `workOrderId`), often abbreviated (`alertId`, `planId`, `auditId`, `splitId`, `operationId`, `itemId`, `tokenId`, `readingId`), and never a bare `id`. Two exceptions noted per table: `WorkOrderNotifLink` (composite `@@id([workOrderId, notificationId])`, no generated pk) and `SequenceCounter` (`code` is a business-key `String @id`, not a generated uuid). |
 | Business codes | Plain `String` columns, **not** `@unique` in Prisma. Uniqueness is enforced by partial unique indexes created in migrations, scoped to `WHERE "isDeleted" = false`. A soft-deleted row releases its code for reuse. |
 | Soft delete | `isDeleted Boolean @default(false)`. 34 of 38 tables. Queries must filter on it. The four exceptions are deliberate and documented in their rows: `RefreshToken` (revoked, not deleted), `AuditLogEntry` (immutable append-only, the purge-with-retention target of §4.3), `WorkOrderSnapshot` (immutable history) and `SequenceCounter` (numeric semaphore). |
 | `modifiedDate` | `DateTime @updatedAt` on soft-deleted tables, so the application must set the value. `Attachment` deviates — see its row. |
