@@ -35,11 +35,23 @@ Matrix line 255 (§4.1 horizontal scaling) moves `Partial` → `Met`; line 281 (
 separate background service) keeps its `Partial` status because its email-notification
 and report-generation limbs are still absent (see the closure log).
 
-## B. Close now — documentation gap (1)
+## B. Close now — documentation gap (0)
 
-| ID | Item | Where it lives | Size |
-|---|---|---|---|
-| D1 | Documentation accuracy sweep — one entry, with what it covers: the five stale limitation-register claims named in OWNER_ACTION_SHEET note 8 (no task-list screen — `TaskListsPage.tsx` exists; no meter/combined PM strategy — `scheduler.ts:111` evaluates all three; hard-coded generated status; read-only BOM/cost-split lines — both have write endpoints; no system-generated alerts — all four fire); the stale Table 1 asks (item 1 "no failure field" — `WorkOrder.failureCodeId` exists at `schema.prisma:372`, delivered `1e4b28c`; item 5 "trial-run report missing" — delivered `c81bc3d`; item 6 — decided 2026-10-05, see N9; item 7 — answered by D-7) and the "Seven items need your answer" header; `README.md:262` ("200-user load test remains post-go-live" — the run passed 2026-10-03 and GO was approved), `README.md:265` and `README.md:266` figures; the value-domain comments in `schema.prisma` against the C15 CHECK constraints — closing C15 (`50ff911`, run 241) found two drifts, `SystemAlert.alertType` omitting `Account_Lockout` and `Comment.entityType` omitting `MaintenancePlan`; both comments were corrected at `3ea1b30` (run 242) and all 24 pinned domains now match their comments, so this is the standing re-check rather than an open correction; the tracker's teardown figure — R.9 D3-cleanup-errors and the Phase R close-out still read 68 across 13, but the count re-derived from source and verified by the C14 closure is **54 in 12** (`fd86709`); the stale matrix citations `index.ts:172-192` (line 297) and `workOrders.ts:567` (line 126; declaration is `:752`, applied `:835`) plus the `verify_a1.py` line ranges; and the Table 2 "Migration tooling" wording that reads as if the live importers were done (they are harness-only, see C5); and the unrefreshed `docs/openapi.json` snapshot (a manual re-export, last changed `5aa0094`, still listing the old action set and no `Blocked`, with no gate that regenerates it — a dated stale snapshot to be refreshed, not silently half-patched) | Table 2 "Documentation accuracy sweep"; tracker v1.1-8 (partially exercised `f58e478`) | L |
+Empty since 2026-10-15 — the sole item (D1) is closed. The documentation accuracy
+sweep re-derived the citations, claims and frozen counts it named: every `file:line`
+locator in `docs/SOW_COMPLIANCE.md` was re-checked against source and replaced with a
+symbolic reference (154 locators: 145 rewritten in place, 7 dropped with the stale claims
+that carried them, and the 2 section references to `docs/ADMIN_GUIDE.md` left as they
+were); the five stale limitation-register
+claims (L2, L12, L13, L16, L24) and the five Table 1 asks / "Seven items" header were
+corrected; `README.md`'s load-test sentence was pointed at the 2026-10-03 pass; the
+stale line ranges in `scripts/verify/verify_a1.py` and the tracker's `v1.1-8` citation
+were replaced with symbolic references; and `docs/openapi.json` was re-exported and put
+under a new drift gate (`scripts/verify/verify_openapi.py`). Two of the named items were
+found already correct and needed no edit: the tracker teardown figure (54 in 12, fixed
+at C14) and the `schema.prisma` value-domain comments (all 24 match the C15 CHECK
+constraints). One owner-authorised status move came out of it: matrix line 306 (§5.7
+import tools) `Partial` → `Met`. See the closure log.
 
 ## C. Blocked on owner (0)
 
@@ -141,8 +153,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-0 code and data gap · 1 documentation gap · 0 blocked on owner · 0 blocked on external ·
-10 decisions-not-gap = **11 open items**.
+0 code and data gap · 0 documentation gap · 0 blocked on owner · 0 blocked on external ·
+10 decisions-not-gap = **10 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -184,6 +196,7 @@ landed.
 | C4c | 2026-10-14 | `b31900c` | 292 |
 | C1 | 2026-10-15 | `a9b5326` | 294 |
 | C11 | 2026-10-15 | `e59e9a1` | 296 |
+| D1 | 2026-10-15 | `this commit` | n/a |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -470,3 +483,29 @@ promotion entry (`"4.1 horizontal-scaling"`, `Partial` → `Met`, `this commit`)
 the same commit. All suite work ran against the throwaway `cmms_c11` database; the
 operational `cmms` database was not seeded, migrated or written.
 
+**D1** (`this commit`, run n/a, 2026-10-15). D1 was the documentation accuracy sweep.
+The `docs/SOW_COMPLIANCE.md` citations were its centre: all 154 `file:line` locators were
+re-derived from source and turned into symbolic references (145 rewritten in place, 7
+dropped with the stale claims that carried them, and the 2 `docs/ADMIN_GUIDE.md` section
+references left as they were; a file or a named symbol rather than a line range), because
+a line range breaks silently when a list grows and nothing fails — the same reason v1.1-8 recommends symbolic references. The one citation
+whose target had moved file, the role hierarchy, now names `roleHierarchy` in
+`backend/src/utils/roles.ts` instead of the old `backend/src/middleware/auth.ts`. The
+five stale limitation-register claims were re-checked and corrected (L2 task-list screen,
+L12 meter/combined PM strategy, L13 per-plan generated status, L16 BOM / cost-split /
+plan-meter write paths, L24 system alerts), the stale Table 1 asks and "Seven items"
+header corrected, and `README.md`'s 200-user load-test sentence pointed at the
+2026-10-03 pass and C12. The tracker teardown figure and the `schema.prisma`
+value-domain comments were re-checked and found already correct, so they were left as
+they stood. `verify_a1.py`'s importer citation was rewritten to name the four live
+import routes instead of four off-by-one line numbers, and the tracker's `v1.1-8`
+example citation was made symbolic. `docs/openapi.json` was re-exported from the same
+module the server serves it from (`backend/src/openapi.ts`, extracted so the served
+document, the snapshot and the gate share one definition) — 141 operations / 87 paths →
+146 operations / 92 paths — and `scripts/verify/verify_openapi.py` now fails when the
+snapshot and the route annotations drift. One status move was authorised by the owner
+and landed here: matrix line 306 (§5.7 import tools) `Partial` → `Met`, on the C5 live
+importers (`eefcff1`, run 252); the verifier promotion entry (`"5.7 import-tools"`,
+`Partial` → `Met`, `this commit`) lands in the same commit. §5.7's summary figures move
+to 156 Met / 23 Partial (the §3 total is unchanged at 104 Met / 1 Partial). No database
+was touched — docs, source citations and one verifier comment only.
