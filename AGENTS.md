@@ -41,6 +41,26 @@ reviewer correction; see "Commit discipline" below.
 - Re-derive facts from source, never from prose written about that source. A clean
   previous pass is not evidence that the next one is clean.
 
+## Data safety
+
+- **The `cmms` database on `localhost:5432` holds the Client's migrated operational data,
+  not a fixture.** The B1 full legacy load of 2026-10-10 landed **20,333 of 20,333 rows at
+  100.00%** (`1971686`, run 257; see `docs/migration-runbook.md` and
+  `docs/migration-templates/TRIAL_RUN_REPORT_FULL.md`). No seed script rebuilds it and no
+  dump of it is committed to the repository, so a destructive statement against it is
+  neither recoverable nor revertable.
+- **Never seed, clear, drop, migrate or write to `cmms` from a test, a repro, a verifier or
+  a migration run.** All test and verification work targets a throwaway database made for
+  the purpose; `cmms_gate`, `cmms_gate_fresh`, `cmms_c1`, `cmms_c11` and
+  `cmms_restore_test` have all been used that way.
+- **`backend/scripts/gate.mjs` reads `DATABASE_URL`, and `backend/.env` points it at
+  `cmms`**, so a gate run with the default environment targets the real database. This is
+  the hazard the tracker's E.9 working-practice note names: *"Never point this at the
+  developer's `cmms` database"* (`CMMS_FINALIZATION_TRACKER.md`, E.9). Override per command
+  with `$env:DATABASE_URL`; do not edit `.env` to repoint the project.
+- `backend/tests/load-env.ts` fills only variables that are **unset**, so an explicit
+  `DATABASE_URL` in the environment wins over `.env`.
+
 ## Documentation accuracy
 
 - Every count, clause attribution and line-number citation in the docs is a claim
