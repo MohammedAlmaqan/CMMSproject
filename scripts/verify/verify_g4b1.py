@@ -3,13 +3,15 @@
 # G4b-1  E2E VERIFY — PM scheduler core: idempotency (3.1c), manual admin
 # trigger (3.1f), env-driven cron + startup run (3.1g).
 # Live API gate: admin login -> create Time plan due today -> run-scheduler
-# x2 -> wosCreated=1 / wosSkipped=0 then wosCreated=0 / wosSkipped=1 ->
-# exactly one WO with sourcePlanCycle = today -> cleanup + post-checks.
+# x2 -> the first run evaluates the active plans and mints WOs across their
+# call horizons, the second mints none (idempotent) -> the plan's own WOs are
+# one per horizon cycle and identical across both runs -> cleanup + post-checks.
 # Usage: python scripts/verify/verify_g4b1.py
 # Exit:  0 PASS  1 FAIL
 # ═══════════════════════════════════════════════════════════════════════
 import argparse
 import json
+import re
 import time
 from datetime import date
 from playwright.sync_api import sync_playwright
@@ -93,6 +95,11 @@ def main():
                 SI["plan_create_status"] = None
 
             # ---------- run-scheduler 1st call ----------
+            # The endpoint evaluates every active Time/Meter/Combined plan and
+            # materialises each cycle inside its call horizon (SOW 3.4.1-3.4.3),
+            # so wosCreated and plansEvaluated are not ours alone. Assert the run
+            # happened and minted something; our plan's own work orders are read
+            # back below.
             r1_ok = False
             try:
                 r1 = req.post("/api/maintenance-plans/run-scheduler", headers=hdrs, data={})
@@ -101,10 +108,29 @@ def main():
                 SI["run1_wosCreated"] = j1.get("wosCreated")
                 SI["run1_wosSkipped"] = j1.get("wosSkipped")
                 SI["run1_plansEvaluated"] = j1.get("plansEvaluated")
-                r1_ok = r1.status == 200 and j1.get("wosCreated") == 1 and j1.get("wosSkipped") == 0
+                r1_ok = (
+                    r1.status == 200
+                    and (j1.get("plansEvaluated") or 0) >= 1
+                    and (j1.get("wosCreated") or 0) >= 1
+                )
             except Exception as e:
                 print("RUN1_ERR", e)
                 SI["run1_status"] = None
+
+            def plan_work_orders():
+                r = req.get("/api/work-orders?take=1000", headers=hdrs)
+                d = r.json()
+                if isinstance(d, dict):
+                    d = d.get("data", [])
+                return r.status, [w for w in d if w.get("sourcePlanId") == plan_id]
+
+            after_run1 = []
+            try:
+                _st, after_run1 = plan_work_orders()
+                SI["run1_plan_wo_count"] = len(after_run1)
+                SI["run1_plan_cycles"] = sorted({w.get("sourcePlanCycle") for w in after_run1})
+            except Exception as e:
+                print("RUN1_WO_LIST_ERR", e)
 
             # ---------- run-scheduler 2nd call (idempotency) ----------
             r2_ok = False
@@ -115,46 +141,59 @@ def main():
                 SI["run2_wosCreated"] = j2.get("wosCreated")
                 SI["run2_wosSkipped"] = j2.get("wosSkipped")
                 SI["run2_plansEvaluated"] = j2.get("plansEvaluated")
-                r2_ok = r2.status == 200 and j2.get("wosCreated") == 0 and j2.get("wosSkipped") == 1
+                # A second run must mint nothing: every cycle in the horizon is
+                # already covered, so no duplicate work order can appear.
+                r2_ok = r2.status == 200 and j2.get("wosCreated") == 0
             except Exception as e:
                 print("RUN2_ERR", e)
                 SI["run2_status"] = None
 
-            # ---------- Exactly one WO for the plan, cycle = today ----------
+            # ---------- Our plan's work orders: one per horizon cycle, stable ----------
+            after_run2 = []
             wo_ok = False
             try:
-                wl = req.get("/api/work-orders?take=200", headers=hdrs)
-                wos = wl.json()
-                if isinstance(wos, dict):
-                    wos = wos.get("data", [])
-                mine = [w for w in wos if w.get("sourcePlanId") == plan_id]
-                SI["wo_list_status"] = wl.status
-                SI["wo_supplier_count"] = len(mine)
-                SI["wo_sourceCycle"] = mine[0].get("sourcePlanCycle") if mine else None
-                wo_ok = (
-                    wl.status == 200
-                    and len(mine) == 1
-                    and mine[0].get("sourcePlanCycle") == today_iso
+                st2, after_run2 = plan_work_orders()
+                SI["wo_list_status"] = st2
+                SI["wo_plan_count"] = len(after_run2)
+                SI["wo_stable"] = sorted(
+                    w.get("workOrderId") for w in after_run1
+                ) == sorted(w.get("workOrderId") for w in after_run2)
+                cycles = sorted({w.get("sourcePlanCycle") for w in after_run2})
+                SI["wo_sourceCycles"] = cycles
+                cycle_ok = bool(cycles) and all(
+                    re.match(r"^\d{4}-\d{2}-\d{2}#[0-9a-f-]{36}$", c or "") for c in cycles
                 )
-                if mine:
+                wo_ok = (
+                    st2 == 200
+                    and len(after_run2) >= 1
+                    and SI["wo_stable"]
+                    and cycle_ok
+                )
+                SI["plan_wo_ids"] = [w.get("workOrderId") for w in after_run2]
+                SI["plan_wo_numbers"] = [w.get("woNumber") for w in after_run2]
+                if after_run2:
                     global GENERATED_WO_ID
-                    GENERATED_WO_ID = mine[0].get("workOrderId")
+                    GENERATED_WO_ID = after_run2[0].get("workOrderId")
             except Exception as e:
                 print("WO_LIST_ERR", e)
                 SI["wo_list_status"] = None
 
-            # ---------- Cleanup: soft-delete plan + generated WO ----------
+            # ---------- Cleanup: soft-delete every WO for the plan, then the plan ----------
             cleanup_ok = False
             try:
+                wo_statuses = []
+                for wid in SI.get("plan_wo_ids", []):
+                    dr = req.delete(f"/api/work-orders/{wid}", headers=hdrs)
+                    wo_statuses.append(dr.status)
+                SI["wo_delete_statuses"] = wo_statuses
+                SI["wo_delete_all_ok"] = len(wo_statuses) >= 1 and all(s == 200 for s in wo_statuses)
                 dp = req.delete(f"/api/maintenance-plans/{plan_id}", headers=hdrs)
                 SI["plan_delete_status"] = dp.status
-                dw = req.delete(f"/api/work-orders/{GENERATED_WO_ID}", headers=hdrs)
-                SI["wo_delete_status"] = dw.status
-                cleanup_ok = dp.status == 200 and dw.status == 200
+                cleanup_ok = bool(SI.get("wo_delete_all_ok")) and dp.status == 200
             except Exception as e:
                 print("CLEANUP_ERR", e)
                 SI["plan_delete_status"] = None
-                SI["wo_delete_status"] = None
+                SI["wo_delete_all_ok"] = False
 
             # ---------- Post-cleanup absence ----------
             try:
