@@ -183,10 +183,10 @@ VALUES
 
 INSERT INTO "Notification" ("notificationId", "notificationNumber", type, priority, "functionalLocationId", "equipmentId", "reportedByUserId", description, status, "createdDate", "modifiedDate")
 VALUES
- ('{N1}', 'R7-N1', 'Malfunction', 'High',   '{LOC}', '{ids['eq_p']}', '{ids['admin']}', 'r7 notif high',   'Open',       TIMESTAMP '2026-09-15 12:00:00', now()),
- ('{N2}', 'R7-N2', 'Malfunction', 'Medium', '{LOC}', NULL,             '{ids['admin']}', 'r7 notif medium', 'Open',       TIMESTAMP '2026-09-15 12:00:00', now()),
- ('{N3}', 'R7-N3', 'Malfunction', 'Low',    '{LOC}', NULL,             '{ids['admin']}', 'r7 notif low',    'In Process', TIMESTAMP '2026-09-15 12:00:00', now()),
- ('{N4}', 'R7-N4', 'Malfunction', 'High',   '{LOC}', NULL,             '{ids['admin']}', 'r7 notif done',   'Completed',  TIMESTAMP '2026-09-15 12:00:00', now());
+  ('{N1}', 'R7-N1', 'M1', 'High',   '{LOC}', '{ids['eq_p']}', '{ids['admin']}', 'r7 notif high',   'Open',       TIMESTAMP '2026-09-15 12:00:00', now()),
+  ('{N2}', 'R7-N2', 'M1', 'Medium', '{LOC}', NULL,             '{ids['admin']}', 'r7 notif medium', 'Open',       TIMESTAMP '2026-09-15 12:00:00', now()),
+  ('{N3}', 'R7-N3', 'M1', 'Low',    '{LOC}', NULL,             '{ids['admin']}', 'r7 notif low',    'In Process', TIMESTAMP '2026-09-15 12:00:00', now()),
+  ('{N4}', 'R7-N4', 'M1', 'High',   '{LOC}', NULL,             '{ids['admin']}', 'r7 notif done',   'Completed',  TIMESTAMP '2026-09-15 12:00:00', now());
 COMMIT;
 """
 
