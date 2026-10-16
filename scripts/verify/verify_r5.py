@@ -55,9 +55,14 @@ def main():
     emit("=" * 74)
     emit("R5 VERIFY - Excel export format, opened by openpyxl")
     emit("=" * 74)
-    if not folder or not os.path.isdir(folder):
+    if not folder:
+        emit("  usage: verify_r5.py <folder-of-xlsx>")
+        emit("  the folder must hold at least one exported workbook plus the")
+        emit("  purpose-built _values.xlsx probe (scripts/verify/make_r5_probe.ts)")
+        return 2
+    if not os.path.isdir(folder):
         emit(f"  no such folder: {folder}")
-        return 1
+        return 2
     emit(f"  folder: {folder}")
     emit()
 
@@ -126,8 +131,11 @@ def main():
         def cell_at(address):
             for row in ws.iter_rows():
                 for cell in row:
-                    if cell.coordinate == address:
-                        return cell
+                    try:
+                        if getattr(cell, "coordinate", None) == address:
+                            return cell
+                    except Exception:
+                        pass
             return None
 
         a2 = cell_at("A2")
