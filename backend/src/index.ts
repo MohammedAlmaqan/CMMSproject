@@ -112,6 +112,7 @@ function isPrismaDecimal(value: unknown): value is { toNumber: () => number } {
 
 function normalizeDecimals(value: unknown): unknown {
   if (isPrismaDecimal(value)) return value.toNumber();
+  if (value instanceof Date) return value;
   if (Array.isArray(value)) return value.map(normalizeDecimals);
   if (typeof value === 'object' && value !== null) {
     const out: Record<string, unknown> = {};
