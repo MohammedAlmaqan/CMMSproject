@@ -2,7 +2,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 # G5  E2E VERIFY — Dashboard + Reports (live API integration)
 # Committed live API gate (login → 7 report + 3 dashboard endpoints →
-# headless /reports + /dashboard renders → CSV export download),
+# headless /reports + /dashboard renders → .xlsx export download),
 # assertions + screenshots.
 # Usage: python scripts/verify/verify_g5.py
 # Exit:  0 PASS  1 FAIL
@@ -102,14 +102,18 @@ def main():
             hdrs = {}
 
         # ---------- API: 7 report + 3 dashboard endpoints ----------
+        # Shape per report: the rollup reports return an OBJECT keyed by grouping
+        # (byStatus/byEquipment/...), only mtbf and downtime return a bare list.
+        # Declaring the object reports as "list" made their shape assertion fail
+        # unconditionally, not merely on empty data.
         probes = [
-            ("/api/reports/backlog", "list", ("status", "count")),
-            ("/api/reports/pm-compliance", "dict", ("period", "complianceRate")),
+            ("/api/reports/backlog", "dict", ("byStatus", "byPriority", "byWorkCenter")),
+            ("/api/reports/pm-compliance", "dict", ("period", "complianceRate", "scheduledPM", "completedPM")),
             ("/api/reports/mtbf", "list", None),
-            ("/api/reports/mttr", "list", None),
-            ("/api/reports/cost-summary", "list", None),
+            ("/api/reports/mttr", "dict", ("byEquipment", "byLocation", "excludedIncomplete")),
+            ("/api/reports/cost-summary", "dict", ("period", "byCostCenter")),
             ("/api/reports/downtime", "list", None),
-            ("/api/reports/material-consumption", "list", None),
+            ("/api/reports/material-consumption", "dict", ("byMaterial", "byWorkOrder", "byEquipment")),
             ("/api/dashboard/kpis", "dict", ("activeWorkOrders", "completionRate")),
             ("/api/dashboard/alerts", "list", None),
             ("/api/dashboard/cost-summary", "list", None),
@@ -179,13 +183,13 @@ def main():
             print("REPORTS_PM_ERR", e)
             SI["reports_pm_period_ok"] = False
 
-        # Export CSV download (current report has rows)
+        # Export download is .xlsx now (row 59 / ReportsPage exportXlsx), not CSV.
         try:
             with page.expect_download(timeout=15000) as dl:
                 page.get_by_role("button", name="Export", exact=True).first.click()
             download = dl.value
             SI["export_suggested_filename"] = download.suggested_filename
-            SI["export_download_ok"] = download.suggested_filename.endswith(".csv")
+            SI["export_download_ok"] = download.suggested_filename.endswith(".xlsx")
         except Exception as e:
             print("EXPORT_ERR", e)
             SI["export_download_ok"] = False
@@ -195,6 +199,20 @@ def main():
         page.goto(base + "/dashboard", wait_until="domcontentloaded")
         SI["dashboard_seen_api"] = bool(SEEN_API.get("/api/dashboard/cost-summary"))
         SI["dashboard_alerts_seen_api"] = bool(SEEN_API.get("/api/dashboard/alerts"))
+        # The trend X-axis is the data's own months (DashboardPage maps
+        # "2026-10" -> "Oct"), so assert the rendered axis against the months the
+        # cost-summary API just returned rather than a hard-coded month, which is
+        # what made this fail as the data (and the calendar) moved on.
+        _abbr = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        expected_months = []
+        try:
+            for _r in (json.loads(SI.get("api_dashboard_cost-summary_raw") or "[]") or []):
+                _m = int(str(_r.get("month", ""))[5:7])
+                if 1 <= _m <= 12:
+                    expected_months.append(_abbr[_m - 1])
+        except Exception:
+            expected_months = []
         try:
             page.get_by_role("heading", name="Maintenance Trend", exact=True).wait_for(timeout=15000)
             trend_card = page.get_by_role("heading", name="Maintenance Trend", exact=True).locator(
@@ -203,7 +221,9 @@ def main():
             trend_card.locator("svg.recharts-surface").wait_for(timeout=15000)
             area_count = trend_card.locator(".recharts-area").count()
             SI["trend_area_series"] = area_count
-            SI["trend_chart_ok"] = area_count >= 1 and "Sep" in page.locator("body").inner_text()
+            SI["trend_months_expected"] = expected_months
+            SI["trend_chart_ok"] = area_count >= 1 and (
+                not expected_months or any(m in page.locator("body").inner_text() for m in expected_months))
         except Exception as e:
             print("TREND_ERR", e)
             SI["trend_chart_ok"] = False
