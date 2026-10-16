@@ -2,8 +2,8 @@
 # ═══════════════════════════════════════════════════════════════════════
 # G4a  E2E VERIFY — Preventive Maintenance (frontend wiring + generate-wo)
 # Committed live API gate (login UI+API → POST test plan → GET list/detail →
-# generate-wo x2 → distinct WO numbers → headless /preventive-maintenance
-# render → cleanup plan + WOs), assertions + screenshots.
+# generate-wo x2 → idempotent single WO → headless /preventive-maintenance
+# render → cleanup plan + WO), assertions + screenshots.
 # Usage: python scripts/verify/verify_g4a.py
 # Exit:  0 PASS  1 FAIL
 # ═══════════════════════════════════════════════════════════════════════
@@ -238,20 +238,23 @@ def main():
             SI["gen2_status"] = g2.status
             SI["gen1_wo_number"] = j1.get("woNumber")
             SI["gen2_wo_number"] = j2.get("woNumber")
-            distinct_ok = (
-                g1.status == 201
-                and g2.status == 201
-                and bool(wo1_id)
-                and bool(wo2_id)
-                and wo1_id != wo2_id
-                and j1.get("woNumber") != j2.get("woNumber")
+            # generate-wo is idempotent for a plan cycle by design: a second
+            # call must not mint a second work order. It answers 200 with
+            # alreadyExisted/skipReason and the same work order as the first.
+            same_wo = bool(wo1_id) and wo1_id == wo2_id
+            SI["generate_idempotent"] = (
+                g1.status in (200, 201)
+                and g2.status == 200
+                and same_wo
+                and j1.get("woNumber") == j2.get("woNumber")
+                and j2.get("alreadyExisted") is True
             )
-            SI["distinct_wo_numbers"] = distinct_ok
+            idempotent_ok = SI["generate_idempotent"]
         except Exception as e:
             print("GEN_WO_ERR", e)
             SI["gen1_status"] = None
             SI["gen2_status"] = None
-            distinct_ok = False
+            idempotent_ok = False
 
         # ---------- Render /preventive-maintenance headless ----------
         page.goto(base + "/preventive-maintenance", wait_until="domcontentloaded")
@@ -277,17 +280,13 @@ def main():
             SI["plan_delete_status"] = None
         try:
             dw1 = page.request.delete(api + f"/api/work-orders/{wo1_id}", headers=admin_hdrs)
-            dw2 = page.request.delete(api + f"/api/work-orders/{wo2_id}", headers=admin_hdrs)
             SI["wo1_delete_status"] = dw1.status
-            SI["wo2_delete_status"] = dw2.status
         except Exception as e:
             print("WO_DELETE_ERR", e)
             SI["wo1_delete_status"] = None
-            SI["wo2_delete_status"] = None
         cleanup_ok = (
             SI.get("plan_delete_status") == 200
             and SI.get("wo1_delete_status") == 200
-            and SI.get("wo2_delete_status") == 200
         )
 
         # ---------- Post-cleanup absent checks ----------
@@ -324,7 +323,7 @@ def main():
             and plan_ok
             and list_ok
             and shape_ok
-            and distinct_ok
+            and idempotent_ok
             and SI.get("plan_row_visible")
             and cleanup_ok
             and SI.get("list_post_cleanup_clean")
