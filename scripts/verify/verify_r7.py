@@ -77,13 +77,23 @@ def approx(a, b, tol=0.005):
 
 # ─────────────────────────── database helpers ───────────────────────────
 def db_url():
-    m = re.search(r'^DATABASE_URL="?([^\s"]+)"?', (BACKEND / ".env").read_text(encoding="utf-8"), re.M)
-    if not m:
-        raise SystemExit("DATABASE_URL not found in backend/.env")
-    url = m.group(1)
+    # Honour the runtime DATABASE_URL first, exactly as the backend process
+    # resolves it. backend/.env is only a fallback: under a test/E2E override
+    # it still names the developer's live database, and this pack writes a
+    # fixture into whatever it names (see fixture_sql / CLEANUP_SQL below).
+    url = (os.environ.get("DATABASE_URL") or "").strip().strip('"')
+    source = "process env"
+    if not url:
+        m = re.search(r'^DATABASE_URL="?([^\s"]+)"?', (BACKEND / ".env").read_text(encoding="utf-8"), re.M)
+        if not m:
+            raise SystemExit("DATABASE_URL not found in process env or backend/.env")
+        url = m.group(1)
+        source = "backend/.env"
     # Prisma appends ?connection_limit=...&pool_timeout=... which libpq rejects
     # as an unknown URI parameter. Keep only the connection part.
     url = url.split("?", 1)[0]
+    # Mask credentials; the database name is what makes the target auditable.
+    print(f"R7_DB_TARGET source={source} target={url.rsplit('@', 1)[-1]}")
     return url
 
 
