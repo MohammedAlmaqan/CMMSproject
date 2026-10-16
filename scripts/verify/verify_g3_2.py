@@ -237,7 +237,13 @@ def main():
                 bad_msg = bad.json().get("error", "").lower()
             except Exception:
                 pass
-            SI["badtype_rejected"] = bad.status == 400 and "unsupported file type" in bad_msg
+            # The allowlist hardening (D-11) now answers "Executable and script
+            # files are not allowed: .exe"; this gate was written against the
+            # older "unsupported file type" wording. Accept either — the claim
+            # under test is that a disallowed type is refused with a 400.
+            SI["badtype_rejected"] = bad.status == 400 and (
+                "not allowed" in bad_msg or "unsupported" in bad_msg
+            )
 
             SI["ATTACHMENT_ID"] = att_id or ""
         except Exception as e:
