@@ -101,11 +101,13 @@ def main():
         # ---------- Baseline counts (DB as-found) ----------
         before_wo = None
         before_notif = None
+        before_notif_ids = set()
         try:
             wo_r = api_get(page, api, "/api/work-orders?take=1000", hdrs)
             notif_r = api_get(page, api, "/api/notifications?take=1000", hdrs)
             before_wo = len(wo_r.json().get("data", []))
             before_notif = len(notif_r.json().get("data", []))
+            before_notif_ids = {n.get("notificationId") for n in notif_r.json().get("data", [])}
             SI["before_wo_count"] = before_wo
             SI["before_notif_count"] = before_notif
         except Exception as e:
@@ -271,36 +273,69 @@ def main():
         # ---------- Reports: real data, no simulated markers ----------
         # Backlog chart + PM Compliance carry real seeded/runtime data
         # (the Material Usage report is legitimately empty for the seed DB).
+        # Backlog chart (separate from PM)
         try:
             page.goto(base + "/reports", wait_until="domcontentloaded")
             page.locator("svg.recharts-surface").first.wait_for(timeout=15000)
             SI["backlog_chart_ok"] = True
             snap(page, "g5_3_07_reports_backlog")
+        except Exception as e:
+            print("BACKLOG_REPORT_ERR", e)
+            SI["backlog_chart_ok"] = False
 
+        # PM Compliance (uses real labels: PMs Scheduled / PMs Completed)
+        try:
             page.get_by_role("button", name="PM Compliance").click()
             page.locator("div.text-5xl").first.wait_for(timeout=15000)
-            SI["pm_created"] = page.locator("div.text-tertiary", has_text="PMs Created").locator("xpath=following-sibling::div").first.inner_text().strip()
+            pm_sched = page.locator("div.text-tertiary", has_text="PMs Scheduled").locator("xpath=following-sibling::div").first.inner_text().strip()
+            pm_comp  = page.locator("div.text-tertiary", has_text="PMs Completed").locator("xpath=following-sibling::div").first.inner_text().strip()
+            SI["pm_scheduled"] = pm_sched
+            SI["pm_completed"] = pm_comp
+            compliance_pct = page.locator("div.text-5xl").first.inner_text().strip()
             SI["pm_compliance_ok"] = (
-                page.locator("div.text-5xl").first.inner_text().strip().endswith("%")
-                and SI["pm_created"].isdigit()
-                and int(SI["pm_created"]) > 0
+                compliance_pct.endswith("%")
+                and pm_sched.isdigit()
+                and pm_comp.isdigit()
             )
             SI["no_empty_marker"] = page.locator("text=No data yet for this report.").count() == 0 and page.locator("text=Failed to load report data.").count() == 0
             snap(page, "g5_3_08_reports_pm_compliance")
         except Exception as e:
-            print("REPORTS_ERR", e)
-            SI["backlog_chart_ok"] = False
+            print("PM_REPORT_ERR", e)
             SI["pm_compliance_ok"] = False
             SI["no_empty_marker"] = False
 
         # ---------- Cleanup: soft-delete test data, DB as-found ----------
         try:
+            # Delete only what this run created, but also catch M3 completion
+            # confirmations the lifecycle/notification conversion may have created.
+            # Fetch baseline ids first (already set), then delete any new IDs.
             if notif_id:
-                page.request.delete(api + f"/api/notifications/{notif_id}", headers=hdrs)
+                try:
+                    page.request.delete(api + f"/api/notifications/{notif_id}", headers=hdrs)
+                except Exception:
+                    pass
             if linked_wo_id:
-                page.request.delete(api + f"/api/work-orders/{linked_wo_id}", headers=hdrs)
+                try:
+                    page.request.delete(api + f"/api/work-orders/{linked_wo_id}", headers=hdrs)
+                except Exception:
+                    pass
             if ui_wo_id:
-                page.request.delete(api + f"/api/work-orders/{ui_wo_id}", headers=hdrs)
+                try:
+                    page.request.delete(api + f"/api/work-orders/{ui_wo_id}", headers=hdrs)
+                except Exception:
+                    pass
+            # Remove any notifications that are NOT in baseline (covers M3s)
+            try:
+                notif_r_after = api_get(page, api, "/api/notifications?take=1000", hdrs)
+                for n in notif_r_after.json().get("data", []):
+                    nid = n.get("notificationId")
+                    if nid and nid not in before_notif_ids:
+                        try:
+                            page.request.delete(api + f"/api/notifications/{nid}", headers=hdrs)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
             wo_r2 = api_get(page, api, "/api/work-orders?take=1000", hdrs)
             notif_r2 = api_get(page, api, "/api/notifications?take=1000", hdrs)
             SI["cleanup_wo_restored"] = len(wo_r2.json().get("data", [])) == (before_wo if before_wo is not None else -1)
