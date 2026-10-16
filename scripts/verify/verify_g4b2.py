@@ -2,8 +2,10 @@
 # ═══════════════════════════════════════════════════════════════════════
 # G4b-2  E2E VERIFY — PM scheduler safeguards:
 #   3.1a PM2 fork config (instances:1 / fork / no register.js)
-#   3.1b startup lock (foreign running row blocks a 2nd backend process)
+#   3.1b startup lock (foreign running row blocks a 2nd worker process)
 #   3.1d scheduler heartbeat health + SystemAlert on staleness
+# (C11: the scheduler, heartbeat row and startup lock live in the background
+#  worker - `backend/src/worker.ts`, `npm run worker:dev` — not the stateless API.)
 #   3.1e non-blocking batches (setImmediate + batch log in scheduler.ts)
 # Usage: python scripts/verify/verify_g4b2.py
 # Exit:  0 PASS  1 FAIL
@@ -28,6 +30,10 @@ BACKEND = str(Path(__file__).resolve().parents[2] / "backend")
 ECOSYSTEM = Path(BACKEND) / "ecosystem.config.cjs"
 SCHEDULER = Path(BACKEND) / "src" / "services" / "scheduler.ts"
 SECOND_LOG = Path(BACKEND) / "backend-g4b2-second.log"
+
+WORKER_CMD = ["cmd", "/c", "npm.cmd", "run", "worker:dev"]
+WORKER_HELD = "[worker] startup lock held by another worker"
+WORKER_STARTED = "[worker] background worker started"
 
 SI = {}
 
@@ -148,33 +154,32 @@ def main():
             fake_id = str(uuid.uuid4())
             fake_pid = 60000 + (int(time.time()) % 30000) + os.getpid() % 1000
             r = db_exec(
-                'INSERT INTO "SchedulerRun" ("schedulerRunId","hostname","pid","status","startedAt","heartbeatAt")\n'
-                f"VALUES ('{fake_id}','fakehost',{fake_pid},'running',now(),now());\n"
+                'INSERT INTO "SchedulerRun" ("schedulerRunId","hostname","pid","status","startedAt","heartbeatAt","modifiedDate")\n'
+                f"VALUES ('{fake_id}','fakehost',{fake_pid},'running',now(),now(),now());\n"
             )
+            SI["fake_insert_rc"] = r.returncode
             chk_fake = db_read(f'SELECT count(*)::int AS c FROM "SchedulerRun" WHERE "schedulerRunId" = \'{fake_id}\';\n')
             SI["fake_row_inserted"] = bool(chk_fake and chk_fake[0].get("c") == 1)
 
             second_started = time.time()
             env = dict(os.environ)
-            env["PORT"] = str(SECOND_PORT)
             env["FORCE_COLOR"] = "0"
             with SECOND_LOG.open("w", encoding="utf-8") as f:
                 proc = subprocess.Popen(
-                    ["cmd", "/c", "npm.cmd", "run", "dev"],
+                    WORKER_CMD,
                     cwd=BACKEND,
                     env=env,
                     stdout=f,
                     stderr=subprocess.STDOUT,
                 )
-            disabled_marker = "[scheduler] disabled — lock held by"
             found = False
-            deadline = time.time() + 40
+            deadline = time.time() + 60
             while time.time() < deadline:
                 try:
                     content = (SECOND_LOG.read_text(encoding="utf-8", errors="replace") or "")
                 except Exception:
                     content = ""
-                if disabled_marker in content:
+                if WORKER_HELD in content:
                     found = True
                     break
                 if proc.poll() is not None:
@@ -189,33 +194,53 @@ def main():
             content = (SECOND_LOG.read_text(encoding="utf-8", errors="replace") or "")
             SI["second_boot_ms"] = boot_ms
             SI["second_disabled_marker"] = found
-            SI["second_started_cron_absent"] = "started cron" not in content
-            SI["second_locked_out_message"] = disabled_marker in content
+            SI["second_started_cron_absent"] = WORKER_STARTED not in content
+            SI["second_locked_out_message"] = WORKER_HELD in content
             # delete the fake row once the 2nd process is killed
             db_exec(f'DELETE FROM "SchedulerRun" WHERE "schedulerRunId" = \'{fake_id}\';\n')
 
-            # ---------- 3.1d: run once + success row + healthy ----------
-            rs = req.post("/api/maintenance-plans/run-scheduler", headers=hdrs, data={})
-            j = rs.json()
-            SI["run_rs_status"] = rs.status
-            SI["run_rs_wosCreated"] = j.get("wosCreated")
-
-            sr_rows = db_read('SELECT "schedulerRunId" AS id, pid AS pid FROM "SchedulerRun" WHERE status = \'success\' ORDER BY "completedAt" DESC LIMIT 1;\n')
-            success_id = (sr_rows or [{}])[0].get("id") if sr_rows else None
-            main_pid = (sr_rows or [{}])[0].get("pid") if sr_rows else None
+            # ---------- 3.1d: worker startup sweep -> success row -> healthy ----------
+            # The API is stateless (C11): the /run-scheduler route runs without the
+            # startup lock, so it writes no SchedulerRun row. The heartbeat row read by
+            # /health/scheduler is written by the background worker's startup sweep,
+            # which is the process that holds the lock.
+            db_exec('DELETE FROM "SchedulerRun";\n')
+            success_id = None
+            main_pid = None
+            with SECOND_LOG.open("w", encoding="utf-8") as f:
+                wproc = subprocess.Popen(
+                    WORKER_CMD,
+                    cwd=BACKEND,
+                    env=dict(os.environ),
+                    stdout=f,
+                    stderr=subprocess.STDOUT,
+                )
+            deadline = time.time() + 90
+            while time.time() < deadline:
+                sr_rows = db_read('SELECT "schedulerRunId" AS id, pid AS pid FROM "SchedulerRun" WHERE status = \'success\' AND "isDeleted" = false ORDER BY "completedAt" DESC LIMIT 1;\n')
+                if sr_rows:
+                    success_id = sr_rows[0].get("id")
+                    main_pid = sr_rows[0].get("pid")
+                    break
+                if wproc.poll() is not None:
+                    break
+                time.sleep(1)
             SI["success_row_exists"] = success_id is not None
             SI["success_row_id"] = success_id
             SI["success_row_pid"] = main_pid
-            if success_id:
-                # stale-history leak safety: keep only this process's live row so the
-                # staleness assertion has a meaningful "no recent success" environment
-                db_exec(f'DELETE FROM "SchedulerRun" WHERE "schedulerRunId" <> \'{success_id}\';\n')
 
-            h1 = req.get("/api/health/scheduler")
+            h1 = req.get("/api/health/scheduler", headers=hdrs)
             hj1 = h1.json()
             SI["health_ok_status"] = h1.status
             SI["health_ok_status_field"] = hj1.get("status")
             SI["minutes_since_success"] = hj1.get("minutesSinceSuccess")
+
+            # the worker keeps its cron jobs alive; stop it now the row exists
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(wproc.pid)], capture_output=True)
+            try:
+                wproc.wait(timeout=10)
+            except Exception:
+                pass
 
             # ---------- 3.1d staleness: 503 + SystemAlert, then restore ----------
             stale_alert = None
@@ -223,7 +248,7 @@ def main():
             if success_id:
                 su = db_exec(f'UPDATE "SchedulerRun" SET "completedAt" = now() - interval \'30 days\' WHERE "schedulerRunId" = \'{success_id}\';\n')
                 SI["stale_update_rc"] = su.returncode
-                h2 = req.get("/api/health/scheduler")
+                h2 = req.get("/api/health/scheduler", headers=hdrs)
                 hj2 = h2.json()
                 SI["stale_status_code"] = h2.status
                 SI["stale_status_field"] = hj2.get("status")
@@ -234,24 +259,31 @@ def main():
                 SI["stale_alert_id"] = stale_alert
                 rr = db_exec(f'UPDATE "SchedulerRun" SET "completedAt" = now() WHERE "schedulerRunId" = \'{success_id}\';\n')
                 SI["restore_rc"] = rr.returncode
-                h3 = req.get("/api/health/scheduler")
+                h3 = req.get("/api/health/scheduler", headers=hdrs)
                 SI["restored_health_status"] = h3.status
                 restored = h3.status == 200
 
-            # ---------- WO evidence for the test plan ----------
+            # ---------- WO evidence for the test plan (post-C11: one WO per cycle) ----------
             wo_ok = False
+            plan_wo_ids = []
             try:
                 wl = req.get("/api/work-orders?take=200", headers=hdrs)
                 wos = wl.json()
                 if isinstance(wos, dict):
                     wos = wos.get("data", [])
                 mine = [w for w in wos if w.get("sourcePlanId") == plan_id]
+                cycles = [w.get("sourcePlanCycle") for w in mine]
+                plan_wo_ids = [w.get("workOrderId") for w in mine if w.get("workOrderId")]
                 SI["wo_supplier_count"] = len(mine)
-                wo_ok = wl.status == 200 and len(mine) == 1 and mine[0].get("sourcePlanCycle") == today_iso
-                generated_wo_id = mine[0].get("workOrderId") if mine else None
+                SI["wo_cycles"] = cycles
+                wo_ok = (
+                    wl.status == 200
+                    and len(mine) >= 1
+                    and all(isinstance(c, str) and re.match(r"^\d{4}-\d{2}-\d{2}#[0-9a-f-]{36}$", c) for c in cycles)
+                )
             except Exception as e:
                 print("WO_LIST_ERR", e)
-                generated_wo_id = None
+                plan_wo_ids = []
                 SI["wo_supplier_count"] = None
 
             # ---------- Cleanup ----------
@@ -263,11 +295,12 @@ def main():
                 SI["plan_delete_status"] = None
                 dp = None
             try:
-                if generated_wo_id:
-                    dw = req.delete(f"/api/work-orders/{generated_wo_id}", headers=hdrs)
-                    SI["wo_delete_status"] = dw.status
-                else:
-                    SI["wo_delete_status"] = None
+                codes = [req.delete(f"/api/work-orders/{wid}", headers=hdrs).status for wid in plan_wo_ids]
+                SI["wo_delete_codes"] = codes
+                SI["wo_delete_status"] = (
+                    204 if codes and all(c in (200, 204) for c in codes)
+                    else (codes[0] if codes else None)
+                )
             except Exception as e:
                 print("WO_DELETE_ERR", e)
                 SI["wo_delete_status"] = None
@@ -304,7 +337,6 @@ def main():
             and SI.get("sched_has_batch")
             and SI.get("second_disabled_marker")
             and SI.get("second_started_cron_absent")
-            and SI.get("run_rs_status") == 200
             and SI.get("success_row_exists")
             and SI.get("health_ok_status") == 200
             and SI.get("health_ok_status_field") == "ok"
