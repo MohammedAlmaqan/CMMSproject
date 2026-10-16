@@ -139,10 +139,10 @@ def main():
             wc_sel = page.locator("form select").nth(4)
             wc_sel.locator("option").nth(1).wait_for(state="attached", timeout=15000)
             wc_sel.select_option(index=1)
-            sup_sel = page.locator("form select").nth(5)
+            sup_sel = page.locator("form select").nth(6)
             sup_sel.locator("option").nth(1).wait_for(state="attached", timeout=15000)
             sup_sel.select_option(index=1)
-            page.locator("form textarea").fill("G5-3 E2E lifecycle test WO")
+            page.locator("form textarea").first.fill("G5-3 E2E lifecycle test WO")
             snap(page, "g5_3_03_create_form")
             page.get_by_role("button", name="Create Work Order").click()
             page.wait_for_url(re.compile(r".*/work-orders/[0-9a-fA-F-]{36}"), timeout=20000)
@@ -173,6 +173,25 @@ def main():
         SI["closed"] = False
         try:
             ui_login(page, base, "admin")
+            crf = api_get(page, api, "/api/crafts?take=1", hdrs).json()
+            crfs = crf if isinstance(crf, list) else crf.get("data", [])
+            op = page.request.post(
+                api + "/api/work-order-operations",
+                headers={"Authorization": hdrs.get("Authorization", ""), "Content-Type": "application/json"},
+                data=json.dumps({
+                    "workOrderId": ui_wo_id,
+                    "sequenceNumber": 1,
+                    "description": "G5-3 lifecycle operation",
+                    "craftId": crfs[0]["craftId"],
+                    "plannedHours": 1,
+                    "numberOfTechnicians": 1,
+                }),
+            )
+            SI["op_added"] = op.status in (200, 201)
+        except Exception as e:
+            print("OP_ADD_ERR", e)
+            SI["op_added"] = False
+        try:
             if ui_wo_id:
                 page.goto(base + f"/work-orders/{ui_wo_id}", wait_until="domcontentloaded")
             for key, (btn, nxt) in transitions.items():
@@ -309,6 +328,7 @@ def main():
             and SI.get("api_token_ok")
             and SI.get("wo_created")
             and SI.get("wo_in_list")
+            and SI.get("op_added")
             and SI.get("planned")
             and SI.get("scheduled")
             and SI.get("in_progress")
