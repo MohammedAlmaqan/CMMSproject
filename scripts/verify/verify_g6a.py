@@ -117,14 +117,22 @@ except Exception as e:
     wo_id = not_id = eq_id = "none"
     print("API_IDS_ERR", e)
 
+# Detail routes are exercised only when a real id exists. first_id() returns
+# the sentinel "none" for an empty table; probing a fabricated id would test a
+# route that has nothing to render, which is not a finding.
 ROUTES_UP = [
     ("/dashboard", ["DASHBOARD", "Maintenance Trend"]),
     ("/work-orders", ["WORK ORDERS"]),
-    (f"/work-orders/{wo_id}", ["Operations", "WO-"]),
-    ("/notifications", ["NOTIFICATIONS"]),
-    (f"/notifications/{not_id}", ["Notification", "Back"]),
-    ("/equipment", ["EQUIPMENT"]),
-    (f"/equipment/{eq_id}", ["Meters", "BOM"]),
+]
+if wo_id != "none":
+    ROUTES_UP.append((f"/work-orders/{wo_id}", ["Operations", "WO-"]))
+ROUTES_UP.append(("/notifications", ["NOTIFICATIONS"]))
+if not_id != "none":
+    ROUTES_UP.append((f"/notifications/{not_id}", ["Notification", "Back"]))
+ROUTES_UP.append(("/equipment", ["EQUIPMENT"]))
+if eq_id != "none":
+    ROUTES_UP.append((f"/equipment/{eq_id}", ["Meters", "BOM"]))
+ROUTES_UP += [
     ("/locations", ["LOCATIONS"]),
     ("/materials", ["MATERIALS"]),
     ("/work-centers", ["WORK CENTERS"]),
