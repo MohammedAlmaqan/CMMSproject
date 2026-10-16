@@ -10,6 +10,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -43,13 +44,21 @@ def snap(page, label):
 
 
 def db_credentials():
-    env_file = Path(BACKEND_DIR) / ".env"
-    if not env_file.exists():
-        return None
-    m = re.search(r'^DATABASE_URL="?([^\s"]+)"?', env_file.read_text(), re.M)
-    if not m:
-        return None
-    url = m.group(1)
+    # Honour the runtime DATABASE_URL first, exactly as the backend process
+    # resolves it; backend/.env is only a fallback. Under a test/E2E override
+    # the file still names the developer's live database, so reading it here
+    # would query the wrong target (see AGENTS.md, "Data safety").
+    url = (os.environ.get("DATABASE_URL") or "").strip().strip('"')
+    if not url:
+        env_file = Path(BACKEND_DIR) / ".env"
+        if not env_file.exists():
+            return None
+        m = re.search(r'^DATABASE_URL="?([^\s"]+)"?', env_file.read_text(encoding="utf-8"), re.M)
+        if not m:
+            return None
+        url = m.group(1)
+    # Prisma appends ?connection_limit=...&pool_timeout=...; libpq rejects those.
+    url = url.split("?", 1)[0]
     g = re.match(r'^postgres(ql)?://(?P<u>.+):(?P<p>.+)@(?P<h>[^:]+):(?P<po>\d+)/(?P<d>\S+)$', url)
     if not g:
         return None
@@ -66,7 +75,7 @@ def attachment_is_deleted(attachment_id: str) -> bool:
             [PSQL, '-h', creds['h'], '-p', creds['po'], '-U', creds['u'], '-d', creds['d'],
              '-t', '-A', '-c', sql],
             capture_output=True, text=True, timeout=30,
-            env={**__import__('os').environ, 'PGPASSWORD': creds['p']},
+            env={**os.environ, 'PGPASSWORD': creds['p']},
         )
         return r.returncode == 0 and 't' in r.stdout.strip().lower()
     except Exception as e:
