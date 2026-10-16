@@ -15,12 +15,18 @@
 #   5. a purpose-built probe proves the value rules: "=" text, numbers as
 #      numbers, booleans as booleans, XML escaped, control chars stripped
 #
-# Usage: python scripts/verify/verify_r5.py <folder-of-xlsx>
-# Exit:  0 PASS   1 FAIL   2 CANNOT RUN (openpyxl unavailable)
+# Usage: python scripts/verify/verify_r5.py [folder-of-xlsx]
+#   With no folder it fetches the live report exports from the API and generates
+#   the probe workbook, so the gate runs unattended under the regression fleet.
+# Exit:  0 PASS   1 FAIL   2 CANNOT RUN (openpyxl unavailable / API unreachable)
 # ═══════════════════════════════════════════════════════════════════════
 import glob
+import json
 import os
+import subprocess
 import sys
+import tempfile
+import urllib.request
 import zipfile
 
 try:
@@ -31,6 +37,9 @@ except Exception as exc:  # pragma: no cover - environment guard
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCREEN = os.path.join(ROOT, "screenshots")
+
+API = os.environ.get("CMMS_API_BASE", "http://localhost:4000")
+REPORTS = ("backlog", "pm-compliance", "mttr", "mtbf")
 
 OUT = []
 FAIL = []
@@ -50,17 +59,56 @@ def check(label, ok, detail=""):
     return ok
 
 
+def _login():
+    req = urllib.request.Request(
+        f"{API}/api/auth/login",
+        data=json.dumps({"username": "admin", "password": "password"}).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode())["token"]
+
+
+def provision(folder):
+    """Fetch the live report exports and generate the probe workbook, so the
+    gate can run with no arguments under the fleet runner."""
+    token = _login()
+    for name in REPORTS:
+        req = urllib.request.Request(
+            f"{API}/api/reports/{name}/export.xlsx",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            body = resp.read()
+        if body[:2] != b"PK":
+            raise RuntimeError(f"{name} export is not an xlsx archive ({len(body)} bytes)")
+        with open(os.path.join(folder, f"{name}.xlsx"), "wb") as fh:
+            fh.write(body)
+    tsx = os.path.join(ROOT, "backend", "node_modules", ".bin", "tsx.cmd")
+    script = os.path.join(ROOT, "scripts", "verify", "make_r5_probe.ts")
+    command = f'"{tsx}" "{script}" "{folder}"'
+    proc = subprocess.run(command, cwd=ROOT, shell=True,
+                          capture_output=True, text=True, timeout=180)
+    if proc.returncode != 0:
+        raise RuntimeError(f"probe generator failed: {(proc.stderr or '').strip()[:200]}")
+
+
 def main():
     folder = sys.argv[1] if len(sys.argv) > 1 else None
     emit("=" * 74)
     emit("R5 VERIFY - Excel export format, opened by openpyxl")
     emit("=" * 74)
     if not folder:
-        emit("  usage: verify_r5.py <folder-of-xlsx>")
-        emit("  the folder must hold at least one exported workbook plus the")
-        emit("  purpose-built _values.xlsx probe (scripts/verify/make_r5_probe.ts)")
-        return 2
-    if not os.path.isdir(folder):
+        folder = tempfile.mkdtemp(prefix="r5-evidence-")
+        emit(f"  no folder given - provisioning live evidence in {folder}")
+        try:
+            provision(folder)
+            emit("  provisioned report exports and the value-rules probe")
+        except Exception as exc:
+            emit(f"  cannot run: {exc}")
+            return 2
+    elif not os.path.isdir(folder):
         emit(f"  no such folder: {folder}")
         return 2
     emit(f"  folder: {folder}")
