@@ -181,6 +181,7 @@ function steps(ids: DemoIds, allDemoIds: string[]): Step[] {
     { label: 'EquipmentBOMMaterial', run: (tx) => tx.equipmentBOMMaterial.deleteMany({ where: { equipmentId: { in: ids.eqIds } } }).then((r) => r.count) },
     { label: 'EquipmentMeter', run: (tx) => tx.equipmentMeter.deleteMany({ where: { equipmentId: { in: ids.eqIds } } }).then((r) => r.count) },
     { label: 'Equipment', run: (tx) => tx.equipment.deleteMany({ where: { equipmentId: { in: ids.eqIds } } }).then((r) => r.count) },
+    { label: 'Material', run: (tx) => tx.material.deleteMany({ where: { materialId: { in: ids.matIds } } }).then((r) => r.count) },
     { label: 'FunctionalLocation', run: (tx) => tx.functionalLocation.deleteMany({ where: { functionalLocationId: { in: ids.locIds } } }).then((r) => r.count) },
     { label: 'Craft', run: (tx) => tx.craft.deleteMany({ where: { craftId: { in: ids.craftIds } } }).then((r) => r.count) },
     { label: 'WorkCenter', run: (tx) => tx.workCenter.deleteMany({ where: { workCenterId: { in: ids.wcIds } } }).then((r) => r.count) },
