@@ -5,7 +5,9 @@
 # Draft→Planned→Scheduled→In Progress→Completed→Closed (UI, admin role)
 # → create Notification (API; the app exposes no notification-create form,
 #   creation is API-only, conversion is UI) → Convert to WO (UI)
-# → verify linked WO → Reports render real data (no simulated markers)
+# → verify linked WO → Reports: backlog chart draws and the PM Compliance
+#   panel is populated with real labels + numeric values (rendered, not
+#   reconciled - value correctness is verify_r7.py's hand-computed check)
 # → cleanup soft-deletes test WO/notification so DB is as-found.
 # Usage: python scripts/verify/verify_g5_3.py
 # Exit:  0 PASS  1 FAIL
@@ -270,9 +272,12 @@ def main():
                 SI["notif_converted_ui"] = False
             snap(page, "g5_3_06_converted_notification")
 
-        # ---------- Reports: real data, no simulated markers ----------
-        # Backlog chart + PM Compliance carry real seeded/runtime data
-        # (the Material Usage report is legitimately empty for the seed DB).
+        # ---------- Reports: populated panels, no simulated markers ----------
+        # Asserts the Reports page renders: the backlog chart draws, and the
+        # PM Compliance panel shows real labels (PMs Scheduled / PMs Completed)
+        # with numeric values. It does NOT reconcile the rate against a fixture
+        # plan - value correctness is verify_r7.py's hand-computed SQL check.
+        # (Material Usage is legitimately empty for the seed DB.)
         # Backlog chart (separate from PM)
         try:
             page.goto(base + "/reports", wait_until="domcontentloaded")
