@@ -92,9 +92,10 @@ reviewer correction; see "Commit discipline" below.
   assets, `/dashboard` and `/api/health`). PM2 autostart is registered as the *logon*
   Scheduled Task `CommandPulse CMMS PM2 Resurrect` (`pm2 resurrect`), and the firewall
   rule `CMMS API 4000 block external` is active on all profiles — loopback stays reachable
-  (Windows Firewall does not filter loopback), so the IIS proxy keeps working. No
-  boot-order autostart and no service account: both apps run as the interactive user
-  `Injaz`.
+  (Windows Firewall does not filter loopback), so the IIS proxy keeps working. The API is
+  pinned to loopback (`BIND_HOST: '127.0.0.1'` in `backend/ecosystem.config.cjs`), so port
+  4000 is not externally reachable even without the firewall rule. No boot-order autostart
+  and no service account: both apps run as the interactive user `Injaz`.
 
 ## Documentation accuracy
 

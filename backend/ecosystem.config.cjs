@@ -12,6 +12,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 4000,
+        BIND_HOST: '127.0.0.1',
       },
       watch: false,
       max_memory_restart: '512M',
