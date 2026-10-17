@@ -121,7 +121,15 @@ position is a deployment step recorded here, not a reopening of the row.
    against the throwaway `cmms_c1` database (GAP register C1 closure). After step 5
    applies the C1 migration to the deployed database, confirm the server-side idle
    window, refresh rotation and logout revocation behave as specified in the deployed
-   instance. *Verified open: C1 has run only against a throwaway database.*
+   instance. *Closed 2026-10-17 (live):* verified against the deployed API on the live
+   `cmms` database (the owner authorised the session writes this requires). Sign-in → `200`;
+   `POST /api/auth/refresh` returns a rotated cookie whose value differs from the presented
+   one (`200`); replaying the pre-rotation cookie → `401` (single-use); `POST /api/auth/logout`
+   → `204` and the rotated cookie is then refused by `/api/auth/refresh` → `401` (revocation);
+   with a live session `/api/auth/me` → `200`, and once its `RefreshToken.lastUsedAt` is
+   backdated past `SESSION_IDLE_MS` (30 min default) `/api/auth/me` → `401` and the row is
+   revoked — server-side idle expiry, independent of the browser. *Superseded open check
+   (kept): C1 has run only against a throwaway database.*
 
 ## Defect position (matrix row 334 §6.4/c)
 
@@ -131,10 +139,19 @@ position is a deployment step recorded here, not a reopening of the row.
     `/preventive-maintenance` renders the plan list. See `SOW_COMPLIANCE.md` row 334 and
     `HANDOFF.md` (Date-window impact check). *Verified: `b47c2be` is an ancestor of the
     `v1.2.1` deployment anchor (`2313b02`), so the fix ships with the anchor; it was not an
-    ancestor of the previous `v1.2.0` anchor (`a995e77`).*
+    ancestor of the previous `v1.2.0` anchor (`a995e77`).* *Closed 2026-10-17 (live):*
+    headless Chromium (Playwright) signed in to the deployed `https://cmms.local` and loaded
+    `/preventive-maintenance`; the plan list rendered — page heading present, 1 plan row, no
+    console/page errors, no `Invalid time value` and no error boundary — and the deployed
+    `backend/dist/index.js` carries the `b47c2be` `instanceof Date` guard in
+    `normalizeDecimals`. Screenshot: `screenshots/golive_10_pm_page.png`.
 
 11. **Verify no other Critical/Major defect was open at acceptance and is still open at
     go-live.** Any such defect must be closed before deployment. Row 334's `Met` is an
     acceptance-time call on the defect position as it stood on 2026-10-05; this step
-    re-checks that position at go-live. *Verified open: re-check to be performed at
-    go-live.*
+    re-checks that position at go-live. *Closed 2026-10-17 (go-live re-check):*
+    `GAP_REGISTER.md` categories A–D are empty (no open code/data, close-now or blocker
+    item); Category E holds 10 owner decisions/acceptances, not defects; the one `npm audit`
+    critical (`proxy-addr`) was cleared at `89585f8`, and the sole residual is the dev-only
+    `deepmerge-ts` advisory (unreachable at runtime) accepted in C21. No open Critical/Major
+    defect remains. *Superseded open check (kept): re-check to be performed at go-live.*
