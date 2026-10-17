@@ -89,8 +89,12 @@ reviewer correction; see "Commit discipline" below.
   from `C:\inetpub\cmms-site` (its `web.config` reverse-proxies `/api` to
   `http://localhost:4000`); the stale build was replaced 2026-10-17 with `app\dist` (new
   asset hashes) and verified over `https://cmms.local` (200 for `/`, the JS/CSS/chunk
-  assets, `/dashboard` and `/api/health`). PM2 autostart-at-boot and the firewall rules
-  are pending elevation.
+  assets, `/dashboard` and `/api/health`). PM2 autostart is registered as the *logon*
+  Scheduled Task `CommandPulse CMMS PM2 Resurrect` (`pm2 resurrect`), and the firewall
+  rule `CMMS API 4000 block external` is active on all profiles — loopback stays reachable
+  (Windows Firewall does not filter loopback), so the IIS proxy keeps working. No
+  boot-order autostart and no service account: both apps run as the interactive user
+  `Injaz`.
 
 ## Documentation accuracy
 

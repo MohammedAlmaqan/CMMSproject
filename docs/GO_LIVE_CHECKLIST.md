@@ -72,15 +72,16 @@ position is a deployment step recorded here, not a reopening of the row.
    `INSTALLATION_GUIDE.md`, but no saved PM2 process list exists on this host, so PM2
    will not restore the apps after a reboot. Run `pm2 save` and the generated
    `pm2 startup` command.
-   *Progress 2026-10-17:* both apps are now running under PM2 from
-   `backend/ecosystem.config.cjs` — `cmms-api` (fork, port 4000) and `cmms-worker`
-   (fork) are `online` as user `Injaz`, and `pm2 save` wrote
-   `C:\Users\Injaz\.pm2\dump.pm2`. **`pm2 startup` does not apply on this host:** it is
-   Unix-only and exits with `Error: Init system not found` under Windows, so it produces
-   no copy-paste command. The Windows equivalent is a Scheduled Task that runs
-   `pm2 resurrect` at boot; registering it needs elevation. *Status: process list saved;
-   autostart pending elevation.* *Superseded open check (kept): no `dump.pm2` on this
-   host.*
+   *Closed 2026-10-17:* both apps run under PM2 from `backend/ecosystem.config.cjs` —
+   `cmms-api` (fork, port 4000) and `cmms-worker` (fork) are `online` as user `Injaz` — and
+   `pm2 save` wrote `C:\Users\Injaz\.pm2\dump.pm2`. **`pm2 startup` does not apply on this
+   host:** it is Unix-only and exits with `Error: Init system not found` under Windows, so
+   it produces no copy-paste command. The Windows equivalent was registered instead: the
+   Scheduled Task `CommandPulse CMMS PM2 Resurrect` runs `pm2 resurrect` at logon and is
+   present (`State: Ready`). **Recorded deviation:** it is a *logon* task, not a boot task,
+   so PM2 starts only once `Injaz` logs on — the same "logged-on only" model already
+   accepted for the backup task — and a pre-logon boot task would need a stored password or
+   an S4U principal. *Superseded open check (kept): no `dump.pm2` on this host.*
 
 5. **Apply the pending migrations to the live `cmms` database.** The live `cmms`
    database is behind the repository schema by **three** migrations — not one. Applied:
@@ -97,13 +98,17 @@ position is a deployment step recorded here, not a reopening of the row.
    host.*
 
 7. **Firewall rules.** Block inbound TCP 4000 from non-loopback addresses, and allow
-   inbound 443 (already permitted by the host's IIS rules). The block-4000 commands are
-   in `INSTALLATION_GUIDE.md` (Enable HTTPS / TLS).
-   *Status 2026-10-17:* the block-4000 rules are still absent; the two
-   `New-NetFirewallRule` commands (`INSTALLATION_GUIDE.md` lines 164-165) were handed to
-   the owner to run in an elevated prompt — **pending elevation**. 443 needs no new rule;
-   it is already allowed by the host's IIS rules. *Superseded open check (kept): no
-   `CMMS*` firewall rules exist on this host.*
+   inbound 443 (already permitted by the host's IIS rules). The block-4000 command is in
+   `INSTALLATION_GUIDE.md` (Enable HTTPS / TLS).
+   *Closed 2026-10-17:* the rule `CMMS API 4000 block external` is active (Inbound, Block,
+   TCP 4000, `-RemoteAddress Any`, all profiles). Loopback stays reachable — Windows
+   Firewall does not filter loopback — so `https://cmms.local/api/health` returned 200 both
+   before and after the rule was applied, while external 4000 is denied. The guide's
+   companion "loopback only" rule was dropped: `New-NetFirewallRule` rejected the loopback
+   IPv6 literal with `0x80070057` (*"An unspecified, multicast, broadcast, or loopback IPv6
+   address was specified"*), and a block rule made it redundant; `INSTALLATION_GUIDE.md`
+   was corrected to the single rule. 443 needs no new rule (already allowed by the host's
+   IIS rules). *Superseded open check (kept): no `CMMS*` firewall rules exist on this host.*
 
 8. **Extractor output folder is a stable, non-git path.** The migration runbook requires
    the extractor's `--out` directory to be a scratch directory
