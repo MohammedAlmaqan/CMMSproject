@@ -20,11 +20,11 @@ import type {
 } from '@/types';
 
 vi.mock('@/services/functionalLocationService', () => ({
-  functionalLocationService: { getAll: vi.fn() },
+  functionalLocationService: { getAll: vi.fn(), getAllPages: vi.fn() },
 }));
 
 vi.mock('@/services/equipmentService', () => ({
-  equipmentService: { getAll: vi.fn() },
+  equipmentService: { getAll: vi.fn(), getAllPages: vi.fn(), exportCsv: vi.fn(), importCsv: vi.fn() },
 }));
 
 vi.mock('@/services/workCenterService', () => ({
@@ -173,8 +173,10 @@ describe('WorkOrderCreatePage template/asset warning (SOW 3.1.4)', () => {
   beforeEach(() => {
     useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
     vi.clearAllMocks();
-    vi.mocked(functionalLocationService.getAll).mockResolvedValue([location]);
-    vi.mocked(equipmentService.getAll).mockResolvedValue([assetA, assetB]);
+    vi.mocked(functionalLocationService.getAll).mockResolvedValue({data:[location],total:1,skip:0,take:50});
+    vi.mocked(functionalLocationService.getAllPages).mockResolvedValue([location]);
+    vi.mocked(equipmentService.getAll).mockResolvedValue({data:[assetA,assetB],total:2,skip:0,take:50});
+    vi.mocked(equipmentService.getAllPages).mockResolvedValue([assetA,assetB]);
     vi.mocked(workCenterService.getAll).mockResolvedValue([workCenter]);
     vi.mocked(taskListService.getAll).mockResolvedValue([tlForAssetA, tlFleetWide, tlClassScoped]);
     vi.mocked(causeCodeService.getAll).mockResolvedValue([] as CauseCode[]);

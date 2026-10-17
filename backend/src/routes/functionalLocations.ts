@@ -159,27 +159,33 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
  *         description: Offset; overrides skip when present.
  *     responses:
  *       '200':
- *         description: Array of functional locations
+ *         description: Page of functional locations
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   functionalLocationId: { type: string }
- *                   locationCode: { type: string }
- *                   description: { type: string }
- *                   parentLocationId: { type: string, nullable: true }
- *                   locationType: { type: string, enum: [Plant, Area, Unit, Sub-unit, System] }
- *                   operationalStatus: { type: string, enum: [Active, Inactive] }
- *                   installationDate: { type: string, format: date-time, nullable: true }
- *                   gpsCoordinates: { type: string, nullable: true, description: "Free text, not validated as a coordinate pair" }
- *                   safetyCritical: { type: boolean }
- *                   createdBy: { type: string }
- *                   createdDate: { type: string, format: date-time }
- *                   modifiedBy: { type: string }
- *                   modifiedDate: { type: string, format: date-time }
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       functionalLocationId: { type: string }
+ *                       locationCode: { type: string }
+ *                       description: { type: string }
+ *                       parentLocationId: { type: string, nullable: true }
+ *                       locationType: { type: string, enum: [Plant, Area, Unit, Sub-unit, System] }
+ *                       operationalStatus: { type: string, enum: [Active, Inactive] }
+ *                       installationDate: { type: string, format: date-time, nullable: true }
+ *                       gpsCoordinates: { type: string, nullable: true, description: "Free text, not validated as a coordinate pair" }
+ *                       safetyCritical: { type: boolean }
+ *                       createdBy: { type: string }
+ *                       createdDate: { type: string, format: date-time }
+ *                       modifiedBy: { type: string }
+ *                       modifiedDate: { type: string, format: date-time }
+ *                 total: { type: integer }
+ *                 skip: { type: integer }
+ *                 take: { type: integer }
  *       '401':
  *         description: Missing or invalid bearer token
  *       '500':
@@ -244,16 +250,25 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
     }
 
-    const locations = await prisma.functionalLocation.findMany({
-      where: mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.FunctionalLocationWhereInput,
-      orderBy: grammar.query.orderBy
-        ? (grammar.query.orderBy as unknown as Prisma.FunctionalLocationOrderByWithRelationInput[])
-        : { locationCode: 'asc' },
-      ...(grammar.query.skip !== null ? { skip: grammar.query.skip } : {}),
-      ...(grammar.query.take !== null ? { take: grammar.query.take } : {}),
-    });
+    const finalWhere = mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.FunctionalLocationWhereInput;
+    const rawSkip = req.query.skip;
+    const rawTake = req.query.take;
+    const skipNum = grammar.query.skip ?? (rawSkip ? parseInt(String(rawSkip), 10) || 0 : 0);
+    const takeNum = grammar.query.take ?? (rawTake ? parseInt(String(rawTake), 10) || 50 : 50);
 
-    res.json(selectRows(locations, grammar.query.select));
+    const [locations, total] = await Promise.all([
+      prisma.functionalLocation.findMany({
+        where: finalWhere,
+        orderBy: grammar.query.orderBy
+          ? (grammar.query.orderBy as unknown as Prisma.FunctionalLocationOrderByWithRelationInput[])
+          : { locationCode: 'asc' },
+        skip: skipNum,
+        take: takeNum,
+      }),
+      prisma.functionalLocation.count({ where: finalWhere }),
+    ]);
+
+    res.json({ data: selectRows(locations, grammar.query.select), total, skip: skipNum, take: takeNum });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching functional locations');
     res.status(500).json({ error: 'Internal server error' });

@@ -84,8 +84,8 @@ export default function LocationsPage() {
     setLoadError(null);
     try {
       const [locRes, eqRes, treeRes] = await Promise.all([
-        functionalLocationService.getAll(),
-        equipmentService.getAll(),
+        functionalLocationService.getAllPages(),
+        equipmentService.getAllPages(),
         functionalLocationService.getTree(),
       ]);
       setLocations(locRes);

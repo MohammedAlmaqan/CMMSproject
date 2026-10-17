@@ -100,7 +100,7 @@ export default function EquipmentDetailPage() {
   useEffect(() => {
     // The material picker needs the catalog; a failure only empties the
     // picker, so it must not take the page down.
-    materialService.getAll().then(setMaterials).catch(() => setMaterials([]));
+    materialService.getAllPages().then(setMaterials).catch(() => setMaterials([]));
   }, []);
 
   const reload = useCallback(async () => {

@@ -208,3 +208,29 @@ export interface PaginatedResponse<T> {
   skip: number;
   take: number;
 }
+
+/**
+ * Walk every page of a paginated collection and return the complete set.
+ *
+ * The server caps a single page at 500 rows (queryGrammar MAX_TOP), so a caller
+ * that genuinely needs the whole collection - a dropdown, or a figure that must
+ * cover the estate rather than the first page - pages through with $top/$skip
+ * until the reported total is reached. The +1 page guard stops a row inserted
+ * mid-walk from spinning the loop; the length check ends it.
+ */
+export async function fetchAllPages<T>(
+  fetchPage: (params: Record<string, string | number | boolean | undefined>) => Promise<PaginatedResponse<T>>,
+  params: Record<string, string | number | boolean | undefined> = {}
+): Promise<T[]> {
+  const limit = 500;
+  const first = await fetchPage({ ...params, $top: limit, $skip: 0 });
+  let data = first.data ?? [];
+  const total = first.total ?? data.length;
+  const maxPages = Math.ceil(total / limit) + 1;
+  for (let i = 1; data.length < total && i <= maxPages; i++) {
+    const next = await fetchPage({ ...params, $top: limit, $skip: data.length });
+    if (!next.data || next.data.length === 0) break;
+    data = data.concat(next.data);
+  }
+  return data;
+}

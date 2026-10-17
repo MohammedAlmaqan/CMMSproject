@@ -22,11 +22,11 @@ vi.mock('@/services/workOrderService', () => ({
 }));
 
 vi.mock('@/services/functionalLocationService', () => ({
-  functionalLocationService: { getAll: vi.fn() },
+  functionalLocationService: { getAll: vi.fn(), getAllPages: vi.fn() },
 }));
 
 vi.mock('@/services/equipmentService', () => ({
-  equipmentService: { getAll: vi.fn() },
+  equipmentService: { getAll: vi.fn(), getAllPages: vi.fn(), exportCsv: vi.fn(), importCsv: vi.fn() },
 }));
 
 vi.mock('@/services/notificationService', () => ({
@@ -34,7 +34,7 @@ vi.mock('@/services/notificationService', () => ({
 }));
 
 vi.mock('@/services/materialService', () => ({
-  materialService: { getAll: vi.fn() },
+  materialService: { getAll: vi.fn(), getAllPages: vi.fn(), exportCsv: vi.fn(), importCsv: vi.fn() },
 }));
 
 vi.mock('@/services/workCenterService', () => ({
@@ -96,10 +96,13 @@ const awaitServices = async () => {
   const { alertService } = await import('@/services/alertService');
   vi.mocked(workOrderService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 250 });
   vi.mocked(workOrderService.getAllPages).mockResolvedValue([]);
-  vi.mocked(functionalLocationService.getAll).mockResolvedValue([]);
-  vi.mocked(equipmentService.getAll).mockResolvedValue([]);
+  vi.mocked(functionalLocationService.getAll).mockResolvedValue({data:[],total:0,skip:0,take:0});
+  vi.mocked(functionalLocationService.getAllPages).mockResolvedValue([]);
+  vi.mocked(equipmentService.getAll).mockResolvedValue({data:[],total:0,skip:0,take:0});
+  vi.mocked(equipmentService.getAllPages).mockResolvedValue([]);
   vi.mocked(notificationService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 250 });
-  vi.mocked(materialService.getAll).mockResolvedValue([]);
+  vi.mocked(materialService.getAll).mockResolvedValue({data:[],total:0,skip:0,take:0});
+  vi.mocked(materialService.getAllPages).mockResolvedValue([]);
   vi.mocked(workCenterService.getAll).mockResolvedValue([]);
   vi.mocked(maintenancePlanService.getAll).mockResolvedValue([]);
   vi.mocked(taskListService.getAll).mockResolvedValue([]);

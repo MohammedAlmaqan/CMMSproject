@@ -76,8 +76,8 @@ export default function WorkOrderCreatePage() {
     (async () => {
       try {
         const [locData, eqData, wcData, userData, tlData, ccData] = await Promise.all([
-          functionalLocationService.getAll(),
-          equipmentService.getAll(),
+          functionalLocationService.getAllPages(),
+          equipmentService.getAllPages(),
           workCenterService.getAll(),
           userService.getOptions(),
           // A failure to load templates must not block creating a work order

@@ -321,7 +321,7 @@ const isAdmin = hasPermission(['Administrator']);
         workOrderService.getHistory(id!),
         isAdmin ? userService.getAll() : Promise.resolve([]),
         craftService.getAll(),
-        materialService.getAll(),
+        materialService.getAllPages(),
         safetyChecklistService.getTemplates(),
         attachmentService.getByEntity('WorkOrder', id!),
         causeCodeService.getAll().catch(() => [] as CauseCode[]),

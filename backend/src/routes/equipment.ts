@@ -330,33 +330,39 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
  *         description: Offset; overrides skip when present.
  *     responses:
  *       '200':
- *         description: Array of equipment
+ *         description: Page of equipment
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   equipmentId: { type: string }
- *                   equipmentCode: { type: string }
- *                   name: { type: string }
- *                   description: { type: string }
- *                   manufacturer: { type: string }
- *                   model: { type: string }
- *                   serialNumber: { type: string }
- *                   assetTag: { type: string }
- *                   equipmentClass: { type: string }
- *                   criticality: { type: string, enum: [S, A, B, C] }
- *                   operationalStatus: { type: string, enum: [Active, Inactive, Decommissioned] }
- *                   installationDate: { type: string, format: date-time, nullable: true }
- *                   warrantyExpiryDate: { type: string, format: date-time, nullable: true }
- *                   technicalParameters: { type: object, additionalProperties: true }
- *                   functionalLocationId: { type: string }
- *                   createdBy: { type: string }
- *                   createdDate: { type: string, format: date-time }
- *                   modifiedBy: { type: string }
- *                   modifiedDate: { type: string, format: date-time }
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       equipmentId: { type: string }
+ *                       equipmentCode: { type: string }
+ *                       name: { type: string }
+ *                       description: { type: string }
+ *                       manufacturer: { type: string }
+ *                       model: { type: string }
+ *                       serialNumber: { type: string }
+ *                       assetTag: { type: string }
+ *                       equipmentClass: { type: string }
+ *                       criticality: { type: string, enum: [S, A, B, C] }
+ *                       operationalStatus: { type: string, enum: [Active, Inactive, Decommissioned] }
+ *                       installationDate: { type: string, format: date-time, nullable: true }
+ *                       warrantyExpiryDate: { type: string, format: date-time, nullable: true }
+ *                       technicalParameters: { type: object, additionalProperties: true }
+ *                       functionalLocationId: { type: string }
+ *                       createdBy: { type: string }
+ *                       createdDate: { type: string, format: date-time }
+ *                       modifiedBy: { type: string }
+ *                       modifiedDate: { type: string, format: date-time }
+ *                 total: { type: integer }
+ *                 skip: { type: integer }
+ *                 take: { type: integer }
  *       '401':
  *         description: Missing or invalid bearer token
  *       '500':
@@ -442,19 +448,28 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
     }
 
-    const equipment = await prisma.equipment.findMany({
-      where: mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.EquipmentWhereInput,
-      orderBy: grammar.query.orderBy
-        ? (grammar.query.orderBy as unknown as Prisma.EquipmentOrderByWithRelationInput[])
-        : { equipmentCode: 'asc' },
-      ...(grammar.query.skip !== null ? { skip: grammar.query.skip } : {}),
-      ...(grammar.query.take !== null ? { take: grammar.query.take } : {}),
-      include: {
-        functionalLocation: true,
-      },
-    });
+    const finalWhere = mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.EquipmentWhereInput;
+    const rawSkip = req.query.skip;
+    const rawTake = req.query.take;
+    const skipNum = grammar.query.skip ?? (rawSkip ? parseInt(String(rawSkip), 10) || 0 : 0);
+    const takeNum = grammar.query.take ?? (rawTake ? parseInt(String(rawTake), 10) || 50 : 50);
 
-    res.json(selectRows(equipment, grammar.query.select));
+    const [equipment, total] = await Promise.all([
+      prisma.equipment.findMany({
+        where: finalWhere,
+        orderBy: grammar.query.orderBy
+          ? (grammar.query.orderBy as unknown as Prisma.EquipmentOrderByWithRelationInput[])
+          : { equipmentCode: 'asc' },
+        skip: skipNum,
+        take: takeNum,
+        include: {
+          functionalLocation: true,
+        },
+      }),
+      prisma.equipment.count({ where: finalWhere }),
+    ]);
+
+    res.json({ data: selectRows(equipment, grammar.query.select), total, skip: skipNum, take: takeNum });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching equipment');
     res.status(500).json({ error: 'Internal server error' });

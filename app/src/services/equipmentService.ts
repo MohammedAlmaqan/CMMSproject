@@ -1,4 +1,5 @@
-import { api, getAuthToken, ApiError, notifyApiActivity } from '@/lib/api';
+import { api, getAuthToken, ApiError, notifyApiActivity, fetchAllPages } from '@/lib/api';
+import type { PaginatedResponse } from '@/lib/api';
 import type { Equipment, EquipmentHistoryEntry, EquipmentBOM, EquipmentMeter } from '@/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -11,7 +12,9 @@ export interface CsvImportResult {
 
 export const equipmentService = {
   getAll: (params?: Record<string, string | number | boolean | undefined>) =>
-    api.get<Equipment[]>('/equipment', params),
+    api.get<PaginatedResponse<Equipment>>('/equipment', params),
+  getAllPages: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchAllPages<Equipment>((p) => api.get<PaginatedResponse<Equipment>>('/equipment', p), params),
   getById: (id: string) => api.get<Equipment>(`/equipment/${id}`),
   getHistory: (id: string, params?: { skip?: number; take?: number }) =>
     api.get<{ data: EquipmentHistoryEntry[]; total: number; skip: number; take: number }>(

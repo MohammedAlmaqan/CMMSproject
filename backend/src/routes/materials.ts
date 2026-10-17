@@ -269,24 +269,30 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
  *         description: Offset; overrides skip when present.
  *     responses:
  *       '200':
- *         description: Array of materials
+ *         description: Page of materials
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   materialId: { type: string }
- *                   materialCode: { type: string }
- *                   description: { type: string }
- *                   unitOfMeasure: { type: string }
- *                   standardCost: { type: number, format: float, nullable: true, description: "Stored as DECIMAL(12,2) since Phase E (D-17); served as a JSON number" }
- *                   currentStock: { type: number, format: float, nullable: true, description: "Quantity column; stays binary float (not in the D-17 monetary scope)" }
- *                   createdBy: { type: string }
- *                   createdDate: { type: string, format: date-time }
- *                   modifiedBy: { type: string }
- *                   modifiedDate: { type: string, format: date-time }
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       materialId: { type: string }
+ *                       materialCode: { type: string }
+ *                       description: { type: string }
+ *                       unitOfMeasure: { type: string }
+ *                       standardCost: { type: number, format: float, nullable: true, description: "Stored as DECIMAL(12,2) since Phase E (D-17); served as a JSON number" }
+ *                       currentStock: { type: number, format: float, nullable: true, description: "Quantity column; stays binary float (not in the D-17 monetary scope)" }
+ *                       createdBy: { type: string }
+ *                       createdDate: { type: string, format: date-time }
+ *                       modifiedBy: { type: string }
+ *                       modifiedDate: { type: string, format: date-time }
+ *                 total: { type: integer }
+ *                 skip: { type: integer }
+ *                 take: { type: integer }
  *       '401':
  *         description: Missing or invalid bearer token
  *       '500':
@@ -309,16 +315,25 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid query parameters', details: grammar.errors });
     }
 
-    const materials = await prisma.material.findMany({
-      where: mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.MaterialWhereInput,
-      orderBy: grammar.query.orderBy
-        ? (grammar.query.orderBy as unknown as Prisma.MaterialOrderByWithRelationInput[])
-        : { materialCode: 'asc' },
-      ...(grammar.query.skip !== null ? { skip: grammar.query.skip } : {}),
-      ...(grammar.query.take !== null ? { take: grammar.query.take } : {}),
-    });
+    const finalWhere = mergeWhere(where as Record<string, unknown>, grammar.query.where) as Prisma.MaterialWhereInput;
+    const rawSkip = req.query.skip;
+    const rawTake = req.query.take;
+    const skipNum = grammar.query.skip ?? (rawSkip ? parseInt(String(rawSkip), 10) || 0 : 0);
+    const takeNum = grammar.query.take ?? (rawTake ? parseInt(String(rawTake), 10) || 50 : 50);
 
-    res.json(selectRows(materials, grammar.query.select));
+    const [materials, total] = await Promise.all([
+      prisma.material.findMany({
+        where: finalWhere,
+        orderBy: grammar.query.orderBy
+          ? (grammar.query.orderBy as unknown as Prisma.MaterialOrderByWithRelationInput[])
+          : { materialCode: 'asc' },
+        skip: skipNum,
+        take: takeNum,
+      }),
+      prisma.material.count({ where: finalWhere }),
+    ]);
+
+    res.json({ data: selectRows(materials, grammar.query.select), total, skip: skipNum, take: takeNum });
   } catch (error) {
     logger.error({ err: error }, 'Error fetching materials');
     res.status(500).json({ error: 'Internal server error' });

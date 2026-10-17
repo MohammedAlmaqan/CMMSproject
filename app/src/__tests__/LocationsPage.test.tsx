@@ -10,6 +10,7 @@ import type { FunctionalLocation, User } from '@/types';
 vi.mock('@/services/functionalLocationService', () => ({
   functionalLocationService: {
     getAll: vi.fn(),
+    getAllPages: vi.fn(),
     getTree: vi.fn(),
     getById: vi.fn(),
     create: vi.fn(),
@@ -21,6 +22,9 @@ vi.mock('@/services/functionalLocationService', () => ({
 vi.mock('@/services/equipmentService', () => ({
   equipmentService: {
     getAll: vi.fn(),
+    getAllPages: vi.fn(),
+    exportCsv: vi.fn(),
+    importCsv: vi.fn(),
   },
 }));
 
@@ -69,9 +73,11 @@ describe('LocationsPage functional-location CRUD (SOW 3.1.1)', () => {
   beforeEach(() => {
     useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
     vi.clearAllMocks();
-    vi.mocked(functionalLocationService.getAll).mockResolvedValue([location]);
+    vi.mocked(functionalLocationService.getAll).mockResolvedValue({data:[location],total:1,skip:0,take:50});
+    vi.mocked(functionalLocationService.getAllPages).mockResolvedValue([location]);
     vi.mocked(functionalLocationService.getTree).mockResolvedValue([{ ...location, children: [] }]);
-    vi.mocked(equipmentService.getAll).mockResolvedValue([]);
+    vi.mocked(equipmentService.getAll).mockResolvedValue({data:[],total:0,skip:0,take:0});
+    vi.mocked(equipmentService.getAllPages).mockResolvedValue([]);
   });
 
   it('creates a location and reports its code', async () => {
@@ -149,7 +155,7 @@ describe('LocationsPage functional-location CRUD (SOW 3.1.1)', () => {
     });
     renderPage();
 
-    await waitFor(() => expect(functionalLocationService.getAll).toHaveBeenCalled());
+    await waitFor(() => expect(functionalLocationService.getAllPages).toHaveBeenCalled());
     expect(screen.queryByRole('button', { name: /new location/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /edit fl-01/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /delete fl-01/i })).not.toBeInTheDocument();

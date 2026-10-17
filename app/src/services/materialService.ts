@@ -1,4 +1,5 @@
-import { api, getAuthToken, ApiError, notifyApiActivity } from '@/lib/api';
+import { api, getAuthToken, ApiError, notifyApiActivity, fetchAllPages } from '@/lib/api';
+import type { PaginatedResponse } from '@/lib/api';
 import type { Material } from '@/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -10,8 +11,10 @@ export interface CsvImportResult {
 }
 
 export const materialService = {
-  getAll: (params?: { search?: string }) =>
-    api.get<Material[]>('/materials', params),
+  getAll: (params?: Record<string, string | number | boolean | undefined>) =>
+    api.get<PaginatedResponse<Material>>('/materials', params),
+  getAllPages: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchAllPages<Material>((p) => api.get<PaginatedResponse<Material>>('/materials', p), params),
   getById: (id: string) => api.get<Material>(`/materials/${id}`),
   create: (data: Partial<Material>) => api.post<Material>('/materials', data),
   update: (id: string, data: Partial<Material>) => api.put<Material>(`/materials/${id}`, data),

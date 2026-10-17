@@ -12,6 +12,9 @@ import type { Equipment, Material, User } from '@/types';
 vi.mock('@/services/equipmentService', () => ({
   equipmentService: {
     getAll: vi.fn(),
+    getAllPages: vi.fn(),
+    exportCsv: vi.fn(),
+    importCsv: vi.fn(),
     getById: vi.fn(),
     getHistory: vi.fn(),
     create: vi.fn(),
@@ -24,7 +27,7 @@ vi.mock('@/services/equipmentService', () => ({
 }));
 
 vi.mock('@/services/materialService', () => ({
-  materialService: { getAll: vi.fn() },
+  materialService: { getAll: vi.fn(), getAllPages: vi.fn(), exportCsv: vi.fn(), importCsv: vi.fn() },
 }));
 
 vi.mock('@/services/attachmentService', () => ({
@@ -102,7 +105,8 @@ describe('EquipmentDetailPage BOM editing (SOW 3.1.2)', () => {
     vi.clearAllMocks();
     vi.mocked(equipmentService.getById).mockResolvedValue(equipment);
     vi.mocked(equipmentService.getHistory).mockResolvedValue({ data: [], total: 0, skip: 0, take: 200 });
-    vi.mocked(materialService.getAll).mockResolvedValue([material]);
+    vi.mocked(materialService.getAll).mockResolvedValue({data:[material],total:1,skip:0,take:50});
+    vi.mocked(materialService.getAllPages).mockResolvedValue([material]);
     vi.mocked(attachmentService.getByEntity).mockResolvedValue([]);
   });
 

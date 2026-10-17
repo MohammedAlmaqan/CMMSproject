@@ -152,11 +152,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const canListUsers = role === 'Administrator';
       const [locations, equipment, workOrders, notifications, materials, workCenters, maintenancePlans, taskLists, crafts, users, auditLog] =
         await Promise.all([
-          functionalLocationService.getAll(),
-          equipmentService.getAll(),
+          functionalLocationService.getAllPages(),
+          equipmentService.getAllPages(),
           workOrderService.getAll({ take: 200 }).then(r => r.data),
           notificationService.getAll({ take: 250 }).then(r => r.data),
-          materialService.getAll(),
+          materialService.getAllPages(),
           workCenterService.getAll(),
           maintenancePlanService.getAll(),
           taskListService.getAll(),

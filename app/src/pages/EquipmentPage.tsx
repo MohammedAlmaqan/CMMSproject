@@ -89,8 +89,8 @@ export default function EquipmentPage() {
     setLoadError(null);
     try {
       const [eqRes, locRes, woRows] = await Promise.all([
-        equipmentService.getAll(),
-        functionalLocationService.getAll(),
+        equipmentService.getAllPages(),
+        functionalLocationService.getAllPages(),
         workOrderService.getAllPages({ $select: 'equipmentId' }),
       ]);
       setEquipment(eqRes);

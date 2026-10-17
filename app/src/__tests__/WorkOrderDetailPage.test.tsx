@@ -44,7 +44,7 @@ vi.mock('@/services/craftService', () => ({
 }));
 
 vi.mock('@/services/materialService', () => ({
-  materialService: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  materialService: { getAll: vi.fn(), getAllPages: vi.fn(), exportCsv: vi.fn(), importCsv: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
 }));
 
 vi.mock('@/services/safetyChecklistService', () => ({
@@ -121,7 +121,8 @@ describe('WorkOrderDetailPage', () => {
     vi.mocked(auditLogService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 100 });
     vi.mocked(userService.getAll).mockResolvedValue([]);
     vi.mocked(craftService.getAll).mockResolvedValue([]);
-    vi.mocked(materialService.getAll).mockResolvedValue([]);
+    vi.mocked(materialService.getAll).mockResolvedValue({data:[],total:0,skip:0,take:0});
+    vi.mocked(materialService.getAllPages).mockResolvedValue([]);
     vi.mocked(safetyChecklistService.getTemplates).mockResolvedValue([]);
     vi.mocked(attachmentService.getByEntity).mockResolvedValue([]);
     vi.mocked(failureCodeService.getAll).mockResolvedValue([]);
