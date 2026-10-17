@@ -75,6 +75,14 @@ reviewer correction; see "Commit discipline" below.
   with `$env:DATABASE_URL`; do not edit `.env` to repoint the project.
 - `backend/tests/load-env.ts` fills only variables that are **unset**, so an explicit
   `DATABASE_URL` in the environment wins over `.env`.
+- **Live backup posture (2026-10-17):** both Step 2 go-live controls are now active on
+  this host. The Windows task `CommandPulse CMMS Daily Backup` runs `scripts\backup.bat`
+  daily at 02:00 as the interactive user `Injaz` (runs only while logged on) — a recorded
+  deviation from the dedicated-service-account template, accepted for this single-user
+  laptop; `PGPASSWORD` comes from the machine-scoped variable. PostgreSQL runs
+  `archive_mode=on` with `archive_command` copying each WAL segment to `C:\cmms-wal\wal`
+  (`archive_timeout=300`), verified 2026-10-17 (`pg_stat_archiver` `archived_count=1`,
+  `failed_count=0`). Go-live detail: `docs/GO_LIVE_CHECKLIST.md` items 2-3.
 
 ## Documentation accuracy
 

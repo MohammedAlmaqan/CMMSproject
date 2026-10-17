@@ -324,6 +324,19 @@ set "CMMSPROJECT=C:\CMMSproject"
 schtasks /Create /TN "CommandPulse CMMS Daily Backup" /TR "%CMMSPROJECT%\scripts\backup.bat" /SC DAILY /ST 02:00 /RU "BACKUP-SERVICE-ACCOUNT" /RL LIMITED /F
 ```
 
+> **As built on this host (2026-10-17).** The task `CommandPulse CMMS Daily Backup` was
+> created and verified: an on-demand run produced `backups\cmms-2026-10-17-1905.sql`
+> (9,254,347 bytes) with its paired `-uploads` snapshot, and `PGPASSWORD` was read from
+> the existing machine-scoped variable, so no credential is embedded in the task. Two
+> deviations from the template are recorded rather than left silent. (1) The task runs as
+> the **interactive user** rather than a dedicated service account — accepted by the owner
+> for this single-user laptop deployment; the dedicated-service-account form above remains
+> the template for a shared host. (2) Because this host is a laptop, the `schtasks`-default
+> power conditions were cleared (`DisallowStartIfOnBatteries=false`,
+> `StopIfGoingOnBatteries=false`) and `StartWhenAvailable=true`: a task created by the
+> command above on battery stays **Queued** and never runs. WAL archiving (next section of
+> `ADMIN_GUIDE.md`) was enabled in the same go-live step.
+
 ### Restore Drill
 
 Run the restore drill periodically and after backup-policy changes:
@@ -339,7 +352,9 @@ It also asserts the paired attachment snapshot. After the `WorkOrder` query it m
 
 ### Recovery Objectives
 
-- **RPO:** ≤ 24 hours because the database backup runs daily.
+- **RPO:** ≤ 24 hours because the database backup runs daily. *Updated 2026-10-17:* WAL
+  archiving is now enabled on this host (see `ADMIN_GUIDE.md` 7.8), which narrows the live
+  worst case to 5 minutes; the 24-hour figure is the daily-backup-only bound.
 - **RTO:** 5.35 seconds measured on 2026-09-25 from drill start through the successful `WorkOrder` count query on the local dataset (84 rows; 306,826-byte dump). Re-run the drill after material database growth or infrastructure changes and update this measurement.
 
 ### Application Files

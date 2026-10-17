@@ -41,14 +41,32 @@ position is a deployment step recorded here, not a reopening of the row.
    rehearsed on 2026-10-05 (`scripts/pitr-drill.ps1`, matrix row 262 `Met`), but
    `archive_mode` is still `off` on the live `localhost:5432` cluster, so nothing is
    archiving yet. Turn it on with a real second target. See `ADMIN_GUIDE.md` 7.8.
-   *Verified open: `archive_mode` is off on the live cluster.*
+   *Closed 2026-10-17:* archiving is now active on the live cluster. The settings were
+   applied with `ALTER SYSTEM` (written to `postgresql.auto.conf`): `archive_mode=on`,
+   `archive_command = 'copy "%p" "C:\cmms-wal\wal\%f"'`, `archive_timeout=300`; the
+   PostgreSQL service was restarted, and `SELECT pg_switch_wal()` confirmed a segment
+   reached the target — `pg_stat_archiver` reported `archived_count=1`, `failed_count=0`,
+   last segment `00000001000000000000003A` at 2026-10-17 19:12:49. *Superseded open check
+   (kept): `archive_mode` was off on the live cluster.*
 
 3. **Windows Scheduled Task for the daily backup.** `scripts\backup.bat` exists and the
    paired backup/restore drill passed on 2026-09-29 (189 work orders, 75/75 attachments
    verified; the full recovery sequence was re-measured on 2026-10-14 at 85.82 s, matrix
    row 263), but the scheduled task itself has not been created. Create it and set
-   `PGPASSWORD` in the task's environment. See `ADMIN_GUIDE.md` 7.4. *Verified open: no
-   CMMS/backup scheduled task exists on this host.*
+   `PGPASSWORD` in the task's environment. See `ADMIN_GUIDE.md` 7.4.
+   *Closed 2026-10-17:* the task `CommandPulse CMMS Daily Backup` is created (daily
+   02:00, runs `scripts\backup.bat`) and was verified by an on-demand run that produced
+   `backups\cmms-2026-10-17-1905.sql` (9,254,347 bytes, `PostgreSQL database dump
+   complete`) with its paired 211-file `-uploads` snapshot; `PGPASSWORD` is read from the
+   existing machine-scoped variable, so no credential is stored in the task.
+   **Recorded deviation (owner call 2026-10-17):** the task runs as the *interactive*
+   user `Injaz` — only while that user is logged on — rather than a dedicated
+   noninteractive service account. The owner accepted this for the single-user laptop
+   deployment; the documented service-account form remains the enterprise template. A
+   task created by `schtasks` also defaults to `DisallowStartIfOnBatteries`, which left
+   this laptop's task queued and never running, so those power conditions were cleared
+   and `StartWhenAvailable` set. *Superseded open check (kept): no CMMS/backup scheduled
+   task exists on this host.*
 
 4. **PM2 autostart on boot.** `pm2 start` / `pm2 save` / `pm2 startup` are documented in
    `INSTALLATION_GUIDE.md`, but no saved PM2 process list exists on this host, so PM2
