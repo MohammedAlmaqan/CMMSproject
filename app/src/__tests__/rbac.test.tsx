@@ -13,6 +13,7 @@ vi.mock('@/services/authService', () => ({
 vi.mock('@/services/workOrderService', () => ({
   workOrderService: {
     getAll: vi.fn(),
+    getAllPages: vi.fn(),
     getById: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -100,6 +101,7 @@ const awaitServices = async () => {
   const { dashboardService } = await import('@/services/dashboardService');
   const { alertService } = await import('@/services/alertService');
   vi.mocked(workOrderService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 250 });
+  vi.mocked(workOrderService.getAllPages).mockResolvedValue([]);
   vi.mocked(functionalLocationService.getAll).mockResolvedValue([]);
   vi.mocked(equipmentService.getAll).mockResolvedValue([]);
   vi.mocked(notificationService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 250 });

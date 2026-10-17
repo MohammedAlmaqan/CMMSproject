@@ -24,7 +24,7 @@ import { equipmentService } from '@/services/equipmentService';
 import { functionalLocationService } from '@/services/functionalLocationService';
 import { workOrderService } from '@/services/workOrderService';
 import { ApiError } from '@/lib/api';
-import type { Equipment, FunctionalLocation, WorkOrder } from '@/types';
+import type { Equipment, FunctionalLocation } from '@/types';
 
 const PAGE_SIZE = 12;
 
@@ -33,7 +33,10 @@ export default function EquipmentPage() {
 
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [locations, setLocations] = useState<FunctionalLocation[]>([]);
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  // The per-asset work-order count is a property of the whole estate, so it is
+  // computed from every work order (ids only) rather than the first 200 rows the
+  // page used to fetch - which understated the count for every asset.
+  const [woCounts, setWoCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -85,14 +88,18 @@ export default function EquipmentPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [eqRes, locRes, woRes] = await Promise.all([
+      const [eqRes, locRes, woRows] = await Promise.all([
         equipmentService.getAll(),
         functionalLocationService.getAll(),
-        workOrderService.getAll({ take: 200 }),
+        workOrderService.getAllPages({ $select: 'equipmentId' }),
       ]);
       setEquipment(eqRes);
       setLocations(locRes);
-      setWorkOrders(woRes.data);
+      const counts: Record<string, number> = {};
+      for (const wo of woRows as Array<{ equipmentId: string | null }>) {
+        if (wo.equipmentId) counts[wo.equipmentId] = (counts[wo.equipmentId] || 0) + 1;
+      }
+      setWoCounts(counts);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Failed to load equipment');
     } finally {
@@ -353,7 +360,7 @@ export default function EquipmentPage() {
                   <tbody>
                     {paged.map((eq, idx) => {
                       const loc = locations.find((l) => l.functionalLocationId === eq.functionalLocationId);
-                      const woCount = workOrders.filter((w) => w.equipmentId === eq.equipmentId).length;
+                      const woCount = woCounts[eq.equipmentId] || 0;
                       return (
                         <tr
                           key={eq.equipmentId}

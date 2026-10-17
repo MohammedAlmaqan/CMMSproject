@@ -46,6 +46,7 @@ export default function NotificationsPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -78,42 +79,41 @@ export default function NotificationsPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Paged on the server: the endpoint returns { data, total }, so the header
+  // count and the "Showing x-y of n" footer reflect the whole estate instead of
+  // the first 250 rows the page used to fetch. Search and filters are pushed to
+  // the API for the same reason.
+  const queryParams = useMemo(() => {
+    const params: Record<string, string | number> = { skip: page * PAGE_SIZE, take: PAGE_SIZE };
+    if (searchQuery.trim()) params.search = searchQuery.trim();
+    if (typeFilter !== 'All') params.type = typeFilter;
+    if (priorityFilter !== 'All') params.priority = priorityFilter;
+    if (statusFilter !== 'All') params.status = statusFilter;
+    return params;
+  }, [page, searchQuery, typeFilter, priorityFilter, statusFilter]);
+
   const reload = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await notificationService.getAll({ take: 250 });
+      const res = await notificationService.getAll(queryParams);
       setNotifications(res.data);
+      setTotal(res.total ?? 0);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Failed to load notifications');
+      setNotifications([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryParams]);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
-  const filtered = useMemo(() => {
-    let data = [...notifications];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      data = data.filter(
-        (n) =>
-          n.notificationNumber.toLowerCase().includes(q) ||
-          n.description.toLowerCase().includes(q)
-      );
-    }
-    if (typeFilter !== 'All') data = data.filter((n) => n.type === typeFilter);
-    if (priorityFilter !== 'All') data = data.filter((n) => n.priority === priorityFilter);
-    if (statusFilter !== 'All') data = data.filter((n) => n.status === statusFilter);
-    data.sort((a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime());
-    return data;
-  }, [notifications, searchQuery, typeFilter, priorityFilter, statusFilter]);
-
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged = notifications;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const resetForm = () => {
     setFormType('M1');
@@ -257,7 +257,7 @@ export default function NotificationsPage() {
             <option value="Converted">Converted</option>
           </select>
           <span className="text-tertiary text-xs ml-auto">
-            {loading ? 'Loading…' : `${filtered.length} notifications`}
+            {loading ? 'Loading…' : `${total} notifications`}
           </span>
           {loadError && (
             <button
@@ -391,7 +391,7 @@ export default function NotificationsPage() {
               <button onClick={reload} className="text-amber text-xs mt-2 hover:underline">Retry</button>
             </div>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : total === 0 ? (
           <div className="flex-1 flex items-center justify-center py-24">
             <div className="text-center">
               <Bell className="w-12 h-12 text-tertiary mx-auto mb-3" />
@@ -469,7 +469,7 @@ export default function NotificationsPage() {
             {/* Pagination */}
             <div className="flex items-center justify-between mt-4">
               <span className="text-tertiary text-xs">
-                Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+                Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
               </span>
               <div className="flex items-center gap-1">
                 <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary">

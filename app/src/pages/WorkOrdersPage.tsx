@@ -82,7 +82,9 @@ export default function WorkOrdersPage() {
   const canCreate = hasMinRole(role, 'Requester');
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [workOrders, setWorkOrders] = useState<WorkOrderRow[]>([]);
+  const [rows, setRows] = useState<WorkOrderRow[]>([]);
+  const [boardRows, setBoardRows] = useState<WorkOrderRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -95,19 +97,44 @@ export default function WorkOrdersPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(0);
 
+  // The list is paged on the server: the endpoint already returns { data, total },
+  // so the old `take: 250` slice (and the "250 work orders" total it implied) is
+  // gone. The filters and the sort are pushed to the API too, so they cover the
+  // whole estate rather than whichever 250 rows happened to be loaded.
+  const queryParams = useMemo(() => {
+    const params: Record<string, string | number> = { $orderby: `${sortField} ${sortDir}` };
+    if (searchQuery.trim()) params.search = searchQuery.trim();
+    if (statusFilter !== 'All') params.status = statusFilter;
+    if (priorityFilter !== 'All') params.priority = priorityFilter;
+    return params;
+  }, [searchQuery, statusFilter, priorityFilter, sortField, sortDir]);
+
+  const fetchList = useCallback(async () => {
+    const res = await workOrderService.getAll({ ...queryParams, skip: page * PAGE_SIZE, take: PAGE_SIZE });
+    setRows((res.data || []) as WorkOrderRow[]);
+    setTotal(res.total ?? 0);
+  }, [queryParams, page]);
+
+  // The board groups every matching order by status, which cannot be a single
+  // page, so it fetches the complete set through the paging helper.
+  const fetchBoard = useCallback(async () => {
+    setBoardRows((await workOrderService.getAllPages(queryParams)) as WorkOrderRow[]);
+  }, [queryParams]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await workOrderService.getAll({ take: 250 });
-      setWorkOrders((res.data || []) as WorkOrderRow[]);
+      await (viewMode === 'board' ? fetchBoard() : fetchList());
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Failed to load work orders');
-      setWorkOrders([]);
+      setRows([]);
+      setBoardRows([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [viewMode, fetchList, fetchBoard]);
 
   useEffect(() => {
     load();
@@ -115,12 +142,11 @@ export default function WorkOrdersPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await workOrderService.getAll({ take: 250 });
-      setWorkOrders((res.data || []) as WorkOrderRow[]);
+      await (viewMode === 'board' ? fetchBoard() : fetchList());
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : 'Failed to refresh work orders');
     }
-  }, []);
+  }, [viewMode, fetchBoard, fetchList]);
 
   const handleTransition = useCallback(
     async (wo: WorkOrderRow, newStatus: WorkOrderStatus) => {
@@ -140,32 +166,9 @@ export default function WorkOrdersPage() {
     [refresh]
   );
 
-  const filtered = useMemo(() => {
-    let data = [...workOrders];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      data = data.filter(
-        (w) =>
-          w.woNumber.toLowerCase().includes(q) ||
-          w.description.toLowerCase().includes(q)
-      );
-    }
-    if (statusFilter !== 'All') {
-      data = data.filter((w) => w.status === statusFilter);
-    }
-    if (priorityFilter !== 'All') {
-      data = data.filter((w) => w.priority === priorityFilter);
-    }
-    data.sort((a, b) => {
-      const aVal = (a as unknown as Record<string, unknown>)[sortField] as string;
-      const bVal = (b as unknown as Record<string, unknown>)[sortField] as string;
-      return sortDir === 'asc' ? aVal?.localeCompare(bVal) : bVal?.localeCompare(aVal);
-    });
-    return data;
-  }, [workOrders, searchQuery, statusFilter, priorityFilter, sortField, sortDir]);
-
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalCount = viewMode === 'list' ? total : boardRows.length;
+  const paged = rows;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const getEquipmentCode = (wo: WorkOrderRow) => wo.equipment?.equipmentCode || wo.equipmentId || '-';
   const getWorkCenterName = (wo: WorkOrderRow) => wo.workCenter?.code || wo.workCenterId;
@@ -259,11 +262,11 @@ export default function WorkOrdersPage() {
             <option value="Low">Low</option>
           </select>
           <span className="text-tertiary text-xs ml-auto">
-            {filtered.length} work orders
+            {totalCount} work orders
           </span>
         </div>
 
-        {filtered.length === 0 ? (
+        {totalCount === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-2">
             <p className="text-sm text-secondary">No work orders found</p>
             {canCreate && (
@@ -472,7 +475,7 @@ export default function WorkOrdersPage() {
             {/* Pagination */}
             <div className="flex items-center justify-between px-4 py-3 border-t border-subtle">
               <span className="text-tertiary text-xs">
-                Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+                Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
               </span>
               <div className="flex items-center gap-1">
                 <button
@@ -501,7 +504,7 @@ export default function WorkOrdersPage() {
           <div className="flex gap-4 overflow-x-auto pb-2">
             {(['Draft', 'Planned', 'Scheduled', 'In Progress', 'Suspended', 'Completed', 'Closed', 'Cancelled'] as WorkOrderStatus[]).map(
               (status) => {
-                const statusWos = filtered.filter((w) => w.status === status);
+                const statusWos = boardRows.filter((w) => w.status === status);
                 return (
                   <div
                     key={status}

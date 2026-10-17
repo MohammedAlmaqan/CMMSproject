@@ -15,6 +15,13 @@ vi.mock('@/services/reportService', () => ({
   },
 }));
 
+vi.mock('@/services/workOrderService', () => ({
+  workOrderService: {
+    getAll: vi.fn().mockResolvedValue({ data: [], total: 0, skip: 0, take: 0 }),
+    getAllPages: vi.fn().mockResolvedValue([]),
+  },
+}));
+
 vi.mock('@/services/dashboardService', () => ({
   dashboardService: {
     getKPIs: vi.fn(),

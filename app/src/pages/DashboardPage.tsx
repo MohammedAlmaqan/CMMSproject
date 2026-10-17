@@ -17,7 +17,8 @@ import Header from '@/components/layout/Header';
 import { useAppStore } from '@/store/appStore';
 import { dashboardService } from '@/services/dashboardService';
 import { reportService } from '@/services/reportService';
-import type { SystemAlert } from '@/types';
+import { workOrderService } from '@/services/workOrderService';
+import type { WorkOrder, SystemAlert } from '@/types';
 import type { WorkOrderStatus, WorkOrderType } from '@/types';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -50,8 +51,12 @@ const TYPE_COLORS: Record<WorkOrderType, string> = {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const kpis = useAppStore((s) => s.dashboardKPIs);
-  const workOrders = useAppStore((s) => s.workOrders);
   const storeError = useAppStore((s) => s.error);
+  // The status/type pies and the "PMs completed" line count every work order,
+  // so they are drawn from the whole estate (fanned out over the paginated list
+  // endpoint, selecting only the two columns needed) rather than from the store,
+  // which holds only a partial slice. See the report comment below.
+  const [woMix, setWoMix] = useState<Array<Pick<WorkOrder, 'status' | 'type'>>>([]);
   const [trendData, setTrendData] = useState<Array<{ month: string; planned: number; actual: number }>>([]);
   const [dashAlerts, setDashAlerts] = useState<SystemAlert[]>([]);
   // SOW 3.7.2 rows 65-67. Each is fed by its own report route rather than by
@@ -81,6 +86,10 @@ export default function DashboardPage() {
       })
       .catch(() => setTrendData([]));
     dashboardService.getAlerts().then(setDashAlerts).catch(() => setDashAlerts([]));
+    workOrderService
+      .getAllPages({ $select: 'status,type' })
+      .then((rows) => setWoMix(rows as Array<Pick<WorkOrder, 'status' | 'type'>>))
+      .catch(() => setWoMix([]));
 
     // A failed report must not read as a zero. "No backlog" and "the backlog
     // query failed" are different facts, and a maintenance manager acting on the
@@ -108,7 +117,7 @@ export default function DashboardPage() {
 
   const statusData = useMemo(() => {
     const counts: Record<string, number> = {};
-    workOrders.forEach((w) => {
+    woMix.forEach((w) => {
       counts[w.status] = (counts[w.status] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({
@@ -116,11 +125,11 @@ export default function DashboardPage() {
       value,
       color: STATUS_COLORS[name as WorkOrderStatus] || '#92929B',
     }));
-  }, [workOrders]);
+  }, [woMix]);
 
   const typeData = useMemo(() => {
     const counts: Record<string, number> = {};
-    workOrders.forEach((w) => {
+    woMix.forEach((w) => {
       counts[w.type] = (counts[w.type] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({
@@ -128,7 +137,7 @@ export default function DashboardPage() {
       value,
       color: TYPE_COLORS[name as WorkOrderType] || '#92929B',
     }));
-  }, [workOrders]);
+  }, [woMix]);
 
   const unreadAlerts = dashAlerts.filter((a) => !a.isRead);
 
@@ -480,7 +489,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 mt-2">
               <ClipboardCheck className="w-4 h-4 text-green-status" />
               <span className="text-secondary text-xs">
-                {workOrders.filter((w) => w.type === 'PM' && w.status === 'Closed').length} PMs completed this month
+                {woMix.filter((w) => w.type === 'PM' && w.status === 'Closed').length} PMs completed this month
               </span>
             </div>
           </div>

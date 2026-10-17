@@ -10,6 +10,7 @@ import type { WorkOrder } from '@/types';
 vi.mock('@/services/workOrderService', () => ({
   workOrderService: {
     getAll: vi.fn(),
+    getAllPages: vi.fn(),
     getById: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),

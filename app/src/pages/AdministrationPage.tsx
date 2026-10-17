@@ -21,7 +21,8 @@ import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
 import { systemConfigService, type SystemSetting } from '@/services/systemConfigService';
 import { userService } from '@/services/userService';
-import type { User, UserRole, WorkCenter } from '@/types';
+import { auditLogService } from '@/services/auditLogService';
+import type { AuditLogEntry, User, UserRole, WorkCenter } from '@/types';
 import Header from '@/components/layout/Header';
 
 type AdminTab = 'users' | 'audit' | 'settings';
@@ -41,7 +42,6 @@ export default function AdministrationPage() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const users = useAppStore((s) => s.users);
-  const auditLog = useAppStore((s) => s.auditLog);
   const workCenters = useAppStore((s) => s.workCenters);
   const loading = useAppStore((s) => s.loading);
   const storeError = useAppStore((s) => s.error);
@@ -51,6 +51,14 @@ export default function AdministrationPage() {
   const [auditPage, setAuditPage] = useState(0);
   const [auditFilter, setAuditFilter] = useState('');
   const [userSearch, setUserSearch] = useState('');
+
+  // The audit log is paged on the server (20k+ rows), so the tab no longer reads
+  // the store's single 50-row slice. Its own filter and page drive the request,
+  // and the footer total is the table's real row count.
+  const [auditEntries, setAuditEntries] = useState<AuditLogEntry[]>([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState('');
 
   // Row 60: an Administrator can onboard a user and deactivate one from the UI.
   const addUser = useAppStore((s) => s.addUser);
@@ -116,23 +124,49 @@ export default function AdministrationPage() {
     }
   };
 
+  // Audit entries are fetched per page from the server; the free-text filter is
+  // passed as `search` (table name, record id or field name). The old client-side
+  // filter could only ever see the first page of a 20k-row log.
+  useEffect(() => {
+    if (activeTab !== 'audit') return;
+    let cancelled = false;
+    setAuditLoading(true);
+    setAuditError('');
+    auditLogService
+      .getAll({
+        ...(auditFilter.trim() ? { search: auditFilter.trim() } : {}),
+        skip: auditPage * PAGE_SIZE,
+        take: PAGE_SIZE,
+      })
+      .then((res) => {
+        if (cancelled) return;
+        setAuditEntries(res.data);
+        setAuditTotal(res.total ?? 0);
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setAuditError(err.message);
+        setAuditEntries([]);
+        setAuditTotal(0);
+      })
+      .finally(() => {
+        if (!cancelled) setAuditLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, auditFilter, auditPage]);
+
   const filteredUsers = users.filter((u) => {
     if (!userSearch) return true;
     const q = userSearch.toLowerCase();
     return u.fullName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
   });
 
-  const filteredAudit = auditLog.filter((a) => {
-    if (!auditFilter) return true;
-    const q = auditFilter.toLowerCase();
-    return a.tableName.toLowerCase().includes(q) || a.action.toLowerCase().includes(q) || a.userId.toLowerCase().includes(q);
-  });
-
   const userPaged = filteredUsers.slice(userPage * PAGE_SIZE, (userPage + 1) * PAGE_SIZE);
   const userTotalPages = Math.ceil(filteredUsers.length / PAGE_SIZE);
 
-  const auditPaged = filteredAudit.slice(auditPage * PAGE_SIZE, (auditPage + 1) * PAGE_SIZE);
-  const auditTotalPages = Math.ceil(filteredAudit.length / PAGE_SIZE);
+  const auditTotalPages = Math.max(1, Math.ceil(auditTotal / PAGE_SIZE));
 
   const tabs: { id: AdminTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'users', label: 'Users & Roles', icon: Users },
@@ -313,9 +347,12 @@ export default function AdministrationPage() {
                     style={{ backgroundColor: '#27272A' }}
                   />
                 </div>
-                <span className="text-tertiary text-xs ml-auto">{filteredAudit.length} entries</span>
+                <span className="text-tertiary text-xs ml-auto">{auditLoading ? 'Loading…' : `${auditTotal} entries`}</span>
               </div>
-              {!loading && !storeError && filteredAudit.length === 0 && (
+              {auditError && (
+                <p className="mb-4 text-xs text-red-400" role="alert">{auditError}</p>
+              )}
+              {!auditLoading && !auditError && auditTotal === 0 && (
                 <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No audit log entries found.</div>
               )}
 
@@ -329,7 +366,7 @@ export default function AdministrationPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {auditPaged.map((entry, idx) => {
+                    {auditEntries.map((entry, idx) => {
                       const actor = users.find((u) => u.userId === entry.userId);
                       return (
                         <tr key={entry.auditId} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
@@ -357,7 +394,7 @@ export default function AdministrationPage() {
               </div>
 
               <div className="flex items-center justify-between mt-4">
-                <span className="text-tertiary text-xs">Showing {auditPage * PAGE_SIZE + 1}-{Math.min((auditPage + 1) * PAGE_SIZE, filteredAudit.length)} of {filteredAudit.length}</span>
+                <span className="text-tertiary text-xs">Showing {auditPage * PAGE_SIZE + 1}-{Math.min((auditPage + 1) * PAGE_SIZE, auditTotal)} of {auditTotal}</span>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setAuditPage((p) => Math.max(0, p - 1))} disabled={auditPage === 0} aria-label="Previous page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronLeft className="w-4 h-4" /></button>
                   <span className="text-xs text-secondary px-2">{auditPage + 1} / {auditTotalPages}</span>
