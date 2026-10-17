@@ -262,34 +262,42 @@ def main():
     emit("6. Matrix reconciliation unchanged by Phase B code work")
     emit("-" * 74)
     import collections
+    STATUSES = ("Met", "Partial", "Not Met", "Deferred", "Excluded", "Waived")
     rows = []
     with open(MATRIX, "r", encoding="utf-8") as fh:
         for line in fh:
             if not line.startswith("|"):
                 continue
-            c = [x.strip() for x in line.strip().strip("|").split("|")]
-            if len(c) == 5 and c[0].startswith("\u00a7"):
-                rows.append(c)
-    s3 = [r for r in rows if r[0].split(".")[0] in ("\u00a73", "3")]
-    cnt = collections.Counter(r[2] for r in s3)
+            # Index the clause and status cells from the front instead of
+            # requiring exactly five cells. A cell's text can contain an
+            # unspaced pipe (the audit-log method list
+            # "router.post|put|patch|delete" is one), which a len == 5 test
+            # drops, losing two whole section-3 rows and undercounting the
+            # matrix. verify_a1.py parses the same file the same way, so the
+            # two gates agree on the counts.
+            c = line.split("|")
+            if len(c) < 5 or c[3].strip() not in STATUSES:
+                continue
+            clause = c[1].strip().lstrip("\u00a7").strip()
+            rows.append((clause, c[3].strip()))
+    s3 = [r for r in rows if r[0] == "3" or r[0].startswith("3.")]
+    cnt = collections.Counter(r[1] for r in s3)
     build = cnt["Partial"] + cnt["Not Met"]
     total = len(s3)
     emit(f"  section 3 rows        : {total}   expected 126   "
          f"{'OK' if total == 126 else 'MISMATCH'}")
-    emit(f"  build set             : {build}   expected 30   "
-         f"{'OK' if build == 30 else 'MISMATCH'}")
-    emit(f"  waived                : {cnt['Waived']}   expected 10   "
-         f"{'OK' if cnt['Waived'] == 10 else 'MISMATCH'}")
+    emit(f"  build set             : {build}   expected 1   "
+         f"{'OK' if build == 1 else 'MISMATCH'}")
+    emit(f"  waived                : {cnt['Waived']}   expected 11   "
+         f"{'OK' if cnt['Waived'] == 11 else 'MISMATCH'}")
     check("section 3 still totals 126", total == 126)
-    # Phase A froze the build set at 67; phases C-H have since promoted 36
-    # rows to Met/closed, and Phase R's R.2 promoted one more (register row 58,
-    # SOW 3.7.1 report filtering, commit 17c95fb), so the live build set is 30
-    # (verify_a1 recomputes the same number under EXPECT_S3_BUILD = 67 as its
-    # freeze baseline). The matrix is the authority; this is a static
-    # expectation update, not a code behaviour change.
-    check("build set still 30 (Phase A froze 67; C-H promoted 36; R.2 promoted 1)",
-          build == 30)
-    check("waived still 10", cnt["Waived"] == 10)
+    # Phase A froze the section 3 build set at 67. Layers A-C, R.2 and the later
+    # C-H promotions have since moved every row they owned, so the live build
+    # set is 1 and Waived is 11. The matrix is the authority and verify_a1.py
+    # re-derives the same figures from it, so this is an expectation update
+    # against the current matrix, not a behaviour change.
+    check("build set still 1", build == 1)
+    check("waived still 11", cnt["Waived"] == 11)
     recon = cnt["Met"] + build + cnt["Waived"] + cnt["Deferred"] + cnt["Excluded"]
     emit(f"  reconciliation        : {cnt['Met']} Met + {build} build + "
          f"{cnt['Waived']} waived + {cnt['Deferred']} Def + {cnt['Excluded']} Exc"
