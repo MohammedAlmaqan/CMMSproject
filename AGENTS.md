@@ -39,12 +39,17 @@ reviewer correction; see "Commit discipline" below.
 
 ## Data safety
 
-- **The `cmms` database on `localhost:5432` holds the Client's migrated operational data,
-  not a fixture.** The B1 full legacy load of 2026-10-10 landed **20,333 of 20,333 rows at
-  100.00%** (`1971686`, run 257; see `docs/migration-runbook.md` and
-  `docs/migration-templates/TRIAL_RUN_REPORT_FULL.md`). No seed script rebuilds it and no
-  dump of it is committed to the repository, so a destructive statement against it is
-  neither recoverable nor revertable.
+- **The `cmms` database on `localhost:5432` is the live deployment target, but it does
+  not yet hold the Client's operational data.** Corrected 2026-10-17: the B1 full legacy
+  load of 2026-10-10 — **20,333 of 20,333 rows at 100.00%** (`1971686`, run 257) — ran in
+  a throwaway schema (`cmms_trial_13648_1791663306666`) that the run created, migrated and
+  then **dropped**; `docs/migration-templates/TRIAL_RUN_REPORT_FULL.md` records that
+  *"nothing in the app's `public` schema was touched"*. Live `cmms` instead held only a
+  small dev/demo dataset (≈176 rows on 2026-10-17: `WorkOrder` 9, `Equipment` 5,
+  `Notification` 1, `User` 11). The Client dataset reaches `cmms` only through the runbook
+  §3 cutover, which is **pending** (see `docs/migration-runbook.md`). No seed script
+  rebuilds `cmms` and no dump of it is committed to the repository, so a destructive
+  statement against it is still neither recoverable nor revertable.
 - **Never seed, clear, drop, migrate or write to `cmms` from a test, a repro, a verifier or
   a migration run.** All test and verification work targets a throwaway database made for
   the purpose; `cmms_gate`, `cmms_gate_fresh`, `cmms_c1`, `cmms_c11` and
