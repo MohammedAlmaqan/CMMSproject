@@ -85,7 +85,8 @@ async function main(): Promise<void> {
 // Run only when this file is the process entry point, so importing it (for example
 // from a test) does not start the schedulers or take the lock.
 const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+  process.env.pm_id !== undefined ||
+  (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href);
 
 if (invokedDirectly) {
   void main().catch(async (err) => {
