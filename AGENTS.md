@@ -83,6 +83,14 @@ reviewer correction; see "Commit discipline" below.
   `archive_mode=on` with `archive_command` copying each WAL segment to `C:\cmms-wal\wal`
   (`archive_timeout=300`), verified 2026-10-17 (`pg_stat_archiver` `archived_count=1`,
   `failed_count=0`). Go-live detail: `docs/GO_LIVE_CHECKLIST.md` items 2-3.
+- **Live application posture (2026-10-17):** PM2 runs both apps from
+  `backend/ecosystem.config.cjs` — `cmms-api` (fork, port 4000) and `cmms-worker` (fork)
+  are `online` as user `Injaz`, and `pm2 save` wrote `dump.pm2`. IIS serves the frontend
+  from `C:\inetpub\cmms-site` (its `web.config` reverse-proxies `/api` to
+  `http://localhost:4000`); the stale build was replaced 2026-10-17 with `app\dist` (new
+  asset hashes) and verified over `https://cmms.local` (200 for `/`, the JS/CSS/chunk
+  assets, `/dashboard` and `/api/health`). PM2 autostart-at-boot and the firewall rules
+  are pending elevation.
 
 ## Documentation accuracy
 
