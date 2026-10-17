@@ -54,6 +54,15 @@ reviewer correction; see "Commit discipline" below.
   a migration run.** All test and verification work targets a throwaway database made for
   the purpose; `cmms_gate`, `cmms_gate_fresh`, `cmms_c1`, `cmms_c11` and
   `cmms_restore_test` have all been used that way.
+  - **The one authorised exception, added 2026-10-17:** the SOW §5.7 cutover loader
+    (`backend/src/migration-trial/cutover.ts`) may write the Client dataset into `cmms`.
+    It *is* the cutover, not a test, repro, verifier or dry run, and it is the only thing
+    permitted to write to `cmms`. It writes only the nine tables the importers own,
+    additively, in one transaction that rolls the whole load back on any rejected row; it
+    refuses unless `CUTOVER_ALLOW_DB=1` is set and the host is `localhost`, and it refuses
+    a second run. A fresh `scripts/backup.bat` snapshot is a precondition of every run.
+    Nothing else — not `prisma migrate` or `db push`, not a seed, not a verifier — may
+    write to `cmms`.
 - **`backend/scripts/gate.mjs` reads `DATABASE_URL`, and `backend/.env` points it at
   `cmms`**, so a gate run with the default environment targets the real database. This is
   the hazard the tracker's E.9 working-practice note names: *"Never point this at the

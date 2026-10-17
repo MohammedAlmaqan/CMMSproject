@@ -7,8 +7,9 @@ and the cutover steps.
 
 Evidence artefacts: `docs/migration-templates/FULL_LOAD_LEDGER.json` (every source row
 dropped or merged, and why) and `docs/migration-templates/TRIAL_RUN_REPORT_FULL.md` (the
-full-dataset accuracy report). The tooling is `scripts/migration/extract_full_dataset.py`
-and the harness `backend/src/migration-trial/run.ts`.
+full-dataset accuracy report). The tooling is `scripts/migration/extract_full_dataset.py`,
+the accuracy harness `backend/src/migration-trial/run.ts`, and the cutover loader
+`backend/src/migration-trial/cutover.ts`.
 
 ## 1. Scope and inputs
 
@@ -138,27 +139,61 @@ difference is the root functional-location `YE002` free-text description (sample
 
 ## 3. Cutover procedure
 
-Order matters: parents before children. The importers resolve FK columns as natural keys.
+The cutover is performed by the one-shot loader
+`backend/src/migration-trial/cutover.ts`. It reuses the same importers and `persistDataset`
+core as the §2b harness — a cutover row lands exactly as the measured trial row did — but
+it writes into the live `public` schema **additively** instead of a throwaway schema. It is
+the only authorised writer of the Client dataset against the live database (`AGENTS.md`,
+Data safety).
 
-1. **Back up** the target database (`scripts/backup.bat`; see `ADMIN_GUIDE.md`).
-2. **Confirm the ledger** — re-run the extractor and check the counts against
-   `FULL_LOAD_LEDGER.json`. A mismatch means the source changed since the last load.
-4. **Load master data first** — FunctionalLocations, Equipment, Materials, WorkCenters,
-   Users. The live API already imports Equipment and Materials
-   (`POST /api/equipment/import`, `POST /api/materials/import`); the harness loads the
-   full set into a throwaway schema for the measurement.
-5. **Load transactional data** — Notifications, then WorkOrders (parents before the links
-   and comments that reference them).
-6. **Re-run the harness** against the target and confirm 0 rejected and ≥ 99.9%.
-7. **Verify** row counts against the ledger and spot-check work-order statuses
-   (TECO→Completed, Released→Scheduled, WPART→Suspended).
+What the loader does, and its guard-rails:
+
+- Loads all nine datasets in one transaction; if any row is rejected the whole load rolls
+  back, leaving the database exactly as the backup captured it.
+- Writes only the nine tables the importers own. The baseline the Client dataset does not
+  supply — the Administrator user, failure codes, crafts, task lists, system config,
+  checklist templates — lives in tables no importer writes, so it is preserved without a
+  merge step.
+- Refuses unless `CUTOVER_ALLOW_DB=1` is set and the host is `localhost`.
+- Refuses if the client dataset is already present: a second run would duplicate
+  `WorkOrderNotifLink` and `Comment`, which have no natural key.
+- When `CUTOVER_EXPECTED` names the reviewed ledger, refuses unless every dataset's mapped
+  count equals the ledger's, so a changed source cannot half-load.
+- Attributes every row and its audit entry to the active Administrator (preferring `admin`).
+- Never prints a connection string.
+
+Procedure (parents before children; the loader already orders the nine datasets):
+
+- **Back up** the live database with `scripts/backup.bat` (see `docs/ADMIN_GUIDE.md`) and
+  confirm the dump file exists and is non-empty. This is the recovery point for §3b.
+- **Confirm the ledger** — re-run the extractor (§2) and check every emitted count against
+  `FULL_LOAD_LEDGER.json`. A mismatch means the source changed since the last load.
+- **Run the loader** from `backend` against the live `cmms` database:
+
+  ```
+  $env:DATABASE_URL='postgresql://<user>:<pw>@localhost:5432/cmms?schema=public'
+  $env:CUTOVER_ALLOW_DB='1'
+  $env:CUTOVER_CSV_DIR='<extractor --out dir>'
+  $env:CUTOVER_EXPECTED='<repo>/docs/migration-templates/FULL_LOAD_LEDGER.json'
+  $env:CUTOVER_REPORT_PATH='<path to write the cutover report>'
+  node node_modules\tsx\dist\cli.mjs src\migration-trial\cutover.ts
+  ```
+
+  Exit codes: `0` loaded and committed; `1` refused (opt-in, host, actor or sentinel) or a
+  missing input file; `2` ledger mismatch; `3` a row was rejected and the load rolled back.
+- **Verify** row counts against the ledger, confirm the baseline is intact (the
+  Administrator can log in; failure codes, crafts, task lists, system config and checklist
+  templates are unchanged), and spot-check work-order statuses (TECO→Completed,
+  Released→Scheduled, WPART→Suspended).
 
 ## 3b. Rollback
 
-The load is additive and idempotent (natural-key upserts). The recovery point is the
-pre-load `pg_dump` backup from step 1; restore it with the standard procedure in
-`docs/ADMIN_GUIDE.md`. The harness's throwaway schema is dropped automatically, so a dry
-run leaves no residue.
+The load is additive and never touches a row it did not create, but it is **not**
+idempotent: `WorkOrderNotifLink` and `Comment` have no natural key, so the loader refuses a
+second run rather than duplicate them. The recovery point is the pre-load `pg_dump` backup
+from step 1; restore it with the standard procedure in `docs/ADMIN_GUIDE.md`. A run rejected
+mid-load needs no restore — the whole load is one transaction and rolls back. The harness's
+throwaway schema is dropped automatically, so a dry run leaves no residue.
 
 ## 4. Re-running
 
