@@ -93,6 +93,23 @@ async function loadReference(client: Client, dataset: string): Promise<Map<strin
       });
       return new Map(rows.map((r) => [r.username, r.userId]));
     }
+    case 'WorkOrder': {
+      // Transactional parents for the link/comment datasets. Loaded from the
+      // live database at the point their children are persisted, so a link's
+      // workOrderId resolves to a row this run has just created.
+      const rows = await client.workOrder.findMany({
+        where: { isDeleted: false },
+        select: { woNumber: true, workOrderId: true },
+      });
+      return new Map(rows.map((r) => [r.woNumber, r.workOrderId]));
+    }
+    case 'Notification': {
+      const rows = await client.notification.findMany({
+        where: { isDeleted: false },
+        select: { notificationNumber: true, notificationId: true },
+      });
+      return new Map(rows.map((r) => [r.notificationNumber, r.notificationId]));
+    }
     default:
       throw new Error(`No live reference loader for dataset '${dataset}'`);
   }
