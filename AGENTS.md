@@ -39,15 +39,20 @@ reviewer correction; see "Commit discipline" below.
 
 ## Data safety
 
-- **The `cmms` database on `localhost:5432` is the live deployment target, but it does
-  not yet hold the Client's operational data.** Corrected 2026-10-17: the B1 full legacy
+- **The `cmms` database on `localhost:5432` is the live deployment target and, since
+  2026-10-17, holds the Client's operational data.** *Superseded status, kept: this lead
+  line read "but it does not yet hold the Client's operational data" until the cutover
+  ran.* Corrected 2026-10-17: the B1 full legacy
   load of 2026-10-10 — **20,333 of 20,333 rows at 100.00%** (`1971686`, run 257) — ran in
   a throwaway schema (`cmms_trial_13648_1791663306666`) that the run created, migrated and
   then **dropped**; `docs/migration-templates/TRIAL_RUN_REPORT_FULL.md` records that
   *"nothing in the app's `public` schema was touched"*. Live `cmms` instead held only a
   small dev/demo dataset (≈176 rows on 2026-10-17: `WorkOrder` 9, `Equipment` 5,
   `Notification` 1, `User` 11). The Client dataset reaches `cmms` only through the runbook
-  §3 cutover, which is **pending** (see `docs/migration-runbook.md`). No seed script
+  §3 cutover, **executed 2026-10-17** (was *pending*; see `docs/migration-runbook.md`):
+  **20,333 of 20,333 rows created, 0 rejected**, one transaction, against the verified
+  backup `backups/cmms-2026-10-17-1823.sql`, report
+  `docs/migration-templates/CUTOVER_REPORT_LIVE.md`. No seed script
   rebuilds `cmms` and no dump of it is committed to the repository, so a destructive
   statement against it is still neither recoverable nor revertable.
 - **Never seed, clear, drop, migrate or write to `cmms` from a test, a repro, a verifier or
