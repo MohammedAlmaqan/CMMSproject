@@ -94,8 +94,12 @@ reviewer correction; see "Commit discipline" below.
   rule `CMMS API 4000 block external` is active on all profiles — loopback stays reachable
   (Windows Firewall does not filter loopback), so the IIS proxy keeps working. The API is
   pinned to loopback (`BIND_HOST: '127.0.0.1'` in `backend/ecosystem.config.cjs`), so port
-  4000 is not externally reachable even without the firewall rule. No boot-order autostart
-  and no service account: both apps run as the interactive user `Injaz`.
+  4000 is not externally reachable even without the firewall rule. The worker's PM,
+  overdue and audit-retention crons run in `cmms-worker`; it only starts when PM2 counts
+  as an entry point, because PM2's fork container sets `process.argv[1]` to its own
+  container script rather than `dist/worker.js` (see `backend/src/worker.ts`). No
+  boot-order autostart and no service account: both apps run as the interactive user
+  `Injaz`.
 
 ## Documentation accuracy
 
