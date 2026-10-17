@@ -527,7 +527,7 @@ $env:PGPASSWORD = '...'
 scripts\pitr-drill.ps1 -ArchiveDir C:\cmms-wal
 ```
 
-What this does **not** do is change the live cluster: `archive_mode` is still `off` on the `localhost:5432` instance, so nothing is archiving yet. Turning it on there, with a real second target, is the remaining deployment step.
+**Live status 2026-10-17 - the live cluster is archiving.** The remaining deployment step has been taken: `ALTER SYSTEM` wrote `archive_mode=on`, `archive_command='copy "%p" "C:\cmms-wal\wal\%f"'` and `archive_timeout='300'` to `postgresql.auto.conf` on the `localhost:5432` instance, and PostgreSQL was restarted. Verified the same day: `pg_stat_archiver` reports `archived_count=1`, `failed_count=0`, and the segment `00000001000000000000003A` is present in `C:\cmms-wal\wal`. The 5-minute RPO bound in [7.6](#76-recovery-objectives) therefore holds on the live host, not just in the rehearsal. *Superseded text (kept for the audit trail): "What this does **not** do is change the live cluster: `archive_mode` is still `off` on the `localhost:5432` instance, so nothing is archiving yet. Turning it on there, with a real second target, is the remaining deployment step."*
 
 ---
 
