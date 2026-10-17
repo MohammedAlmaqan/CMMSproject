@@ -158,14 +158,13 @@ CMMS API server running on port 4000 (bound to 127.0.0.1)
 
 > Leave `BIND_HOST=0.0.0.0` only for local development with no reverse proxy. It is the default in `.env.example` purely so a fresh dev checkout works without extra steps — it is **not** a safe production value.
 
-**Firewall rule (defense-in-depth)** — even bound to loopback, block inbound TCP 4000 from anywhere but the local host. Run PowerShell as Administrator, replacing the profile names with those in use on the host:
+**Firewall rule (defense-in-depth).** Block inbound TCP 4000 from non-loopback addresses so the port stays unreachable even if `BIND_HOST` is later mis-set or IIS is removed. Run PowerShell as Administrator:
 
 ```powershell
-New-NetFirewallRule -DisplayName "CMMS API 4000 loopback only" -Direction Inbound -Action Block -Protocol TCP -LocalPort 4000 -RemoteAddress 127.0.0.1,::1 -Profile Any
 New-NetFirewallRule -DisplayName "CMMS API 4000 block external" -Direction Inbound -Action Block -Protocol TCP -LocalPort 4000 -RemoteAddress Any -Profile Any
 ```
 
-The second rule is the important one: it denies inbound 4000 from every non-loopback address, so the port stays unreachable even if `BIND_HOST` is later mis-set or IIS is removed. Verify the effective state with:
+One rule is enough. Windows Firewall does **not** apply inbound block rules to loopback traffic, so the IIS reverse proxy — which connects to `127.0.0.1:4000` — keeps working while every external address is denied. Do **not** add a companion rule scoped to `-RemoteAddress 127.0.0.1,::1`: `New-NetFirewallRule` rejects the loopback IPv6 literal with *"An unspecified, multicast, broadcast, or loopback IPv6 address was specified"* (`0x80070057`), and even a corrected `-Action Allow` rule would not re-open loopback, because block rules take precedence over allow rules. Verify the effective state with:
 
 ```powershell
 Get-NetFirewallRule -DisplayName "CMMS API 4000*" | Get-NetFirewallPortFilter
