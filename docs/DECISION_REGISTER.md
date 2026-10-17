@@ -301,6 +301,10 @@ delegated.
    deployment anchor is `v1.2.0`, cut 2026-10-15 at `a995e77`, which carries C1, C11, D1 and
    D-20 on top of that snapshot. The rule in item 4 still stands: `v1.0.0` is not re-tagged,
    and neither `v1.0.0` nor `v1.1.0` is moved or re-cut.*
+   *Superseded 2026-10-17 — pointer, original kept; the sentence above was written 2026-10-15.
+   The current deployment anchor is `v1.2.1`, cut 2026-10-17 at `2313b02` (annotated tag object
+   `882965d`), carrying the 2026-10-16 verification reconciliation and the section-3 matrix
+   count fix on top of `v1.2.0`. `v1.2.0`, `v1.1.0` and `v1.0.0` are not moved or re-cut.*
 
 ### 6.4 Flagged items - answered 2026-09-26
 

@@ -3,9 +3,13 @@
 This is the durable go-live checklist for CommandPulse CMMS. It records the steps that
 must be completed **at the go-live event**, as distinct from the acceptance milestone.
 Go-live has not happened yet: `v1.1.0` (`5e2c478`) is the acceptance snapshot and
-`v1.2.0` (`a995e77`) is the current deployment anchor. The steps below are
+`v1.2.1` (`2313b02`, cut 2026-10-17) is the current deployment anchor. The steps below are
 forward-looking and are re-verified on the target host, not assumed from the rehearsal
 host.
+
+*Superseded 2026-10-17 - pointer, original kept: this line read "`v1.2.0` (`a995e77`) is
+the current deployment anchor". `v1.2.0` is now historical and is not moved, nor are
+`v1.1.0` and `v1.0.0`.*
 
 *History: this checklist existed only in the advisor's working memory before 2026-10-16;
 that was the defect, because a durable step that lives in one person's head is not a
@@ -89,8 +93,9 @@ position is a deployment step recorded here, not a reopening of the row.
     (2026-10-16) fixed the `normalizeDecimals` Date flattening that made the Preventive
     Maintenance page throw on `new Date({})`. Confirm on the deployed build that
     `/preventive-maintenance` renders the plan list. See `SOW_COMPLIANCE.md` row 334 and
-    `HANDOFF.md` (Date-window impact check). *Verified open: `b47c2be` is not an ancestor
-    of the `v1.2.0` deployment anchor.*
+    `HANDOFF.md` (Date-window impact check). *Verified: `b47c2be` is an ancestor of the
+    `v1.2.1` deployment anchor (`2313b02`), so the fix ships with the anchor; it was not an
+    ancestor of the previous `v1.2.0` anchor (`a995e77`).*
 
 11. **Verify no other Critical/Major defect was open at acceptance and is still open at
     go-live.** Any such defect must be closed before deployment. Row 334's `Met` is an
