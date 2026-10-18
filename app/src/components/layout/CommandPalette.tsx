@@ -2,7 +2,7 @@
 // Command Palette (Ctrl+K / ⌘K)
 // ============================================================
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -43,6 +43,18 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // The focusable set inside the overlay, in document order: the search input
+  // first, then the command buttons. Used to cycle Tab within the dialog.
+  const dialogFocusables = useCallback((): HTMLElement[] => {
+    if (!dialogRef.current) return [];
+    return Array.from(
+      dialogRef.current.querySelectorAll<HTMLElement>(
+        'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'
+      )
+    ).filter((el) => !el.hasAttribute('disabled'));
+  }, []);
 
   const commands: CommandItem[] = useMemo(
     () => [
@@ -86,6 +98,29 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
     const handler = (e: KeyboardEvent) => {
       if (!open) return;
       if (e.key === 'Escape') onClose();
+      if (e.key === 'Tab') {
+        // v1.1-11 / WCAG 2.1 AA focus trap: the overlay is a modal dialog
+        // (aria-modal), so Tab must not walk into the page behind it.
+        // preventDefault removes the document's default Tab move - which would
+        // land on the page underneath - and focus is placed explicitly,
+        // wrapping at both ends of the dialog's own focusable set.
+        e.preventDefault();
+        const els = dialogFocusables();
+        if (els.length === 0) {
+          inputRef.current?.focus();
+          return;
+        }
+        const idx = els.indexOf(document.activeElement as HTMLElement);
+        const next = e.shiftKey
+          ? idx <= 0
+            ? els.length - 1
+            : idx - 1
+          : idx === -1 || idx === els.length - 1
+            ? 0
+            : idx + 1;
+        els[next].focus();
+        return;
+      }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex((i) => Math.min(i + 1, filtered.length - 1));
@@ -100,7 +135,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [open, filtered, selectedIndex, onClose]);
+  }, [open, filtered, selectedIndex, onClose, dialogFocusables]);
 
   if (!open) return null;
 
@@ -114,6 +149,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
       style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
       onClick={onClose}
