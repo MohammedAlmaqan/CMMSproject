@@ -15,7 +15,7 @@ import { attachmentService } from '@/services/attachmentService';
 import { failureCodeService } from '@/services/failureCodeService';
 import { costSplitService } from '@/services/costSplitService';
 import { ApiError } from '@/lib/api';
-import type { User, WorkOrder } from '@/types';
+import type { User, WorkOrder, LaborEntry } from '@/types';
 
 vi.mock('@/services/workOrderService', () => ({
   workOrderService: {
@@ -415,5 +415,88 @@ describe('WorkOrderDetailPage', () => {
     expect(
       await screen.findByText(/No cost split — charged wholly to CC-1/)
     ).toBeInTheDocument();
+  });
+
+  it('gives every operation row its own edit and delete names', async () => {
+    vi.mocked(workOrderService.getById).mockResolvedValue({
+      ...baseWo,
+      operations: [
+        { operationId: 'op-1', workOrderId: 'wo-1', sequenceNumber: 1, description: 'Isolate supply', craftId: 'cf-1', plannedHours: 2, numberOfTechnicians: 1, actualHours: null, status: 'Pending', craft: null },
+        { operationId: 'op-2', workOrderId: 'wo-1', sequenceNumber: 3, description: 'Fit new belt', craftId: 'cf-1', plannedHours: 4, numberOfTechnicians: 1, actualHours: null, status: 'Pending', craft: null },
+      ],
+    } as WorkOrder);
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+
+    expect(screen.getByRole('button', { name: 'Edit operation 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit operation 3' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete operation 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete operation 3' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  });
+
+  it('scopes the service row edit controls to their row', async () => {
+    vi.mocked(workOrderService.getById).mockResolvedValue({
+      ...baseWo,
+      externalServices: [
+        { serviceCostId: 'svc-1', workOrderId: 'wo-1', vendor: 'Acme Lift', description: 'Quarterly inspection', cost: 250, invoiceRef: 'INV-1' },
+        { serviceCostId: 'svc-2', workOrderId: 'wo-1', vendor: 'Bolt Co', description: 'Fastener supply', cost: 40, invoiceRef: 'INV-2' },
+      ],
+    } as WorkOrder);
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /^Services/ }));
+
+    expect(await screen.findByRole('button', { name: 'Edit service 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit service 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete service 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete service 2' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Edit service 1' }));
+
+    expect(await screen.findByRole('button', { name: 'Save service 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel editing service 1' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  });
+
+  it('distinguishes labor rows even when the same technician logs two entries', async () => {
+    // Both entries are Ada's, so any name derived from the technician alone
+    // would put two identical "Edit"/"Delete" buttons in the accessible tree.
+    vi.mocked(laborService.getByWorkOrder).mockResolvedValue([
+      { laborEntryId: 'le-1', operationId: 'op-1', userId: 'u-1', hoursWorked: 8, entryDateTime: '2026-09-02T08:00:00.000Z', notes: 'Belt fitted', createdBy: 'u-1', createdDate: '2026-09-02T08:00:00.000Z', modifiedBy: '', modifiedDate: '2026-09-02T08:00:00.000Z', isDeleted: false, user: { userId: 'u-1', fullName: 'Ada One', username: 'ada' }, operation: { operationId: 'op-1', description: 'Fit new belt', sequenceNumber: 1 } },
+      { laborEntryId: 'le-2', operationId: 'op-1', userId: 'u-1', hoursWorked: 3, entryDateTime: '2026-09-03T09:00:00.000Z', notes: 'Re-tension', createdBy: 'u-1', createdDate: '2026-09-03T09:00:00.000Z', modifiedBy: '', modifiedDate: '2026-09-03T09:00:00.000Z', isDeleted: false, user: { userId: 'u-1', fullName: 'Ada One', username: 'ada' } },
+    ] as unknown as LaborEntry[]);
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /^Labor/ }));
+
+    expect(await screen.findByRole('button', { name: 'Edit labor entry 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit labor entry 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete labor entry 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete labor entry 2' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  });
+
+  it('gives each attachment row its own download and delete names', async () => {
+    vi.mocked(attachmentService.getByEntity).mockResolvedValue([
+      { attachmentId: 'at-1', entityType: 'WorkOrder', entityId: 'wo-1', originalName: 'pump-data.pdf', mimeType: 'application/pdf', sizeBytes: 2048, storagePath: 'wo-1/pump-data.pdf', uploadedByUserId: 'u-1', createdBy: 'u-1', createdDate: '2026-09-01T00:00:00.000Z', modifiedBy: '', modifiedDate: '2026-09-01T00:00:00.000Z', isDeleted: false },
+      { attachmentId: 'at-2', entityType: 'WorkOrder', entityId: 'wo-1', originalName: 'thermal-scan.jpg', mimeType: 'image/jpeg', sizeBytes: 4096, storagePath: 'wo-1/thermal-scan.jpg', uploadedByUserId: 'u-1', createdBy: 'u-1', createdDate: '2026-09-02T00:00:00.000Z', modifiedBy: '', modifiedDate: '2026-09-02T00:00:00.000Z', isDeleted: false },
+    ]);
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /^Attachments/ }));
+
+    expect(await screen.findByRole('button', { name: 'Download file 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download file 2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete attachment 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete attachment 2' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Download' })).not.toBeInTheDocument();
   });
 });

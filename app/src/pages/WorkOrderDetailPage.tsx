@@ -1284,11 +1284,11 @@ const isAdmin = hasPermission(['Administrator']);
                                   onClick={() => handleUpdateOperation(op)}
                                   disabled={busy === `op:edit:${op.operationId}` || !editOpForm.craftId || !editOpForm.description.trim()}
                                   className="text-green-status hover:opacity-70 disabled:opacity-40"
-                                  title="Save"
+                                  aria-label={`Save operation ${op.sequenceNumber}`}
                                 >
                                   {busy === `op:edit:${op.operationId}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                                 </button>
-                                <button onClick={() => setEditingOpId(null)} className="text-tertiary hover:text-primary" title="Cancel">
+                                <button onClick={() => setEditingOpId(null)} className="text-tertiary hover:text-primary" aria-label={`Cancel editing operation ${op.sequenceNumber}`}>
                                   <XCircle className="w-3.5 h-3.5" />
                                 </button>
                               </div>
@@ -1315,14 +1315,14 @@ const isAdmin = hasPermission(['Administrator']);
                             <td className={tdCls}>
                               {canEdit && (
                                 <div className="flex items-center gap-2">
-                                  <button onClick={() => startEditOperation(op)} className="text-tertiary hover:text-amber transition-colors" title="Edit">
+                                  <button onClick={() => startEditOperation(op)} className="text-tertiary hover:text-amber transition-colors" aria-label={`Edit operation ${op.sequenceNumber}`}>
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteOperation(op)}
                                     disabled={busy === `op:del:${op.operationId}`}
                                     className="text-tertiary hover:text-red-status transition-colors disabled:opacity-40"
-                                    title="Delete"
+                                    aria-label={`Delete operation ${op.sequenceNumber}`}
                                   >
                                     {busy === `op:del:${op.operationId}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                                   </button>
@@ -1462,11 +1462,11 @@ const isAdmin = hasPermission(['Administrator']);
                                   onClick={() => handleUpdateMaterial(wm)}
                                   disabled={busy === `mat:edit:${wm.woMaterialId}`}
                                   className="text-green-status hover:opacity-70 disabled:opacity-40"
-                                  title="Save"
+                                  aria-label={`Save material line ${idx + 1}`}
                                 >
                                   {busy === `mat:edit:${wm.woMaterialId}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                                 </button>
-                                <button onClick={() => setEditingMatId(null)} className="text-tertiary hover:text-primary" title="Cancel">
+                                <button onClick={() => setEditingMatId(null)} className="text-tertiary hover:text-primary" aria-label={`Cancel editing material line ${idx + 1}`}>
                                   <XCircle className="w-3.5 h-3.5" />
                                 </button>
                               </div>
@@ -1491,14 +1491,14 @@ const isAdmin = hasPermission(['Administrator']);
                             <td className={tdCls}>
                               {canEdit && (
                                 <div className="flex items-center gap-2">
-                                  <button onClick={() => startEditMaterial(wm)} className="text-tertiary hover:text-amber transition-colors" title="Edit">
+                                  <button onClick={() => startEditMaterial(wm)} className="text-tertiary hover:text-amber transition-colors" aria-label={`Edit material line ${idx + 1}`}>
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteMaterial(wm)}
                                     disabled={busy === `mat:del:${wm.woMaterialId}`}
                                     className="text-tertiary hover:text-red-status transition-colors disabled:opacity-40"
-                                    title="Remove"
+                                    aria-label={`Remove material line ${idx + 1}`}
                                   >
                                     {busy === `mat:del:${wm.woMaterialId}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                                   </button>
@@ -1608,11 +1608,11 @@ const isAdmin = hasPermission(['Administrator']);
                                   onClick={() => handleUpdateLabor(l)}
                                   disabled={busy === `labor:edit:${l.laborEntryId}`}
                                   className="text-green-status hover:opacity-70 disabled:opacity-40"
-                                  title="Save"
+                                  aria-label={`Save labor entry ${idx + 1}`}
                                 >
                                   {busy === `labor:edit:${l.laborEntryId}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                                 </button>
-                                <button onClick={() => setEditingLaborId(null)} className="text-tertiary hover:text-primary" title="Cancel">
+                                <button onClick={() => setEditingLaborId(null)} className="text-tertiary hover:text-primary" aria-label={`Cancel editing labor entry ${idx + 1}`}>
                                   <XCircle className="w-3.5 h-3.5" />
                                 </button>
                               </div>
@@ -1628,14 +1628,14 @@ const isAdmin = hasPermission(['Administrator']);
                             <td className={tdCls}>
                               {canEdit && (
                                 <div className="flex items-center gap-2">
-                                  <button onClick={() => startEditLabor(l)} className="text-tertiary hover:text-amber transition-colors" title="Edit">
+                                  <button onClick={() => startEditLabor(l)} className="text-tertiary hover:text-amber transition-colors" aria-label={`Edit labor entry ${idx + 1}`}>
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteLabor(l)}
                                     disabled={busy === `labor:del:${l.laborEntryId}`}
                                     className="text-tertiary hover:text-red-status transition-colors disabled:opacity-40"
-                                    title="Delete"
+                                    aria-label={`Delete labor entry ${idx + 1}`}
                                   >
                                     {busy === `labor:del:${l.laborEntryId}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                                   </button>
@@ -1754,11 +1754,11 @@ const isAdmin = hasPermission(['Administrator']);
                                   onClick={() => handleUpdateService(s)}
                                   disabled={busy === `svc:edit:${s.serviceCostId}` || !editSvcForm.vendor.trim() || !editSvcForm.description.trim()}
                                   className="text-green-status hover:opacity-70 disabled:opacity-40"
-                                  title="Save"
+                                  aria-label={`Save service ${idx + 1}`}
                                 >
                                   {busy === `svc:edit:${s.serviceCostId}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                                 </button>
-                                <button onClick={() => setEditingSvcId(null)} className="text-tertiary hover:text-primary" title="Cancel">
+                                <button onClick={() => setEditingSvcId(null)} className="text-tertiary hover:text-primary" aria-label={`Cancel editing service ${idx + 1}`}>
                                   <XCircle className="w-3.5 h-3.5" />
                                 </button>
                               </div>
@@ -1776,14 +1776,14 @@ const isAdmin = hasPermission(['Administrator']);
                             <td className={tdCls}>
                               {canEdit && (
                                 <div className="flex items-center gap-2">
-                                  <button onClick={() => startEditService(s)} className="text-tertiary hover:text-amber transition-colors" title="Edit">
+                                  <button onClick={() => startEditService(s)} className="text-tertiary hover:text-amber transition-colors" aria-label={`Edit service ${idx + 1}`}>
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteService(s)}
                                     disabled={busy === `svc:del:${s.serviceCostId}`}
                                     className="text-tertiary hover:text-red-status transition-colors disabled:opacity-40"
-                                    title="Delete"
+                                    aria-label={`Delete service ${idx + 1}`}
                                   >
                                     {busy === `svc:del:${s.serviceCostId}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                                   </button>
@@ -1987,7 +1987,7 @@ const isAdmin = hasPermission(['Administrator']);
             {(wo.checklists?.length || 0) === 0 ? (
               <EmptyState label="No checklists" />
             ) : (
-              wo.checklists!.map((cl) => {
+              wo.checklists!.map((cl, idx) => {
                 const template = cl.template;
                 const signedByUser = users.find((u) => u.userId === cl.signedBy);
                 const completed = cl.status === 'Completed';
@@ -2012,7 +2012,7 @@ const isAdmin = hasPermission(['Administrator']);
                             onClick={() => handleDeleteChecklist(cl)}
                             disabled={busy === `cl:del:${cl.woChecklistId}`}
                             className="text-tertiary hover:text-red-status transition-colors disabled:opacity-40"
-                            title="Delete checklist"
+                            aria-label={`Delete checklist ${idx + 1}`}
                           >
                             {busy === `cl:del:${cl.woChecklistId}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                           </button>
@@ -2157,7 +2157,7 @@ const isAdmin = hasPermission(['Administrator']);
             {(wo.comments?.length || 0) === 0 ? (
               <EmptyState label="No comments yet" />
             ) : (
-              wo.comments!.map((c) => {
+              wo.comments!.map((c, idx) => {
                 const isOwn = currentUser?.userId === c.userId || currentUser?.role === 'Administrator';
                 return (
                   <div key={c.commentId} className="industrial-card rounded p-4">
@@ -2173,7 +2173,7 @@ const isAdmin = hasPermission(['Administrator']);
                         <button
                           onClick={() => handleDeleteComment(c)}
                           className="ml-auto p-1 text-tertiary hover:text-red-status transition-colors"
-                          title="Delete comment"
+                          aria-label={`Delete comment ${idx + 1}`}
                         >
                           {busy === `comment:del:${c.commentId}` ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -2460,7 +2460,7 @@ const isAdmin = hasPermission(['Administrator']);
                               <button
                                 onClick={() => handleAttachmentDownload(att)}
                                 className="p-1 text-tertiary hover:text-primary transition-colors"
-                                title="Download"
+                                aria-label={`Download file ${idx + 1}`}
                               >
                                 <Download className="w-3.5 h-3.5" />
                               </button>
@@ -2468,7 +2468,7 @@ const isAdmin = hasPermission(['Administrator']);
                                 <button
                                   onClick={() => handleAttachmentDelete(att)}
                                   className="p-1 text-tertiary hover:text-red-status transition-colors"
-                                  title="Delete attachment"
+                                  aria-label={`Delete attachment ${idx + 1}`}
                                 >
                                   {attBusy === `del:${att.attachmentId}` ? (
                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
