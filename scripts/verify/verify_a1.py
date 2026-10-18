@@ -203,6 +203,17 @@ APPROVED_PROMOTIONS: list = [
     # placed outside this clause. Diff coverage is 3.3.8, not 3.6, and is
     # tracked on row 149 and L37; owner acceptance 2026-10-04.
     ("3.6 general change log", "Partial", "Met", "1d702458"),
+
+    # SOW 3.5.2 (row 175). The percentage-allocation route was verified at
+    # e2a005d and the row stayed Partial only because no screen exposed the
+    # editor. UI gap-closure C4 (406b393) shipped a costs tab on the
+    # work-order detail page wired to those routes; green CI run 39143935804
+    # (Frontend job 117723822317, Backend job 117723822493). Owner decision
+    # 2026-10-18 (workstream decision 5) authorised the Partial -> Met move as
+    # a docs commit separate from the feature commit, and this entry is that
+    # commit. First empty BUILD set in the matrix's history; §3 is 105 Met,
+    # 0 Partial, 0 Not Met.
+    ("3.5.2 cost-split-editor", "Partial", "Met", "406b393"),
 ]
 
 # One more row has moved since the freeze and it is NOT a section 3 clause, so
