@@ -15,8 +15,12 @@ describe('materials routes', () => {
   it('returns the seeded material list for an authenticated user', async () => {
     const res = await api().get('/api/materials').set(authHeaders(ctx.adminToken));
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(5);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThanOrEqual(5);
+    expect(typeof res.body.total).toBe('number');
+    expect(res.body.total).toBeGreaterThanOrEqual(res.body.data.length);
+    expect(res.body.skip).toBe(0);
+    expect(res.body.take).toBe(50);
   });
 
   it('rejects requests without a token with 401', async () => {
@@ -78,8 +82,14 @@ describe('materials routes', () => {
     const before = await auditCount(createdId, 'Delete');
     const res = await api().delete(`/api/materials/${createdId}`).set(authHeaders(ctx.adminToken));
     expect(res.status).toBe(200);
-    const list = await api().get('/api/materials').set(authHeaders(ctx.adminToken));
-    expect((list.body as any[]).some((m) => m.materialId === createdId)).toBe(false);
+    // Search for the row by its unique code rather than paging the whole list:
+    // the route serves pages of 50, so a bare first-page scan would not see the
+    // row either way and the assertion would be vacuous.
+    const list = await api()
+      .get('/api/materials')
+      .set(authHeaders(ctx.adminToken))
+      .query({ search: `TESTM-${stamp}` });
+    expect((list.body.data as Array<{ materialId: string }>).some((m) => m.materialId === createdId)).toBe(false);
     expect(await auditCount(createdId, 'Delete')).toBe(before + 1);
   });
   afterAll(async () => {

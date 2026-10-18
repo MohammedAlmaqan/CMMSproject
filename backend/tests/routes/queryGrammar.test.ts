@@ -9,8 +9,8 @@ import { api, authHeaders, ctx, purgeWorkOrders } from '../helpers.js';
 // The seed leaves no work orders (SEED_DEMO=1 seeds master data only), and the
 // suite runs against a fresh database in CI, so this file creates the work orders
 // it needs and purges them afterwards rather than borrowing rows that may not be
-// there. The bare-array checks use seeded equipment and materials, which the seed
-// does provide.
+// there. The paged-collection checks use seeded equipment and materials, which
+// the seed does provide.
 
 interface WorkOrderRow {
   workOrderId: string;
@@ -32,7 +32,7 @@ describe('OData-style query grammar on GET collections (SOW 5.4)', () => {
       api().get('/api/functional-locations').set(authHeaders(ctx.adminToken)),
       api().get('/api/work-centers').set(authHeaders(ctx.adminToken)),
     ]);
-    const flat = fls.body[0]?.functionalLocationId;
+    const flat = fls.body.data[0]?.functionalLocationId;
     const wc = wcs.body[0]?.workCenterId;
     const body = (overrides: Record<string, unknown> = {}) => ({
       type: 'CM',
@@ -156,21 +156,23 @@ describe('OData-style query grammar on GET collections (SOW 5.4)', () => {
     expect(Object.keys(res.body.data[0])).toEqual(['woNumber']);
   });
 
-  it('applies the grammar to a bare-array collection', async () => {
+  it('applies the grammar to a paged collection', async () => {
     const res = await api()
       .get('/api/equipment')
       .set(authHeaders(ctx.adminToken))
       .query({ $select: 'equipmentCode,criticality', $top: '2', $orderby: 'equipmentCode asc' });
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThan(0);
-    expect(res.body.length).toBeLessThanOrEqual(2);
-    for (const row of res.body) {
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(typeof res.body.total).toBe('number');
+    expect(res.body.data.length).toBeGreaterThan(0);
+    expect(res.body.data.length).toBeLessThanOrEqual(2);
+    expect(res.body.take).toBe(2);
+    for (const row of res.body.data) {
       expect(Object.keys(row).sort()).toEqual(['criticality', 'equipmentCode']);
     }
   });
 
-  it('rejects a malformed query on a bare-array collection too', async () => {
+  it('rejects a malformed query on a paged collection too', async () => {
     const res = await api()
       .get('/api/materials')
       .set(authHeaders(ctx.adminToken))

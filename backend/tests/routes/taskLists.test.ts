@@ -259,7 +259,7 @@ describe('task lists routes', () => {
       // this cannot be exercised with an arbitrary string - which is itself worth
       // asserting rather than working around.
       const eqs = await api().get('/api/equipment').set(authHeaders(ctx.adminToken));
-      const live = eqs.body.filter((e: { isDeleted: boolean }) => !e.isDeleted);
+      const live = eqs.body.data.filter((e: { isDeleted: boolean }) => !e.isDeleted);
       expect(live.length).toBeGreaterThanOrEqual(2);
       assetOne = live[0].equipmentId;
       assetTwo = live[1].equipmentId;

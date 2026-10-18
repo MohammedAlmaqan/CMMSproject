@@ -527,7 +527,7 @@ describe('report rows 60-64', () => {
     ]);
     wc = wcs.body[0].workCenterId;
     taskListId = taskLists.body[0].taskListId;
-    materialId = materials.body[0].materialId;
+    materialId = materials.body.data[0].materialId;
 
     const leafRow = await prisma.functionalLocation.findFirst({
       where: { isDeleted: false, children: { none: { isDeleted: false } } },

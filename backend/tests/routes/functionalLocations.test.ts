@@ -17,7 +17,12 @@ describe('functional locations routes', () => {
   it('returns the functional location list (plant tree source)', async () => {
     const res = await api().get('/api/functional-locations').set(authHeaders(ctx.adminToken));
     expect(res.status).toBe(200);
-    expect(res.body.length).toBeGreaterThanOrEqual(6);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThanOrEqual(6);
+    expect(typeof res.body.total).toBe('number');
+    expect(res.body.total).toBeGreaterThanOrEqual(res.body.data.length);
+    expect(res.body.skip).toBe(0);
+    expect(res.body.take).toBe(50);
   });
 
   it('returns the tree shape', async () => {

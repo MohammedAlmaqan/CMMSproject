@@ -30,7 +30,7 @@ describe('maintenance plans routes', () => {
     ]);
     workCenterId = wcs.body[0].workCenterId;
     taskListId = tls.body[0].taskListId;
-    functionalLocationId = fls.body[0].functionalLocationId;
+    functionalLocationId = fls.body.data[0].functionalLocationId;
   });
 
   afterAll(async () => {

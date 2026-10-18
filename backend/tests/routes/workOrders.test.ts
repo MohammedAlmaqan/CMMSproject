@@ -18,7 +18,7 @@ describe('work orders routes', () => {
       api().get('/api/work-centers').set(authHeaders(ctx.adminToken)),
       api().get('/api/crafts').set(authHeaders(ctx.adminToken)),
     ]);
-    flat = fls.body[0].functionalLocationId;
+    flat = fls.body.data[0].functionalLocationId;
     wc = wcs.body[0].workCenterId;
     sup = ctx.adminId;
     // An operation needs a craft, and the work order's own work centre is the

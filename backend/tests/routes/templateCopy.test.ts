@@ -37,7 +37,7 @@ describe('copying operations from a task list into a work order (SOW 3.1.4)', ()
       api().get('/api/work-centers').set(authHeaders(ctx.adminToken)),
       api().get('/api/crafts').set(authHeaders(ctx.adminToken)),
     ]);
-    flat = fls.body[0].functionalLocationId;
+    flat = fls.body.data[0].functionalLocationId;
     wc = wcs.body[0].workCenterId;
     const all: Array<{ craftId: string; workCenterId: string }> = crafts.body;
     craftId = (all.find((c) => c.workCenterId === wc) ?? all[0]).craftId;
