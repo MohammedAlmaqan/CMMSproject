@@ -1,11 +1,15 @@
 import { api } from '@/lib/api';
-import type { SafetyChecklistTemplate, WorkOrderChecklist } from '@/types';
+import type { ChecklistTemplateInput, SafetyChecklistTemplate, WorkOrderChecklist } from '@/types';
 
 export const safetyChecklistService = {
   getTemplates: () =>
     api.get<SafetyChecklistTemplate[]>('/safety-checklists/templates'),
-  createTemplate: (data: Partial<SafetyChecklistTemplate>) =>
+  createTemplate: (data: ChecklistTemplateInput) =>
     api.post<SafetyChecklistTemplate>('/safety-checklists/templates', data),
+  updateTemplate: (id: string, data: ChecklistTemplateInput) =>
+    api.put<SafetyChecklistTemplate>(`/safety-checklists/templates/${id}`, data),
+  deleteTemplate: (id: string) =>
+    api.delete(`/safety-checklists/templates/${id}`),
   getByWorkOrder: (woId: string) =>
     api.get<WorkOrderChecklist[]>(`/safety-checklists/work-order/${woId}`),
   attachToWorkOrder: (woId: string, templateId: string) =>

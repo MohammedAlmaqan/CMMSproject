@@ -360,3 +360,190 @@ afterAll(async () => {
     expect(downgrade).toBeTruthy();
   });
 });
+
+/**
+ * C3 (UI gap U3, owner decision 2): template edit and delete endpoints, added so
+ * the management screen is not create-only. PUT is Maintenance Planner and
+ * reconciles the item set; DELETE is Maintenance Supervisor and is refused while
+ * a live checklist still references the template.
+ */
+describe('safety checklist template update/delete routes', () => {
+  let metaTemplateId = '';
+  let itemsTemplateId = '';
+  let keepItemId = '';
+  let attachedTemplateId = '';
+  let delTemplateId = '';
+  let attachWoId = '';
+
+  const postTemplate = async (name: string, items: { sequenceNumber: number; description: string }[]) => {
+    const res = await api()
+      .post('/api/safety-checklists/templates')
+      .set(authHeaders(ctx.adminToken))
+      .send({ name, description: `${name} fixture`, items });
+    expect(res.status).toBe(201);
+    return res.body as { checklistTemplateId: string; items: { itemId: string; sequenceNumber: number; description: string }[] };
+  };
+
+  beforeAll(async () => {
+    const fl = (await prisma.functionalLocation.findFirst({ where: { isDeleted: false } }))!;
+    const wc = (await prisma.workCenter.findFirst({ where: { isDeleted: false } }))!;
+    const wo = await prisma.workOrder.create({
+      data: {
+        woNumber: `WO-C3${Date.now()}`,
+        type: 'CM',
+        priority: 'Medium',
+        status: 'Draft',
+        description: 'C3 template guard WO',
+        functionalLocationId: fl.functionalLocationId,
+        workCenterId: wc.workCenterId,
+        supervisorUserId: ctx.adminId,
+        reportedByUserId: ctx.adminId,
+        createdBy: ctx.adminId,
+        modifiedBy: ctx.adminId,
+      },
+    });
+    attachWoId = wo.workOrderId;
+
+    const meta = await postTemplate('C3 Meta', [{ sequenceNumber: 10, description: 'Q1' }]);
+    metaTemplateId = meta.checklistTemplateId;
+
+    const items = await postTemplate('C3 Items', [
+      { sequenceNumber: 10, description: 'Keep me' },
+      { sequenceNumber: 20, description: 'Remove me' },
+    ]);
+    itemsTemplateId = items.checklistTemplateId;
+    keepItemId = items.items[0].itemId;
+
+    const attached = await postTemplate('C3 Attached', [{ sequenceNumber: 10, description: 'Q1' }]);
+    attachedTemplateId = attached.checklistTemplateId;
+    const attachRes = await api()
+      .post(`/api/safety-checklists/work-order/${attachWoId}/attach`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ checklistTemplateId: attachedTemplateId });
+    expect(attachRes.status).toBe(201);
+
+    const del = await postTemplate('C3 Delete', [{ sequenceNumber: 10, description: 'Q1' }]);
+    delTemplateId = del.checklistTemplateId;
+  });
+
+  afterAll(async () => {
+    await purgeWorkOrders([attachWoId]);
+    await purgeSafetyChecklistTemplates([metaTemplateId, itemsTemplateId, attachedTemplateId, delTemplateId]);
+  });
+
+  it('rejects template update by a below-Planner role with 403', async () => {
+    const res = await api()
+      .put(`/api/safety-checklists/templates/${metaTemplateId}`)
+      .set(authHeaders(ctx.operatorToken))
+      .send({ name: 'Nope' });
+    expect(res.status).toBe(403);
+  });
+
+  it('updates template metadata (Planner+) and writes field diffs', async () => {
+    const res = await api()
+      .put(`/api/safety-checklists/templates/${metaTemplateId}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ name: 'C3 Meta v2', description: 'renamed', isMandatory: true });
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('C3 Meta v2');
+    expect(res.body.isMandatory).toBe(true);
+    expect(
+      await prisma.auditLogEntry.count({
+        where: { tableName: 'SafetyChecklistTemplate', recordId: metaTemplateId, action: 'Update', fieldName: 'name' },
+      })
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('rejects a malformed update with a zod-derived 400', async () => {
+    const res = await api()
+      .put(`/api/safety-checklists/templates/${metaTemplateId}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ name: '' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 when updating a template that does not exist', async () => {
+    const res = await api()
+      .put('/api/safety-checklists/templates/00000000-0000-0000-0000-000000000000')
+      .set(authHeaders(ctx.adminToken))
+      .send({ name: 'Ghost' });
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects an update naming an item that is not on the template with 400', async () => {
+    const res = await api()
+      .put(`/api/safety-checklists/templates/${itemsTemplateId}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({
+        items: [{ itemId: '00000000-0000-0000-0000-000000000000', sequenceNumber: 10, description: 'Stranger' }],
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('reconciles items on update: keeps, edits, adds and soft-deletes', async () => {
+    const res = await api()
+      .put(`/api/safety-checklists/templates/${itemsTemplateId}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({
+        items: [
+          { itemId: keepItemId, sequenceNumber: 10, description: 'Keep me (edited)' },
+          { sequenceNumber: 30, description: 'New question' },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.items[0].description).toBe('Keep me (edited)');
+
+    const removed = await prisma.checklistItem.findFirst({
+      where: { checklistTemplateId: itemsTemplateId, isDeleted: false, sequenceNumber: 20 },
+    });
+    expect(removed).toBeNull();
+    const removedAnywhere = await prisma.checklistItem.findFirst({
+      where: { checklistTemplateId: itemsTemplateId, sequenceNumber: 20 },
+    });
+    expect(removedAnywhere?.isDeleted).toBe(true);
+  });
+
+  it('refuses to remove an item that is already attached to a work order with 409', async () => {
+    const res = await api()
+      .put(`/api/safety-checklists/templates/${attachedTemplateId}`)
+      .set(authHeaders(ctx.adminToken))
+      // No itemId anywhere, so the live (attached) item would be soft-deleted.
+      .send({ items: [{ sequenceNumber: 10, description: 'Replacement' }] });
+    expect(res.status).toBe(409);
+  });
+
+  it('rejects template delete by a below-Supervisor role with 403', async () => {
+    const res = await api()
+      .delete(`/api/safety-checklists/templates/${delTemplateId}`)
+      .set(authHeaders(ctx.technicianToken));
+    expect(res.status).toBe(403);
+  });
+
+  it('refuses to delete a template that is attached to a work order with 409', async () => {
+    const res = await api()
+      .delete(`/api/safety-checklists/templates/${attachedTemplateId}`)
+      .set(authHeaders(ctx.adminToken));
+    expect(res.status).toBe(409);
+  });
+
+  it('soft deletes a template with its items and writes a Delete audit row', async () => {
+    const res = await api()
+      .delete(`/api/safety-checklists/templates/${delTemplateId}`)
+      .set(authHeaders(ctx.adminToken));
+    expect(res.status).toBe(200);
+
+    const row = await prisma.safetyChecklistTemplate.findUnique({ where: { checklistTemplateId: delTemplateId } });
+    expect(row?.isDeleted).toBe(true);
+    const item = await prisma.checklistItem.findFirst({ where: { checklistTemplateId: delTemplateId } });
+    expect(item?.isDeleted).toBe(true);
+    expect(
+      await prisma.auditLogEntry.count({
+        where: { tableName: 'SafetyChecklistTemplate', recordId: delTemplateId, action: 'Delete' },
+      })
+    ).toBeGreaterThanOrEqual(1);
+
+    const list = await api().get('/api/safety-checklists/templates').set(authHeaders(ctx.adminToken));
+    expect(list.body.map((t: { checklistTemplateId: string }) => t.checklistTemplateId)).not.toContain(delTemplateId);
+  });
+});

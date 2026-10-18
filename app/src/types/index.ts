@@ -463,6 +463,8 @@ export interface SafetyChecklistTemplate extends Auditable {
   name: string;
   description: string;
   isMandatory: boolean;
+  /** Included by GET /safety-checklists/templates; absent on minimal payloads. */
+  items?: ChecklistItem[];
 }
 
 export interface ChecklistItem {
@@ -470,6 +472,14 @@ export interface ChecklistItem {
   checklistTemplateId: string;
   sequenceNumber: number;
   description: string;
+}
+
+/** Write payload for PUT /safety-checklists/templates/:id (C3). */
+export interface ChecklistTemplateInput {
+  name?: string;
+  description?: string;
+  isMandatory?: boolean;
+  items?: Array<{ itemId?: string; sequenceNumber: number; description: string }>;
 }
 
 export interface WorkOrderChecklist {

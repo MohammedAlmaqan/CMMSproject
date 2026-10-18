@@ -269,6 +269,26 @@ export const checklistTemplateCreateSchema = z.object({
     .min(1),
 });
 
+export const checklistTemplateUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  isMandatory: z.boolean().optional(),
+  // An item either names the row it replaces (itemId) or is new. When items are
+  // sent they replace the template's live item set - anything omitted is
+  // soft-deleted by the route, which refuses when the omitted item is already
+  // attached to a work order.
+  items: z
+    .array(
+      z.object({
+        itemId: z.string().optional(),
+        sequenceNumber: z.number().int().positive(),
+        description: z.string().min(1),
+      })
+    )
+    .min(1)
+    .optional(),
+});
+
 export const checklistAttachSchema = z.object({
   checklistTemplateId: z.string().min(1),
 });

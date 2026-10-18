@@ -2988,6 +2988,162 @@
         }
       }
     },
+    "/api/safety-checklists/templates/{id}": {
+      "put": {
+        "summary": "Update a safety checklist template",
+        "description": "Updates a template's name, description and mandatory flag, and optionally replaces its item set. When `items` is sent, each entry either names the row it replaces (`itemId`) or is created new; live items omitted from the list are soft-deleted, and the update is refused with 409 when an omitted item is already attached to a work order. Validated by the zod schema `checklistTemplateUpdateSchema`. Requires the Maintenance Planner role.\n",
+        "tags": [
+          "Safety Checklists"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "SafetyChecklistTemplate checklistTemplateId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Validated by zod `checklistTemplateUpdateSchema`",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "isMandatory": {
+                    "type": "boolean"
+                  },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "sequenceNumber",
+                        "description"
+                      ],
+                      "properties": {
+                        "itemId": {
+                          "type": "string"
+                        },
+                        "sequenceNumber": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Template updated, with its items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "zod validation failed, or an item does not belong to this template"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Caller role is below Maintenance Planner"
+          },
+          "404": {
+            "description": "Checklist template not found"
+          },
+          "409": {
+            "description": "An item to be removed is already attached to a work order"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Soft delete a safety checklist template",
+        "description": "Marks the template and its item rows isDeleted=true. Refused with 409 while a live work order checklist still references the template, because the work order reads filter on the template's isDeleted flag and an in-use template would silently disappear from those work orders. Requires the Maintenance Supervisor role.\n",
+        "tags": [
+          "Safety Checklists"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "SafetyChecklistTemplate checklistTemplateId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template soft deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Caller role is below Maintenance Supervisor"
+          },
+          "404": {
+            "description": "Checklist template not found"
+          },
+          "409": {
+            "description": "Template is attached to a work order"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/safety-checklists/work-order/{woId}": {
       "get": {
         "summary": "List the checklists attached to a work order",
@@ -5566,52 +5722,66 @@
         ],
         "responses": {
           "200": {
-            "description": "Array of materials",
+            "description": "Page of materials",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "materialId": {
-                        "type": "string"
-                      },
-                      "materialCode": {
-                        "type": "string"
-                      },
-                      "description": {
-                        "type": "string"
-                      },
-                      "unitOfMeasure": {
-                        "type": "string"
-                      },
-                      "standardCost": {
-                        "type": "number",
-                        "format": "float",
-                        "nullable": true,
-                        "description": "Stored as DECIMAL(12,2) since Phase E (D-17); served as a JSON number"
-                      },
-                      "currentStock": {
-                        "type": "number",
-                        "format": "float",
-                        "nullable": true,
-                        "description": "Quantity column; stays binary float (not in the D-17 monetary scope)"
-                      },
-                      "createdBy": {
-                        "type": "string"
-                      },
-                      "createdDate": {
-                        "type": "string",
-                        "format": "date-time"
-                      },
-                      "modifiedBy": {
-                        "type": "string"
-                      },
-                      "modifiedDate": {
-                        "type": "string",
-                        "format": "date-time"
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "materialId": {
+                            "type": "string"
+                          },
+                          "materialCode": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "unitOfMeasure": {
+                            "type": "string"
+                          },
+                          "standardCost": {
+                            "type": "number",
+                            "format": "float",
+                            "nullable": true,
+                            "description": "Stored as DECIMAL(12,2) since Phase E (D-17); served as a JSON number"
+                          },
+                          "currentStock": {
+                            "type": "number",
+                            "format": "float",
+                            "nullable": true,
+                            "description": "Quantity column; stays binary float (not in the D-17 monetary scope)"
+                          },
+                          "createdBy": {
+                            "type": "string"
+                          },
+                          "createdDate": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "modifiedBy": {
+                            "type": "string"
+                          },
+                          "modifiedDate": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
                       }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "skip": {
+                      "type": "integer"
+                    },
+                    "take": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -6957,71 +7127,85 @@
         ],
         "responses": {
           "200": {
-            "description": "Array of functional locations",
+            "description": "Page of functional locations",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "functionalLocationId": {
-                        "type": "string"
-                      },
-                      "locationCode": {
-                        "type": "string"
-                      },
-                      "description": {
-                        "type": "string"
-                      },
-                      "parentLocationId": {
-                        "type": "string",
-                        "nullable": true
-                      },
-                      "locationType": {
-                        "type": "string",
-                        "enum": [
-                          "Plant",
-                          "Area",
-                          "Unit",
-                          "Sub-unit",
-                          "System"
-                        ]
-                      },
-                      "operationalStatus": {
-                        "type": "string",
-                        "enum": [
-                          "Active",
-                          "Inactive"
-                        ]
-                      },
-                      "installationDate": {
-                        "type": "string",
-                        "format": "date-time",
-                        "nullable": true
-                      },
-                      "gpsCoordinates": {
-                        "type": "string",
-                        "nullable": true,
-                        "description": "Free text, not validated as a coordinate pair"
-                      },
-                      "safetyCritical": {
-                        "type": "boolean"
-                      },
-                      "createdBy": {
-                        "type": "string"
-                      },
-                      "createdDate": {
-                        "type": "string",
-                        "format": "date-time"
-                      },
-                      "modifiedBy": {
-                        "type": "string"
-                      },
-                      "modifiedDate": {
-                        "type": "string",
-                        "format": "date-time"
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "functionalLocationId": {
+                            "type": "string"
+                          },
+                          "locationCode": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "parentLocationId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "locationType": {
+                            "type": "string",
+                            "enum": [
+                              "Plant",
+                              "Area",
+                              "Unit",
+                              "Sub-unit",
+                              "System"
+                            ]
+                          },
+                          "operationalStatus": {
+                            "type": "string",
+                            "enum": [
+                              "Active",
+                              "Inactive"
+                            ]
+                          },
+                          "installationDate": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "gpsCoordinates": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Free text, not validated as a coordinate pair"
+                          },
+                          "safetyCritical": {
+                            "type": "boolean"
+                          },
+                          "createdBy": {
+                            "type": "string"
+                          },
+                          "createdDate": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "modifiedBy": {
+                            "type": "string"
+                          },
+                          "modifiedDate": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
                       }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "skip": {
+                      "type": "integer"
+                    },
+                    "take": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -8873,89 +9057,103 @@
         ],
         "responses": {
           "200": {
-            "description": "Array of equipment",
+            "description": "Page of equipment",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "equipmentId": {
-                        "type": "string"
-                      },
-                      "equipmentCode": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "description": {
-                        "type": "string"
-                      },
-                      "manufacturer": {
-                        "type": "string"
-                      },
-                      "model": {
-                        "type": "string"
-                      },
-                      "serialNumber": {
-                        "type": "string"
-                      },
-                      "assetTag": {
-                        "type": "string"
-                      },
-                      "equipmentClass": {
-                        "type": "string"
-                      },
-                      "criticality": {
-                        "type": "string",
-                        "enum": [
-                          "S",
-                          "A",
-                          "B",
-                          "C"
-                        ]
-                      },
-                      "operationalStatus": {
-                        "type": "string",
-                        "enum": [
-                          "Active",
-                          "Inactive",
-                          "Decommissioned"
-                        ]
-                      },
-                      "installationDate": {
-                        "type": "string",
-                        "format": "date-time",
-                        "nullable": true
-                      },
-                      "warrantyExpiryDate": {
-                        "type": "string",
-                        "format": "date-time",
-                        "nullable": true
-                      },
-                      "technicalParameters": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
                         "type": "object",
-                        "additionalProperties": true
-                      },
-                      "functionalLocationId": {
-                        "type": "string"
-                      },
-                      "createdBy": {
-                        "type": "string"
-                      },
-                      "createdDate": {
-                        "type": "string",
-                        "format": "date-time"
-                      },
-                      "modifiedBy": {
-                        "type": "string"
-                      },
-                      "modifiedDate": {
-                        "type": "string",
-                        "format": "date-time"
+                        "properties": {
+                          "equipmentId": {
+                            "type": "string"
+                          },
+                          "equipmentCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "manufacturer": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "serialNumber": {
+                            "type": "string"
+                          },
+                          "assetTag": {
+                            "type": "string"
+                          },
+                          "equipmentClass": {
+                            "type": "string"
+                          },
+                          "criticality": {
+                            "type": "string",
+                            "enum": [
+                              "S",
+                              "A",
+                              "B",
+                              "C"
+                            ]
+                          },
+                          "operationalStatus": {
+                            "type": "string",
+                            "enum": [
+                              "Active",
+                              "Inactive",
+                              "Decommissioned"
+                            ]
+                          },
+                          "installationDate": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "warrantyExpiryDate": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "technicalParameters": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "functionalLocationId": {
+                            "type": "string"
+                          },
+                          "createdBy": {
+                            "type": "string"
+                          },
+                          "createdDate": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "modifiedBy": {
+                            "type": "string"
+                          },
+                          "modifiedDate": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
                       }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "skip": {
+                      "type": "integer"
+                    },
+                    "take": {
+                      "type": "integer"
                     }
                   }
                 }

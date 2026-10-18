@@ -20,6 +20,7 @@ import {
   CalendarClock,
   HardHat,
   Tags,
+  ListChecks,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { hasMinRole, routeFloor } from '@/lib/rbac';
@@ -41,6 +42,7 @@ const navigation = [
   { name: 'Task Lists', icon: ClipboardList, path: '/task-lists' },
   { name: 'Materials', icon: Package, path: '/materials' },
   { name: 'Code Lists', icon: Tags, path: '/code-lists' },
+  { name: 'Safety Checklists', icon: ListChecks, path: '/safety-checklists' },
   { name: 'Reports', icon: BarChart3, path: '/reports' },
   { name: 'Administration', icon: Shield, path: '/administration' },
 ];

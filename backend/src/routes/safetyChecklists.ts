@@ -8,6 +8,7 @@ import { logger } from '../utils/logger.js';
 import {
   validate,
   checklistTemplateCreateSchema,
+  checklistTemplateUpdateSchema,
   checklistAttachSchema,
   checklistUpdateSchema,
   checklistItemUpdateSchema,
@@ -61,7 +62,7 @@ router.get('/templates', async (_req: Request, res: Response) => {
   try {
     const templates = await prisma.safetyChecklistTemplate.findMany({
       where: { isDeleted: false },
-      include: { items: { orderBy: { sequenceNumber: 'asc' } } },
+      include: { items: { where: { isDeleted: false }, orderBy: { sequenceNumber: 'asc' } } },
       orderBy: { name: 'asc' },
     });
 
@@ -148,6 +149,251 @@ router.post('/templates', authorizeMinRole('Maintenance Planner'), validate(chec
     res.status(201).json(template);
   } catch (error) {
     logger.error({ err: error }, 'Error creating checklist template');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+/**
+ * @openapi
+ * /api/safety-checklists/templates/{id}:
+ *   put:
+ *     summary: Update a safety checklist template
+ *     description: >
+ *       Updates a template's name, description and mandatory flag, and optionally
+ *       replaces its item set. When `items` is sent, each entry either names the
+ *       row it replaces (`itemId`) or is created new; live items omitted from the
+ *       list are soft-deleted, and the update is refused with 409 when an omitted
+ *       item is already attached to a work order. Validated by the zod schema
+ *       `checklistTemplateUpdateSchema`. Requires the Maintenance Planner role.
+ *     tags: [Safety Checklists]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: SafetyChecklistTemplate checklistTemplateId
+ *     requestBody:
+ *       required: true
+ *       description: "Validated by zod `checklistTemplateUpdateSchema`"
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               description: { type: string }
+ *               isMandatory: { type: boolean }
+ *               items:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: object
+ *                   required: [sequenceNumber, description]
+ *                   properties:
+ *                     itemId: { type: string }
+ *                     sequenceNumber: { type: integer, minimum: 1 }
+ *                     description: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Template updated, with its items
+ *         content:
+ *           application/json:
+ *             schema: { type: object, additionalProperties: true }
+ *       '400':
+ *         description: zod validation failed, or an item does not belong to this template
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '404':
+ *         description: Checklist template not found
+ *       '409':
+ *         description: An item to be removed is already attached to a work order
+ *       '500':
+ *         description: Internal server error
+ */
+router.put('/templates/:id', authorizeMinRole('Maintenance Planner'), validate(checklistTemplateUpdateSchema), async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { name, description, isMandatory, items } = req.body;
+
+    const existing = await prisma.safetyChecklistTemplate.findFirst({
+      where: { checklistTemplateId: id, isDeleted: false },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'Checklist template not found' });
+    }
+
+    if (items !== undefined) {
+      const liveItems = await prisma.checklistItem.findMany({
+        where: { checklistTemplateId: id, isDeleted: false },
+        select: { itemId: true },
+      });
+      const liveIds = new Set(liveItems.map((i) => i.itemId));
+      const providedIds = items
+        .filter((item: { itemId?: string }) => item.itemId)
+        .map((item: { itemId: string }) => item.itemId);
+      if (providedIds.some((itemId: string) => !liveIds.has(itemId))) {
+        return res.status(400).json({ error: 'Checklist item does not belong to this template' });
+      }
+      const keep = new Set(providedIds);
+      const removed = liveItems.filter((i) => !keep.has(i.itemId)).map((i) => i.itemId);
+      if (removed.length > 0) {
+        // An item already instantiated on a work order is evidence, not a draft
+        // line. Soft-deleting it would silently drop the question - and any
+        // answer to it - from that work order's checklist view, so the route
+        // refuses rather than losing it.
+        const attached = await prisma.workOrderChecklistItem.count({
+          where: { itemId: { in: removed }, isDeleted: false },
+        });
+        if (attached > 0) {
+          return res.status(409).json({
+            error: 'Checklist items already attached to a work order cannot be removed',
+          });
+        }
+      }
+    }
+
+    const template = await prisma.$transaction(async (tx) => {
+      const updated = await tx.safetyChecklistTemplate.update({
+        where: { checklistTemplateId: id },
+        data: {
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
+          ...(isMandatory !== undefined && { isMandatory }),
+          modifiedBy: req.user!.userId,
+        },
+      });
+      if (items !== undefined) {
+        const keepIds = items
+          .filter((item: { itemId?: string }) => item.itemId)
+          .map((item: { itemId: string }) => item.itemId);
+        await tx.checklistItem.updateMany({
+          where: { checklistTemplateId: id, isDeleted: false, itemId: { notIn: keepIds } },
+          data: { isDeleted: true, modifiedBy: req.user!.userId },
+        });
+        for (const item of items as { itemId?: string; sequenceNumber: number; description: string }[]) {
+          if (item.itemId) {
+            await tx.checklistItem.update({
+              where: { itemId: item.itemId },
+              data: {
+                sequenceNumber: item.sequenceNumber,
+                description: item.description,
+                modifiedBy: req.user!.userId,
+              },
+            });
+          } else {
+            await tx.checklistItem.create({
+              data: {
+                checklistTemplateId: id,
+                sequenceNumber: item.sequenceNumber,
+                description: item.description,
+                createdBy: req.user!.userId,
+                modifiedBy: req.user!.userId,
+              },
+            });
+          }
+        }
+      }
+      return updated;
+    });
+
+    await logFieldChanges({
+      table: 'SafetyChecklistTemplate',
+      recordId: id,
+      before: existing,
+      after: template,
+      fields: AUDITED_FIELDS.SafetyChecklistTemplate,
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
+
+    const withItems = await prisma.safetyChecklistTemplate.findUnique({
+      where: { checklistTemplateId: id },
+      include: { items: { where: { isDeleted: false }, orderBy: { sequenceNumber: 'asc' } } },
+    });
+    res.json(withItems);
+  } catch (error) {
+    logger.error({ err: error }, 'Error updating checklist template');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+/**
+ * @openapi
+ * /api/safety-checklists/templates/{id}:
+ *   delete:
+ *     summary: Soft delete a safety checklist template
+ *     description: >
+ *       Marks the template and its item rows isDeleted=true. Refused with 409 while a
+ *       live work order checklist still references the template, because the work order
+ *       reads filter on the template's isDeleted flag and an in-use template would
+ *       silently disappear from those work orders. Requires the Maintenance Supervisor
+ *       role.
+ *     tags: [Safety Checklists]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: SafetyChecklistTemplate checklistTemplateId
+ *     responses:
+ *       '200':
+ *         description: Template soft deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Supervisor
+ *       '404':
+ *         description: Checklist template not found
+ *       '409':
+ *         description: Template is attached to a work order
+ *       '500':
+ *         description: Internal server error
+ */
+router.delete('/templates/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const existing = await prisma.safetyChecklistTemplate.findFirst({
+      where: { checklistTemplateId: id, isDeleted: false },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'Checklist template not found' });
+    }
+
+    const attached = await prisma.workOrderChecklist.count({
+      where: { checklistTemplateId: id, isDeleted: false },
+    });
+    if (attached > 0) {
+      return res.status(409).json({ error: 'Checklist template is attached to a work order and cannot be deleted' });
+    }
+
+    await prisma.checklistItem.updateMany({
+      where: { checklistTemplateId: id },
+      data: { isDeleted: true, modifiedBy: req.user!.userId },
+    });
+    await prisma.safetyChecklistTemplate.update({
+      where: { checklistTemplateId: id },
+      data: { isDeleted: true, modifiedBy: req.user!.userId },
+    });
+
+    await logAuditAction({ table: 'SafetyChecklistTemplate', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
+
+    res.json({ message: 'Checklist template deleted successfully' });
+  } catch (error) {
+    logger.error({ err: error }, 'Error deleting checklist template');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
