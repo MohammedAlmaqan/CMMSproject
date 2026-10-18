@@ -391,7 +391,7 @@ export default function WorkOrdersPage() {
                           <button
                             onClick={(e) => { e.stopPropagation(); navigate(`/work-orders/${wo.workOrderId}`); }}
                             className="p-1 text-tertiary hover:text-primary transition-colors"
-                            title="View"
+                            aria-label={`View ${wo.woNumber}`}
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
@@ -403,7 +403,7 @@ export default function WorkOrdersPage() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Planned'); }}
                                   className="p-1 text-tertiary hover:text-amber transition-colors"
-                                  title="Plan"
+                                  aria-label={`Plan ${wo.woNumber}`}
                                 >
                                   <CalendarClock className="w-3.5 h-3.5" />
                                 </button>
@@ -412,7 +412,7 @@ export default function WorkOrdersPage() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Scheduled'); }}
                                   className="p-1 text-tertiary hover:text-blue-status transition-colors"
-                                  title="Schedule"
+                                  aria-label={`Schedule ${wo.woNumber}`}
                                 >
                                   <CalendarCheck className="w-3.5 h-3.5" />
                                 </button>
@@ -421,7 +421,7 @@ export default function WorkOrdersPage() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'In Progress'); }}
                                   className="p-1 text-tertiary hover:text-green-status transition-colors"
-                                  title="Start"
+                                  aria-label={`Start ${wo.woNumber}`}
                                 >
                                   <Play className="w-3.5 h-3.5" />
                                 </button>
@@ -430,7 +430,7 @@ export default function WorkOrdersPage() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Completed'); }}
                                   className="p-1 text-tertiary hover:text-green-status transition-colors"
-                                  title="Complete"
+                                  aria-label={`Complete ${wo.woNumber}`}
                                 >
                                   <CheckCircle className="w-3.5 h-3.5" />
                                 </button>
@@ -439,7 +439,7 @@ export default function WorkOrdersPage() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Suspended'); }}
                                   className="p-1 text-tertiary hover:text-amber transition-colors"
-                                  title="Suspend"
+                                  aria-label={`Suspend ${wo.woNumber}`}
                                 >
                                   <Pause className="w-3.5 h-3.5" />
                                 </button>
@@ -448,7 +448,7 @@ export default function WorkOrdersPage() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Closed'); }}
                                   className="p-1 text-tertiary hover:text-primary transition-colors"
-                                  title="Close"
+                                  aria-label={`Close ${wo.woNumber}`}
                                 >
                                   <Lock className="w-3.5 h-3.5" />
                                 </button>
@@ -457,7 +457,7 @@ export default function WorkOrdersPage() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Cancelled'); }}
                                   className="p-1 text-tertiary hover:text-red-status transition-colors"
-                                  title="Cancel"
+                                  aria-label={`Cancel ${wo.woNumber}`}
                                 >
                                   <XCircle className="w-3.5 h-3.5" />
                                 </button>

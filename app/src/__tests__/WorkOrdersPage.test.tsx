@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event';
 import WorkOrdersPage from '@/pages/WorkOrdersPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { workOrderService } from '@/services/workOrderService';
+import { useAuthStore } from '@/store/authStore';
 import type { PaginatedResponse } from '@/lib/api';
-import type { WorkOrder } from '@/types';
+import type { User, WorkOrder } from '@/types';
 
 vi.mock('@/services/workOrderService', () => ({
   workOrderService: {
@@ -52,6 +53,17 @@ const row: WorkOrder = {
 };
 
 const page = (items: WorkOrder[]): PaginatedResponse<WorkOrder> => ({ data: items, total: items.length, skip: 0, take: 250 });
+
+const adminUser: User = {
+  userId: 'u-admin',
+  username: 'admin',
+  fullName: 'AdminUser',
+  email: 'admin@example.com',
+  role: 'Administrator',
+  workCenterId: null,
+  isActive: true,
+  lastLogin: null,
+};
 
 describe('WorkOrdersPage', () => {
   beforeEach(() => {
@@ -108,5 +120,29 @@ describe('WorkOrdersPage', () => {
     renderWithProviders(<WorkOrdersPage />, { route: '/work-orders' });
 
     expect(await screen.findByText('No work orders found')).toBeInTheDocument();
+  });
+
+  it('labels each row control with its work order number (tracker v1.1-14)', async () => {
+    useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
+    vi.mocked(workOrderService.getAll).mockResolvedValueOnce(
+      page([
+        row,
+        { ...row, workOrderId: 'wo-2', woNumber: 'WO-0002', status: 'Scheduled' },
+      ])
+    );
+
+    renderWithProviders(<WorkOrdersPage />, { route: '/work-orders' });
+
+    expect(await screen.findByText('WO-0001')).toBeInTheDocument();
+
+    expect(screen.getByRole('button', { name: 'View WO-0001' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View WO-0002' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Plan WO-0001' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start WO-0002' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel WO-0002' })).toBeInTheDocument();
+
+    expect(screen.queryByRole('button', { name: 'View' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Plan' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
   });
 });

@@ -96,6 +96,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
                   ? 'nav-active'
                   : 'text-secondary hover:text-primary hover:bg-surface-tertiary'
               } ${collapsed ? 'justify-center' : ''}`}
+              aria-label={item.name}
               title={collapsed ? item.name : undefined}
             >
               <Icon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.5} />
