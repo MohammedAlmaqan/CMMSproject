@@ -178,9 +178,22 @@ export interface FailureCode extends Auditable {
   description: string;
 }
 
+/** SOW 3.1.4: failure codes form a self-referencing hierarchy via parentCodeId. */
+export interface FailureCodeInput {
+  parentCodeId?: string | null;
+  code: string;
+  description: string;
+}
+
 // ─── Cause Code (§3.1.4) ───
 export interface CauseCode extends Auditable {
   causeCodeId: string;
+  code: string;
+  description: string;
+}
+
+/** SOW 3.1.4: cause codes are a flat root-cause list (no parent field). */
+export interface CauseCodeInput {
   code: string;
   description: string;
 }
