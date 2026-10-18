@@ -50,6 +50,14 @@ Conformance targets applied (per WCAG 2.1):
 
 ## Known remaining gaps (acceptable for light pass)
 
+*Superseded 2026-10-18: all four items below were remediated in the UI
+gap-closure workstream — the Command Palette focus trap as C5 (`b8282d7`,
+green CI run 341), the repeated row labels as C6 (`093bb5b`, run 342), the
+chart tick contrast as C7 (`3ce1bec`, run 343), and the title-only icon
+names as C8 (`bd88162`, push held for owner review). The list below is kept
+as the record of the 2026-10-05 light pass and the owner acceptance made
+on it that day.*
+
 - `WorkOrderDetailPage` inline edit rows reuse aria-labelled controls on every
   table row; edits are mechanically equivalent.
 - Chart tick text at `#92929B` on plot backgrounds meets ≥ 4.5:1 in most panes;

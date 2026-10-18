@@ -26,21 +26,13 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (3)
+## A. Close now — code and data gap (0)
 
-Empty 2026-10-15 → 2026-10-18, when the backlog review re-opened the section with
-three UI gaps. The C11-era position below the table stands: the PM/overdue/audit
-schedulers run in a separate worker process (`backend/src/worker.ts`,
-`npm run worker`) instead of inside the API, so the API tier is stateless and scales;
-matrix line 255 (§4.1 horizontal scaling) is `Met`, and line 281 (§5.1 separate
-background service) keeps its `Partial` status because its email-notification and
-report-generation limbs are still absent (see the closure log).
-
-| ID | Item | Where it lives | Size |
-|---|---|---|---|
-| U1 | Crafts management screen — `backend/src/routes/crafts.ts` has full CRUD (POST/PUT Maintenance Planner+, DELETE Maintenance Supervisor+); the frontend has no page and no route, only read-only pickers (task lists, work centers, work-order operations, capacity board) | Tracker v1.1-15; `docs/UI_GAP_CLOSURE_PLAN.md` | M |
-| U2 | Cause-code / failure-code management — both entities have full CRUD APIs and work-order pickers, but no screen creates, edits or retires either list. Owner approved one `/code-lists` page with two sections (flat-with-parent failure codes, no tree editor) on 2026-10-18 | Tracker v1.1-16; `docs/UI_GAP_CLOSURE_PLAN.md` | M |
-| U3 | Safety-checklist template screen — the API exposes only list/create (`GET`/`POST /safety-checklists/templates`, nested items) and the UI only attaches/responds on the work-order detail page; no edit/delete endpoints and no screen. Owner approved the template `PUT`/`DELETE` endpoints on 2026-10-18 so the screen is not create-only | Tracker v1.1-17; `docs/UI_GAP_CLOSURE_PLAN.md` | M |
+Empty since 2026-10-18 — U1, U2 and U3 shipped as UI gap-closure C1–C3
+(`dd1ab6c`, `5ba3285`, `b328a81`; green CI runs 337–339), and N1's cost-split
+editor shipped as C4 (`406b393`, run 340) with matrix line 175 promoted in
+`65d296d`. The four accessibility items (N2, tracker v1.1-11…14) shipped as
+C5–C8; N2 stays in section E until C8's green CI lands. See the closure log.
 
 ## B. Close now — documentation gap (0)
 
@@ -73,12 +65,11 @@ IIS/ARR front end was executed and verified against the live site on 2026-10-03
 (matrix §4.2, line 256), and `README.md:267`–`README.md:268` are corrected to
 that state (see the closure log).
 
-## E. Decision, not gap (10)
+## E. Decision, not gap (9)
 
 | ID | Item | Where it lives | Decision |
 |---|---|---|---|
-| N1 | Cost-split editor screen (allocation is implemented, tested and reachable by API). **Re-scoped into scheduled work 2026-10-18** — the owner approved the screen in the UI gap-closure workstream; the 2026-10-04 deferral is superseded but preserved. Planned as C4; the matrix-line-175 move lands as a separate docs commit after the screen ships | Tracker v1.1-9; matrix line 175 (§3.5.2); Table 1 item 2; `docs/UI_GAP_CLOSURE_PLAN.md` | Owner, 2026-10-04; **re-scoped 2026-10-18** |
-| N2 | Accessibility remediation: command-palette focus trap, repeated aria-labels on the work-order detail rows, chart tick contrast, title-only icon names | Tracker v1.1-11…14; matrix line 265 (§4.4); Table 2 "Accessibility polish" | Owner acceptance 2026-10-05 |
+| N2 | Accessibility remediation: command-palette focus trap, repeated aria-labels on the work-order detail rows, chart tick contrast, title-only icon names. **Remediated 2026-10-18** as UI gap-closure C5–C8: focus trap (`b8282d7`, green CI run 341), unique row labels (`093bb5b`, run 342), chart tick contrast (`3ce1bec`, run 343), icon-button labels (`bd88162` — push held for owner review, so this row closes on that commit's green CI). The 2026-10-05 acceptance is superseded by the remediation, not by reinterpretation | Tracker v1.1-11…14; matrix line 265 (§4.4); Table 2 "Accessibility polish" | Owner acceptance 2026-10-05; **superseded by remediation 2026-10-18 (C8 CI pending)** |
 | N3 | `MaintenancePlan.functionalLocationId` remains a plain scalar with no relation/FK, mitigated not removed | Matrix line 291 (§5.3) | D-10 / F3 (`638dbd6`) |
 | N4 | Mobile/tablet viewport and ERP integration not delivered | Matrix lines 39 (§1.3), 38 mobile limb | D-6; Client decision (ERP, line 39) |
 | N5 | Deployable container artifacts excluded — delivery is a source-and-pipeline handoff | Matrix line 316 (§6.1) | Client decision recorded at line 316 |
@@ -158,10 +149,15 @@ All 13 Action Sheet Table 2 rows map to one entry: 1→C12, 2→C1, 3→C2, 4→
 All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1, 9→N1,
 10→N10, 11…14→N2.
 
+*Superseded 2026-10-18: as a list of open items this mapping is stale — rows 9,
+11–14 are now closed (see the tracker v1.1 rows and the closure log) and 15–17,
+which did not exist at the freeze, are closed as U1–U3. The mapping stands as a
+record of the freeze state.*
+
 ## Totals
 
-3 code and data gap · 0 documentation gap · 0 blocked on owner · 0 blocked on external ·
-10 decisions-not-gap = **13 open items**.
+0 code and data gap · 0 documentation gap · 0 blocked on owner · 0 blocked on external ·
+9 decisions-not-gap = **9 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -204,6 +200,10 @@ landed.
 | C1 | 2026-10-15 | `a9b5326` | 294 |
 | C11 | 2026-10-15 | `e59e9a1` | 296 |
 | D1 | 2026-10-15 | `7db0d20` | 298 |
+| U1 | 2026-10-18 | `dd1ab6c` | 337 |
+| U2 | 2026-10-18 | `5ba3285` | 338 |
+| U3 | 2026-10-18 | `b328a81` | 339 |
+| N1 | 2026-10-18 | `406b393` + matrix `65d296d` | 340 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.

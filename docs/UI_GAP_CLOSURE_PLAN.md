@@ -83,3 +83,30 @@ closed citing the commit, live deploy + smoke after merge.
 Tree editor for failure codes; navigation IA changes beyond the new items; any
 `SOW_COMPLIANCE.md` status move (each is the owner's, timed per decision 5);
 meter readings (N6); per-user alert opt-out (N8).
+
+## Completion record (2026-10-18)
+
+All eight feature commits and the owner-decision-5 matrix move landed. Every
+pushed commit is green at its own SHA; C8 and the two final docs commits are
+held locally for owner review per instruction, so their CI runs start on push.
+
+| Step | Commit | CI |
+|---|---|---|
+| C0 backlog registration | `6113796` | green |
+| C1 crafts screen (v1.1-15) | `dd1ab6c` | run 337 green |
+| C2 code lists (v1.1-16) | `5ba3285` | run 338 green |
+| C3 checklist templates (v1.1-17) | `b328a81` | run 339 green |
+| C4 cost-split tab (v1.1-9) | `406b393` | run 340 green |
+| C5 palette focus trap (v1.1-11) | `b8282d7` | run 341 green |
+| C6 row aria-labels (v1.1-12) | `093bb5b` | run 342 green |
+| C7 chart tick contrast (v1.1-13) | `3ce1bec` | run 343 green |
+| C8 icon-button labels (v1.1-14) | `bd88162` | pending push (held for owner review) |
+| matrix move §3.5.2 → Met (decision 5) | `65d296d` | n/a (docs + verifier) |
+| records close-out (tracker, GAP register, this record) | this commit | n/a (docs) |
+
+Tracker rows v1.1-9/11/12/13/15/16/17 are closed in the same docs commits'
+wake; v1.1-14 closes on C8's green CI. GAP register: U1–U3 and N1 are in the
+closure log; N2 stays open in section E until C8's green CI lands. §3 is
+105 Met / 0 Partial / 0 Not Met and the §6.4.1 BUILD set is empty for the
+first time. Live deploy + smoke (the definition-of-done line above) remains
+an owner/ops step and was not part of these commits.
