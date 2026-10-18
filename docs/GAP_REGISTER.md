@@ -32,7 +32,7 @@ Empty since 2026-10-18 — U1, U2 and U3 shipped as UI gap-closure C1–C3
 (`dd1ab6c`, `5ba3285`, `b328a81`; green CI runs 337–339), and N1's cost-split
 editor shipped as C4 (`406b393`, run 340) with matrix line 175 promoted in
 `65d296d`. The four accessibility items (N2, tracker v1.1-11…14) shipped as
-C5–C8; N2 stays in section E until C8's green CI lands. See the closure log.
+C5–C8 with green CI runs 341–344, and N2 is closed in the closure log.
 
 ## B. Close now — documentation gap (0)
 
@@ -65,11 +65,10 @@ IIS/ARR front end was executed and verified against the live site on 2026-10-03
 (matrix §4.2, line 256), and `README.md:267`–`README.md:268` are corrected to
 that state (see the closure log).
 
-## E. Decision, not gap (9)
+## E. Decision, not gap (8)
 
 | ID | Item | Where it lives | Decision |
 |---|---|---|---|
-| N2 | Accessibility remediation: command-palette focus trap, repeated aria-labels on the work-order detail rows, chart tick contrast, title-only icon names. **Remediated 2026-10-18** as UI gap-closure C5–C8: focus trap (`b8282d7`, green CI run 341), unique row labels (`093bb5b`, run 342), chart tick contrast (`3ce1bec`, run 343), icon-button labels (`bd88162` — push held for owner review, so this row closes on that commit's green CI). The 2026-10-05 acceptance is superseded by the remediation, not by reinterpretation | Tracker v1.1-11…14; matrix line 265 (§4.4); Table 2 "Accessibility polish" | Owner acceptance 2026-10-05; **superseded by remediation 2026-10-18 (C8 CI pending)** |
 | N3 | `MaintenancePlan.functionalLocationId` remains a plain scalar with no relation/FK, mitigated not removed | Matrix line 291 (§5.3) | D-10 / F3 (`638dbd6`) |
 | N4 | Mobile/tablet viewport and ERP integration not delivered | Matrix lines 39 (§1.3), 38 mobile limb | D-6; Client decision (ERP, line 39) |
 | N5 | Deployable container artifacts excluded — delivery is a source-and-pipeline handoff | Matrix line 316 (§6.1) | Client decision recorded at line 316 |
@@ -157,7 +156,7 @@ record of the freeze state.*
 ## Totals
 
 0 code and data gap · 0 documentation gap · 0 blocked on owner · 0 blocked on external ·
-9 decisions-not-gap = **9 open items**.
+8 decisions-not-gap = **8 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
@@ -204,6 +203,7 @@ landed.
 | U2 | 2026-10-18 | `5ba3285` | 338 |
 | U3 | 2026-10-18 | `b328a81` | 339 |
 | N1 | 2026-10-18 | `406b393` + matrix `65d296d` | 340 |
+| N2 | 2026-10-18 | `b8282d7` + `093bb5b` + `3ce1bec` + `bd88162` | 341–344 |
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
