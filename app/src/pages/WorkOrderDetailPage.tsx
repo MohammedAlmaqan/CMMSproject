@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Loader2,
   DollarSign,
+  Percent,
   Package,
   Users,
   Wrench,
@@ -40,6 +41,7 @@ import { workOrderOperationService } from '@/services/workOrderOperationService'
 import { workOrderMaterialService } from '@/services/workOrderMaterialService';
 import { laborService } from '@/services/laborService';
 import { externalServiceService } from '@/services/externalServiceService';
+import { costSplitService } from '@/services/costSplitService';
 import { safetyChecklistService } from '@/services/safetyChecklistService';
 import { commentService } from '@/services/commentService';
 import { attachmentService } from '@/services/attachmentService';
@@ -61,13 +63,14 @@ import type {
   Material,
   SafetyChecklistTemplate,
   Attachment,
+  CostSplitAllocation,
   ServiceCostCategory,
   CauseCode,
   FailureCode,
 } from '@/types';
 import { serviceCostCategories } from '@/types';
 
-type DetailTab = 'operations' | 'materials' | 'labor' | 'services' | 'checklists' | 'notifications' | 'comments' | 'attachments' | 'history' | 'notes';
+type DetailTab = 'operations' | 'materials' | 'labor' | 'services' | 'costs' | 'checklists' | 'notifications' | 'comments' | 'attachments' | 'history' | 'notes';
 
 interface CraftRef { craftId: string; craftCode: string; craftName?: string; hourlyRate?: number }
 
@@ -238,6 +241,16 @@ export default function WorkOrderDetailPage() {
   // lookup failed". The picker says which one it is.
   const [failureCodesFailed, setFailureCodesFailed] = useState(false);
   const [templates, setTemplates] = useState<SafetyChecklistTemplate[]>([]);
+  // SOW 3.5.2 cost allocation: the whole-set read from GET
+  // /work-order-cost-splits, its own failure flag (this secondary read must not
+  // take the whole page down, and a failure must not read as "no allocation"),
+  // and the replace editor's draft rows.
+  const [costs, setCosts] = useState<CostSplitAllocation | null>(null);
+  const [costsFailed, setCostsFailed] = useState(false);
+  const [costEditing, setCostEditing] = useState(false);
+  const [costDraft, setCostDraft] = useState<{ costCenterCode: string; percentage: string }[]>([]);
+  const [costError, setCostError] = useState<string | null>(null);
+  const [costSuccess, setCostSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -310,12 +323,19 @@ export default function WorkOrderDetailPage() {
     [hasPermission]
   );
 
+  // SOW 3.5.2: replacing the allocation is Maintenance Planner+ on the API.
+  // The per-line DELETE is Supervisor+, but the screen only exposes the atomic
+  // replace - a whole-set write cannot produce the partial state (a remainder
+  // that does not total 100) that the per-line endpoint guards against, and
+  // "these percentages total 100" is only ever true of the set.
+  const canReplaceAllocation = hasPermission(['Maintenance Planner', 'Administrator']);
+
   const reload = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
 const isAdmin = hasPermission(['Administrator']);
-      const [woData, laborData, historyData, usersData, craftsData, materialsData, templatesData, attachmentsData, causeCodesData, failureCodesData] = await Promise.all([
+      const [woData, laborData, historyData, usersData, craftsData, materialsData, templatesData, attachmentsData, causeCodesData, failureCodesData, costsData] = await Promise.all([
         workOrderService.getById(id!),
         laborService.getByWorkOrder(id!),
         workOrderService.getHistory(id!),
@@ -326,6 +346,7 @@ const isAdmin = hasPermission(['Administrator']);
         attachmentService.getByEntity('WorkOrder', id!),
         causeCodeService.getAll().catch(() => [] as CauseCode[]),
         failureCodeService.getAll().catch(() => null),
+        costSplitService.getAllocation(id!).catch(() => null),
       ]);
       setWo(woData as WorkOrderDetail);
       setNotesForm({
@@ -358,6 +379,8 @@ const isAdmin = hasPermission(['Administrator']);
       setCauseCodes(causeCodesData as CauseCode[]);
       setFailureCodes((failureCodesData as FailureCode[] | null) ?? []);
       setFailureCodesFailed(failureCodesData === null);
+      setCosts(costsData);
+      setCostsFailed(costsData === null);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Failed to load work order');
     } finally {
@@ -368,6 +391,73 @@ const isAdmin = hasPermission(['Administrator']);
   useEffect(() => {
     if (id) reload();
   }, [id, reload]);
+
+  // Only the allocation refetches, so a retry or a post-save reload does not
+  // re-pull the entire work order.
+  const reloadCosts = useCallback(async () => {
+    setCostsFailed(false);
+    try {
+      setCosts(await costSplitService.getAllocation(id!));
+    } catch {
+      setCostsFailed(true);
+    }
+  }, [id]);
+
+  const openCostEditor = () => {
+    setCostError(null);
+    setCostSuccess(null);
+    setCostDraft(
+      costs && costs.splits.length > 0
+        ? costs.splits.map((s) => ({ costCenterCode: s.costCenterCode, percentage: String(s.percentage) }))
+        : [{ costCenterCode: '', percentage: '' }]
+    );
+    setCostEditing(true);
+  };
+
+  const handleSaveAllocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCostError(null);
+    setCostSuccess(null);
+
+    // Client-side mirror of checkAllocation() (backend/src/utils/costSplits.ts)
+    // so a bad set is caught here instead of as a 400 round trip; the API
+    // revalidates regardless - this is a courtesy, not the enforcement point.
+    const payload = costDraft.map((r) => ({
+      costCenterCode: r.costCenterCode.trim(),
+      percentage: Number(r.percentage),
+    }));
+    if (payload.some((r) => !r.costCenterCode)) {
+      setCostError('Every row needs a cost centre.');
+      return;
+    }
+    if (payload.some((r) => !Number.isFinite(r.percentage) || r.percentage <= 0 || r.percentage >= 100)) {
+      setCostError('Each percentage must be greater than 0 and less than 100.');
+      return;
+    }
+    const keys = payload.map((r) => r.costCenterCode.toUpperCase());
+    if (new Set(keys).size !== keys.length) {
+      setCostError('A cost centre cannot be allocated more than once.');
+      return;
+    }
+    const total = payload.reduce((sum, r) => sum + r.percentage, 0);
+    if (payload.length > 0 && Math.abs(total - 100) > 1e-6) {
+      setCostError(`Cost split percentages must total 100 (received ${total}).`);
+      return;
+    }
+
+    setBusy('costs:save');
+    try {
+      await costSplitService.replace(id!, payload);
+      setCostEditing(false);
+      setCostSuccess(payload.length === 0 ? 'Allocation cleared.' : 'Allocation saved.');
+      await reloadCosts();
+    } catch (err) {
+      setCostError(err instanceof ApiError ? err.message : 'Failed to save allocation');
+    } finally {
+      setBusy(null);
+    }
+  };
+
 
   const handleAttachmentUpload = async (file: File | undefined) => {
     if (!file) return;
@@ -876,6 +966,13 @@ const isAdmin = hasPermission(['Administrator']);
       : wo.status === 'Suspended' || wo.status === 'Cancelled' ? '#DC2626' : '#D97706';
   }, [wo]);
 
+  const costDraftTotal = useMemo(
+    () => costDraft.reduce((sum, r) => sum + (Number(r.percentage) || 0), 0),
+    [costDraft]
+  );
+  const costDraftBalanced =
+    costDraft.length === 0 || Math.abs(costDraftTotal - 100) < 1e-6;
+
   const tabs = useMemo(() => {
     if (!wo) return [] as { id: DetailTab; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[];
     return [
@@ -883,6 +980,7 @@ const isAdmin = hasPermission(['Administrator']);
       { id: 'materials', label: 'Materials', icon: Package, count: wo.woMaterials?.length || 0 },
       { id: 'labor', label: 'Labor', icon: Users, count: labor.length },
       { id: 'services', label: 'Services', icon: DollarSign, count: wo.externalServices?.length || 0 },
+      { id: 'costs', label: 'Costs', icon: Percent, count: costs?.splits.length || 0 },
       { id: 'checklists', label: 'Checklists', icon: Shield, count: wo.checklists?.length || 0 },
       { id: 'notifications', label: 'Notifications', icon: Bell, count: wo.notifications?.length || 0 },
       { id: 'comments', label: 'Comments', icon: MessageSquare, count: wo.comments?.length || 0 },
@@ -890,7 +988,7 @@ const isAdmin = hasPermission(['Administrator']);
       { id: 'notes', label: 'Failure, Cause & Notes', icon: ClipboardList },
       { id: 'history', label: 'History', icon: FileText, count: history.length },
     ];
-  }, [wo, labor, history, attachments]);
+  }, [wo, labor, history, attachments, costs]);
 
   if (loading) {
     return (
@@ -1700,6 +1798,165 @@ const isAdmin = hasPermission(['Administrator']);
                 </table>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'costs' && (
+          <div className="space-y-3">
+            {costsFailed ? (
+              <div className="industrial-card rounded p-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-status" />
+                  <span className="text-secondary text-sm">Cost allocation could not be loaded.</span>
+                </div>
+                <button
+                  onClick={reloadCosts}
+                  aria-label="Retry cost allocation load"
+                  className="text-amber text-xs hover:underline"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : !costs ? (
+              <EmptyState label="No cost data" />
+            ) : costEditing ? (
+              <form onSubmit={handleSaveAllocation} className="industrial-card rounded p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-primary">Cost allocation (must total 100%)</span>
+                  <button type="button" onClick={() => setCostEditing(false)} aria-label="Cancel allocation edit" className="text-tertiary hover:text-primary">
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+                {costDraft.map((row, idx) => (
+                  <div key={idx} className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <FieldLabel>Cost Centre</FieldLabel>
+                      <input
+                        className={inputCls}
+                        value={row.costCenterCode}
+                        onChange={(e) =>
+                          setCostDraft(costDraft.map((r, i) => (i === idx ? { ...r, costCenterCode: e.target.value } : r)))
+                        }
+                        placeholder="Cost centre code"
+                        aria-label={`Cost centre row ${idx + 1}`}
+                      />
+                    </div>
+                    <div className="w-32">
+                      <FieldLabel>Percentage</FieldLabel>
+                      <input
+                        className={inputCls}
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        value={row.percentage}
+                        onChange={(e) =>
+                          setCostDraft(costDraft.map((r, i) => (i === idx ? { ...r, percentage: e.target.value } : r)))
+                        }
+                        aria-label={`Percentage row ${idx + 1}`}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCostDraft(costDraft.filter((_, i) => i !== idx))}
+                      aria-label={`Remove cost row ${idx + 1}`}
+                      className="text-tertiary hover:text-red-status transition-colors p-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setCostDraft([...costDraft, { costCenterCode: '', percentage: '' }])}
+                    className="flex items-center gap-1.5 text-amber text-xs hover:underline"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add row
+                  </button>
+                  <span className={`text-xs font-mono ${costDraftBalanced ? 'text-green-status' : 'text-red-status'}`}>
+                    Total: {costDraftTotal}%
+                  </span>
+                </div>
+                <p className="text-tertiary text-[11px]">
+                  Removing every row clears the allocation and returns the work order to its own cost centre.
+                </p>
+                {costError && (
+                  <div className="text-xs text-red-status border border-red-status/30 rounded px-2 py-1.5" style={{ backgroundColor: 'rgba(220,38,38,0.08)' }}>
+                    {costError}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setCostEditing(false)} className="px-3 py-1.5 rounded text-xs text-secondary border border-subtle hover:text-primary transition-colors">
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={busy === 'costs:save'}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                    style={{ backgroundColor: '#D97706', color: '#111113' }}
+                  >
+                    {busy === 'costs:save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    {costDraft.length === 0 ? 'Clear allocation' : 'Save allocation'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <InfoCard label="WO Cost Centre" value={costs.workOrderCostCenterCode || '-'} />
+                  <InfoCard label="Actual Cost" value={costs.actualCost == null ? '-' : `$${formatMoney(costs.actualCost)}`} />
+                  <InfoCard label="Planned Cost" value={costs.plannedCost == null ? '-' : `$${formatMoney(costs.plannedCost)}`} />
+                  <InfoCard
+                    label="Allocation"
+                    value={costs.splits.length === 0 ? 'Unallocated' : `${costs.totalPercentage}%`}
+                    color={costs.splits.length === 0 ? undefined : costs.isBalanced ? '#059669' : '#DC2626'}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  {canReplaceAllocation && (
+                    <button
+                      onClick={openCostEditor}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Edit allocation
+                    </button>
+                  )}
+                </div>
+                <div className="industrial-card rounded overflow-hidden">
+                  {costs.splits.length === 0 ? (
+                    <EmptyState label={`No cost split — charged wholly to ${costs.workOrderCostCenterCode || 'its own cost centre'}`} />
+                  ) : (
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: '#27272A' }}>
+                          {['Cost Centre', 'Percentage', 'Allocated Actual Cost'].map((h) => (
+                            <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {costs.splits.map((s, idx) => (
+                          <tr key={s.splitId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
+                            <td className={`${tdCls} text-xs text-primary`}>{s.costCenterCode}</td>
+                            <td className={`${tdCls} font-mono text-xs text-primary`}>{s.percentage}%</td>
+                            <td className={`${tdCls} font-mono text-xs text-secondary`}>${formatMoney(s.allocatedActualCost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+                {!canReplaceAllocation && (
+                  <p className="text-tertiary text-[11px]">Only Maintenance Planners can change the cost allocation.</p>
+                )}
+                {costSuccess && (
+                  <div className="text-xs text-green-status border border-green-status/30 rounded px-2 py-1.5" style={{ backgroundColor: 'rgba(5,150,105,0.08)' }}>
+                    {costSuccess}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

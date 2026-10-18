@@ -671,6 +671,20 @@ export interface CostSplit {
   workOrderId: string;
   costCenterCode: string;
   percentage: number;
+  /** Present on GET /work-order-cost-splits: this line's share of actualCost. */
+  allocatedActualCost?: number;
+}
+
+/** GET /work-order-cost-splits: one work order's whole allocation as a unit. */
+export interface CostSplitAllocation {
+  workOrderId: string;
+  workOrderCostCenterCode: string | null;
+  actualCost: number | null;
+  plannedCost: number | null;
+  splits: CostSplit[];
+  totalPercentage: number;
+  /** True when the work order has no rows, or the rows total exactly 100. */
+  isBalanced: boolean;
 }
 
 // ─── Dashboard KPI Types ───

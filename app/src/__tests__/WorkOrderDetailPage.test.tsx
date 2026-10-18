@@ -13,6 +13,8 @@ import { materialService } from '@/services/materialService';
 import { safetyChecklistService } from '@/services/safetyChecklistService';
 import { attachmentService } from '@/services/attachmentService';
 import { failureCodeService } from '@/services/failureCodeService';
+import { costSplitService } from '@/services/costSplitService';
+import { ApiError } from '@/lib/api';
 import type { User, WorkOrder } from '@/types';
 
 vi.mock('@/services/workOrderService', () => ({
@@ -59,6 +61,10 @@ vi.mock('@/services/failureCodeService', () => ({
   failureCodeService: { getAll: vi.fn() },
 }));
 
+vi.mock('@/services/costSplitService', () => ({
+  costSplitService: { getAllocation: vi.fn(), replace: vi.fn() },
+}));
+
 const adminUser: User = {
   userId: 'u-admin',
   username: 'admin',
@@ -68,6 +74,32 @@ const adminUser: User = {
   workCenterId: null,
   isActive: true,
   lastLogin: null,
+};
+
+const technicianUser: User = {
+  userId: 'u-tech',
+  username: 'tech',
+  fullName: 'TechUser',
+  email: 'tech@example.com',
+  role: 'Technician',
+  workCenterId: null,
+  isActive: true,
+  lastLogin: null,
+};
+
+// SOW 3.5.2 fixture: a balanced two-way split with the allocated amounts the
+// GET endpoint computes by distributing actualCost largest-share-first.
+const allocationFixture = {
+  workOrderId: 'wo-1',
+  workOrderCostCenterCode: 'CC-1',
+  actualCost: 1000,
+  plannedCost: 800,
+  splits: [
+    { splitId: 's1', workOrderId: 'wo-1', costCenterCode: 'CC-1', percentage: 60, allocatedActualCost: 600 },
+    { splitId: 's2', workOrderId: 'wo-1', costCenterCode: 'CC-2', percentage: 40, allocatedActualCost: 400 },
+  ],
+  totalPercentage: 100,
+  isBalanced: true,
 };
 
 const baseWo: WorkOrder = {
@@ -126,6 +158,13 @@ describe('WorkOrderDetailPage', () => {
     vi.mocked(safetyChecklistService.getTemplates).mockResolvedValue([]);
     vi.mocked(attachmentService.getByEntity).mockResolvedValue([]);
     vi.mocked(failureCodeService.getAll).mockResolvedValue([]);
+    vi.mocked(costSplitService.getAllocation).mockResolvedValue(allocationFixture);
+    vi.mocked(costSplitService.replace).mockResolvedValue({
+      workOrderId: 'wo-1',
+      splits: [],
+      replacedCount: 2,
+      totalPercentage: 100,
+    });
     vi.mocked(workOrderService.transitionStatus).mockResolvedValue(baseWo);
   });
 
@@ -233,5 +272,148 @@ describe('WorkOrderDetailPage', () => {
     await waitFor(() => {
       expect(vi.mocked(workOrderService.transitionStatus)).toHaveBeenCalledWith('wo-1', 'Closed');
     });
+  });
+
+  it('renders the cost allocation with per-line allocated amounts', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /Costs/ }));
+
+    expect(await screen.findByText('$600')).toBeInTheDocument();
+    expect(screen.getByText('$400')).toBeInTheDocument();
+    expect(screen.getByText('CC-2')).toBeInTheDocument();
+    expect(screen.getByText('40%')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit allocation' })).toBeInTheDocument();
+  });
+
+  it('replaces the whole set on save and re-reads the allocation', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /Costs/ }));
+    await user.click(await screen.findByRole('button', { name: 'Edit allocation' }));
+
+    expect(screen.getByLabelText('Cost centre row 1')).toHaveValue('CC-1');
+    expect(screen.getByLabelText('Percentage row 2')).toHaveValue(40);
+
+    await user.clear(screen.getByLabelText('Cost centre row 2'));
+    await user.type(screen.getByLabelText('Cost centre row 2'), 'CC-3');
+    await user.click(screen.getByRole('button', { name: 'Save allocation' }));
+
+    await waitFor(() => {
+      expect(costSplitService.replace).toHaveBeenCalledWith('wo-1', [
+        { costCenterCode: 'CC-1', percentage: 60 },
+        { costCenterCode: 'CC-3', percentage: 40 },
+      ]);
+    });
+    expect(await screen.findByText('Allocation saved.')).toBeInTheDocument();
+    expect(vi.mocked(costSplitService.getAllocation)).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('button', { name: 'Save allocation' })).not.toBeInTheDocument();
+  });
+
+  it('refuses to submit an allocation that does not total 100', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /Costs/ }));
+    await user.click(await screen.findByRole('button', { name: 'Edit allocation' }));
+
+    await user.clear(screen.getByLabelText('Percentage row 2'));
+    await user.type(screen.getByLabelText('Percentage row 2'), '30');
+    await user.click(screen.getByRole('button', { name: 'Save allocation' }));
+
+    expect(
+      await screen.findByText('Cost split percentages must total 100 (received 90).')
+    ).toBeInTheDocument();
+    expect(costSplitService.replace).not.toHaveBeenCalled();
+    // The editor stays open so the bad row can be corrected in place.
+    expect(screen.getByLabelText('Cost centre row 1')).toBeInTheDocument();
+  });
+
+  it('surfaces the API rejection when the server refuses the set', async () => {
+    vi.mocked(costSplitService.replace).mockRejectedValueOnce(
+      new ApiError(400, 'Cost center CC-1 is allocated more than once')
+    );
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /Costs/ }));
+    await user.click(await screen.findByRole('button', { name: 'Edit allocation' }));
+    await user.click(screen.getByRole('button', { name: 'Save allocation' }));
+
+    expect(await screen.findByText('Cost center CC-1 is allocated more than once')).toBeInTheDocument();
+    expect(screen.getByLabelText('Cost centre row 1')).toBeInTheDocument();
+  });
+
+  it('offers no allocation editor below the Maintenance Planner floor', async () => {
+    useAuthStore.setState({ user: technicianUser, isAuthenticated: true, loading: false, error: null });
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /Costs/ }));
+
+    expect(await screen.findByText('$600')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit allocation' })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/Only Maintenance Planners can change the cost allocation/)
+    ).toBeInTheDocument();
+  });
+
+  it('says so when the allocation read fails, and the retry re-reads it', async () => {
+    vi.mocked(costSplitService.getAllocation).mockRejectedValue(new Error('allocation read down'));
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /Costs/ }));
+
+    expect(await screen.findByText('Cost allocation could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByText('No cost split')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Retry cost allocation load' }));
+
+    await waitFor(() => {
+      expect(costSplitService.getAllocation).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByText('Cost allocation could not be loaded.')).toBeInTheDocument();
+  });
+
+  it('clearing every row sends an empty set, returning the work order to its own cost centre', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /Costs/ }));
+    await user.click(await screen.findByRole('button', { name: 'Edit allocation' }));
+
+    await user.click(screen.getByRole('button', { name: 'Remove cost row 1' }));
+    await user.click(screen.getByRole('button', { name: 'Remove cost row 1' }));
+
+    // The next read after the clear returns the now-empty allocation.
+    vi.mocked(costSplitService.getAllocation).mockResolvedValueOnce({
+      workOrderId: 'wo-1',
+      workOrderCostCenterCode: 'CC-1',
+      actualCost: 1000,
+      plannedCost: 800,
+      splits: [],
+      totalPercentage: 0,
+      isBalanced: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Clear allocation' }));
+
+    await waitFor(() => {
+      expect(costSplitService.replace).toHaveBeenCalledWith('wo-1', []);
+    });
+    expect(await screen.findByText('Allocation cleared.')).toBeInTheDocument();
+    expect(
+      await screen.findByText(/No cost split — charged wholly to CC-1/)
+    ).toBeInTheDocument();
   });
 });
