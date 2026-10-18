@@ -16,6 +16,7 @@ import EquipmentDetailPage from '@/pages/EquipmentDetailPage';
 import LocationsPage from '@/pages/LocationsPage';
 import MaterialsPage from '@/pages/MaterialsPage';
 import WorkCentersPage from '@/pages/WorkCentersPage';
+import CraftsPage from '@/pages/CraftsPage';
 import TaskListsPage from '@/pages/TaskListsPage';
 import PreventiveMaintenancePage from '@/pages/PreventiveMaintenancePage';
 import ReportsPage from '@/pages/ReportsPage';
@@ -76,6 +77,7 @@ function App() {
                   <Route path="/locations" element={<LocationsPage />} />
                   <Route path="/materials" element={<MaterialsPage />} />
                   <Route path="/work-centers" element={<WorkCentersPage />} />
+                  <Route path="/crafts" element={<CraftsPage />} />
                   <Route path="/task-lists" element={<TaskListsPage />} />
                   <Route path="/preventive-maintenance" element={<PreventiveMaintenancePage />} />
                   <Route path="/reports" element={<ReportsPage />} />

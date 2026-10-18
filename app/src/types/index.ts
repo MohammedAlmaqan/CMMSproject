@@ -143,6 +143,14 @@ export interface Craft extends Auditable {
   hourlyRate: number;
 }
 
+/** SOW 3.1.3: craft write payload; hourlyRate feeds 3.5.1 cost estimation (D-16). */
+export interface CraftInput {
+  workCenterId: string;
+  craftCode: string;
+  description: string;
+  hourlyRate: number;
+}
+
 // ─── Material / Spare Parts (§3.1.5) ───
 export interface Material extends Auditable {
   materialId: string;
