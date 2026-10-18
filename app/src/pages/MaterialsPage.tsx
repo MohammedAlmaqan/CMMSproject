@@ -2,7 +2,7 @@
 // Materials Page — Spare Parts Catalog
 // ============================================================
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   Search,
   ChevronLeft,
@@ -13,16 +13,17 @@ import {
   X,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
-import { useAppStore } from '@/store/appStore';
 import { materialService } from '@/services/materialService';
 import { ApiError } from '@/lib/api';
+import type { Material } from '@/types';
 
 const PAGE_SIZE = 10;
 
 export default function MaterialsPage() {
-  const materials = useAppStore((s) => s.materials);
-  const loading = useAppStore((s) => s.loading);
-  const storeError = useAppStore((s) => s.error);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [sortField, setSortField] = useState<string>('materialCode');
@@ -54,7 +55,7 @@ export default function MaterialsPage() {
     setImportBusy(true);
     try {
       const res = await materialService.importCsv(file);
-      await useAppStore.getState().loadFromApi();
+      await reload();
       setToastError(false);
       setToast(`Import complete: ${res.created} created, ${res.updated} updated`);
     } catch (err) {
@@ -65,28 +66,38 @@ export default function MaterialsPage() {
     }
   };
 
-  const filtered = useMemo(() => {
-    let data = [...materials];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      data = data.filter(
-        (m) =>
-          m.materialCode.toLowerCase().includes(q) ||
-          m.description.toLowerCase().includes(q)
-      );
-    }
-    data.sort((a, b) => {
-      const aVal = (a as unknown as Record<string, unknown>)[sortField] as string;
-      const bVal = (b as unknown as Record<string, unknown>)[sortField] as string;
-      return sortDir === 'asc'
-        ? String(aVal).localeCompare(String(bVal))
-        : String(bVal).localeCompare(String(aVal));
-    });
-    return data;
-  }, [materials, searchQuery, sortField, sortDir]);
+  const queryParams = useMemo(() => {
+    const params: Record<string, string | number> = {
+      $orderby: `${sortField} ${sortDir}`,
+      skip: page * PAGE_SIZE,
+      take: PAGE_SIZE,
+    };
+    if (searchQuery.trim()) params.search = searchQuery.trim();
+    return params;
+  }, [page, searchQuery, sortField, sortDir]);
 
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await materialService.getAll(queryParams);
+      setMaterials(res.data || []);
+      setTotal(res.total ?? 0);
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : 'Failed to load materials');
+      setMaterials([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [queryParams]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  const paged = materials;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleSort = (field: string) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -109,13 +120,13 @@ export default function MaterialsPage() {
             Loading materials...
           </div>
         )}
-        {storeError && (
+        {loadError && (
           <div className="mb-4 flex items-center justify-between rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
-            <span>{storeError}</span>
-            <button onClick={() => useAppStore.getState().loadFromApi()} className="ml-2 underline hover:text-red-100">Retry</button>
+            <span>{loadError}</span>
+            <button onClick={() => reload()} className="ml-2 underline hover:text-red-100">Retry</button>
           </div>
         )}
-        {!loading && !storeError && materials.length === 0 && (
+        {!loading && !loadError && materials.length === 0 && (
           <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No materials found in the system.</div>
         )}
         <div className="flex items-center gap-3 mb-4">
@@ -153,7 +164,7 @@ export default function MaterialsPage() {
             >
               <Download className="w-3.5 h-3.5" /> {exportBusy ? 'Exporting…' : 'Export'}
             </button>
-            <span className="text-tertiary text-xs">{filtered.length} materials</span>
+            <span className="text-tertiary text-xs">{total} materials</span>
           </div>
         </div>
 
@@ -221,7 +232,7 @@ export default function MaterialsPage() {
 
         <div className="flex items-center justify-between mt-4">
           <span className="text-tertiary text-xs">
-            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
           </span>
           <div className="flex items-center gap-1">
             <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><ChevronLeft className="w-4 h-4" /></button>

@@ -28,16 +28,25 @@ import type { Equipment, FunctionalLocation } from '@/types';
 
 const PAGE_SIZE = 12;
 
+// The tree sidebar needs every asset's id and location to count equipment per
+// node, and the class dropdown needs the estate-wide class list - so the page
+// keeps one lightweight index (ids only) and pages the table itself through the
+// API rather than holding every full row in memory.
+type EquipmentIndexEntry = Pick<Equipment, 'equipmentId' | 'functionalLocationId' | 'equipmentClass'>;
+
 export default function EquipmentPage() {
   const navigate = useNavigate();
 
-  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [equipIndex, setEquipIndex] = useState<EquipmentIndexEntry[]>([]);
+  const [rows, setRows] = useState<Equipment[]>([]);
+  const [total, setTotal] = useState(0);
   const [locations, setLocations] = useState<FunctionalLocation[]>([]);
   // The per-asset work-order count is a property of the whole estate, so it is
   // computed from every work order (ids only) rather than the first 200 rows the
   // page used to fetch - which understated the count for every asset.
   const [woCounts, setWoCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [rowsLoading, setRowsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
@@ -73,7 +82,7 @@ export default function EquipmentPage() {
     setImportBusy(true);
     try {
       const res = await equipmentService.importCsv(file);
-      await reload();
+      await Promise.all([loadIndex(), fetchRows()]);
       setToastError(false);
       setToast(`Import complete: ${res.created} created, ${res.updated} updated`);
     } catch (err) {
@@ -84,16 +93,16 @@ export default function EquipmentPage() {
     }
   };
 
-  const reload = useCallback(async () => {
+  const loadIndex = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [eqRes, locRes, woRows] = await Promise.all([
-        equipmentService.getAllPages(),
+      const [idxRes, locRes, woRows] = await Promise.all([
+        equipmentService.getAllPages({ $select: 'equipmentId,functionalLocationId,equipmentClass' }),
         functionalLocationService.getAllPages(),
         workOrderService.getAllPages({ $select: 'equipmentId' }),
       ]);
-      setEquipment(eqRes);
+      setEquipIndex(idxRes as EquipmentIndexEntry[]);
       setLocations(locRes);
       const counts: Record<string, number> = {};
       for (const wo of woRows as Array<{ equipmentId: string | null }>) {
@@ -108,8 +117,8 @@ export default function EquipmentPage() {
   }, []);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    loadIndex();
+  }, [loadIndex]);
 
   // Build tree
   const rootLocations = locations.filter((l) => l.parentLocationId === null);
@@ -136,33 +145,74 @@ export default function EquipmentPage() {
         getChildren(id).forEach((c) => collect(c.functionalLocationId));
       };
       collect(locId);
-      return equipment.filter((e) => allIds.has(e.functionalLocationId));
+      return equipIndex.filter((e) => allIds.has(e.functionalLocationId));
     },
-    [getChildren, equipment]
+    [getChildren, equipIndex]
   );
 
-  const filteredEquipment = useMemo(() => {
-    let data = selectedLocationId
-      ? getEquipmentForNode(selectedLocationId)
-      : equipment;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      data = data.filter(
-        (e) =>
-          e.equipmentCode.toLowerCase().includes(q) ||
-          e.name.toLowerCase().includes(q) ||
-          e.description.toLowerCase().includes(q)
-      );
+  // The class, criticality and search filters are honoured by the API; the
+  // location tree is not, because a node stands for its whole subtree and the
+  // collection grammar cannot express "id in this set". When a node is
+  // selected the matching rows are therefore narrowed client-side over the
+  // complete filtered set, which keeps the descendant semantics and still
+  // reports the true total for the selection.
+  const queryParams = useMemo(() => {
+    const params: Record<string, string | number> = {};
+    if (searchQuery.trim()) params.search = searchQuery.trim();
+    if (classFilter !== 'All') params.equipmentClass = classFilter;
+    if (criticalityFilter !== 'All') params.criticality = criticalityFilter;
+    return params;
+  }, [searchQuery, classFilter, criticalityFilter]);
+
+  const subtreeIds = useMemo(() => {
+    if (!selectedLocationId) return null;
+    const ids = new Set<string>();
+    const collect = (id: string) => {
+      ids.add(id);
+      getChildren(id).forEach((c) => collect(c.functionalLocationId));
+    };
+    collect(selectedLocationId);
+    return ids;
+  }, [selectedLocationId, getChildren]);
+
+  const fetchRows = useCallback(async () => {
+    setRowsLoading(true);
+    setLoadError(null);
+    try {
+      if (!subtreeIds) {
+        const res = await equipmentService.getAll({
+          ...queryParams,
+          skip: page * PAGE_SIZE,
+          take: PAGE_SIZE,
+        });
+        setRows(res.data || []);
+        setTotal(res.total ?? 0);
+      } else {
+        const all = await equipmentService.getAllPages(queryParams);
+        const filtered = all.filter((e) => subtreeIds.has(e.functionalLocationId));
+        setRows(filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE));
+        setTotal(filtered.length);
+      }
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : 'Failed to load equipment');
+      setRows([]);
+      setTotal(0);
+    } finally {
+      setRowsLoading(false);
     }
-    if (classFilter !== 'All') data = data.filter((e) => e.equipmentClass === classFilter);
-    if (criticalityFilter !== 'All') data = data.filter((e) => e.criticality === criticalityFilter);
-    return data;
-  }, [equipment, selectedLocationId, searchQuery, classFilter, criticalityFilter, getEquipmentForNode]);
+  }, [queryParams, page, subtreeIds]);
 
-  const paged = filteredEquipment.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const totalPages = Math.ceil(filteredEquipment.length / PAGE_SIZE);
+  useEffect(() => {
+    fetchRows();
+  }, [fetchRows]);
 
-  const equipmentClasses = useMemo(() => [...new Set(equipment.map((e) => e.equipmentClass))], [equipment]);
+  const paged = rows;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const equipmentClasses = useMemo(
+    () => [...new Set(equipIndex.map((e) => e.equipmentClass))],
+    [equipIndex]
+  );
 
   const renderTree = (nodes: FunctionalLocation[], depth = 0) => {
     return nodes.map((node) => {
@@ -312,12 +362,12 @@ export default function EquipmentPage() {
                 <Download className="w-3.5 h-3.5" /> {exportBusy ? 'Exporting…' : 'Export'}
               </button>
               <span className="text-tertiary text-xs">
-                {loading ? 'Loading…' : `${filteredEquipment.length} equipment`}
+                {loading || rowsLoading ? 'Loading…' : `${total} equipment`}
               </span>
             </div>
             {loadError && (
               <button
-                onClick={reload}
+                onClick={() => { loadIndex(); fetchRows(); }}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber/50 hover:bg-amber/10"
               >
                 <RefreshCw className="w-3 h-3" /> Retry
@@ -325,7 +375,7 @@ export default function EquipmentPage() {
             )}
           </div>
 
-          {loading ? (
+          {loading || (rowsLoading && rows.length === 0) ? (
             <div className="flex-1 flex items-center justify-center py-24">
               <Loader2 className="w-6 h-6 animate-spin text-tertiary" />
               <span className="ml-3 text-sm text-tertiary">Loading equipment...</span>
@@ -335,10 +385,10 @@ export default function EquipmentPage() {
               <div className="text-center">
                 <Box className="w-12 h-12 text-tertiary mx-auto mb-3" />
                 <p className="text-secondary text-sm">{loadError}</p>
-                <button onClick={reload} className="text-amber text-xs mt-2 hover:underline">Retry</button>
+                <button onClick={() => { loadIndex(); fetchRows(); }} className="text-amber text-xs mt-2 hover:underline">Retry</button>
               </div>
             </div>
-          ) : filteredEquipment.length === 0 ? (
+          ) : total === 0 ? (
             <div className="flex-1 flex items-center justify-center py-24">
               <div className="text-center">
                 <Box className="w-12 h-12 text-tertiary mx-auto mb-3" />
@@ -409,7 +459,7 @@ export default function EquipmentPage() {
 
               {/* Pagination */}
               <div className="flex items-center justify-between mt-4">
-                <span className="text-tertiary text-xs">Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filteredEquipment.length)} of {filteredEquipment.length}</span>
+                <span className="text-tertiary text-xs">Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, total)} of {total}</span>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} aria-label="Previous page" className="p-1 text-secondary hover:text-primary disabled:text-tertiary"><CPLeft className="w-4 h-4" /></button>
                   <span className="text-xs text-secondary px-2">{page + 1} / {totalPages}</span>
