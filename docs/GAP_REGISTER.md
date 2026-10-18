@@ -26,14 +26,21 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (0)
+## A. Close now — code and data gap (3)
 
-Empty since 2026-10-15 — the sole item (C11) is resolved: the PM/overdue/audit
-schedulers now run in a separate worker process (`backend/src/worker.ts`,
-`npm run worker`) instead of inside the API, so the API tier is stateless and scales.
-Matrix line 255 (§4.1 horizontal scaling) moves `Partial` → `Met`; line 281 (§5.1
-separate background service) keeps its `Partial` status because its email-notification
-and report-generation limbs are still absent (see the closure log).
+Empty 2026-10-15 → 2026-10-18, when the backlog review re-opened the section with
+three UI gaps. The C11-era position below the table stands: the PM/overdue/audit
+schedulers run in a separate worker process (`backend/src/worker.ts`,
+`npm run worker`) instead of inside the API, so the API tier is stateless and scales;
+matrix line 255 (§4.1 horizontal scaling) is `Met`, and line 281 (§5.1 separate
+background service) keeps its `Partial` status because its email-notification and
+report-generation limbs are still absent (see the closure log).
+
+| ID | Item | Where it lives | Size |
+|---|---|---|---|
+| U1 | Crafts management screen — `backend/src/routes/crafts.ts` has full CRUD (POST/PUT Maintenance Planner+, DELETE Maintenance Supervisor+); the frontend has no page and no route, only read-only pickers (task lists, work centers, work-order operations, capacity board) | Tracker v1.1-15; `docs/UI_GAP_CLOSURE_PLAN.md` | M |
+| U2 | Cause-code / failure-code management — both entities have full CRUD APIs and work-order pickers, but no screen creates, edits or retires either list. Owner approved one `/code-lists` page with two sections (flat-with-parent failure codes, no tree editor) on 2026-10-18 | Tracker v1.1-16; `docs/UI_GAP_CLOSURE_PLAN.md` | M |
+| U3 | Safety-checklist template screen — the API exposes only list/create (`GET`/`POST /safety-checklists/templates`, nested items) and the UI only attaches/responds on the work-order detail page; no edit/delete endpoints and no screen. Owner approved the template `PUT`/`DELETE` endpoints on 2026-10-18 so the screen is not create-only | Tracker v1.1-17; `docs/UI_GAP_CLOSURE_PLAN.md` | M |
 
 ## B. Close now — documentation gap (0)
 
@@ -70,7 +77,7 @@ that state (see the closure log).
 
 | ID | Item | Where it lives | Decision |
 |---|---|---|---|
-| N1 | Cost-split editor screen (allocation is implemented, tested and reachable by API) | Tracker v1.1-9; matrix line 175 (§3.5.2); Table 1 item 2 | Owner, 2026-10-04 |
+| N1 | Cost-split editor screen (allocation is implemented, tested and reachable by API). **Re-scoped into scheduled work 2026-10-18** — the owner approved the screen in the UI gap-closure workstream; the 2026-10-04 deferral is superseded but preserved. Planned as C4; the matrix-line-175 move lands as a separate docs commit after the screen ships | Tracker v1.1-9; matrix line 175 (§3.5.2); Table 1 item 2; `docs/UI_GAP_CLOSURE_PLAN.md` | Owner, 2026-10-04; **re-scoped 2026-10-18** |
 | N2 | Accessibility remediation: command-palette focus trap, repeated aria-labels on the work-order detail rows, chart tick contrast, title-only icon names | Tracker v1.1-11…14; matrix line 265 (§4.4); Table 2 "Accessibility polish" | Owner acceptance 2026-10-05 |
 | N3 | `MaintenancePlan.functionalLocationId` remains a plain scalar with no relation/FK, mitigated not removed | Matrix line 291 (§5.3) | D-10 / F3 (`638dbd6`) |
 | N4 | Mobile/tablet viewport and ERP integration not delivered | Matrix lines 39 (§1.3), 38 mobile limb | D-6; Client decision (ERP, line 39) |
@@ -153,8 +160,8 @@ All 10 open v1.1 backlog rows map to one entry: 4→C15, 6→D5, 7→C14, 8→D1
 
 ## Totals
 
-0 code and data gap · 0 documentation gap · 0 blocked on owner · 0 blocked on external ·
-10 decisions-not-gap = **10 open items**.
+3 code and data gap · 0 documentation gap · 0 blocked on owner · 0 blocked on external ·
+10 decisions-not-gap = **13 open items**.
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
