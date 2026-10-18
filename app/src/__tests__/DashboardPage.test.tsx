@@ -65,8 +65,12 @@ vi.mock('recharts', () => ({
   Cell: () => <div />,
   AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Area: () => <div data-testid="area" />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
+  XAxis: ({ stroke, tick }: { stroke?: string; tick?: { fill?: string } }) => (
+    <div data-testid="chart-axis" data-stroke={stroke} data-tick-fill={tick?.fill} />
+  ),
+  YAxis: ({ stroke, tick }: { stroke?: string; tick?: { fill?: string } }) => (
+    <div data-testid="chart-axis" data-stroke={stroke} data-tick-fill={tick?.fill} />
+  ),
   CartesianGrid: () => <div />,
   Tooltip: () => <div />,
 }));
@@ -164,5 +168,19 @@ describe('DashboardPage rows 65-67', () => {
     // The count stays 0 because that is the initial state, but the widget is
     // marked unavailable so the zero cannot be read as "nothing is waiting".
     await waitFor(() => expect(screen.getByText('unavailable')).toBeInTheDocument());
+  });
+
+  it('paints every chart axis tick with the secondary text colour (v1.1-13)', async () => {
+    renderWithProviders(<DashboardPage />, { route: '/' });
+    await screen.findByTestId('bar-backlogHours');
+
+    // Three charts (trend, type, backlog) at two axes each.
+    const axes = await screen.findAllByTestId('chart-axis');
+    expect(axes.length).toBe(6);
+    for (const axis of axes) {
+      expect(axis.dataset.tickFill).toBe('#A1A1AA');
+      // The axis line itself keeps the decorative stroke.
+      expect(axis.dataset.stroke).toBe('#92929B');
+    }
   });
 });

@@ -30,6 +30,11 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+// v1.1-13: tick text is the secondary token (#A1A1AA) so labels clear 4.5:1 on
+// every pane background; the axis stroke stays #92929B - axis lines are
+// decorative and outside the text-contrast rule.
+const AXIS_TICK = { fill: '#A1A1AA' };
+
 type ReportType =
   | 'backlog'
   | 'pm-compliance'
@@ -275,8 +280,8 @@ export default function ReportsPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={backlogData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                        <XAxis dataKey="status" stroke="#92929B" fontSize={11} />
-                        <YAxis stroke="#92929B" fontSize={11} />
+                        <XAxis dataKey="status" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
+                        <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                         <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
                         <Bar dataKey="count" fill="#D97706" radius={[2, 2, 0, 0]} />
                       </BarChart>
@@ -289,8 +294,8 @@ export default function ReportsPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={backlogPriorityData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                        <XAxis dataKey="priority" stroke="#92929B" fontSize={11} />
-                        <YAxis stroke="#92929B" fontSize={11} />
+                        <XAxis dataKey="priority" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
+                        <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                         <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
                         <Bar dataKey="count" fill="#2563EB" radius={[2, 2, 0, 0]} />
                       </BarChart>
@@ -303,8 +308,8 @@ export default function ReportsPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={backlogData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                        <XAxis dataKey="status" stroke="#92929B" fontSize={11} />
-                        <YAxis stroke="#92929B" fontSize={11} />
+                        <XAxis dataKey="status" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
+                        <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                         <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
                         <Bar dataKey="hours" fill="#059669" radius={[2, 2, 0, 0]} />
                       </BarChart>
@@ -379,8 +384,8 @@ export default function ReportsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={mtbfData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                    <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} />
-                    <YAxis stroke="#92929B" fontSize={11} />
+                    <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
+                    <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                     <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
                     <Bar dataKey="mtbf" fill="#2563EB" radius={[2, 2, 0, 0]} name="MTBF (hrs)" />
                   </BarChart>
@@ -401,8 +406,8 @@ export default function ReportsPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={mttrData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                        <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} />
-                        <YAxis stroke="#92929B" fontSize={11} />
+                        <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
+                        <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                         <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
                         <Bar dataKey="mttr" fill="#D97706" radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
                       </BarChart>
@@ -415,8 +420,8 @@ export default function ReportsPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={mttrLocationData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                        <XAxis dataKey="location" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} />
-                        <YAxis stroke="#92929B" fontSize={11} />
+                        <XAxis dataKey="location" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
+                        <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                         <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
                         <Bar dataKey="mttr" fill="#2563EB" radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
                       </BarChart>
@@ -445,8 +450,8 @@ export default function ReportsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={costData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                    <XAxis dataKey="costCenter" stroke="#92929B" fontSize={11} />
-                    <YAxis stroke="#92929B" fontSize={11} />
+                    <XAxis dataKey="costCenter" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
+                    <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                     <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
                     <Bar dataKey="planned" fill="#D97706" radius={[2, 2, 0, 0]} name="Planned" />
                     <Bar dataKey="actual" fill="#059669" radius={[2, 2, 0, 0]} name="Actual" />
@@ -514,8 +519,8 @@ export default function ReportsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={downtimeData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                    <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} />
-                    <YAxis stroke="#92929B" fontSize={11} />
+                    <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
+                    <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                     <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
                     <Bar dataKey="hours" fill="#DC2626" radius={[2, 2, 0, 0]} name="Downtime (hrs)" />
                   </BarChart>

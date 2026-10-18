@@ -25,6 +25,11 @@ import {
   Tooltip, ResponsiveContainer, AreaChart, Area,
 } from 'recharts';
 
+// v1.1-13: tick text is the secondary token (#A1A1AA) so labels clear 4.5:1 on
+// every pane background; the axis stroke stays #92929B - axis lines are
+// decorative and outside the text-contrast rule.
+const AXIS_TICK = { fill: '#A1A1AA' };
+
 const TacticalDashboardGrid = lazy(
   () => import('@/components/dashboard/TacticalDashboardGrid')
 );
@@ -261,8 +266,8 @@ export default function DashboardPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                  <XAxis dataKey="month" stroke="#92929B" fontSize={11} />
-                  <YAxis stroke="#92929B" fontSize={11} />
+                  <XAxis dataKey="month" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
+                  <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#18181B',
@@ -286,8 +291,8 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={typeData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                  <XAxis type="number" stroke="#92929B" fontSize={11} />
-                  <YAxis dataKey="name" type="category" stroke="#92929B" fontSize={11} width={30} />
+                  <XAxis type="number" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
+                  <YAxis dataKey="name" type="category" stroke="#92929B" fontSize={11} tick={AXIS_TICK} width={30} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#18181B',
@@ -319,8 +324,8 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={backlogByCenter}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                  <XAxis dataKey="name" stroke="#92929B" fontSize={11} />
-                  <YAxis stroke="#92929B" fontSize={11} />
+                  <XAxis dataKey="name" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
+                  <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#18181B',
