@@ -26,7 +26,7 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (10)
+## A. Close now — code and data gap (5)
 
 Empty since 2026-10-18 — U1, U2 and U3 shipped as UI gap-closure C1–C3
 (`dd1ab6c`, `5ba3285`, `b328a81`; green CI runs 337–339), and N1's cost-split
@@ -36,24 +36,19 @@ C5–C8 with green CI runs 341–344, and N2 is closed in the closure log.
 
 *Re-opened 2026-10-19 by the RBAC/UI alignment workstream
 (`docs/RBAC_UI_ALIGNMENT_PLAN.md`) for the findings raised in the administrator UAT.
-N11–N15 are scheduled now (commits C1–C5) and N16–N20 are deferred to v1.1 by the
-owner's 2026-10-19 decision; the register follows its existing practice of holding
-deferred-but-planned v1.1 items in category A, as it did for N1 and N2.*
+N11–N15 were scheduled now (commits C1–C5) and **all five closed the same day** (see the
+closure log); N16–N20 were deferred to v1.1 by the owner's 2026-10-19 decision and are held
+here, as the register did for N1 and N2. Count: 10 at re-open → **5**.*
 
 | ID | Item | Where it lives | Size | Schedule |
 |---|---|---|---|---|
-| N11 | Dashboard KPI ribbon is displaced by the lazily-loaded 3D grid and clipped once the grid loads (cards vanish) | `app/src/pages/DashboardPage.tsx`, `app/src/components/dashboard/TacticalDashboardGrid.tsx`, `app/src/index.css` | S | Now (C1) |
-| N12 | Seven mutating controls are shown to roles the API denies, so a low-privilege click returns 403: notification convert-to-WO (Maintenance Planner), PM generate-WO (Maintenance Planner), Equipment and Materials CSV import (Maintenance Planner), work-order/equipment attachment upload (Requester), work-order comment post (Requester), the work-order status transitions (Technician), and the header bell mark-all-read (Requester) | `NotificationDetailPage.tsx`, `PreventiveMaintenancePage.tsx`, `EquipmentPage.tsx`, `MaterialsPage.tsx`, `WorkOrderDetailPage.tsx`, `EquipmentDetailPage.tsx`, `Header.tsx` | M | Now (C2) |
-| N13 | Notification delete exists at Maintenance Supervisor+ in the API but has no UI control anywhere; `notificationService.delete` is dead code | `backend/src/routes/notifications.ts` (`DELETE /:id`), both notification pages | S | Now (C3) |
-| N14 | `PUT /work-orders/:id` floor is Requester, below the UI edit gate (Technician) and the SOW §2.2 Requester scope | `backend/src/routes/workOrders.ts` | S | Now (C4) |
-| N15 | The root error boundary renders the raw stack trace and a light, non-conforming screen | `app/src/components/ErrorBoundary.tsx` | S | Now (C5) |
 | N16 | Management UIs absent for materials CRUD, work-centre CRUD, user edit, audit-log purge, functional-location CSV import and notification edit, though the APIs and services exist | `app/src/services/*` and their pages | L | v1.1 |
 | N17 | No frontend capability map — action gating is ad-hoc per page; the root cause of N12 and N13 | `app/src/lib/rbac.ts` | M | v1.1 |
 | N18 | `GET /users/:id` is authenticate-only while `GET /users` is Administrator-only | `backend/src/routes/users.ts` | S | v1.1 |
 | N19 | `DELETE /external-services/:id` floor (Technician) is below the house Supervisor pattern for deletes | `backend/src/routes/externalServiceCosts.ts` | S | v1.1 |
 | N20 | Alerts have no per-item mark-read UI and exclude Administrator from the recipient fan-out | `Header.tsx`, `backend/src/routes/alerts.ts` | S | v1.1 |
 
-## B. Close now — documentation gap (1)
+## B. Close now — documentation gap (0)
 
 Empty since 2026-10-15 — the sole item (D1) is closed. The documentation accuracy
 sweep re-derived the citations, claims and frozen counts it named: every `file:line`
@@ -72,12 +67,12 @@ constraints). One owner-authorised status move came out of it: matrix line 306 (
 import tools) `Partial` → `Met`. See the closure log.
 
 *Re-opened 2026-10-19 by the RBAC/UI alignment workstream
-(`docs/RBAC_UI_ALIGNMENT_PLAN.md`): the guide and manual rows that still assert
-pre-shipment features are corrected by C6.*
-
-| ID | Item | Where it lives | Size | Schedule |
-|---|---|---|---|---|
-| D2 | Guide/manual rows assert features that have shipped — the notification form, the PM/task-list screens, the user CRUD API and the Requester scoping | `docs/ADMIN_GUIDE.md`, `docs/USER_MANUAL.md` | S | Now (C6) |
+(`docs/RBAC_UI_ALIGNMENT_PLAN.md`): the guide and manual rows still asserting pre-shipment
+features were corrected by C6 (`67b62ba`) and the SOW summary table was reconciled to the
+derived counts by C7a (`c32163e`). The item was registered as **D2** at C0 (`506e8cb`) on
+2026-10-19, which collided with the migration-runbook **D2** closed on 2026-10-10 (closure
+log); it is renumbered **D6** at closure. Closed the same day — see the closure log. Count:
+1 at re-open → **0**.*
 
 ## C. Blocked on owner (0)
 
@@ -189,6 +184,11 @@ record of the freeze state.*
 gap · 1 documentation gap · 0 blocked on owner · 0 blocked on external · 8 decisions-not-gap
 = **19 open items** (see the tables in A and B above).*
 
+*Superseded 2026-10-19 (after the re-open): N11–N15 and D6 closed the same day (commits
+C1–C7a; see the closure log), so the current line reads 5 code and data gap · 0
+documentation gap · 0 blocked on owner · 0 blocked on external · 8 decisions-not-gap =
+**13 open items** (N16–N20 held for v1.1 in category A).*
+
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
 ---
@@ -235,6 +235,17 @@ landed.
 | U3 | 2026-10-18 | `b328a81` | 339 |
 | N1 | 2026-10-18 | `406b393` + matrix `65d296d` | 340 |
 | N2 | 2026-10-18 | `b8282d7` + `093bb5b` + `3ce1bec` + `bd88162` | 341–344 |
+| N11 | 2026-10-19 | `80e6888` | 351 |
+| N12 | 2026-10-19 | `00e2c0f` | 351 |
+| N13 | 2026-10-19 | `052c5e2` | 351 |
+| N14 | 2026-10-19 | `96dd5c2` | 351 |
+| N15 | 2026-10-19 | `e2746df` | †push |
+| D6 | 2026-10-19 | `67b62ba` + `c32163e` | †push |
+
+† The C0–C4 commits (registration and N11–N14) were pushed together, so their green run
+is the batch tip: **run 351 at `96dd5c2`**. N15 (C5) and D6 (C6/C7a) ride the follow-up
+push of 2026-10-19; its run is recorded in the Standing-State Report of that date, and the
+SHA is the durable anchor, per the `this commit` convention.
 
 C9 also needed a test-isolation fix at `e3d87e6` (run 226): the seed's new home-centre
 assignment exposed an unordered `workCenter.findFirst` in `workOrderAlerts.test.ts`.
@@ -575,3 +586,25 @@ in every other doc. That took the all-clauses count from **166 Met / 13 Partial*
 **167 Met / 12 Partial**; the §3 total is unchanged at **104 Met / 1 Partial**. No
 code changed and no decision ID was created: the C6c closure-log row above and the
 row-264 note are the durable anchor, as with C4b, C1, C11, C5 and §5.5.
+
+**N11–N15 and D6** (`80e6888`…`c32163e`, 2026-10-19, and the registration commit C0
+`506e8cb`) close the RBAC/UI alignment workstream (`docs/RBAC_UI_ALIGNMENT_PLAN.md`), the
+findings raised in the 2026-10-19 administrator UAT. **N11** (C1 `80e6888`) keeps the
+dashboard KPI ribbon above the lazily-loaded 3D grid (absolutely-positioned, non-flow
+layers). **N12** (C2 `00e2c0f`) gates all seven mutating controls (including the bell
+mark-read) at their API floors via `hasMinRole`. **N13** (C3 `052c5e2`) adds notification
+delete to the list and detail pages, gated Maintenance Supervisor, making
+`notificationService.delete` live. **N14** (C4 `96dd5c2`) raises `PUT /work-orders/:id`
+from Requester to `Technician`, matching the UI edit gate and SOW §2.2. **N15** (C5
+`e2746df`) stops the root error boundary rendering `error.message` and `error.stack` and
+restyles it with the dark tokens, with a test asserting neither reaches the DOM. **D6**
+(registered as **D2** at C0, renumbered here to avoid the migration-runbook D2 closed
+2026-10-10) corrects the guide/manual feature-availability claims (C6 `67b62ba`) and
+reconciles the `docs/SOW_COMPLIANCE.md` summary table to the counts its Status column
+derives, 168/11 and §3 105/0 (C7a `c32163e`). No `SOW_COMPLIANCE.md` Status moved for
+N11–N15 (implementation and UI items, none holding an open clause) or for D6 (a
+documentation correction, not a status change). C0–C4 landed in one push, green **run 351**
+at the batch tip `96dd5c2`; C5 and C6/C7a landed in the follow-up push of the same day,
+whose run is recorded in the Standing-State Report. All suite work ran against a throwaway
+database (`cmms_e2e_c4`); the operational `cmms` database was not seeded, migrated or
+written.

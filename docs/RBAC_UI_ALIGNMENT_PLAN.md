@@ -16,7 +16,7 @@ owner on 2026-10-19** with the decisions recorded below. Baseline: tag `v1.4.0`
 | F3 | Notification delete exists at Maintenance Supervisor+ in the API but has no UI control anywhere | Missing capability | N13 | v1.1-20 |
 | F4 | `PUT /work-orders/:id` floor is Requester, below the UI edit gate (Technician) and the SOW §2.2 Requester scope | Authorization | N14 | v1.1-21 |
 | F5 | The root error boundary renders the raw stack trace and a light, non-conforming screen | Hygiene / info-disclosure | N15 | v1.1-22 |
-| F6 | Guide/manual rows assert features that have shipped (notification form, PM/task screens, user API, Requester scoping) | Documentation | D2 | — |
+| F6 | Guide/manual rows assert features that have shipped (notification form, PM/task screens, user API, Requester scoping) | Documentation | D6 | — |
 | F7 | Management UIs absent for materials CRUD, work-centre CRUD, user edit, audit-log purge, functional-location CSV import and notification edit, though the APIs and services exist | Missing capability | N16 | v1.1-23 |
 | F8 | No frontend capability map — action gating is ad-hoc per page, the root cause of F2/F3 | Systemic | N17 | v1.1-24 |
 | F9 | `GET /users/:id` is authenticate-only while `GET /users` is Administrator-only | Authorization | N18 | v1.1-25 |
@@ -56,13 +56,14 @@ One concern per commit; each feature commit updates the docs its change makes st
 
 | # | Commit | Concern |
 |---|---|---|
-| C0 | `docs(backlog): register RBAC/UI alignment workstream` | This plan + GAP N11–N20 + D2 + tracker v1.1-18…27 |
+| C0 | `docs(backlog): register RBAC/UI alignment workstream` | This plan + GAP N11–N20 + doc finding (registered as D2, renumbered D6 at closure) + tracker v1.1-18…27 |
 | C1 | `fix(app): keep dashboard KPI ribbon above the lazy 3D grid` | N11 |
 | C2 | `fix(app): gate mutating controls at their API floors` | N12, all seven controls |
-| C3 | `feat(app): delete a notification from the list and detail` | N13 |
-| C4 | `fix(api): raise the work-order update floor above Requester` | N14 |
+| C3 | `feat(app): add notification delete with Supervisor gate` | N13 |
+| C4 | `fix(rbac): require Technician to update a work order` | N14 |
 | C5 | `fix(app): stop leaking stack traces in the error fallback` | N15 |
-| C6 | `docs: correct stale feature-availability claims` | D2 |
+| C6 | `docs: correct stale feature-availability claims` | D6 (guide and manual) |
+| C7a | `docs(compliance): reconcile the SOW summary table to the derived counts` | D6 (SOW summary table) |
 | C7 | `docs(records): close the RBAC/UI alignment findings` | Closure rows for N11–N15 / v1.1-18…22 |
 
 Definition of done per step: `tsc` + eslint clean; frontend and backend tests green
@@ -79,4 +80,25 @@ Administrator fan-out). Status moves in `docs/SOW_COMPLIANCE.md`, if any, stay t
 
 ## Closure record
 
-To be completed at C7, citing each fix's SHA and green CI run.
+Closed 2026-10-19. Every item landed. C0–C4 were pushed together, so their green CI run is
+the batch tip `96dd5c2`.
+
+| # | Item | Commit | Run |
+|---|---|---|---|
+| C0 | plan + GAP N11–N20 + doc finding (D2→D6) + tracker v1.1-18…27 | `506e8cb` | 351 |
+| C1 | N11 | `80e6888` | 351 |
+| C2 | N12 | `00e2c0f` | 351 |
+| C3 | N13 | `052c5e2` | 351 |
+| C4 | N14 | `96dd5c2` | 351 |
+| C5 | N15 | `e2746df` | this push† |
+| C6 | D6 (guide and manual) | `67b62ba` | this push† |
+| C7a | D6 (SOW summary table) | `c32163e` | this push† |
+| C7 | closure records | this commit | this push† |
+
+† C5, C6, C7a and C7 are carried in the follow-up push of 2026-10-19; the Standing-State
+Report of that date records the run number, and each SHA is the durable anchor, per the
+tracker's `this commit` convention. No `SOW_COMPLIANCE.md` Status moved: N11–N15 are
+implementation and UI items holding no open clause, and D6 is a documentation correction,
+so the matrix stays at 168 Met / 11 Partial (§3: 105 Met / 0 Partial). The doc finding was
+registered as **D2** at C0 and renumbered **D6** at closure to avoid the migration-runbook
+D2 closed 2026-10-10. Out of scope, deferred to v1.1: N16, N17, N18, N19, N20.

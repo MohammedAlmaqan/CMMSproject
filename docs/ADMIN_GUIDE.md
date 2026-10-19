@@ -670,7 +670,7 @@ Recorded here so that nobody plans an operation around a feature that does not e
 | Notification email | Not implemented. Alerts surface on the Dashboard only |
 | Automatic log pruning | Not implemented. The audit log grows without bound |
 
-*Updated 2026-10-19 (C6, register D2): the user create/delete API, user-create audit trail,
+*Updated 2026-10-19 (C6, register D6): the user create/delete API, user-create audit trail,
 lockout-clear/user-edit API, PM plan and task-list screens, notification create screen,
 manual scheduler trigger screen and notification scoping rows were corrected from their
 pre-shipment "not implemented" wording to the shipped state. The superseded wording read:

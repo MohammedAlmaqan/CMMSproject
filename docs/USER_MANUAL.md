@@ -494,7 +494,7 @@ These operations exist in the system but have no screen. This section exists so 
 | Clear a lockout early | No | **No API exists.** Database update - see the [Administrator Guide](ADMIN_GUIDE.md#64-clear-an-account-lockout) |
 | Edit a number-prefix setting | Yes (Administrator) | `PUT /api/system-config`; other settings come from environment variables - see the [Administrator Guide](ADMIN_GUIDE.md#3-configuration) |
 
-*Updated 2026-10-19 (C6, register D2): the "Raise a notification", "Create / edit / delete a PM plan" and "Run the PM scheduler manually" rows were removed because those operations now have screens, and an "Edit a user's role, work center, name or email" row was added because editing an existing user still has no UI control.*
+*Updated 2026-10-19 (C6, register D6): the "Raise a notification", "Create / edit / delete a PM plan" and "Run the PM scheduler manually" rows were removed because those operations now have screens, and an "Edit a user's role, work center, name or email" row was added because editing an existing user still has no UI control.*
 
 If a task you need is on this list and there is no screen for it, raise it with your administrator. It is a known gap, not user error.
 
