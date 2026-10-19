@@ -25,6 +25,7 @@ Conformance targets applied (per WCAG 2.1):
 | Icon-only **pagination** prev/next chevron buttons (Materials, Equipment, Work Orders, Notifications, Preventive Maintenance, Administration ×2) | `aria-label="Previous page"` / `aria-label="Next page"`. |
 | Header bell / Sidebar collapse / Login show-password / detail back buttons | `aria-label`s added (`Notifications`, `Collapse/Expand sidebar`, `Show/Hide password`, `Back to …`). |
 | Toast / dismiss buttons (3.3 pages, PM page) | `aria-label="Dismiss message"` (already present on 3.3 pages). |
+| Native `<select>` option lists rendered white-on-white (browser painted the list white while option text inherited the app's light text colour) — every select dropdown in the app | Root `color-scheme: dark` (native controls, including the select list, pickers and scrollbars, paint dark) plus an explicit `select option { background-color:#18181B; color:#FAFAFA }` fallback in `index.css` (WCAG 1.4.3). Global: applies to all 12 pages using native selects. |
 
 ## Per-route record
 

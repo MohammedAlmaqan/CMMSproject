@@ -7,6 +7,18 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Paint native form controls (select dropdown list, pickers, scrollbars)
+       in the dark theme. Without this the browser paints the <select> option
+       list white while the option text inherits the app's light text colour,
+       making every option unreadable. */
+    color-scheme: dark;
+  }
+
+  /* Explicit fallback for engines/OSes that do not honour color-scheme for the
+     <select> option list: force readable option colours globally. */
+  select option {
+    background-color: #18181B;
+    color: #FAFAFA;
   }
 
   body {
