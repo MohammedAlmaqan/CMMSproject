@@ -764,7 +764,7 @@ export default function PreventiveMaintenancePage() {
                   <tr
                     key={plan.planId}
                     className="border-t border-subtle"
-                    style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}
+                    style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}
                   >
                     <td className="px-4 py-2.5 font-mono text-xs text-amber">{plan.planCode}</td>
                     <td className="px-4 py-2.5 text-xs text-primary">{plan.description}</td>

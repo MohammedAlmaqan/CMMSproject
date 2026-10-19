@@ -330,7 +330,7 @@ export default function ReportsPage() {
                     </thead>
                     <tbody>
                       {backlogCentreData.map((c, idx) => (
-                        <tr key={c.centre} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                        <tr key={c.centre} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
                           <td className="px-4 py-2 font-mono text-xs text-primary">{c.centre}</td>
                           <td className="px-4 py-2 font-mono text-xs text-secondary">{c.count}</td>
                           <td className="px-4 py-2 font-mono text-xs text-secondary">{c.hours.toLocaleString()}</td>
@@ -350,15 +350,15 @@ export default function ReportsPage() {
               {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
               <>
                 <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
+                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#151517' }}>
                     <div className="text-tertiary" style={{ fontSize: '10px' }}>Period</div>
                     <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.period}</div>
                   </div>
-                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
+                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#151517' }}>
                     <div className="text-tertiary" style={{ fontSize: '10px' }}>PMs Scheduled</div>
                     <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.scheduledPM ?? 0}</div>
                   </div>
-                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
+                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#151517' }}>
                     <div className="text-tertiary" style={{ fontSize: '10px' }}>PMs Completed</div>
                     <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.completedPM ?? 0}</div>
                   </div>
@@ -469,7 +469,7 @@ export default function ReportsPage() {
                   </thead>
                   <tbody>
                     {costData.map((c, idx) => (
-                      <tr key={c.costCenter} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                      <tr key={c.costCenter} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
                         <td className="px-4 py-2 font-mono text-xs text-primary">{c.costCenter}</td>
                         <td className="px-4 py-2 font-mono text-xs text-secondary">${c.planned.toLocaleString()}</td>
                         <td className="px-4 py-2 font-mono text-xs text-secondary">${c.actual.toLocaleString()}</td>
@@ -494,7 +494,7 @@ export default function ReportsPage() {
                     </thead>
                     <tbody>
                       {costLocationData.map((c, idx) => (
-                        <tr key={c.location} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                        <tr key={c.location} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
                           <td className="px-4 py-2 font-mono text-xs text-primary">{c.location}</td>
                           <td className="px-4 py-2 font-mono text-xs text-secondary">${c.planned.toLocaleString()}</td>
                           <td className="px-4 py-2 font-mono text-xs text-secondary">${c.actual.toLocaleString()}</td>
@@ -522,7 +522,7 @@ export default function ReportsPage() {
                     <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
                     <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                     <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
-                    <Bar dataKey="hours" fill="#DC2626" radius={[2, 2, 0, 0]} name="Downtime (hrs)" />
+                    <Bar dataKey="hours" fill="#F87171" radius={[2, 2, 0, 0]} name="Downtime (hrs)" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -546,7 +546,7 @@ export default function ReportsPage() {
                   </thead>
                   <tbody>
                     {materialConsumption.map((m, idx) => (
-                      <tr key={m.code} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                      <tr key={m.code} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
                         <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.code}</td>
                         <td className="px-4 py-2.5 text-xs text-secondary">{m.description}</td>
                         <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.totalQty}</td>
@@ -568,7 +568,7 @@ export default function ReportsPage() {
                   </thead>
                   <tbody>
                     {materialByOrder.map((m, idx) => (
-                      <tr key={m.workOrder} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                      <tr key={m.workOrder} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
                         <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.workOrder}</td>
                         <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.totalQty}</td>
                         <td className="px-4 py-2.5 font-mono text-xs text-amber">${m.totalCost.toLocaleString()}</td>
@@ -589,7 +589,7 @@ export default function ReportsPage() {
                   </thead>
                   <tbody>
                     {materialByEquipment.map((m, idx) => (
-                      <tr key={m.equipment} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                      <tr key={m.equipment} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
                         <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.equipment}</td>
                         <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.totalQty}</td>
                         <td className="px-4 py-2.5 font-mono text-xs text-amber">${m.totalCost.toLocaleString()}</td>

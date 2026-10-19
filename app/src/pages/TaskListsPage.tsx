@@ -463,7 +463,7 @@ export default function TaskListsPage() {
               </div>
 
               {ops.map((o, i) => (
-                <div key={i} className="rounded border border-subtle p-3 mb-2" style={{ backgroundColor: '#111113' }}>
+                <div key={i} className="rounded border border-subtle p-3 mb-2" style={{ backgroundColor: '#151517' }}>
                   <div className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-1">
                       <span className={labelCls}>#{o.sequenceNumber}</span>

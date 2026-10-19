@@ -25,7 +25,7 @@ import { ApiError } from '@/lib/api';
 import type { Notification, NotificationInput, NotificationType, Priority } from '@/types';
 
 const typeConfig: Record<NotificationType, { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string; label: string }> = {
-  M1: { icon: AlertTriangle, color: '#DC2626', label: 'Malfunction' },
+  M1: { icon: AlertTriangle, color: '#F87171', label: 'Malfunction' },
   M2: { icon: Wrench, color: '#2563EB', label: 'Request' },
   M3: { icon: Bell, color: '#059669', label: 'Completion' },
 };
@@ -418,7 +418,7 @@ export default function NotificationsPage() {
                       <tr
                         key={notif.notificationId}
                         className="border-t border-subtle cursor-pointer table-row-hover transition-colors"
-                        style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}
+                        style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}
                         onClick={() => navigate(`/notifications/${notif.notificationId}`)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {

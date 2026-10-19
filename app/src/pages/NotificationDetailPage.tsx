@@ -22,7 +22,7 @@ import { ApiError } from '@/lib/api';
 import type { Notification, NotificationType } from '@/types';
 
 const typeConfig: Record<NotificationType, { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string; label: string }> = {
-  M1: { icon: AlertTriangle, color: '#DC2626', label: 'Malfunction Report' },
+  M1: { icon: AlertTriangle, color: '#F87171', label: 'Malfunction Report' },
   M2: { icon: Wrench, color: '#2563EB', label: 'Maintenance Request' },
   M3: { icon: Bell, color: '#059669', label: 'Completion Confirmation' },
 };

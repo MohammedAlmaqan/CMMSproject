@@ -279,7 +279,7 @@ export default function AdministrationPage() {
                     {userPaged.map((u, idx) => {
                       const wc = workCenters.find((w) => w.workCenterId === u.workCenterId);
                       return (
-                        <tr key={u.userId} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                        <tr key={u.userId} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
                           <td className="px-4 py-2.5 font-mono text-xs text-primary">{u.username}</td>
                           <td className="px-4 py-2.5 text-xs text-primary font-medium">{u.fullName}</td>
                           <td className="px-4 py-2.5 text-xs text-secondary">{u.email}</td>
@@ -369,7 +369,7 @@ export default function AdministrationPage() {
                     {auditEntries.map((entry, idx) => {
                       const actor = users.find((u) => u.userId === entry.userId);
                       return (
-                        <tr key={entry.auditId} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}>
+                        <tr key={entry.auditId} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
                           <td className="px-4 py-2 font-mono text-xs text-secondary">{new Date(entry.timestamp).toLocaleString()}</td>
                           <td className="px-4 py-2 font-mono text-xs text-primary">{entry.tableName}</td>
                           <td className="px-4 py-2">

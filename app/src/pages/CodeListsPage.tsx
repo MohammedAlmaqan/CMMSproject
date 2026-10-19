@@ -338,7 +338,7 @@ function CodeSection({ kind, noun, codeLabel, descriptionLabel, codePlaceholder,
             <div
               key={idOf(item)}
               className={`grid ${columns} gap-3 px-3 py-2 text-xs border-b border-subtle hover:bg-surface-tertiary transition-colors`}
-              style={{ backgroundColor: '#111113' }}
+              style={{ backgroundColor: '#151517' }}
             >
               <span className="font-mono text-primary">{item.code}</span>
               <span className="text-secondary truncate">{item.description}</span>

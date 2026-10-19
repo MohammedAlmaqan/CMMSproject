@@ -329,7 +329,7 @@ export default function CraftsPage() {
               <div
                 key={craft.craftId}
                 className="grid grid-cols-[120px_1fr_1fr_100px_auto] gap-4 px-3 py-2 text-xs border-b border-subtle hover:bg-surface-tertiary transition-colors"
-                style={{ backgroundColor: '#111113' }}
+                style={{ backgroundColor: '#151517' }}
               >
                 <span className="font-mono text-primary">{craft.craftCode}</span>
                 <span className="text-secondary truncate">{craft.description}</span>

@@ -50,7 +50,7 @@ const statusColors: Record<WorkOrderStatus, string> = {
   Planned: '#D97706',
   Scheduled: '#2563EB',
   'In Progress': '#2563EB',
-  Suspended: '#DC2626',
+  Suspended: '#F87171',
   Completed: '#059669',
   Closed: '#059669',
   Cancelled: '#92929B',
@@ -323,7 +323,7 @@ export default function WorkOrdersPage() {
                     <tr
                       key={wo.workOrderId}
                       className="table-row-hover cursor-pointer transition-colors border-t border-subtle"
-                      style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}
+                      style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}
                       onClick={() => navigate(`/work-orders/${wo.workOrderId}`)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -369,7 +369,7 @@ export default function WorkOrdersPage() {
                         <span
                           className="text-xs font-medium px-1.5 py-0.5 rounded"
                           style={{
-                            color: wo.type === 'EM' ? '#DC2626' : wo.type === 'PM' ? '#2563EB' : '#A1A1AA',
+                            color: wo.type === 'EM' ? '#F87171' : wo.type === 'PM' ? '#2563EB' : '#A1A1AA',
                             backgroundColor: wo.type === 'EM' ? 'rgba(220,38,38,0.1)' : wo.type === 'PM' ? 'rgba(37,99,235,0.1)' : 'rgba(82,82,91,0.1)',
                           }}
                         >

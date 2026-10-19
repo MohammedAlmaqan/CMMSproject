@@ -52,7 +52,7 @@ export default function Header({ title, onCreate, tabs, showActions = true }: He
 
       {/* Center: Tabs */}
       {tabs && (
-        <div className="flex items-center rounded overflow-hidden" style={{ backgroundColor: '#111113' }}>
+        <div className="flex items-center rounded overflow-hidden" style={{ backgroundColor: '#151517' }}>
           {tabs.map((tab) => (
             <button
               key={tab.value}

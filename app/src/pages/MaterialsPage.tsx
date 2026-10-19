@@ -208,7 +208,7 @@ export default function MaterialsPage() {
                 <tr
                   key={mat.materialId}
                   className="border-t border-subtle"
-                  style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}
+                  style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}
                 >
                   <td className="px-4 py-2.5 font-mono text-xs text-primary">{mat.materialCode}</td>
                   <td className="px-4 py-2.5 text-xs text-primary">{mat.description}</td>

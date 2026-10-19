@@ -428,7 +428,7 @@ export default function EquipmentDetailPage() {
                     <StatCard label="Total Work Orders" value={String(eqWorkOrders.length)} color="#D97706" />
                     <StatCard label="Open WOs" value={String(eqWorkOrders.filter((w) => !['Closed', 'Cancelled'].includes(w.status)).length)} color="#2563EB" />
                     <StatCard label="Completed" value={String(eqWorkOrders.filter((w) => w.status === 'Closed').length)} color="#059669" />
-                    <StatCard label="Breakdowns" value={String(eqWorkOrders.filter((w) => w.breakdownFlag).length)} color="#DC2626" />
+                    <StatCard label="Breakdowns" value={String(eqWorkOrders.filter((w) => w.breakdownFlag).length)} color="#F87171" />
                   </div>
                 </div>
                 <div className="industrial-card rounded p-4">
@@ -547,7 +547,7 @@ export default function EquipmentDetailPage() {
               <h3 className="text-primary text-sm font-semibold mb-3">Technical Parameters</h3>
               <div className="grid grid-cols-3 gap-3">
                 {Object.entries(eq.technicalParameters || {}).map(([key, value]) => (
-                  <div key={key} className="p-3 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
+                  <div key={key} className="p-3 rounded border border-subtle" style={{ backgroundColor: '#151517' }}>
                     <div className="text-tertiary mb-1" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{key}</div>
                     <div className="text-primary text-sm font-medium">{String(value)}</div>
                   </div>
@@ -845,7 +845,7 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 
 function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="p-3 rounded border border-subtle" style={{ backgroundColor: '#111113' }}>
+    <div className="p-3 rounded border border-subtle" style={{ backgroundColor: '#151517' }}>
       <div className="text-2xl font-bold" style={{ color }}>{value}</div>
       <div className="text-tertiary" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
     </div>

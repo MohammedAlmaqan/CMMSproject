@@ -22,7 +22,7 @@
   }
 
   body {
-    background-color: #111113;
+    background-color: #151517;
     color: #FAFAFA;
     overflow: hidden;
   }
@@ -126,7 +126,7 @@
   }
 
   .badge-high {
-    color: #DC2626;
+    color: #F87171;
     border: 1px solid rgba(220, 38, 38, 0.5);
   }
 
@@ -141,8 +141,8 @@
   }
 
   .criticality-a {
-    color: #DC2626;
-    border-color: #DC2626;
+    color: #F87171;
+    border-color: #F87171;
   }
 
   .criticality-b {
@@ -190,7 +190,7 @@
 
   .breakdown-banner {
     background: linear-gradient(90deg, rgba(220, 38, 38, 0.2), rgba(220, 38, 38, 0.05));
-    border-left: 3px solid #DC2626;
+    border-left: 3px solid #F87171;
     color: #FAFAFA;
   }
 
@@ -204,7 +204,7 @@
   .text-primary { color: #FAFAFA; }
   .text-secondary { color: #A1A1AA; }
   .text-tertiary { color: #92929B; }
-  .bg-base { background-color: #111113; }
+  .bg-base { background-color: #151517; }
   .bg-surface { background-color: #18181B; }
   .bg-surface-secondary { background-color: #1E1E22; }
   .bg-surface-tertiary { background-color: #27272A; }
@@ -213,6 +213,6 @@
   .text-amber { color: #D97706; }
   .bg-amber { background-color: #D97706; }
   .text-green-status { color: #059669; }
-  .text-red-status { color: #DC2626; }
+  .text-red-status { color: #F87171; }
   .text-blue-status { color: #3B82F6; }
 }

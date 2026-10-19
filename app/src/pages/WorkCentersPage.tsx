@@ -83,7 +83,7 @@ export default function WorkCentersPage() {
                       <span className="text-tertiary text-right" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Hourly Rate</span>
                     </div>
                     {wcCrafts.map((craft) => (
-                      <div key={craft.craftId} className="grid grid-cols-3 gap-2 px-4 py-2 border-b border-subtle" style={{ backgroundColor: '#111113' }}>
+                      <div key={craft.craftId} className="grid grid-cols-3 gap-2 px-4 py-2 border-b border-subtle" style={{ backgroundColor: '#151517' }}>
                         <span className="font-mono text-xs text-primary">{craft.craftCode}</span>
                         <span className="text-xs text-secondary">{craft.description}</span>
                         <span className="font-mono text-xs text-amber text-right">${craft.hourlyRate}/hr</span>

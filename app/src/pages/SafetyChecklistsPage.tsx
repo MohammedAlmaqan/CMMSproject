@@ -391,7 +391,7 @@ export default function SafetyChecklistsPage() {
               <div
                 key={template.checklistTemplateId}
                 className="grid grid-cols-[1fr_2fr_90px_80px_auto] gap-4 px-3 py-2 text-xs border-b border-subtle hover:bg-surface-tertiary transition-colors"
-                style={{ backgroundColor: '#111113' }}
+                style={{ backgroundColor: '#151517' }}
               >
                 <span className="font-mono text-primary truncate">{template.name}</span>
                 <span className="text-secondary truncate">{template.description}</span>

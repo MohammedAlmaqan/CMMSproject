@@ -18,7 +18,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#111113' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#151517' }}>
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <Hexagon className="w-12 h-12 text-amber mb-3" strokeWidth={1.2} />

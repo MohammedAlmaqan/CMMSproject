@@ -39,7 +39,7 @@ const STATUS_COLORS: Record<WorkOrderStatus, string> = {
   Planned: '#D97706',
   Scheduled: '#2563EB',
   'In Progress': '#2563EB',
-  Suspended: '#DC2626',
+  Suspended: '#F87171',
   Completed: '#059669',
   Closed: '#059669',
   Cancelled: '#92929B',
@@ -49,7 +49,7 @@ const TYPE_COLORS: Record<WorkOrderType, string> = {
   CM: '#D97706',
   PM: '#2563EB',
   PdM: '#7C3AED',
-  EM: '#DC2626',
+  EM: '#F87171',
   CAL: '#059669',
 };
 
@@ -168,7 +168,7 @@ export default function DashboardPage() {
               icon={<AlertTriangle className="w-5 h-5" />}
               label="Overdue"
               value={String(kpis.overdueWorkOrders)}
-              color="#DC2626"
+              color="#F87171"
               onClick={() => navigate('/work-orders')}
             />
             <KPICard

@@ -415,7 +415,7 @@ export default function EquipmentPage() {
                         <tr
                           key={eq.equipmentId}
                           className="border-t border-subtle cursor-pointer table-row-hover transition-colors"
-                          style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#111113' }}
+                          style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}
                           onClick={() => navigate(`/equipment/${eq.equipmentId}`)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {

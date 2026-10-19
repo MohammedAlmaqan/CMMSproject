@@ -182,7 +182,7 @@ const selectCls = inputCls;
 const thCls =
   'text-left px-4 py-2.5 font-medium text-tertiary truncate';
 const tdCls = 'px-4 py-2.5';
-const rowBg = (idx: number) => (idx % 2 === 0 ? '#1E1E22' : '#111113');
+const rowBg = (idx: number) => (idx % 2 === 0 ? '#1E1E22' : '#151517');
 
 interface OpFormState {
   description: string;
@@ -963,7 +963,7 @@ const isAdmin = hasPermission(['Administrator']);
     if (!wo) return '#D97706';
     return wo.status === 'In Progress' ? '#2563EB'
       : wo.status === 'Completed' || wo.status === 'Closed' ? '#059669'
-      : wo.status === 'Suspended' || wo.status === 'Cancelled' ? '#DC2626' : '#D97706';
+      : wo.status === 'Suspended' || wo.status === 'Cancelled' ? '#F87171' : '#D97706';
   }, [wo]);
 
   const costDraftTotal = useMemo(
@@ -1136,14 +1136,14 @@ const isAdmin = hasPermission(['Administrator']);
 
       {/* WO Info Cards */}
       <div className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-subtle">
-        <InfoCard label="Type" value={wo.type} color={wo.type === 'EM' ? '#DC2626' : wo.type === 'PM' ? '#2563EB' : '#A1A1AA'} />
-        <InfoCard label="Priority" value={wo.priority} color={wo.priority === 'High' ? '#DC2626' : wo.priority === 'Medium' ? '#D97706' : '#92929B'} />
+        <InfoCard label="Type" value={wo.type} color={wo.type === 'EM' ? '#F87171' : wo.type === 'PM' ? '#2563EB' : '#A1A1AA'} />
+        <InfoCard label="Priority" value={wo.priority} color={wo.priority === 'High' ? '#F87171' : wo.priority === 'Medium' ? '#D97706' : '#92929B'} />
         <InfoCard label="Location" value={wo.functionalLocation?.locationCode || '-'} />
         <InfoCard label="Equipment" value={wo.equipment?.equipmentCode || '-'} />
         <InfoCard label="Work Center" value={wo.workCenter?.code || '-'} />
         <InfoCard label="Supervisor" value={wo.supervisor?.fullName || '-'} />
         <InfoCard label="Planned Cost" value={`$${wo.plannedCost.toLocaleString()}`} color="#D97706" />
-        <InfoCard label="Actual Cost" value={`$${wo.actualCost.toLocaleString()}`} color={wo.actualCost > wo.plannedCost ? '#DC2626' : '#059669'} />
+        <InfoCard label="Actual Cost" value={`$${wo.actualCost.toLocaleString()}`} color={wo.actualCost > wo.plannedCost ? '#F87171' : '#059669'} />
         <InfoCard
           label="Planned Start"
           value={wo.plannedStart ? new Date(wo.plannedStart).toLocaleDateString() : '-'}
@@ -1910,7 +1910,7 @@ const isAdmin = hasPermission(['Administrator']);
                   <InfoCard
                     label="Allocation"
                     value={costs.splits.length === 0 ? 'Unallocated' : `${costs.totalPercentage}%`}
-                    color={costs.splits.length === 0 ? undefined : costs.isBalanced ? '#059669' : '#DC2626'}
+                    color={costs.splits.length === 0 ? undefined : costs.isBalanced ? '#059669' : '#F87171'}
                   />
                 </div>
                 <div className="flex justify-end">

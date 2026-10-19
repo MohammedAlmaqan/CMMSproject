@@ -277,7 +277,7 @@ export default function LocationsPage() {
         <div key={node.functionalLocationId}>
           <div
             className="flex items-center gap-2 px-3 py-2 text-xs border-b border-subtle hover:bg-surface-tertiary transition-colors"
-            style={{ paddingLeft: `${12 + depth * 20}px`, backgroundColor: depth % 2 === 0 ? '#1E1E22' : '#111113' }}
+            style={{ paddingLeft: `${12 + depth * 20}px`, backgroundColor: depth % 2 === 0 ? '#1E1E22' : '#151517' }}
           >
             {children.length > 0 ? (
               <button onClick={() => toggleNode(node.functionalLocationId)} aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.locationCode}`} aria-expanded={isExpanded} className="flex-shrink-0">

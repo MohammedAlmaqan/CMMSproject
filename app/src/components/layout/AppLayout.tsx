@@ -77,7 +77,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <>
-      <div className="flex h-screen w-screen overflow-hidden" style={{ backgroundColor: '#111113' }}>
+      <div className="flex h-screen w-screen overflow-hidden" style={{ backgroundColor: '#151517' }}>
         <a href="#main-content" className="skip-link">Skip to main content</a>
         <Sidebar onOpenCommandPalette={handleOpenCommandPalette} />
         <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col overflow-hidden outline-none">

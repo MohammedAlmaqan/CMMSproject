@@ -213,7 +213,7 @@ export default function CapacityBoardPanel({ crafts }: Props) {
                         <div className="overflow-x-auto">
                           <table className="w-full">
                             <thead>
-                              <tr style={{ backgroundColor: '#111113' }}>
+                              <tr style={{ backgroundColor: '#151517' }}>
                                 <th className="text-left px-3 py-2 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Day</th>
                                 {entry.days.map((d) => {
                                   const { dow, dm } = fmtDay(d.date);
@@ -244,7 +244,7 @@ export default function CapacityBoardPanel({ crafts }: Props) {
                                   </td>
                                 ))}
                               </tr>
-                              <tr style={{ backgroundColor: '#111113' }}>
+                              <tr style={{ backgroundColor: '#151517' }}>
                                 <td className="px-3 py-2 text-xs text-tertiary whitespace-nowrap">Utilisation</td>
                                 {entry.days.map((d) => (
                                   <td
