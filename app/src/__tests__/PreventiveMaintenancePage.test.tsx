@@ -268,6 +268,31 @@ describe('PreventiveMaintenancePage plan management (SOW 2.2 / D-10 / 3.4.2)', (
     expect(screen.getByRole('button', { name: /new plan/i })).toBeInTheDocument();
   }, 20000);
 
+  it('only offers the Generate WO control at the Maintenance Planner floor', () => {
+    useAuthStore.setState({
+      user: { ...adminUser, role: 'Maintenance Planner' },
+      isAuthenticated: true,
+      loading: false,
+      error: null,
+    });
+    renderPage();
+
+    expect(screen.getByRole('button', { name: /generate WO/i })).toBeInTheDocument();
+  }, 20000);
+
+  it('hides the Generate WO control below the Maintenance Planner floor', () => {
+    // generate-wo is Planner+ on the API, so a Requester must not be offered it.
+    useAuthStore.setState({
+      user: { ...adminUser, role: 'Requester' },
+      isAuthenticated: true,
+      loading: false,
+      error: null,
+    });
+    renderPage();
+
+    expect(screen.queryByRole('button', { name: /generate WO/i })).not.toBeInTheDocument();
+  }, 20000);
+
   it('hides write controls from a View-Only user', () => {
     useAuthStore.setState({
       user: { ...adminUser, role: 'View-Only' },

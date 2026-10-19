@@ -87,6 +87,24 @@ const technicianUser: User = {
   lastLogin: null,
 };
 
+const requesterUser: User = {
+  ...technicianUser,
+  userId: 'u-req',
+  username: 'req',
+  fullName: 'ReqUser',
+  email: 'req@example.com',
+  role: 'Requester',
+};
+
+const viewOnlyUser: User = {
+  ...technicianUser,
+  userId: 'u-view',
+  username: 'view',
+  fullName: 'ViewUser',
+  email: 'view@example.com',
+  role: 'View-Only',
+};
+
 // SOW 3.5.2 fixture: a balanced two-way split with the allocated amounts the
 // GET endpoint computes by distributing actualCost largest-share-first.
 const allocationFixture = {
@@ -498,5 +516,50 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByRole('button', { name: 'Delete attachment 1' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete attachment 2' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Download' })).not.toBeInTheDocument();
+  });
+
+  it('hides the status transitions, comment composer and upload from a View-Only user', async () => {
+    // N12: PUT /work-orders/:id/status, POST /comments and POST /attachments are
+    // all above View-Only on the API, so none of these controls may be offered.
+    useAuthStore.setState({ user: viewOnlyUser, isAuthenticated: true, loading: false, error: null });
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+
+    expect(screen.queryByRole('button', { name: 'Plan' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Comments/ }));
+    expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Attachments/ }));
+    expect(screen.queryByRole('button', { name: 'Upload' })).not.toBeInTheDocument();
+  });
+
+  it('offers the comment composer and upload to a Requester but not the status transitions', async () => {
+    useAuthStore.setState({ user: requesterUser, isAuthenticated: true, loading: false, error: null });
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+
+    expect(screen.queryByRole('button', { name: 'Plan' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Comments/ }));
+    expect(screen.getByLabelText('Add a comment')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Attachments/ }));
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument();
+  });
+
+  it('offers the status transitions to a Technician', async () => {
+    useAuthStore.setState({ user: technicianUser, isAuthenticated: true, loading: false, error: null });
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+
+    expect(screen.getByRole('button', { name: 'Plan' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 });

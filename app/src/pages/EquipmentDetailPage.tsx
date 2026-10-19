@@ -31,6 +31,7 @@ import { materialService } from '@/services/materialService';
 import { attachmentService } from '@/services/attachmentService';
 import { ApiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import { hasMinRole } from '@/lib/rbac';
 import type { Equipment, FunctionalLocation, EquipmentMeter, EquipmentHistoryEntry, Attachment, EquipmentBOM, Material } from '@/types';
 
 type EqTab = 'general' | 'parameters' | 'history' | 'meters' | 'documents';
@@ -55,6 +56,9 @@ export default function EquipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const hasPermission = useAuthStore((s) => s.hasPermission);
+  // POST /attachments is Requester+ on the API.
+  const role = useAuthStore((s) => s.user?.role);
+  const canUploadAttachment = hasMinRole(role, 'Requester');
 
   const [eq, setEq] = useState<Equipment | null>(null);
   const [eqLocation, setEqLocation] = useState<FunctionalLocation | null>(null);
@@ -750,14 +754,16 @@ export default function EquipmentDetailPage() {
                   className="hidden"
                   onChange={(e) => handleAttachmentUpload(e.target.files?.[0])}
                 />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={attBusy === 'upload'}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all disabled:opacity-50"
-                >
-                  {attBusy === 'upload' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                  Upload
-                </button>
+                {canUploadAttachment && (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={attBusy === 'upload'}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all disabled:opacity-50"
+                  >
+                    {attBusy === 'upload' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    Upload
+                  </button>
+                )}
                 <span className="text-xs text-tertiary">Manuals, drawings, certificates. Up to 10 MB.</span>
               </div>
               {attError && (

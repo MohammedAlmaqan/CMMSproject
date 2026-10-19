@@ -24,6 +24,8 @@ import { equipmentService } from '@/services/equipmentService';
 import { functionalLocationService } from '@/services/functionalLocationService';
 import { workOrderService } from '@/services/workOrderService';
 import { ApiError } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
+import { hasMinRole } from '@/lib/rbac';
 import type { Equipment, FunctionalLocation } from '@/types';
 
 const PAGE_SIZE = 12;
@@ -60,6 +62,9 @@ export default function EquipmentPage() {
   const [exportBusy, setExportBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [toastError, setToastError] = useState(false);
+  // POST /equipment/import.csv is Maintenance Planner+ on the API.
+  const role = useAuthStore((s) => s.user?.role);
+  const canImport = hasMinRole(role, 'Maintenance Planner');
 
   const handleExport = async () => {
     setExportBusy(true);
@@ -347,13 +352,15 @@ export default function EquipmentPage() {
                 aria-label="Import equipment CSV"
                 onChange={handleImportFile}
               />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importBusy}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight hover:text-amber disabled:opacity-50"
-              >
-                <Upload className="w-3.5 h-3.5" /> {importBusy ? 'Importing…' : 'Import'}
-              </button>
+              {canImport && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={importBusy}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight hover:text-amber disabled:opacity-50"
+                >
+                  <Upload className="w-3.5 h-3.5" /> {importBusy ? 'Importing…' : 'Import'}
+                </button>
+              )}
               <button
                 onClick={handleExport}
                 disabled={exportBusy}

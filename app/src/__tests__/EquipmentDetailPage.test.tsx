@@ -178,4 +178,35 @@ describe('EquipmentDetailPage BOM editing (SOW 3.1.2)', () => {
     expect(screen.queryByRole('button', { name: /edit bom mat-1/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /remove bom mat-1/i })).not.toBeInTheDocument();
   }, 20000);
+
+  it('hides the document upload from a View-Only user', async () => {
+    // POST /attachments is Requester+ on the API.
+    useAuthStore.setState({
+      user: { ...adminUser, role: 'View-Only' },
+      isAuthenticated: true,
+      loading: false,
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /documents/i }));
+
+    expect(screen.queryByRole('button', { name: 'Upload' })).not.toBeInTheDocument();
+  }, 20000);
+
+  it('offers the document upload to a Requester', async () => {
+    useAuthStore.setState({
+      user: { ...adminUser, role: 'Requester' },
+      isAuthenticated: true,
+      loading: false,
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /documents/i }));
+
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument();
+  }, 20000);
 });

@@ -51,6 +51,7 @@ import { userService } from '@/services/userService';
 import { craftService } from '@/services/craftService';
 import { materialService } from '@/services/materialService';
 import { ApiError } from '@/lib/api';
+import { hasMinRole } from '@/lib/rbac';
 import type {
   WorkOrder,
   WorkOrderStatus,
@@ -225,6 +226,12 @@ export default function WorkOrderDetailPage() {
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
   const hasPermission = useAuthStore((s) => s.hasPermission);
+  // API floors for the controls this page exposes but the API gates: the work-order
+  // status transitions are Technician+ (PUT /work-orders/:id/status), comments and
+  // attachments are Requester+ (POST /comments, POST /attachments).
+  const canChangeStatus = hasMinRole(currentUser?.role, 'Technician');
+  const canComment = hasMinRole(currentUser?.role, 'Requester');
+  const canUploadAttachment = hasMinRole(currentUser?.role, 'Requester');
 
   const [activeTab, setActiveTab] = useState<DetailTab>('operations');
   const [wo, setWo] = useState<WorkOrderDetail | null>(null);
@@ -1064,7 +1071,7 @@ const isAdmin = hasPermission(['Administrator']);
               <Loader2 className="w-4 h-4 animate-spin text-tertiary" />
             ) : (
               <>
-                {canTransition('Planned') && (
+                {canChangeStatus && canTransition('Planned') && (
                   <button
                     onClick={() => performTransition('Planned')}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
@@ -1072,7 +1079,7 @@ const isAdmin = hasPermission(['Administrator']);
                     <CalendarClock className="w-3.5 h-3.5" /> Plan
                   </button>
                 )}
-                {canTransition('Scheduled') && (
+                {canChangeStatus && canTransition('Scheduled') && (
                   <button
                     onClick={() => performTransition('Scheduled')}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-blue-status border border-blue-status/50 hover:bg-blue-status/10 transition-all"
@@ -1080,7 +1087,7 @@ const isAdmin = hasPermission(['Administrator']);
                     <CalendarCheck className="w-3.5 h-3.5" /> Schedule
                   </button>
                 )}
-                {canTransition('In Progress') && (
+                {canChangeStatus && canTransition('In Progress') && (
                   <button
                     onClick={() => performTransition('In Progress')}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-green-status border border-green-status/50 hover:bg-green-status/10 transition-all"
@@ -1088,7 +1095,7 @@ const isAdmin = hasPermission(['Administrator']);
                     <Play className="w-3.5 h-3.5" /> Start
                   </button>
                 )}
-                {canTransition('Completed') && (
+                {canChangeStatus && canTransition('Completed') && (
                   <button
                     onClick={() => performTransition('Completed')}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-green-status border border-green-status/50 hover:bg-green-status/10 transition-all"
@@ -1104,7 +1111,7 @@ const isAdmin = hasPermission(['Administrator']);
                     <Lock className="w-3.5 h-3.5" /> Close
                   </button>
                 )}
-                {canTransition('Suspended') && (
+                {canChangeStatus && canTransition('Suspended') && (
                   <button
                     onClick={() => performTransition('Suspended')}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
@@ -1112,7 +1119,7 @@ const isAdmin = hasPermission(['Administrator']);
                     <Pause className="w-3.5 h-3.5" /> Suspend
                   </button>
                 )}
-                {canTransition('Cancelled') && (
+                {canChangeStatus && canTransition('Cancelled') && (
                   <button
                     onClick={() => performTransition('Cancelled')}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-red-status border border-red-status/50 hover:bg-red-status/10 transition-all"
@@ -2135,25 +2142,27 @@ const isAdmin = hasPermission(['Administrator']);
 
         {activeTab === 'comments' && (
           <div className="space-y-3">
-            <form onSubmit={handleAddComment} className="flex items-center gap-2">
-              <input
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Add a comment..."
-                aria-label="Add a comment"
-                className="flex-1 px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors"
-                style={{ backgroundColor: '#27272A' }}
-              />
-              <button
-                type="submit"
-                disabled={!newComment.trim() || busy === 'comment:add'}
-                className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                style={{ backgroundColor: '#D97706', color: '#111113' }}
-              >
-                {busy === 'comment:add' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                Post
-              </button>
-            </form>
+            {canComment && (
+              <form onSubmit={handleAddComment} className="flex items-center gap-2">
+                <input
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment..."
+                  aria-label="Add a comment"
+                  className="flex-1 px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors"
+                  style={{ backgroundColor: '#27272A' }}
+                />
+                <button
+                  type="submit"
+                  disabled={!newComment.trim() || busy === 'comment:add'}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                  style={{ backgroundColor: '#D97706', color: '#111113' }}
+                >
+                  {busy === 'comment:add' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Post
+                </button>
+              </form>
+            )}
             {(wo.comments?.length || 0) === 0 ? (
               <EmptyState label="No comments yet" />
             ) : (
@@ -2410,14 +2419,16 @@ const isAdmin = hasPermission(['Administrator']);
                 className="hidden"
                 onChange={(e) => handleAttachmentUpload(e.target.files?.[0])}
               />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={attBusy === 'upload'}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all disabled:opacity-50"
-              >
-                {attBusy === 'upload' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                Upload
-              </button>
+              {canUploadAttachment && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={attBusy === 'upload'}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all disabled:opacity-50"
+                >
+                  {attBusy === 'upload' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  Upload
+                </button>
+              )}
               <span className="text-xs text-tertiary">PDF, images, text, Excel — up to 10 MB</span>
             </div>
             {attError && (

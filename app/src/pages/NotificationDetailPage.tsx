@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { notificationService } from '@/services/notificationService';
 import { ApiError } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
+import { hasMinRole } from '@/lib/rbac';
 import type { Notification, NotificationType } from '@/types';
 
 const typeConfig: Record<NotificationType, { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string; label: string }> = {
@@ -30,6 +32,9 @@ const typeConfig: Record<NotificationType, { icon: React.ComponentType<{ classNa
 export default function NotificationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // POST /notifications/convert-to-wo is Maintenance Planner+ on the API.
+  const role = useAuthStore((s) => s.user?.role);
+  const canConvert = hasMinRole(role, 'Maintenance Planner');
 
   const [notif, setNotif] = useState<Notification | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,7 +131,7 @@ export default function NotificationDetailPage() {
               </div>
             </div>
           </div>
-          {notif.status !== 'Converted' && (
+          {notif.status !== 'Converted' && canConvert && (
             <button
               onClick={handleConvertToWO}
               disabled={converting}
@@ -193,7 +198,7 @@ export default function NotificationDetailPage() {
               <div className="text-center py-8">
                 <ClipboardList className="w-8 h-8 text-tertiary mx-auto mb-2" />
                 <p className="text-tertiary text-xs">No work orders linked yet</p>
-                {notif.status !== 'Converted' && (
+                {notif.status !== 'Converted' && canConvert && (
                   <button
                     onClick={handleConvertToWO}
                     disabled={converting}

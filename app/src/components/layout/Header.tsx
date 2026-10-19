@@ -5,6 +5,8 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Filter, Download, Plus, ChevronRight } from 'lucide-react';
 import { useAppStore } from '@/store/appStore';
+import { useAuthStore } from '@/store/authStore';
+import { hasMinRole } from '@/lib/rbac';
 
 interface HeaderProps {
   title: string;
@@ -18,6 +20,10 @@ export default function Header({ title, onCreate, tabs, showActions = true }: He
   const navigate = useNavigate();
   const unreadCount = useAppStore((s) => s.getUnreadAlertCount());
   const markAllAlertsRead = useAppStore((s) => s.markAllAlertsRead);
+  // PUT /alerts/read-all is Requester+ on the API. The bell still opens the
+  // notifications list for every role; only the mark-all-read call is gated.
+  const role = useAuthStore((s) => s.user?.role);
+  const canMarkAllRead = hasMinRole(role, 'Requester');
 
   const getBreadcrumb = () => {
     const parts = location.pathname.split('/').filter(Boolean);
@@ -83,7 +89,7 @@ export default function Header({ title, onCreate, tabs, showActions = true }: He
           {/* Alerts Bell */}
           <button
             onClick={() => {
-              markAllAlertsRead();
+              if (canMarkAllRead) markAllAlertsRead();
               navigate('/notifications');
             }}
             aria-label="Notifications"
