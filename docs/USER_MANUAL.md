@@ -128,7 +128,7 @@ View-Only  (lowest, read only)
 
 A **Maintenance Supervisor** can therefore do everything a Technician can do, and a **Maintenance Planner** can do everything a Supervisor can do, in addition to planning.
 
-The Administration screen contains an "RBAC Configuration" panel that lists these roles. Treat that panel as background information only: it is fixed text, it is not configurable, and one line in it is inaccurate. It says a Requester can "view own requests", but the Notifications list in fact shows **all** notifications to every signed-in user, not only your own. Section 5 explains how to work with that in practice.
+The Administration screen contains an "RBAC Configuration" panel that lists these roles. Treat that panel as background information only: it is fixed text and it is not configurable. Its line that a Requester can "view own requests" is accurate - the Notifications list shows a Requester only the notifications they raised ([5.4](#54-follow-up-the-status-of-notifications)).
 
 | Role | In practice |
 |---|---|
@@ -176,9 +176,9 @@ The detail screen shows the current status, and the **History** tab shows every 
 
 A **notification** records a problem against a piece of equipment or a location. It can later be converted into a work order.
 
-**`API only` - there is no screen for raising a notification today.** The Notifications screen lists, filters, and opens existing notifications but has no create form. A **Create Notification** entry exists in the command palette, but it only navigates to the list; it does not open a form.
+**Raise a notification directly from the Notifications screen.** Select **Notifications**, then **New Notification**; choose a type and priority, a location or an equipment record, a description and any observations, and select **Save**. The command palette's **Create Notification** entry navigates to this list.
 
-Until a create screen exists, ask an administrator or your supervisor to raise the notification through the API, or have them raise a work order directly using section 5.1. See [section 14](#14-reference-operations-that-are-not-available-in-the-screen) for the API request.
+The same operation is available as `POST /api/notifications` for Requesters and above.
 
 ### 5.4 Follow up the status of notifications
 
@@ -186,7 +186,7 @@ Until a create screen exists, ask an administrator or your supervisor to raise t
 2. Filter by **Status** to narrow to `Open`, `In Process`, `Completed`, or `Converted`, or use the search box.
 3. Select a row to open it. The detail screen shows the reporter, the equipment or location, and the full history.
 
-**Important:** the Notifications list is **not** limited to notifications you raised - every signed-in user sees all of them. To find your own reports, sort or search and then check the **Reported By** name on the detail screen. `[screenshot pending]`
+**Important:** the Notifications list is scoped to your role. A Requester sees only the notifications they raised; a Technician and every role above sees the whole backlog. `[screenshot pending]`
 
 ### 5.5 Other things you can do
 
@@ -302,13 +302,13 @@ The seven reports are listed in [section 12](#12-reference-the-seven-reports). R
 
 ## 8. Maintenance Planner
 
-A Maintenance Planner can do everything in [section 7](#7-maintenance-supervisor), plus the following. Read the honesty notes carefully: **most preventive maintenance setup is currently `API only`.**
+A Maintenance Planner can do everything in [section 7](#7-maintenance-supervisor), plus preventive-maintenance plan and task-list maintenance.
 
 ### 8.1 View the preventive maintenance schedule
 
 1. Select **Preventive Maintenance**.
 2. The page shows summary tiles for Time-Based, Meter-Based, Combined, and Active plan counts.
-3. The table below lists every plan with its plan code, description, equipment, strategy, interval, call horizon, work center, task list, status, next due date, and a **Generate** action.
+3. The table below lists every plan with its plan code, description, equipment, strategy, interval, call horizon, work center, task list, status, next due date, and per-row **Generate**, **Edit** and (Maintenance Supervisor and above) **Delete** actions.
 
 ![PM plan list](images/g4a_01_plan_list.png)
 ![PM plan details](images/g4a_02_plan_row_details.png)
@@ -323,41 +323,39 @@ Use the search box and the strategy and status filters to find the plans you own
 
 Use this to test a plan or to bring forward work that the nightly run has not produced yet. The nightly automated run is described in the [Administrator Guide](ADMIN_GUIDE.md#5-scheduler-operations).
 
-### 8.3 Create or edit a PM plan - `API only`
+### 8.3 Create, edit or delete a PM plan
 
-**There is no screen for creating, editing, or deleting a preventive maintenance plan.** The Preventive Maintenance page is a read-only register with a Generate action. A plan can only be added or changed through the API:
+**In the UI:** on the **Preventive Maintenance** page, select **New Plan** to create one. Use the per-row **Edit** control to change a plan, and the per-row **Delete** control (Maintenance Supervisor and above) to remove one. Creating and editing require the Requester role or above.
+
+The same operations are available as API calls:
 
 - `POST /api/maintenance-plans` - create a plan (Requester and above)
 - `PUT /api/maintenance-plans/{id}` - change a plan (Requester and above)
 - `DELETE /api/maintenance-plans/{id}` - delete a plan (Maintenance Supervisor and above)
 
-Ask an administrator to apply the change, and supply the plan code, description, equipment, strategy, interval, call horizon, and work center. See the [API Reference](API_REFERENCE.md#maintenance-plans).
+Provide the plan code, description, equipment, strategy, interval, call horizon, and work center. See the [API Reference](API_REFERENCE.md#maintenance-plans).
 
 ### 8.4 Edit a PM task list
 
 **There is a Task Lists screen** (`/task-lists`, in the sidebar). Use it to create, edit, and delete task lists and their operations. The route behind it is `/api/task-lists`.
 
-### 8.5 Run the scheduler manually - `API only`
+### 8.5 Run the scheduler manually
 
-**There is no button on the Preventive Maintenance page to run the scheduler.** It is triggered by the API:
+**In the UI:** the **Preventive Maintenance** page carries a **Run Scheduler** button, visible to Administrators, next to **New Plan**. It runs the job immediately and reports what it generated.
 
-```
-POST /api/maintenance-plans/run-scheduler
-```
-
-This requires an Administrator token. See the [Administrator Guide](ADMIN_GUIDE.md#52-running-the-scheduler-manually) for the exact command and for what to check afterwards.
+The same run is available as `POST /api/maintenance-plans/run-scheduler`, which requires an Administrator token. See the [Administrator Guide](ADMIN_GUIDE.md#52-running-the-scheduler-manually) for the exact command and for what to check afterwards.
 
 ---
 
 ## 9. Administrator
 
-A Maintenance Planner can do everything in [section 8](#8-maintenance-planner), plus user and audit administration. As with PM plans, **most user administration is `API only` today.**
+A Maintenance Planner can do everything in [section 8](#8-maintenance-planner), plus user and audit administration. **Editing an existing user (role, work center, name, email) is `API only` today.**
 
 ### 9.1 Administration screen
 
 Select **Administration**. The screen has three tabs:
 
-- **Users & Roles** - a read-only list of every user with username, full name, email, role, active flag, and last sign-in. There is no create, edit, or delete button on this screen.
+- **Users & Roles** - a list of every user with username, full name, email, role, active flag, and last sign-in. It carries an **Add User** form and a per-row **Deactivate** control ([9.2](#92-create-a-user), [9.3](#93-disable-a-user)). Editing an existing user's role, work center, name or email has no UI control and is done through `PUT /api/users/{userId}`.
 - **Audit Log** - every recorded change, filterable by table, action, and free text, and paginated. Only Administrators can read it; any other role selecting this tab receives an error.
 - **Settings** - shows configuration. The two number-prefix rows (`wo_number_prefix`, `notif_number_prefix`) load from `GET /api/system-config` and are editable by an Administrator (saved via `PUT /api/system-config`); the remaining rows are a read-only display of static values.
 
@@ -486,17 +484,17 @@ Each of the first six tabs has its own add form, so you stay on the work order w
 
 ## 14. Reference: operations that are not available in the screen
 
-These operations exist in the system but have no screen. This section exists so you are not left looking for a button that is not there. **Creating, disabling and deactivating a user all have screens** - see [section 9.2](#92-create-a-user) and [9.3](#93-disable-a-user) - so they are deliberately absent from this list.
+These operations exist in the system but have no screen. This section exists so you are not left looking for a button that is not there. Operations that **do** have screens - raising a notification ([5.3](#53-raise-a-problem-report-notification)), creating, editing or deleting a PM plan ([8.3](#83-create-edit-or-delete-a-pm-plan)), running the scheduler manually ([8.5](#85-run-the-scheduler-manually)), and creating, disabling and deactivating a user ([9.2](#92-create-a-user), [9.3](#93-disable-a-user)) - are deliberately absent from this list.
 
 | Operation | Screen available? | How it is done |
 |---|---|---|
-| Raise a notification | No | `POST /api/notifications` - Requester and above |
-| Create / edit / delete a PM plan | No | `/api/maintenance-plans` endpoints - Maintenance Planner and above |
-| Run the PM scheduler manually | No | `POST /api/maintenance-plans/run-scheduler` - Administrator |
 | Reset a user's password | No | `PUT /api/users/{userId}/password` - Administrator |
 | Re-enable a disabled user | No | `PUT /api/users/{userId}` with `isActive: true` - Administrator |
+| Edit a user's role, work center, name or email | No | `PUT /api/users/{userId}` - Administrator |
 | Clear a lockout early | No | **No API exists.** Database update - see the [Administrator Guide](ADMIN_GUIDE.md#64-clear-an-account-lockout) |
 | Edit a number-prefix setting | Yes (Administrator) | `PUT /api/system-config`; other settings come from environment variables - see the [Administrator Guide](ADMIN_GUIDE.md#3-configuration) |
+
+*Updated 2026-10-19 (C6, register D2): the "Raise a notification", "Create / edit / delete a PM plan" and "Run the PM scheduler manually" rows were removed because those operations now have screens, and an "Edit a user's role, work center, name or email" row was added because editing an existing user still has no UI control.*
 
 If a task you need is on this list and there is no screen for it, raise it with your administrator. It is a known gap, not user error.
 

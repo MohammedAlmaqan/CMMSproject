@@ -213,7 +213,7 @@ On a system that has just been installed and has never run, expect `503` until t
 
 ### 5.2 Running the scheduler manually
 
-**There is no button for this in the application.** The Preventive Maintenance page is read-only apart from a per-plan *Generate* action. The run endpoint requires an Administrator token:
+**In the UI:** the **Preventive Maintenance** page carries a **Run Scheduler** button next to **New Plan**, visible to Administrators. The same run is available as an API call, which requires an Administrator token:
 
 ```cmd
 curl -s -X POST http://localhost:4000/api/maintenance-plans/run-scheduler ^
@@ -548,8 +548,7 @@ What is recorded:
 
 What is **not** recorded, and must be understood before treating the audit log as complete:
 
-- **User creation.** There is no create endpoint, so users inserted per [6.1](#61-create-a-user) leave no audit trail. This is the most important gap here.
-- Direct database writes generally, including the soft delete in [6.7](#67-delete-or-decommission-a-user) and the lockout clear in [6.4](#64-clear-an-account-lockout). These leave no audit entry, though the resulting `LoginFailure` history still constrains lockout behaviour.
+- **Direct database writes.** User creation, role and work-center edits, deactivation and the password reset are all recorded when performed through the UI or the API - see [6.1](#61-create-a-user) to [6.7](#67-delete-or-decommission-a-user). Only rows changed by hand - the SQL fallback in [6.1](#61-create-a-user) or [6.7](#67-delete-or-decommission-a-user), or the lockout clear in [6.4](#64-clear-an-account-lockout) - bypass the application and leave no audit entry. The resulting `LoginFailure` history still constrains lockout behaviour.
 - Reads. There is no read logging, so the log cannot answer "who looked at this record".
 
 The log has no automatic purge, so it grows indefinitely. Because it is the lockout authority, **do not prune `LoginFailure` rows** - doing so can only lower a user's failure count, but the retention decision should be made deliberately. If you must reduce volume, archive the whole table to a separate database or a timestamped export before deleting anything, and keep recent `LoginFailure` rows intact.
@@ -655,21 +654,28 @@ Recorded here so that nobody plans an operation around a feature that does not e
 | **200-concurrent-user capacity test** | **Deferred post-go-live.** Recorded P2028 decision. Do not quote the k6 smoke numbers as capacity evidence |
 | Prisma connection-pool exhaustion (`P2028`) | **Resolved 2026-09-29.** Never observed in the passing 100-VU run after the fix in [14.3](#143-prisma-p2028---connection-pool-exhaustion) |
 | IIS `curl` verification | Untested; the HTTPS path in the installation guide has not been verified end to end |
-| User create / delete API | Never implemented. Database procedure in [6.1](#61-create-a-user) and [6.7](#67-delete-or-decommission-a-user) |
-| User create audit trail | Not possible while creation bypasses the application. See [8](#8-audit-log) |
-| Lockout clear / user edit API | No endpoint exists; `lockedUntil` is not in the accepted update schema |
-| PM plan and task list screens | Task Lists has a full UI (`/task-lists`). The Preventive Maintenance page is read-only plus a per-plan Generate action (`/api/maintenance-plans`) |
-| Notification create screen | No UI. The command palette entry navigates to the list and opens no form. `POST /api/notifications` only |
-| Manual scheduler trigger screen | No UI. `POST /api/maintenance-plans/run-scheduler` only |
+| User create / delete API | **Implemented.** `POST /api/users` (Administrator) and the soft-delete `DELETE /api/users/{userId}` back the **Add User** form and per-row **Deactivate** control on Administration → Users & Roles. The SQL in [6.1](#61-create-a-user) and [6.7](#67-delete-or-decommission-a-user) is a bulk/scripted fallback only |
+| User create audit trail | **Implemented.** Creation through the UI or `POST /api/users` writes a `User` **Create** audit row. Only the SQL fallback in [6.1](#61-create-a-user) bypasses the log. See [8](#8-audit-log) |
+| Lockout clear / user edit API | **Partly resolved.** `PUT /api/users/{userId}` (Administrator) edits role, work center, name, email and the active flag. There is still **no lockout-clear endpoint** and `lockedUntil` is not in the accepted update schema, so clearing a lockout early remains a database update ([6.4](#64-clear-an-account-lockout)) |
+| PM plan and task list screens | **Implemented.** Task Lists has a full UI (`/task-lists`), and the Preventive Maintenance page is a full editor - create, edit and delete plans, per-plan **Generate WO**, and a **Run Scheduler** button for Administrators (`/api/maintenance-plans`) |
+| Notification create screen | **Implemented.** The Notifications page has a **New Notification** form, backed by `POST /api/notifications`. The command palette's "Create Notification" entry navigates to the list |
+| Manual scheduler trigger screen | **Implemented.** A **Run Scheduler** button on the Preventive Maintenance page (Administrators), backed by `POST /api/maintenance-plans/run-scheduler` |
 | System settings screen | Partly editable. Only `wo_number_prefix` and `notif_number_prefix` write via `PUT /api/system-config`; the other displayed values are environment-only |
 | Content-Security-Policy | Disabled. See [12.1](#121-network-exposure) |
 | Server-side session revocation | Implemented from C1 (logout, rotation-reuse, idle window). Disabling a user still takes effect at their next sign-in, not by revoking an in-progress session |
 | Multi-factor authentication | Not implemented |
 | Forced password change / expiry | Not implemented. A reset password stays in force |
 | Read logging | Not implemented. The audit log cannot answer who viewed a record |
-| Notifications scoped to the reporter | Not implemented. Every user sees all notifications, contrary to the text on the Administration screen |
+| Notifications scoped to the reporter | **Implemented.** A Requester sees only the notifications they raised; every role above Requester triages the whole backlog, matching the text on the Administration screen |
 | Notification email | Not implemented. Alerts surface on the Dashboard only |
 | Automatic log pruning | Not implemented. The audit log grows without bound |
+
+*Updated 2026-10-19 (C6, register D2): the user create/delete API, user-create audit trail,
+lockout-clear/user-edit API, PM plan and task-list screens, notification create screen,
+manual scheduler trigger screen and notification scoping rows were corrected from their
+pre-shipment "not implemented" wording to the shipped state. The superseded wording read:
+"No endpoint exists", "Never implemented", "read-only plus a per-plan Generate action",
+"No UI", and "Every user sees all notifications".*
 
 ---
 
