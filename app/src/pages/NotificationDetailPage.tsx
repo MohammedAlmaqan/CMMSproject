@@ -16,6 +16,7 @@ import {
   MapPin,
   WrenchIcon,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { notificationService } from '@/services/notificationService';
 import { ApiError } from '@/lib/api';
@@ -40,7 +41,10 @@ export default function NotificationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [converting, setConverting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // DELETE /notifications/:id is Maintenance Supervisor+ on the API.
+  const canDelete = hasMinRole(role, 'Maintenance Supervisor');
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -71,6 +75,20 @@ export default function NotificationDetailPage() {
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : 'Failed to convert to work order');
       setConverting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!notif) return;
+    if (!window.confirm(`Delete notification ${notif.notificationNumber}? This cannot be undone.`)) return;
+    setActionError(null);
+    setDeleting(true);
+    try {
+      await notificationService.delete(notif.notificationId);
+      navigate('/notifications');
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Failed to delete notification');
+      setDeleting(false);
     }
   };
 
@@ -131,17 +149,29 @@ export default function NotificationDetailPage() {
               </div>
             </div>
           </div>
-          {notif.status !== 'Converted' && canConvert && (
-            <button
-              onClick={handleConvertToWO}
-              disabled={converting}
-              className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-              style={{ backgroundColor: '#D97706', color: '#111113' }}
-            >
-              {converting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ClipboardList className="w-3.5 h-3.5" />}
-              Convert to WO
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {notif.status !== 'Converted' && canConvert && (
+              <button
+                onClick={handleConvertToWO}
+                disabled={converting}
+                className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                style={{ backgroundColor: '#D97706', color: '#111113' }}
+              >
+                {converting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ClipboardList className="w-3.5 h-3.5" />}
+                Convert to WO
+              </button>
+            )}
+            {canDelete && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold border border-red-status/60 text-red-status hover:bg-red-status/10 transition-all disabled:opacity-50"
+              >
+                {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                Delete
+              </button>
+            )}
+          </div>
         </div>
         {actionError && (
           <div className="mt-2 text-red-status text-xs">{actionError}</div>

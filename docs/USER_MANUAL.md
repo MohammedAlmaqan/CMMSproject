@@ -134,7 +134,7 @@ The Administration screen contains an "RBAC Configuration" panel that lists thes
 |---|---|
 | Requester | Raise work orders, report problems, track their progress, read the registers and reports |
 | Technician | Execute work orders: operations, labor, materials, services, checklists, comments, attachments |
-| Maintenance Supervisor | Everything a Technician does, plus approve and close work orders, convert notifications, run the reports |
+| Maintenance Supervisor | Everything a Technician does, plus approve and close work orders, convert notifications, **delete notifications**, run the reports |
 | Maintenance Planner | Everything a Supervisor does, plus own the preventive maintenance plans |
 | Administrator | Everything a Planner does, plus user administration and the audit log |
 | View-Only | Read everything, change nothing |

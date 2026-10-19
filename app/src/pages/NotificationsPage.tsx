@@ -16,6 +16,7 @@ import {
   Plus,
   X,
   CheckCircle,
+  Trash2,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { notificationService } from '@/services/notificationService';
@@ -70,6 +71,8 @@ export default function NotificationsPage() {
   // The API allows Requester and above to raise a notification; the screen
   // hides the control from roles the API would reject.
   const canWrite = hasPermission(['Requester', 'Technician', 'Maintenance Supervisor', 'Administrator']);
+  // DELETE /notifications/:id is Maintenance Supervisor+ on the API.
+  const canDelete = hasPermission(['Maintenance Supervisor', 'Administrator']);
 
   const notify = useCallback((text: string, error = false) => setToast({ text, error }), []);
 
@@ -176,6 +179,20 @@ export default function NotificationsPage() {
       await reload();
     } catch (err) {
       notify(err instanceof ApiError ? err.message : 'Could not raise the notification', true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async (n: Notification) => {
+    if (!window.confirm(`Delete notification ${n.notificationNumber}? This cannot be undone.`)) return;
+    setBusy(true);
+    try {
+      await notificationService.delete(n.notificationId);
+      notify(`Notification ${n.notificationNumber} deleted`);
+      await reload();
+    } catch (err) {
+      notify(err instanceof ApiError ? err.message : 'Could not delete the notification', true);
     } finally {
       setBusy(false);
     }
@@ -408,6 +425,7 @@ export default function NotificationsPage() {
                     {['Type', 'Priority', 'Number', 'Description', 'Location', 'Equipment', 'Reported By', 'Date', 'Status'].map((h) => (
                       <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                     ))}
+                    {canDelete && <th className="px-4 py-2.5" aria-label="Actions" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -459,6 +477,17 @@ export default function NotificationsPage() {
                             {notif.status}
                           </span>
                         </td>
+                        {canDelete && (
+                          <td className="px-4 py-2.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDelete(notif); }}
+                              aria-label={`Delete ${notif.notificationNumber}`}
+                              className="p-1 text-tertiary hover:text-red-status transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
