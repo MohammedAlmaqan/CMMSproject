@@ -26,7 +26,7 @@ plus the backend routes/schema/middleware and the frontend pages/routes/services
 
 ---
 
-## A. Close now — code and data gap (0)
+## A. Close now — code and data gap (10)
 
 Empty since 2026-10-18 — U1, U2 and U3 shipped as UI gap-closure C1–C3
 (`dd1ab6c`, `5ba3285`, `b328a81`; green CI runs 337–339), and N1's cost-split
@@ -34,7 +34,26 @@ editor shipped as C4 (`406b393`, run 340) with matrix line 175 promoted in
 `65d296d`. The four accessibility items (N2, tracker v1.1-11…14) shipped as
 C5–C8 with green CI runs 341–344, and N2 is closed in the closure log.
 
-## B. Close now — documentation gap (0)
+*Re-opened 2026-10-19 by the RBAC/UI alignment workstream
+(`docs/RBAC_UI_ALIGNMENT_PLAN.md`) for the findings raised in the administrator UAT.
+N11–N15 are scheduled now (commits C1–C5) and N16–N20 are deferred to v1.1 by the
+owner's 2026-10-19 decision; the register follows its existing practice of holding
+deferred-but-planned v1.1 items in category A, as it did for N1 and N2.*
+
+| ID | Item | Where it lives | Size | Schedule |
+|---|---|---|---|---|
+| N11 | Dashboard KPI ribbon is displaced by the lazily-loaded 3D grid and clipped once the grid loads (cards vanish) | `app/src/pages/DashboardPage.tsx`, `app/src/components/dashboard/TacticalDashboardGrid.tsx`, `app/src/index.css` | S | Now (C1) |
+| N12 | Seven mutating controls are shown to roles the API denies, so a low-privilege click returns 403: notification convert-to-WO (Maintenance Planner), PM generate-WO (Maintenance Planner), Equipment and Materials CSV import (Maintenance Planner), work-order/equipment attachment upload (Requester), work-order comment post (Requester), the work-order status transitions (Technician), and the header bell mark-all-read (Requester) | `NotificationDetailPage.tsx`, `PreventiveMaintenancePage.tsx`, `EquipmentPage.tsx`, `MaterialsPage.tsx`, `WorkOrderDetailPage.tsx`, `EquipmentDetailPage.tsx`, `Header.tsx` | M | Now (C2) |
+| N13 | Notification delete exists at Maintenance Supervisor+ in the API but has no UI control anywhere; `notificationService.delete` is dead code | `backend/src/routes/notifications.ts` (`DELETE /:id`), both notification pages | S | Now (C3) |
+| N14 | `PUT /work-orders/:id` floor is Requester, below the UI edit gate (Technician) and the SOW §2.2 Requester scope | `backend/src/routes/workOrders.ts` | S | Now (C4) |
+| N15 | The root error boundary renders the raw stack trace and a light, non-conforming screen | `app/src/components/ErrorBoundary.tsx` | S | Now (C5) |
+| N16 | Management UIs absent for materials CRUD, work-centre CRUD, user edit, audit-log purge, functional-location CSV import and notification edit, though the APIs and services exist | `app/src/services/*` and their pages | L | v1.1 |
+| N17 | No frontend capability map — action gating is ad-hoc per page; the root cause of N12 and N13 | `app/src/lib/rbac.ts` | M | v1.1 |
+| N18 | `GET /users/:id` is authenticate-only while `GET /users` is Administrator-only | `backend/src/routes/users.ts` | S | v1.1 |
+| N19 | `DELETE /external-services/:id` floor (Technician) is below the house Supervisor pattern for deletes | `backend/src/routes/externalServiceCosts.ts` | S | v1.1 |
+| N20 | Alerts have no per-item mark-read UI and exclude Administrator from the recipient fan-out | `Header.tsx`, `backend/src/routes/alerts.ts` | S | v1.1 |
+
+## B. Close now — documentation gap (1)
 
 Empty since 2026-10-15 — the sole item (D1) is closed. The documentation accuracy
 sweep re-derived the citations, claims and frozen counts it named: every `file:line`
@@ -51,6 +70,14 @@ found already correct and needed no edit: the tracker teardown figure (54 in 12,
 at C14) and the `schema.prisma` value-domain comments (all 24 match the C15 CHECK
 constraints). One owner-authorised status move came out of it: matrix line 306 (§5.7
 import tools) `Partial` → `Met`. See the closure log.
+
+*Re-opened 2026-10-19 by the RBAC/UI alignment workstream
+(`docs/RBAC_UI_ALIGNMENT_PLAN.md`): the guide and manual rows that still assert
+pre-shipment features are corrected by C6.*
+
+| ID | Item | Where it lives | Size | Schedule |
+|---|---|---|---|---|
+| D2 | Guide/manual rows assert features that have shipped — the notification form, the PM/task-list screens, the user CRUD API and the Requester scoping | `docs/ADMIN_GUIDE.md`, `docs/USER_MANUAL.md` | S | Now (C6) |
 
 ## C. Blocked on owner (0)
 
@@ -157,6 +184,10 @@ record of the freeze state.*
 
 0 code and data gap · 0 documentation gap · 0 blocked on owner · 0 blocked on external ·
 8 decisions-not-gap = **8 open items**.
+
+*Superseded 2026-10-19: re-opened by the RBAC/UI alignment workstream — 10 code and data
+gap · 1 documentation gap · 0 blocked on owner · 0 blocked on external · 8 decisions-not-gap
+= **19 open items** (see the tables in A and B above).*
 
 Items found on my own and listed nowhere else before: C19, C20, C21, E1, D3, D4, D5.
 
