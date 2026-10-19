@@ -23,44 +23,32 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     if (this.state.error) {
       return (
         <div
+          className="bg-base text-primary"
           style={{
             minHeight: '100vh',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'column',
+            gap: '1rem',
             padding: '2rem',
-            fontFamily: 'system-ui, sans-serif',
-            color: '#0f172a',
-            background: '#f8fafc',
+            textAlign: 'center',
           }}
         >
-          <h1 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Something went wrong</h1>
-          <p style={{ color: '#b91c1c', marginBottom: '1rem' }}>{this.state.error.message}</p>
-          <pre
-            style={{
-              maxWidth: '80ch',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              background: '#1e293b',
-              color: '#e2e8f0',
-              padding: '1rem',
-              borderRadius: '0.5rem',
-              overflow: 'auto',
-              marginBottom: '1rem',
-            }}
-          >
-            {this.state.error.stack}
-          </pre>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>Something went wrong</h1>
+          <p className="text-secondary" style={{ maxWidth: '48ch' }}>
+            An unexpected error occurred and this screen could not be shown. Reload the
+            application to continue. If it happens again, contact your administrator.
+          </p>
           <button
             type="button"
             onClick={() => window.location.reload()}
+            className="rounded font-semibold transition-all hover:brightness-110"
             style={{
               padding: '0.5rem 1rem',
-              borderRadius: '0.375rem',
               border: 'none',
-              background: '#2563eb',
-              color: '#ffffff',
+              backgroundColor: '#D97706',
+              color: '#151517',
               cursor: 'pointer',
             }}
           >
