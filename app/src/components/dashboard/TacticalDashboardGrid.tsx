@@ -205,7 +205,7 @@ export default function TacticalDashboardGrid() {
   const cameraPosition: [number, number, number] = [frustumSize * aspect, frustumSize, frustumSize];
 
   return (
-    <div className="kpi-canvas-container">
+    <div className="kpi-canvas-layer">
       <Canvas
         orthographic
         camera={{ position: cameraPosition, zoom: 50, near: 0.1, far: 1000 }}

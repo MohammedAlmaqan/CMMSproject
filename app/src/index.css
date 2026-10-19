@@ -163,7 +163,15 @@
     border-bottom: 1px solid #27272A;
   }
 
-  .kpi-canvas-container canvas {
+  .kpi-canvas-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .kpi-canvas-container canvas,
+  .kpi-canvas-layer canvas {
     position: absolute;
     top: 0;
     left: 0;
@@ -174,13 +182,13 @@
   }
 
   .kpi-metrics-overlay {
-    position: relative;
+    position: absolute;
+    inset: 0;
     z-index: 10;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 1rem;
     padding: 1rem;
-    height: 100%;
     align-items: center;
   }
 
