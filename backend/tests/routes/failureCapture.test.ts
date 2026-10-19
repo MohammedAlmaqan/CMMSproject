@@ -128,7 +128,7 @@ describe('SOW 3.1.4 failure capture (row 8)', () => {
 
   it('sets a failure code later with a partial update', async () => {
     const id = await createWo();
-    const res = await api().put(`/api/work-orders/${id}`).set(authHeaders(ctx.operatorToken)).send({ failureCodeId: failureId });
+    const res = await api().put(`/api/work-orders/${id}`).set(authHeaders(ctx.technicianToken)).send({ failureCodeId: failureId });
     expect(res.status).toBe(200);
     const stored = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });
     expect(stored.failureCodeId).toBe(failureId);
@@ -136,7 +136,7 @@ describe('SOW 3.1.4 failure capture (row 8)', () => {
 
   it('clears a failure code back to none', async () => {
     const id = await createWo({ failureCodeId: failureId });
-    const res = await api().put(`/api/work-orders/${id}`).set(authHeaders(ctx.operatorToken)).send({ failureCodeId: null });
+    const res = await api().put(`/api/work-orders/${id}`).set(authHeaders(ctx.technicianToken)).send({ failureCodeId: null });
     expect(res.status).toBe(200);
     const stored = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });
     expect(stored.failureCodeId).toBeNull();
@@ -176,7 +176,7 @@ describe('SOW 3.1.4 failure capture (row 8)', () => {
 
   it('audits a change to the failure code', async () => {
     const id = await createWo();
-    await api().put(`/api/work-orders/${id}`).set(authHeaders(ctx.operatorToken)).send({ failureCodeId: failureId });
+    await api().put(`/api/work-orders/${id}`).set(authHeaders(ctx.technicianToken)).send({ failureCodeId: failureId });
     const entries = await prisma.auditLogEntry.findMany({
       where: { tableName: 'WorkOrder', recordId: id, fieldName: 'failureCodeId' },
     });
@@ -202,7 +202,7 @@ describe('SOW 3.1.4 failure capture (row 8)', () => {
     const blocked = await api().put(`/api/work-orders/${id}/status`).set(authHeaders(ctx.technicianToken)).send({ status: 'Completed' });
     expect(blocked.status).toBe(409);
 
-    await api().put(`/api/work-orders/${id}`).set(authHeaders(ctx.operatorToken)).send({ causeCodeId: causeId });
+    await api().put(`/api/work-orders/${id}`).set(authHeaders(ctx.technicianToken)).send({ causeCodeId: causeId });
     const allowed = await api().put(`/api/work-orders/${id}/status`).set(authHeaders(ctx.technicianToken)).send({ status: 'Completed' });
     expect(allowed.status).toBe(200);
 

@@ -381,18 +381,26 @@ describe('work orders routes', () => {
     expect(cancelled.body.status).toBe('Cancelled');
   });
 
-  it('updates a work order (Requester+) and writes an audit row', async () => {
+  it('updates a work order (Technician+) and writes an audit row', async () => {
     const before = await prisma.auditLogEntry.count({
       where: { tableName: 'WorkOrder', recordId: createdId, action: 'Update' },
     });
     const res = await api()
       .put(`/api/work-orders/${createdId}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ description: 'updated test work order' });
     expect(res.status).toBe(200);
     expect(
       await prisma.auditLogEntry.count({ where: { tableName: 'WorkOrder', recordId: createdId, action: 'Update' } })
     ).toBe(before + 1);
+  });
+
+  it('rejects an update by a below-Technician role with 403', async () => {
+    const res = await api()
+      .put(`/api/work-orders/${createdId}`)
+      .set(authHeaders(ctx.operatorToken))
+      .send({ description: 'requester edit must be refused' });
+    expect(res.status).toBe(403);
   });
 
   it('diffs the columns that moved on update (row 149)', async () => {
@@ -401,7 +409,7 @@ describe('work orders routes', () => {
 
     const res = await api()
       .put(`/api/work-orders/${createdId}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ description: 'edited by row 149', priority: nextPriority });
     expect(res.status).toBe(200);
     expect(res.body.description).toBe('edited by row 149');
@@ -425,7 +433,7 @@ describe('work orders routes', () => {
     });
     expect(descriptionDiff).not.toBeNull();
     expect(descriptionDiff?.oldValue).toBe(prior?.description);
-    expect(descriptionDiff?.userId).toBe(ctx.operatorId);
+    expect(descriptionDiff?.userId).toBe(ctx.technicianId);
 
     const priorityDiff = await prisma.auditLogEntry.findFirst({
       where: {
@@ -438,7 +446,7 @@ describe('work orders routes', () => {
     });
     expect(priorityDiff).not.toBeNull();
     expect(priorityDiff?.oldValue).toBe(prior?.priority);
-    expect(priorityDiff?.userId).toBe(ctx.operatorId);
+    expect(priorityDiff?.userId).toBe(ctx.technicianId);
   });
 
   it('leaves the cost columns to costs.ts instead of logging them twice', async () => {
@@ -450,7 +458,7 @@ describe('work orders routes', () => {
     });
     const res = await api()
       .put(`/api/work-orders/${createdId}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ internalOrder: 'IO-ROW149' });
     expect(res.status).toBe(200);
     expect(
@@ -579,7 +587,7 @@ describe('work orders routes', () => {
 
       const set = await api()
         .put(`/api/work-orders/${id}`)
-        .set(authHeaders(ctx.operatorToken))
+        .set(authHeaders(ctx.technicianToken))
         .send({ safetyNotes: 'Line 1\nLine 2', completionRemarks: 'Done' });
       expect(set.status).toBe(200);
 
@@ -590,7 +598,7 @@ describe('work orders routes', () => {
 
       const clear = await api()
         .put(`/api/work-orders/${id}`)
-        .set(authHeaders(ctx.operatorToken))
+        .set(authHeaders(ctx.technicianToken))
         .send({ completionRemarks: null });
       expect(clear.status).toBe(200);
 
@@ -730,7 +738,7 @@ describe('work orders routes', () => {
 
       const edited = await api()
         .put(`/api/work-orders/${id}`)
-        .set(authHeaders(ctx.operatorToken))
+        .set(authHeaders(ctx.technicianToken))
         .send({ description: 'edited, still no snapshot' });
       expect(edited.status).toBe(200);
 

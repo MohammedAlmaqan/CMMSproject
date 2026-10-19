@@ -94,7 +94,7 @@ describe('SOW 3.3.1 emergency priority (row 23)', () => {
     const id = await createWo('CM', 'Medium');
     const res = await api()
       .put(`/api/work-orders/${id}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ type: 'EM' });
     expect(res.status).toBe(200);
     expect(res.body.priority).toBe('High');
@@ -106,7 +106,7 @@ describe('SOW 3.3.1 emergency priority (row 23)', () => {
     const id = await createWo('EM', 'High');
     const res = await api()
       .put(`/api/work-orders/${id}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ priority: 'Low' });
     expect(res.status).toBe(200);
     const stored = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });
@@ -117,7 +117,7 @@ describe('SOW 3.3.1 emergency priority (row 23)', () => {
     const id = await createWo('CM', 'High');
     const res = await api()
       .put(`/api/work-orders/${id}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ priority: 'Low' });
     expect(res.status).toBe(200);
     const stored = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });

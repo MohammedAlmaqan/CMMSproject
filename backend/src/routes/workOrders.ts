@@ -746,7 +746,7 @@ router.post('/', authorizeMinRole('Requester'), validate(workOrderCreateSchema),
  *       '500':
  *         description: Internal server error
  */
-router.put('/:id', authorizeMinRole('Requester'), validate(workOrderUpdateSchema), async (req: Request, res: Response) => {
+router.put('/:id', authorizeMinRole('Technician'), validate(workOrderUpdateSchema), async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const existing = await prisma.workOrder.findFirst({

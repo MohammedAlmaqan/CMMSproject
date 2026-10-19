@@ -387,6 +387,7 @@ export interface TestContext {
   plannerToken: string;
   adminId: string;
   operatorId: string;
+  technicianId: string;
 }
 
 export const ctx: TestContext = {
@@ -398,4 +399,5 @@ export const ctx: TestContext = {
   plannerToken: '',
   adminId: '',
   operatorId: '',
+  technicianId: '',
 };

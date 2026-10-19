@@ -113,7 +113,7 @@ describe('SOW 3.3.1 calibration capture (row 24)', () => {
 
     const res = await api()
       .put(`/api/work-orders/${id}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ calibrationAsLeft: null });
     expect(res.status).toBe(200);
 
@@ -159,7 +159,7 @@ describe('SOW 3.3.1 calibration capture (row 24)', () => {
 
     const saved = await api()
       .put(`/api/work-orders/${id}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ calibrationResult: 'Fail' });
     expect(saved.status).toBe(200);
 

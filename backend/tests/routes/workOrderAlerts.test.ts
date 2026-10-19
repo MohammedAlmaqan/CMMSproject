@@ -128,7 +128,7 @@ describe('SOW 3.8 work order alerts (rows 69 and 70)', () => {
 
     const res = await api()
       .put(`/api/work-orders/${id}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ supervisorUserId: sup });
     expect(res.status).toBe(200);
 
@@ -141,7 +141,7 @@ describe('SOW 3.8 work order alerts (rows 69 and 70)', () => {
 
     const res = await api()
       .put(`/api/work-orders/${id}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ supervisorUserId: ctx.operatorId });
     expect(res.status).toBe(200);
 

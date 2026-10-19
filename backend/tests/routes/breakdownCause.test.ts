@@ -114,7 +114,7 @@ describe('SOW 3.1.4 breakdown cause codes (row 8)', () => {
     const id = await createWo({ breakdownFlag: true });
     const res = await api()
       .put(`/api/work-orders/${id}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ causeCodeId });
     expect(res.status).toBe(200);
     const stored = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });
@@ -139,7 +139,7 @@ describe('SOW 3.1.4 breakdown cause codes (row 8)', () => {
   it('completes the same breakdown once a cause code is set', async () => {
     const id = await createWo({ breakdownFlag: true });
     await walkToInProgress(id);
-    await api().put(`/api/work-orders/${id}`).set(authHeaders(ctx.operatorToken)).send({ causeCodeId });
+    await api().put(`/api/work-orders/${id}`).set(authHeaders(ctx.technicianToken)).send({ causeCodeId });
 
     const res = await transition(id, 'Completed');
     expect(res.status).toBe(200);
@@ -170,7 +170,7 @@ describe('SOW 3.1.4 breakdown cause codes (row 8)', () => {
 
     const res = await api()
       .put(`/api/work-orders/${id}`)
-      .set(authHeaders(ctx.operatorToken))
+      .set(authHeaders(ctx.technicianToken))
       .send({ status: 'Completed' });
     expect(res.status).toBe(200);
     const stored = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });

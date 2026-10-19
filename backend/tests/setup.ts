@@ -16,6 +16,7 @@ beforeAll(async () => {
   }
   ctx.adminId = admin.userId;
   ctx.operatorId = operator.userId;
+  ctx.technicianId = technician.userId;
   const sign = (id: string, username: string, role: string) =>
     jwt.sign({ userId: id, username, role }, JWT_SECRET, { expiresIn: '8h' });
   ctx.adminToken = sign(admin.userId, admin.username, admin.role);
