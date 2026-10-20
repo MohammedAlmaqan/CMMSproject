@@ -26,7 +26,9 @@ import {
   Pencil,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import EquipmentForm from '@/components/EquipmentForm';
 import { equipmentService } from '@/services/equipmentService';
+import { functionalLocationService } from '@/services/functionalLocationService';
 import { materialService } from '@/services/materialService';
 import { attachmentService } from '@/services/attachmentService';
 import { ApiError } from '@/lib/api';
@@ -74,6 +76,13 @@ export default function EquipmentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<EqTab>('general');
+
+  // G4: the master-data record itself. PUT /equipment/:id is Technician+ on the
+  // API, and the form needs the location list for its picker, which is loaded
+  // lazily the first time the form is opened.
+  const canEditEquipment = hasMinRole(role, 'Technician');
+  const [editFormOpen, setEditFormOpen] = useState(false);
+  const [editLocations, setEditLocations] = useState<FunctionalLocation[]>([]);
 
   // BOM write floors mirror the API: create/update need Technician, delete
   // needs a Supervisor.
@@ -371,6 +380,7 @@ export default function EquipmentDetailPage() {
               <div className="flex items-center gap-3">
                 <span className="font-mono text-lg font-bold text-primary">{eq.equipmentCode}</span>
                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs font-semibold ${
+                  eq.criticality === 'S' ? 'criticality-s' :
                   eq.criticality === 'A' ? 'criticality-a' : eq.criticality === 'B' ? 'criticality-b' : 'criticality-c'
                 }`}>
                   {eq.criticality}
@@ -410,7 +420,41 @@ export default function EquipmentDetailPage() {
           {activeTab === 'general' && (
             <div className="grid grid-cols-2 gap-4">
               <div className="industrial-card rounded p-4">
-                <h3 className="text-primary text-sm font-semibold mb-4">General Information</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-primary text-sm font-semibold">General Information</h3>
+                  {canEditEquipment && !editFormOpen && (
+                    <button
+                      onClick={async () => {
+                        // The location picker needs the full tree, which this
+                        // page does not otherwise load; fetch it on first open.
+                        if (editLocations.length === 0) {
+                          try {
+                            setEditLocations(await functionalLocationService.getAllPages());
+                          } catch {
+                            setEditLocations([]);
+                          }
+                        }
+                        setEditFormOpen(true);
+                      }}
+                      className="flex items-center gap-1 text-xs text-amber hover:underline"
+                    >
+                      <Pencil className="w-3 h-3" /> Edit
+                    </button>
+                  )}
+                </div>
+                {editFormOpen && (
+                  <div className="mb-4">
+                    <EquipmentForm
+                      locations={editLocations}
+                      initial={eq}
+                      onCancel={() => setEditFormOpen(false)}
+                      onSaved={async () => {
+                        setEditFormOpen(false);
+                        await reload();
+                      }}
+                    />
+                  </div>
+                )}
                 <div className="space-y-2.5">
                   <InfoItem label="Description" value={eq.description} />
                   <InfoItem label="Equipment Class" value={eq.equipmentClass} />

@@ -5,8 +5,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import EquipmentDetailPage from '@/pages/EquipmentDetailPage';
 import { useAuthStore } from '@/store/authStore';
 import { equipmentService } from '@/services/equipmentService';
+import { functionalLocationService } from '@/services/functionalLocationService';
 import { materialService } from '@/services/materialService';
 import { attachmentService } from '@/services/attachmentService';
+import { ApiError } from '@/lib/api';
 import type { Equipment, Material, User } from '@/types';
 
 vi.mock('@/services/equipmentService', () => ({
@@ -28,6 +30,10 @@ vi.mock('@/services/equipmentService', () => ({
 
 vi.mock('@/services/materialService', () => ({
   materialService: { getAll: vi.fn(), getAllPages: vi.fn(), exportCsv: vi.fn(), importCsv: vi.fn() },
+}));
+
+vi.mock('@/services/functionalLocationService', () => ({
+  functionalLocationService: { getAllPages: vi.fn() },
 }));
 
 vi.mock('@/services/attachmentService', () => ({
@@ -208,5 +214,90 @@ describe('EquipmentDetailPage BOM editing (SOW 3.1.2)', () => {
     await user.click(await screen.findByRole('button', { name: /documents/i }));
 
     expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument();
+  }, 20000);
+});
+
+describe('EquipmentDetailPage master-data edit (G4)', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
+    vi.clearAllMocks();
+    vi.mocked(equipmentService.getById).mockResolvedValue(equipment);
+    vi.mocked(equipmentService.getHistory).mockResolvedValue({ data: [], total: 0, skip: 0, take: 200 });
+    vi.mocked(materialService.getAllPages).mockResolvedValue([]);
+    vi.mocked(materialService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 50 });
+    vi.mocked(attachmentService.getByEntity).mockResolvedValue([]);
+    vi.mocked(functionalLocationService.getAllPages).mockResolvedValue([
+      { functionalLocationId: 'fl-1', locationCode: 'PLANT-01', description: 'Main plant', parentLocationId: null, locationType: 'Plant', operationalStatus: 'Active', installationDate: null, gpsCoordinates: null, safetyCritical: false, createdBy: 'u-admin', createdDate: '2026-09-01T00:00:00.000Z', modifiedBy: '', modifiedDate: '2026-09-01T00:00:00.000Z', isDeleted: false },
+    ]);
+  });
+
+  it('saves master-data changes through equipmentService.update and reloads', async () => {
+    vi.mocked(equipmentService.update).mockResolvedValue({
+      ...equipment,
+      name: 'Feed pump Mk2',
+      criticality: 'S',
+    });
+    // First read serves the initial render; the post-save reload must see the
+    // saved values, so subsequent reads return the updated record.
+    vi.mocked(equipmentService.getById)
+      .mockResolvedValueOnce(equipment)
+      .mockResolvedValue({ ...equipment, name: 'Feed pump Mk2', criticality: 'S' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+
+    const name = await screen.findByLabelText('Equipment name');
+    expect(name).toHaveValue('Feed pump');
+    await user.clear(name);
+    await user.type(name, 'Feed pump Mk2');
+    await user.selectOptions(screen.getByLabelText('Equipment criticality'), 'S');
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() =>
+      expect(vi.mocked(equipmentService.update)).toHaveBeenCalledWith(
+        'eq-1',
+        expect.objectContaining({ name: 'Feed pump Mk2', criticality: 'S' })
+      )
+    );
+    // The page reloads after save, so the header shows the new name.
+    expect(await screen.findByText('Feed pump Mk2')).toBeInTheDocument();
+  }, 20000);
+
+  it('offers S (Safety Critical) in the criticality picker, matching the API enum', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+
+    const criticality = await screen.findByLabelText('Equipment criticality');
+    for (const value of ['S', 'A', 'B', 'C']) {
+      expect(criticality.querySelector(`option[value="${value}"]`)).toBeInTheDocument();
+    }
+  }, 20000);
+
+  it('hides the edit control from a View-Only user (PUT floor is Technician)', async () => {
+    useAuthStore.setState({
+      user: { ...adminUser, role: 'View-Only' },
+      isAuthenticated: true,
+      loading: false,
+      error: null,
+    });
+    renderPage();
+
+    expect(await screen.findByText('PUMP-01')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  }, 20000);
+
+  it('surfaces the API rejection and keeps the form open', async () => {
+    vi.mocked(equipmentService.update).mockRejectedValue(new ApiError(409, 'Equipment code already exists'));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    await user.click(await screen.findByRole('button', { name: 'Save Changes' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Equipment code already exists');
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
   }, 20000);
 });

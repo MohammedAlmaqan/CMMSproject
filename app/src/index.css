@@ -140,6 +140,11 @@
     border: 1px solid rgba(82, 82, 91, 0.5);
   }
 
+  .criticality-s {
+    color: #E11D48;
+    border-color: #E11D48;
+  }
+
   .criticality-a {
     color: #F87171;
     border-color: #F87171;

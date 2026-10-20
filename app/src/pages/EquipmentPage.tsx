@@ -18,8 +18,10 @@ import {
   Upload,
   Download,
   X,
+  Plus,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import EquipmentForm from '@/components/EquipmentForm';
 import { equipmentService } from '@/services/equipmentService';
 import { functionalLocationService } from '@/services/functionalLocationService';
 import { workOrderService } from '@/services/workOrderService';
@@ -65,6 +67,9 @@ export default function EquipmentPage() {
   // POST /equipment/import.csv is Maintenance Planner+ on the API.
   const role = useAuthStore((s) => s.user?.role);
   const canImport = hasMinRole(role, 'Maintenance Planner');
+  // POST /equipment is Technician+ on the API (G4).
+  const canCreate = hasMinRole(role, 'Technician');
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const handleExport = async () => {
     setExportBusy(true);
@@ -339,6 +344,7 @@ export default function EquipmentPage() {
               style={{ backgroundColor: '#27272A' }}
             >
               <option value="All">All Criticality</option>
+              <option value="S">S - Safety Critical</option>
               <option value="A">A - Critical</option>
               <option value="B">B - Important</option>
               <option value="C">C - Normal</option>
@@ -352,6 +358,14 @@ export default function EquipmentPage() {
                 aria-label="Import equipment CSV"
                 onChange={handleImportFile}
               />
+              {canCreate && (
+                <button
+                  onClick={() => setShowCreateForm((v) => !v)}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight hover:text-amber"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Equipment
+                </button>
+              )}
               {canImport && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -381,6 +395,20 @@ export default function EquipmentPage() {
               </button>
             )}
           </div>
+
+          {showCreateForm && (
+            <EquipmentForm
+              locations={locations}
+              onCancel={() => setShowCreateForm(false)}
+              onSaved={() => {
+                setShowCreateForm(false);
+                // The tree index counts equipment per node and the class
+                // dropdown reads it too, so a full reload keeps both honest.
+                loadIndex();
+                fetchRows();
+              }}
+            />
+          )}
 
           {loading || (rowsLoading && rows.length === 0) ? (
             <div className="flex-1 flex items-center justify-center py-24">
@@ -438,6 +466,7 @@ export default function EquipmentPage() {
                           <td className="px-4 py-2.5 text-xs text-secondary">{eq.equipmentClass}</td>
                           <td className="px-4 py-2.5">
                             <span className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs font-semibold ${
+                              eq.criticality === 'S' ? 'criticality-s' :
                               eq.criticality === 'A' ? 'criticality-a' :
                               eq.criticality === 'B' ? 'criticality-b' : 'criticality-c'
                             }`}>

@@ -61,7 +61,7 @@ export interface Equipment extends Auditable {
   serialNumber: string;
   assetTag: string;
   equipmentClass: string;
-  criticality: 'A' | 'B' | 'C';
+  criticality: 'S' | 'A' | 'B' | 'C';
   installationDate: string | null;
   warrantyExpiryDate: string | null;
   operationalStatus: 'Active' | 'Inactive' | 'Decommissioned';
