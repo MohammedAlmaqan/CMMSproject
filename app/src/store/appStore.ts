@@ -79,6 +79,7 @@ interface AppState {
   updateMaterial: (id: string, updates: Partial<Material>) => void;
 
   addWorkCenter: (wc: WorkCenter) => void;
+  updateWorkCenter: (id: string, updates: Partial<WorkCenter>) => void;
 
   addUser: (user: User) => void;
   updateUser: (id: string, updates: Partial<User>) => void;
@@ -336,6 +337,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   addWorkCenter: (wc) => {
     set((s) => ({ workCenters: [...s.workCenters, wc] }));
+  },
+
+  updateWorkCenter: (id, updates) => {
+    set((s) => ({
+      workCenters: s.workCenters.map((w) =>
+        w.workCenterId === id ? { ...w, ...updates } : w
+      ),
+    }));
   },
 
   addUser: (user) => {
