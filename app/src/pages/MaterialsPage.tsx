@@ -11,6 +11,8 @@ import {
   Upload,
   Download,
   X,
+  Plus,
+  Pencil,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { materialService } from '@/services/materialService';
@@ -20,6 +22,129 @@ import { hasMinRole } from '@/lib/rbac';
 import type { Material } from '@/types';
 
 const PAGE_SIZE = 10;
+
+interface MaterialFormProps {
+  initial: Material | null;
+  onCancel: () => void;
+  onSaved: (message: string) => void;
+}
+
+function MaterialForm({ initial, onCancel, onSaved }: MaterialFormProps) {
+  const [materialCode, setMaterialCode] = useState(initial?.materialCode ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [unitOfMeasure, setUnitOfMeasure] = useState(initial?.unitOfMeasure ?? '');
+  const [standardCost, setStandardCost] = useState(initial ? String(initial.standardCost) : '');
+  const [currentStock, setCurrentStock] = useState(initial ? String(initial.currentStock) : '');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!materialCode.trim() || !description.trim() || !unitOfMeasure.trim()) {
+      setError('Material code, description and unit of measure are required');
+      return;
+    }
+    const payload = {
+      materialCode: materialCode.trim(),
+      description: description.trim(),
+      unitOfMeasure: unitOfMeasure.trim(),
+      standardCost: Number(standardCost || 0),
+      currentStock: Number(currentStock || 0),
+    };
+    if (payload.standardCost < 0 || payload.currentStock < 0) {
+      setError('Standard cost and stock cannot be negative');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      if (initial) await materialService.update(initial.materialId, payload);
+      else await materialService.create(payload);
+      onSaved(initial ? 'Material updated' : 'Material created');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Save failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} aria-label={initial ? 'Edit material' : 'New material'} className="industrial-card rounded p-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <label className="block text-xs text-secondary">
+          Material code
+          <input
+            value={materialCode}
+            onChange={(e) => setMaterialCode(e.target.value)}
+            required
+            disabled={busy}
+            className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+        <label className="block text-xs text-secondary">
+          Description
+          <input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            required
+            disabled={busy}
+            className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+        <label className="block text-xs text-secondary">
+          Unit of measure
+          <input
+            value={unitOfMeasure}
+            onChange={(e) => setUnitOfMeasure(e.target.value)}
+            required
+            disabled={busy}
+            className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+        <label className="block text-xs text-secondary">
+          Standard cost
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={standardCost}
+            onChange={(e) => setStandardCost(e.target.value)}
+            disabled={busy}
+            className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+        <label className="block text-xs text-secondary">
+          Current stock
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={currentStock}
+            onChange={(e) => setCurrentStock(e.target.value)}
+            disabled={busy}
+            className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+      </div>
+      {error && (
+        <div role="alert" className="mt-3 rounded border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">{error}</div>
+      )}
+      <div className="mt-3 flex items-center gap-2">
+        <button type="submit" disabled={busy} className="px-3 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight disabled:opacity-50">
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+        <button type="button" onClick={onCancel} disabled={busy} className="px-3 py-1.5 rounded text-xs text-secondary border border-subtle hover:border-highlight disabled:opacity-50">
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
 
 export default function MaterialsPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -35,9 +160,13 @@ export default function MaterialsPage() {
   const [exportBusy, setExportBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [toastError, setToastError] = useState(false);
-  // POST /materials/import.csv is Maintenance Planner+ on the API.
+  // POST/PUT /materials are Requester+ on the API; delete is deliberately omitted
+  // here (no delete endpoint is wired on this page — see the audit's open items).
   const role = useAuthStore((s) => s.user?.role);
   const canImport = hasMinRole(role, 'Maintenance Planner');
+  const canManage = hasMinRole(role, 'Requester');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editing, setEditing] = useState<Material | null>(null);
 
   const handleExport = async () => {
     setExportBusy(true);
@@ -147,6 +276,15 @@ export default function MaterialsPage() {
             />
           </div>
           <div className="flex items-center gap-2 ml-auto">
+            {canManage && (
+              <button
+                onClick={() => { setEditing(null); setShowCreateForm(true); }}
+                aria-label="Add Material"
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight hover:text-amber"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Material
+              </button>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -175,6 +313,20 @@ export default function MaterialsPage() {
           </div>
         </div>
 
+        {(showCreateForm || editing) && canManage && (
+          <MaterialForm
+            initial={editing}
+            onCancel={() => { setShowCreateForm(false); setEditing(null); }}
+            onSaved={(msg) => {
+              setShowCreateForm(false);
+              setEditing(null);
+              setToastError(false);
+              setToast(msg);
+              reload();
+            }}
+          />
+        )}
+
         <div className="industrial-card rounded overflow-hidden">
           <table className="w-full">
             <thead>
@@ -186,25 +338,30 @@ export default function MaterialsPage() {
                   { key: 'standardCost', label: 'Std Cost' },
                   { key: 'currentStock', label: 'Stock' },
                   { key: 'value', label: 'Value' },
+                  ...(canManage ? [{ key: 'actions', label: 'Actions' }] : []),
                 ].map((col) => (
                   <th
                     key={col.key}
-                    className="text-left px-4 py-2.5 font-medium text-tertiary cursor-pointer select-none"
+                    className="text-left px-4 py-2.5 font-medium text-tertiary select-none"
                     style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}
-                    onClick={() => col.key !== 'value' && handleSort(col.key)}
-                    onKeyDown={(e) => {
-                      if ((e.key === 'Enter' || e.key === ' ') && col.key !== 'value') {
-                        e.preventDefault();
-                        handleSort(col.key);
-                      }
-                    }}
-                    tabIndex={col.key !== 'value' ? 0 : undefined}
-                    role={col.key !== 'value' ? 'button' : undefined}
-                    aria-label={col.key !== 'value' ? `Sort by ${col.label}` : undefined}
+                    {...(col.key !== 'value' && col.key !== 'actions'
+                      ? {
+                          onClick: () => handleSort(col.key),
+                          onKeyDown: (e: React.KeyboardEvent) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleSort(col.key);
+                            }
+                          },
+                          tabIndex: 0,
+                          role: 'button',
+                          'aria-label': `Sort by ${col.label}`,
+                        }
+                      : {})}
                   >
                     <div className="flex items-center gap-1">
                       {col.label}
-                      {col.key !== 'value' && <ArrowUpDown className="w-3 h-3" />}
+                      {col.key !== 'value' && col.key !== 'actions' && <ArrowUpDown className="w-3 h-3" />}
                     </div>
                   </th>
                 ))}
@@ -231,6 +388,17 @@ export default function MaterialsPage() {
                   <td className="px-4 py-2.5 font-mono text-xs text-primary">
                     ${(mat.currentStock * mat.standardCost).toLocaleString()}
                   </td>
+                  {canManage && (
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={() => { setShowCreateForm(false); setEditing(mat); }}
+                        aria-label={`Edit material ${mat.materialCode}`}
+                        className="flex items-center gap-1 px-2 py-1 rounded text-xs text-secondary border border-subtle hover:border-highlight hover:text-amber"
+                      >
+                        <Pencil className="w-3 h-3" /> Edit
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
