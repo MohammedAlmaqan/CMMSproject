@@ -294,8 +294,8 @@ The new work order appears in the work orders list with a link back to the sourc
 
 1. Select **Reports**.
 2. Choose one of the seven reports from the tabs.
-3. Set any date range and filters offered on that report.
-4. Read the results, then select **Export** to download a server-built Excel (.xlsx) workbook for Excel or further analysis.
+3. Set the filter bar: a from/to date range, a functional location, an equipment item, a work centre, and an **include descendant locations** toggle. The filters apply to every report and to the export; **Clear filters** resets them.
+4. Read the results, then select **Export** to download a server-built Excel (.xlsx) workbook for Excel or further analysis - the export carries the same filters.
 
 ![Backlog report](images/g5_01_reports_backlog.png)
 ![PM compliance report](images/g5_02_reports_pm_compliance.png)
@@ -354,14 +354,13 @@ The same run is available as `POST /api/maintenance-plans/run-scheduler`, which 
 
 ## 9. Administrator
 
-A Maintenance Planner can do everything in [section 8](#8-maintenance-planner), plus user and audit administration. **Editing an existing user (role, work center, name, email) is `API only` today.**
+A Maintenance Planner can do everything in [section 8](#8-maintenance-planner), plus user and audit administration. **Editing an existing user, and resetting your own password, are both available from the screen.**
 
 ### 9.1 Administration screen
 
 Select **Administration**. The screen has three tabs:
 
-- **Users & Roles** - a list of every user with username, full name, email, role, active flag, and last sign-in. It carries an **Add User** form and a per-row **Deactivate** control ([9.2](#92-create-a-user), [9.3](#93-disable-a-user)). Editing an existing user's role, work center, name or email has no UI control and is done through `PUT /api/users/{userId}`.
-- **Audit Log** - every recorded change, filterable by table, action, and free text, and paginated. Only Administrators can read it; any other role selecting this tab receives an error.
+- **Users & Roles** - a list of every user with username, full name, email, role, active flag, and last sign-in. It carries an **Add User** form, a per-row **Edit** control ([9.3a](#93a-edit-a-user)) and a per-row **Deactivate** control ([9.2](#92-create-a-user), [9.3](#93-disable-a-user)).- **Audit Log** - every recorded change, filterable by table, action, and free text, and paginated. Only Administrators can read it; any other role selecting this tab receives an error.
 - **Settings** - shows configuration. Three rows load from `GET /api/system-config` and are editable by an Administrator (saved via `PUT /api/system-config`): the two number-prefix rows (`wo_number_prefix`, `notif_number_prefix`) and the audit retention window (`audit_retention_years`); the remaining rows are a read-only display of static values.
 
 ### 9.2 Create a user
@@ -386,7 +385,21 @@ PUT /api/users/{userId}
 
 A disabled account is refused at sign-in with the generic `Invalid credentials` message - the system deliberately does not tell the user that the account is disabled. The UI cannot re-enable an account; use the `PUT` call above, or see [6.3](ADMIN_GUIDE.md#63-disable-and-re-enable-a-user).
 
-### 9.3a Delete or decommission a user
+### 9.3a Edit a user
+
+1. Select **Administration**, then the **Users & Roles** tab.
+2. Select **Edit** on the user's row.
+3. Change the role, full name, email or work center, or toggle the account active, then save.
+
+The same call is `PUT /api/users/{userId}` (Administrator). A duplicate active username is refused with **409** and the change is written to the audit log.
+
+### 9.3b Change a password
+
+**Self-service:** every signed-in user can change their **own** password from the **Change password** dialog in the sidebar. You supply your current password and the new one. This is the normal recovery path when you still know the current password.
+
+**Administrator reset of another user:** an Administrator can reset any user's password from the same dialog without supplying the target's current password - see [9.4](#94-reset-a-password).
+
+### 9.3c Delete or decommission a user
 
 The **Deactivate** button in **Administration → Users & Roles** performs the soft delete, so this is the same operation as disabling from the user's point of view - it removes the account from every list, blocks sign-in, and preserves the historical record so the person's name stays on work orders, labour entries and audit entries. The underlying call, if you prefer the API:
 
@@ -397,6 +410,10 @@ DELETE /api/users/{userId}
 Deactivating your own account is refused with **400**. If the username should remain reusable, prefer disabling over deleting. See [6.7](ADMIN_GUIDE.md#67-delete-or-decommission-a-user).
 
 ### 9.4 Reset a password
+
+**In the UI:** an Administrator can reset another user's password from the **Change password** dialog (the same dialog the user uses for self-service), which calls the endpoint below without the target's current password.
+
+The same operation as an API call:
 
 ```
 PUT /api/users/{userId}/password
@@ -493,17 +510,16 @@ All seven are on the **Reports** screen, all are available to every signed-in ro
 
 ## 14. Reference: operations that are not available in the screen
 
-These operations exist in the system but have no screen. This section exists so you are not left looking for a button that is not there. Operations that **do** have screens - raising a notification ([5.3](#53-raise-a-problem-report-notification)), creating, editing or deleting a PM plan ([8.3](#83-create-edit-or-delete-a-pm-plan)), running the scheduler manually ([8.5](#85-run-the-scheduler-manually)), and creating, disabling and deactivating a user ([9.2](#92-create-a-user), [9.3](#93-disable-a-user)) - are deliberately absent from this list.
+These operations exist in the system but have no screen. This section exists so you are not left looking for a button that is not there. Operations that **do** have screens - raising a notification ([5.3](#53-raise-a-problem-report-notification)), editing equipment, materials and work centres, recording meter readings, editing a notification, filtering the reports, creating, editing or deleting a PM plan ([8.3](#83-create-edit-or-delete-a-pm-plan)), running the scheduler manually ([8.5](#85-run-the-scheduler-manually)), and creating, editing, disabling and deactivating a user ([9.2](#92-create-a-user), [9.3a](#93a-edit-a-user), [9.3](#93-disable-a-user)) - are deliberately absent from this list.
 
 | Operation | Screen available? | How it is done |
 |---|---|---|
-| Reset a user's password | No | `PUT /api/users/{userId}/password` - Administrator |
-| Re-enable a disabled user | No | `PUT /api/users/{userId}` with `isActive: true` - Administrator |
-| Edit a user's role, work center, name or email | No | `PUT /api/users/{userId}` - Administrator |
+| Re-enable a disabled user | No (Edit toggles the active flag) | `PUT /api/users/{userId}` with `isActive: true` - Administrator; or **Edit** the row and set it active |
 | Clear a lockout early | No | **No API exists.** Database update - see the [Administrator Guide](ADMIN_GUIDE.md#64-clear-an-account-lockout) |
 | Edit a system setting (number prefixes, audit retention) | Yes (Administrator) | `PUT /api/system-config`; other settings come from environment variables - see the [Administrator Guide](ADMIN_GUIDE.md#3-configuration) |
+| Delete equipment or a material | No (deliberate) | Retire by status / deactivate instead; see [15](#15-troubleshooting) |
 
-*Updated 2026-10-19 (C6, register D6): the "Raise a notification", "Create / edit / delete a PM plan" and "Run the PM scheduler manually" rows were removed because those operations now have screens, and an "Edit a user's role, work center, name or email" row was added because editing an existing user still has no UI control.*
+*Updated 2026-10-20 (v1.6.0): the "Reset a user's password" and "Edit a user's role, work center, name or email" rows were removed because both now have screens (the Change password dialog and the per-row Edit control); the re-enable row stays because the Edit control is the supported path but the API remains the direct one. Superseded wording, kept: the 2026-10-19 (C6) revision, which added the "Edit a user's role..." row because editing a user then had no UI control.*
 
 If a task you need is on this list and there is no screen for it, raise it with your administrator. It is a known gap, not user error.
 

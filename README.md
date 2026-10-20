@@ -33,27 +33,31 @@ These counts are the actual current state, not aspirations:
 | Backend API route files | 27 |
 | Backend route groups mounted | 27 |
 | Backend test files | 88 `.test.ts` run by vitest (39 unit + 49 routes), 1180 tests executed (`vitest list` prints 1176: it counts each `it.each` template once, and the runner expands the two 3-case `it.each` templates in `laborAttribution.test.ts` into six); 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 91 |
-| Frontend pages | 17 |
-| Frontend service modules | 26 |
-| Frontend test files | 13 |
+| Frontend pages | 20 |
+| Frontend service modules | 27 |
+| Frontend test files | 28 (153 tests) |
 
-*Re-derived 2026-10-16 against the repository at `9163eda`. This table moved
-from the 2026-10-08 re-derivation: migrations 19→22, backend test files 81→88
-(35 + 46 → 39 + 49), executed tests 1084→1180, frontend service modules 25→26
-and frontend test files 8→13. The 2026-10-08 values, and before them a table
-of 15 migrations, 26 route files and groups, 70 backend tests (33 + 37) with a
-tracked total of 73, 23 service modules and 7 frontend tests, are kept here
-rather than silently overwritten.*
+*Re-derived 2026-10-20 against the repository at `e5de737`. This table moved
+from the 2026-10-16 re-derivation: frontend pages 17→20 (`EquipmentForm`-backed
+equipment create/edit, the crafts, code-lists and safety-checklist screens added
+by the UI gap-closure workstream), frontend service modules 26→27
+(`equipmentMeterService.addReading`), frontend test files 13→28 and 153 tests as
+the Build Now set (G1-G10) and the gap-closure workstream added component tests.
+The 2026-10-16 values (frontend pages 17, service modules 26, test files 13) and,
+before them, the 2026-10-08 re-derivation — migrations 19→22, backend test files
+81→88 (35 + 46 → 39 + 49), executed tests 1084→1180, frontend service modules
+25→26 and frontend test files 8→13 — are kept here rather than silently
+overwritten.*
 
 ## Implemented functionality
 
 ### Master data
 - Hierarchical functional locations (plant → area → unit → sub-unit) with a tree endpoint.
-- Equipment catalog with technical parameters, meter definitions, BOM materials, and CSV import/export.
-- Work centers with associated crafts and hourly rates.
-- Materials / spare parts with CSV import/export.
-- Failure codes, cause codes, and task list templates with operations.
-- Equipment meter readings over time.
+- Equipment catalog with technical parameters, meter definitions, BOM materials, and CSV import/export. Equipment is created and edited from the UI (`EquipmentForm`, reachable from the list **Add Equipment** control and the detail-page **Edit** control), with criticality `S`/`A`/`B`/`C`.
+- Work centers with associated crafts and hourly rates, created and edited from the UI (code, name, daily capacity hours, cost rate, active flag; retired by deactivating, not deleting).
+- Materials / spare parts with CSV import/export, plus row-level create and edit from the UI (code, description, unit of measure, standard cost, current stock).
+- Failure codes, cause codes, and task list templates with operations, each with their own management screen (`/crafts`, `/code-lists`, `/task-lists`).
+- Equipment meter readings: an **Add reading** form in the meter card of the equipment detail page appends to the readings history through `POST /api/equipment-meters/{id}/readings` (Technician+), rather than overwriting the latest value.
 
 ### Work management
 - Five work order types: `CM`, `PM`, `PdM`, `EM`, `CAL`.
@@ -70,6 +74,7 @@ rather than silently overwritten.*
 ### Notifications
 - `M1` (Malfunction), `M2` (Request), `M3` (Completion) with a breakdown/emergency flag.
 - Conversion of a notification into a work order.
+- Editing of a notification (type, priority, description, location, equipment, damages, breakdown flag) from its detail page; the edit control is hidden once the notification is `Converted`, since the linked work order owns the truth from that point.
 
 ### Preventive maintenance
 - Maintenance plans with a strategy type (`Time`, `Meter`, `Combined`), a recurrence interval, and a call horizon (default 7 days).
@@ -78,14 +83,14 @@ rather than silently overwritten.*
 
 ### Reporting & dashboard
 - Ten report endpoints. Seven are on the **Reports** screen (`backlog`, `pm-compliance`, `mtbf`, `mttr`, `cost-summary`, `downtime`, `material-consumption`); three back dashboard widgets (`backlog-hours-by-work-center`, `top-cost-equipment`, `notifications-awaiting-conversion`). Every report returns JSON **and** exports a server-built `.xlsx` workbook (`GET /api/reports/{report}/export.xlsx`), so the API is not JSON-only. `material-consumption` aggregates work order material issues, not meter readings.
+- The **Reports** screen carries a filter bar - from/to dates, functional location, equipment, work centre, and an include-descendant-locations toggle - applied to all seven reports and their exports. A rejected filter surfaces the backend's reason, since the API validates the parameters and returns a 400.
 - Dashboard KPIs, system alerts, and cost summary.
 - CSV export exists for the **equipment** and **materials** master lists (`/export.csv`), with matching validated import.
-
 ### Administration & operations
 - Role-based access control across six roles: `Administrator`, `Maintenance Planner`, `Maintenance Supervisor`, `Technician`, `Requester`, `View-Only`.
-- User administration, including per-user password change.
+- User administration: an **Add User** form, a per-row profile **edit** (role, full name, email, work centre, active flag) and a per-row **Deactivate** control on the Administration screen, plus a self-service **Change password** dialog in the global sidebar.
 - System alerts and account lockout after repeated failed logins.
-- Read-only Administration screens for users and audit log. The **Settings** tab edits runtime configuration through `GET`/`PUT /api/system-config`.
+- Administration screens for users and audit log. The **Settings** tab edits runtime configuration through `GET`/`PUT /api/system-config`.
 - Rate limiting on the login route.
 - Structured JSON logging (pino) to `logs/api-out.log` / `logs/api-err.log` (API) and `logs/worker-out.log` / `logs/worker-err.log` (scheduler worker) under PM2.
 
@@ -287,11 +292,11 @@ CMMSproject/
 ├── app/                        # React SPA
 │   └── src/
 │       ├── components/         # layout, dashboard (incl. the R3F canvas)
-│       ├── pages/              # 17 page components
-│       ├── services/           # 26 API service modules
+│       ├── pages/              # 20 page components
+│       ├── services/           # 27 API service modules
 │       ├── store/              # Zustand
 │       ├── types/              # TypeScript types
-│       └── __tests__/          # 13 test files
+│       └── __tests__/          # 28 test files
 ├── backend/                    # Express API
 │   ├── src/
 │   │   ├── routes/             # 27 route files
@@ -314,5 +319,6 @@ CMMSproject/
 
 ## Further reading
 
+- `RELEASE_NOTES.md` — what changed in each release, most recent first.
 - `docs/INSTALLATION_GUIDE.md` — full Windows/IIS deployment, PM2, backup/restore, and k6 instructions.
 - `docs/CMMS_FINALIZATION_TRACKER.md` — per-phase status, verification evidence, and deferred items.

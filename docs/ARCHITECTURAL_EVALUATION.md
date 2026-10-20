@@ -716,18 +716,22 @@ Verdict: **Defer.**
 
 ### D.3 Verdict summary
 
+**Status 2026-10-20: the Build Now set (G1-G10) is complete and shipped in
+`v1.6.0`; each item landed as its own green commit. The Defer set (G11-G18) is
+unchanged. Per-item SHAs are in D.5.**
+
 | # | Gap | Verdict |
 |---|---|---|
-| G1 | Labor logging impossible for non-admins | Build Now (P0) |
-| G2 | No password change/reset UI | Build Now (P0) |
-| G3 | No user edit UI | Build Now (P1) |
-| G4 | No equipment create/edit UI | Build Now (P1) |
-| G5 | No material create/edit/delete UI (stock locked to CSV) | Build Now (P1) |
-| G6 | No work-centre CRUD UI | Build Now (P1) |
-| G7 | Meter readings cannot be recorded | Build Now (P2) |
-| G8 | Reports have no filter UI | Build Now (P2) |
-| G9 | Notifications cannot be edited | Build Now (P2) |
-| G10 | Dead Header Filter/Export buttons | Build Now (P3) |
+| G1 | Labor logging impossible for non-admins | Build Now (P0) - **done `425a833`** |
+| G2 | No password change/reset UI | Build Now (P0) - **done `45a15d8`** |
+| G3 | No user edit UI | Build Now (P1) - **done `7cce927`** |
+| G4 | No equipment create/edit UI | Build Now (P1) - **done `603e3fa`** |
+| G5 | No material create/edit/delete UI (stock locked to CSV) | Build Now (P1) - **done `c19a8ec`** |
+| G6 | No work-centre CRUD UI | Build Now (P1) - **done `f21d286`** |
+| G7 | Meter readings cannot be recorded | Build Now (P2) - **done `192a64a`** |
+| G8 | Reports have no filter UI | Build Now (P2) - **done `cb2aa09`** |
+| G9 | Notifications cannot be edited | Build Now (P2) - **done `3929a5f`** |
+| G10 | Dead Header Filter/Export buttons | Build Now (P3) - **done `e5de737`** |
 | G11 | Deactivated users cannot be restored | Defer |
 | G12 | Work-order CSV import has no UI | Defer |
 | G13 | Audit log UI: search only, no date filter or export | Defer |
@@ -753,6 +757,15 @@ lower-frequency need (bulk WO import), or is a deliberate design choice (no dele
 buttons, no global search).
 
 ### D.5 Execution plan for the Build Now set
+
+**Executed 2026-10-20. All ten items landed, one logical concern per commit, each
+green: G1 `425a833`, G2 `45a15d8`, G3 `7cce927`, G4 `603e3fa`, G5 `c19a8ec`,
+G6 `f21d286`, G7 `192a64a`, G8 `cb2aa09`, G9 `3929a5f`, G10 `e5de737`, released
+as `v1.6.0`. Frontend test count moved 134 -> 153. The plan below is kept as
+written (the proposal), not rewritten now that it is done; the SHAs above are the
+record of execution. G1's commit `425a833` has no CI run of its own (it was
+pushed in a batch boundary the workflow did not trigger on); every other item and
+every subsequent commit has a green run. This is noted rather than papered over.**
 
 Every Build Now item is a change to `app/src` only. None of them requires a database
 change: no migration, no schema edit, no data backfill, no new table, no new column,
