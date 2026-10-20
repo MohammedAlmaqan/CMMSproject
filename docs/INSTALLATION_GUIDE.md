@@ -72,7 +72,7 @@ npm install
 npx prisma generate
 npx prisma migrate deploy
 npx tsc
-..\scripts\seed-demo.bat
+REM ..\scripts\seed-demo.bat  - FRESH DEMO INSTALLS ONLY, see below
 
 REM Frontend
 cd CMMSproject\app
@@ -85,7 +85,10 @@ npm run build
 `scripts\seed-demo.bat` populates demo data and refuses to run against a
 production database. It sets the `SEED_DEMO` guard variable itself, so
 there is no need to export anything first. To start with an empty
-database instead, skip that line.
+database instead, skip that line. The scripted `scripts\build.bat` build
+deliberately omits this step: a build must never destroy live work-order
+or notification data. **Never run `seed-demo.bat` against a database that
+holds real data** - it wipes every table before reloading the demo set.
 
 ### Step 5: Start the Application
 
@@ -99,11 +102,16 @@ runs the daily overdue sweep and purges old audit rows. Run exactly **one** work
 cd CMMSproject\backend
 pm2 start ecosystem.config.cjs
 pm2 save
-pm2 startup
 ```
 
 `ecosystem.config.cjs` defines both apps - `cmms-api` and `cmms-worker` - so this one
 command starts both.
+
+**Autostart after reboot (Windows):** `pm2 startup` is Unix-only and exits with
+"Error: Init system not found" on Windows - do not use it. The supported pattern is a
+Scheduled Task that runs `pm2 resurrect` at logon (the exact task shape used on the
+reference deployment is recorded in `docs/GO_LIVE_CHECKLIST.md`, item 4), or the NSSM
+services in Option B below, which need no task at all.
 
 **Option B: Using Windows Services**
 
@@ -491,9 +499,16 @@ The **100-VU acceptance run** (SOW §6.4.3) is the same login → list → detai
 
 Thresholds that fail the run: `http_req_duration{scenario:load}` p95 must stay under 2000 ms, and `http_req_failed` must stay under 1%.
 
-### Scope: this is not the SOW §4.1 capacity proof
+### Scope: these k6 runs are not the SOW §4.1 capacity proof
 
-SOW §4.1 requires the system to support **200 concurrent users**. That requirement is **deferred to post-go-live** and is not demonstrated by this test. The 50-VU run is a smoke sanity check that the main authenticated read path stays healthy and responsive against a single local backend; it is not a capacity or saturation measurement, and its numbers must not be quoted as evidence for the 200-user clause. Closing the §4.1 gap requires a production-like environment and a separate capacity exercise.
+SOW §4.1 requires the system to support **200 concurrent users**. The formal 200-user
+capacity exercise was executed and passed on 2026-10-03 (tracker G.5; the
+transactional-save limb was measured separately at C12 on 2026-10-10) - the earlier
+"deferred to post-go-live" reading recorded here is superseded. The 50-VU smoke and
+100-VU acceptance runs above are read-path sanity checks against a single local
+backend, not the capacity/saturation measurement; their numbers must not be quoted as
+evidence for the 200-user clause. The capacity evidence is the `scripts\k6\capacity.js`
+and `scripts\k6\write.js` runs recorded in `docs/SOW_COMPLIANCE.md` §4.1.
 
 ---
 
