@@ -2,7 +2,7 @@
 
 **Source of truth:** [`backend/prisma/schema.prisma`](../backend/prisma/schema.prisma)
 **Database:** PostgreSQL. Datasource `db`, Prisma client generator `prisma-client-js`.
-**Scope:** all 38 models, verified against the schema on 2026-09-25; re-verified against 38 models on 2026-09-29 (additions: `TaskListMaterial`, `MaintenancePlanTarget`, `WorkOrderSnapshot`).
+**Scope:** all 38 models, verified against the schema on 2026-09-25; re-verified against 38 models on 2026-09-29 (additions: `TaskListMaterial`, `MaintenancePlanTarget`, `WorkOrderSnapshot`); re-verified 2026-10-20 against the 38-model schema through the `alert_type_scheduler_stale` migration (the two optional WorkOrder→CauseCode/FailureCode cardinalities were corrected from `||` to `o|` at this pass).
 
 ## How to read this
 
@@ -432,8 +432,8 @@ erDiagram
     USER ||--o{ SYSTEM_ALERT : "notified"
     USER ||--o{ COMMENT : "writes"
     WORK_ORDER ||--o{ WORK_ORDER_OPERATION : "comprises"
-    CAUSE_CODE ||--o{ WORK_ORDER : "names a cause on"
-    FAILURE_CODE ||--o{ WORK_ORDER : "names a failure on"
+    CAUSE_CODE o|--o{ WORK_ORDER : "names a cause on"
+    FAILURE_CODE o|--o{ WORK_ORDER : "names a failure on"
     WORK_ORDER ||--o{ WORK_ORDER_MATERIAL : "consumes"
     WORK_ORDER ||--o{ EXTERNAL_SERVICE_COST : "purchased through"
     WORK_ORDER ||--o{ COST_SPLIT : "charged to"
