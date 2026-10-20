@@ -11,7 +11,7 @@ For the initial installation itself, see the [Installation & Deployment Guide](I
 Related documents:
 
 - [User Manual](USER_MANUAL.md) - the guide you give to plant users
-- [API Reference](API_REFERENCE.md) - all 146 endpoints across 27 route groups (supersedes the 141 across 27 cited here earlier, and the 129 across 26 before that)
+- [API Reference](API_REFERENCE.md) - all 150 endpoints across 27 route groups (supersedes the 146 across 27, the 141 across 27, and the 129 across 26 cited here earlier; the two extra endpoints are the `/api/health` and `/api/health/scheduler` routes defined inline in `index.ts`)
 - [Architecture](ARCHITECTURE.md) - design decisions and measured performance
 - [Handoff](HANDOFF.md) - known open risks carried into production
 
@@ -79,7 +79,7 @@ Consequences you must plan for:
 
 ## 3. Configuration
 
-Configuration is mostly by environment variable. The backend reads `backend/.env`; the frontend is compiled with `app/.env.local`. The Administration screen's **Settings** tab edits the two runtime-configurable values (`wo_number_prefix`, `notif_number_prefix`) through `GET`/`PUT /api/system-config` (Administrator only); every other value here still requires an edit and a restart.
+Configuration is mostly by environment variable. The backend reads `backend/.env`; the frontend is compiled with `app/.env.local`. The Administration screen's **Settings** tab edits the three runtime-configurable values (`wo_number_prefix`, `notif_number_prefix`, `audit_retention_years`) through `GET`/`PUT /api/system-config` (Administrator only); every other value here still requires an edit and a restart.
 
 > The configuration tables in this section and in the [Installation Guide](INSTALLATION_GUIDE.md#3-configuration) match; both list the variables `backend\.env.example` documents. The scheduler worker also reads two cron variables omitted here because they have safe defaults: `OVERDUE_SWEEP_CRON` (default `0 3 * * *`) and `AUDIT_RETENTION_CRON` (default `0 4 * * *`).
 
@@ -138,7 +138,7 @@ npx prisma generate
 npx prisma migrate deploy
 ```
 
-The repository carries fourteen migrations under `backend\prisma\migrations\`, from the baseline through the `float_to_decimal` change. `migrate deploy` applies only those not yet applied and never drops data.
+The repository carries twenty-two migrations under `backend\prisma\migrations\`, from the baseline through the `alert_type_scheduler_stale` change (previously cited here as fourteen, through `float_to_decimal` only). `migrate deploy` applies only those not yet applied and never drops data.
 
 **The documented installation path - `migrate deploy`:**
 
@@ -198,10 +198,10 @@ The scheduler generates work orders from preventive maintenance plans whose due 
 ### 5.1 Check the scheduler is actually running
 
 ```cmd
-curl -s http://localhost:4000/api/health/scheduler
+curl -s -H "Authorization: Bearer <token>" http://localhost:4000/api/health/scheduler
 ```
 
-This endpoint requires **no authentication**, so it can be polled by a monitor. Responses:
+This endpoint requires an **authenticated** session (any role - it is wrapped in `authenticate`, unlike the plain `/api/health` sibling), so a monitor must hold a token. Responses:
 
 | Status | Meaning | Action |
 |---|---|---|
@@ -551,7 +551,7 @@ What is **not** recorded, and must be understood before treating the audit log a
 - **Direct database writes.** User creation, role and work-center edits, deactivation and the password reset are all recorded when performed through the UI or the API - see [6.1](#61-create-a-user) to [6.7](#67-delete-or-decommission-a-user). Only rows changed by hand - the SQL fallback in [6.1](#61-create-a-user) or [6.7](#67-delete-or-decommission-a-user), or the lockout clear in [6.4](#64-clear-an-account-lockout) - bypass the application and leave no audit entry. The resulting `LoginFailure` history still constrains lockout behaviour.
 - Reads. There is no read logging, so the log cannot answer "who looked at this record".
 
-The log has no automatic purge, so it grows indefinitely. Because it is the lockout authority, **do not prune `LoginFailure` rows** - doing so can only lower a user's failure count, but the retention decision should be made deliberately. If you must reduce volume, archive the whole table to a separate database or a timestamped export before deleting anything, and keep recent `LoginFailure` rows intact.
+The log is purged automatically: a daily cron (the `audit_retention_years` setting, default 7, editable on the Settings tab) deletes entries older than the retention window, and `POST /api/audit-log/purge` (Administrator) runs the same purge on demand. Because the log is also the lockout authority, **do not set `audit_retention_years` so low that recent `LoginFailure` rows are pruned** - doing so can only lower a user's failure count, but the retention decision should be made deliberately. If you must reduce volume faster, archive the whole table to a separate database or a timestamped export before deleting anything, and keep recent `LoginFailure` rows intact.
 
 ---
 
@@ -573,16 +573,16 @@ Do not paste raw logs into a shared channel. Log lines can contain usernames, IP
 | Endpoint | Auth | Use |
 |---|---|---|
 | `GET /api/health` | None | Liveness. Returns `{"status":"ok","timestamp":"..."}`. Poll this for uptime |
-| `GET /api/health/scheduler` | None | Scheduler freshness. See [5.1](#51-check-the-scheduler-is-actually-running) |
+| `GET /api/health/scheduler` | Any authenticated role | Scheduler freshness. See [5.1](#51-check-the-scheduler-is-actually-running) |
 | `GET /api-docs` | None | Interactive API documentation for every endpoint |
 | `GET /api-docs.json` | None | The OpenAPI document, suitable for client generation |
 
-The two health endpoints are unauthenticated so a monitor can reach them, which means **anything that can reach the API port can read them.** They expose no user data, but keep the port bound to `127.0.0.1` behind IIS so they are not internet-reachable - see [12.1](#121-network-exposure).
+`/api/health` is unauthenticated so a monitor can reach it, which means **anything that can reach the API port can read it.** It exposes no user data, but keep the port bound to `127.0.0.1` behind IIS so it is not internet-reachable - see [12.1](#121-network-exposure). `/api/health/scheduler` requires a bearer token (any role); a monitoring script must sign in first.
 
 Suggested monitoring:
 
 - Poll `/api/health` for uptime; alert on failure.
-- Poll `/api/health/scheduler` and alert on `503`. Note that a `503` is expected on a brand-new system until the first run, so suppress it for the first 25 hours after install.
+- Poll `/api/health/scheduler` with a bearer token and alert on `503`. Note that a `503` is expected on a brand-new system until the first run, so suppress it for the first 25 hours after install.
 - Alert on the appearance of `Scheduler_Stale` SystemAlerts, which is the user-visible signal of the same condition.
 - Watch the age of the newest file in `backups\`. If it is older than about 26 hours, the daily backup has stopped - the most consequential thing to monitor, because a silently dead backup is discovered only at restore time.
 
@@ -660,7 +660,7 @@ Recorded here so that nobody plans an operation around a feature that does not e
 | PM plan and task list screens | **Implemented.** Task Lists has a full UI (`/task-lists`), and the Preventive Maintenance page is a full editor - create, edit and delete plans, per-plan **Generate WO**, and a **Run Scheduler** button for Administrators (`/api/maintenance-plans`) |
 | Notification create screen | **Implemented.** The Notifications page has a **New Notification** form, backed by `POST /api/notifications`. The command palette's "Create Notification" entry navigates to the list |
 | Manual scheduler trigger screen | **Implemented.** A **Run Scheduler** button on the Preventive Maintenance page (Administrators), backed by `POST /api/maintenance-plans/run-scheduler` |
-| System settings screen | Partly editable. Only `wo_number_prefix` and `notif_number_prefix` write via `PUT /api/system-config`; the other displayed values are environment-only |
+| System settings screen | Partly editable. `wo_number_prefix`, `notif_number_prefix` and `audit_retention_years` write via `PUT /api/system-config`; the other displayed values are environment-only |
 | Content-Security-Policy | Disabled. See [12.1](#121-network-exposure) |
 | Server-side session revocation | Implemented from C1 (logout, rotation-reuse, idle window). Disabling a user still takes effect at their next sign-in, not by revoking an in-progress session |
 | Multi-factor authentication | Not implemented |
@@ -668,7 +668,7 @@ Recorded here so that nobody plans an operation around a feature that does not e
 | Read logging | Not implemented. The audit log cannot answer who viewed a record |
 | Notifications scoped to the reporter | **Implemented.** A Requester sees only the notifications they raised; every role above Requester triages the whole backlog, matching the text on the Administration screen |
 | Notification email | Not implemented. Alerts surface on the Dashboard only |
-| Automatic log pruning | Not implemented. The audit log grows without bound |
+| Automatic log pruning | **Implemented.** A daily cron purges entries older than `audit_retention_years` (default 7, Settings tab); `POST /api/audit-log/purge` (Administrator) runs it on demand. Superseded wording, kept: "Not implemented. The audit log grows without bound" |
 
 *Updated 2026-10-19 (C6, register D6): the user create/delete API, user-create audit trail,
 lockout-clear/user-edit API, PM plan and task-list screens, notification create screen,
@@ -745,7 +745,7 @@ If a user is signing in correctly and is still refused, check for a lockout **fi
 
 ### 14.6 No work orders are being generated from PM plans
 
-1. `curl -s http://localhost:4000/api/health/scheduler` - and confirm `cmms-worker` is `online` in `pm2 status`; see [5.3](#53-when-the-scheduler-reports-stale).
+1. `curl -s -H "Authorization: Bearer <token>" http://localhost:4000/api/health/scheduler` - and confirm `cmms-worker` is `online` in `pm2 status`; see [5.3](#53-when-the-scheduler-reports-stale).
 2. Is the plan's **Next Due** date actually reached? Generation is driven by the due date, not by the plan's age.
 3. Is the plan active?
 4. Does the plan have the equipment, work center, and task list it needs? A missing reference fails that plan and appears in the manual run's `errors` array.
