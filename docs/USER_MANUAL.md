@@ -82,7 +82,7 @@ The 30-minute limit is enforced by the system, not only by your browser: the sig
 
 ### 3.1 Navigation
 
-The left sidebar shows all eleven sections to every signed-in user:
+The left sidebar shows fourteen sections to every signed-in user (thirteen for anyone below Administrator - **Administration** is hidden):
 
 | Section | What it is for |
 |---|---|
@@ -93,8 +93,11 @@ The left sidebar shows all eleven sections to every signed-in user:
 | Locations | Functional location register |
 | Equipment | Equipment register and per-equipment detail, including meters and BOM |
 | Work Centers | Work center register and craft capabilities |
+| Crafts | Craft register used by labor booking |
 | Task Lists | PM task list templates with operations |
 | Materials | Material register |
+| Code Lists | Failure and cause code registers |
+| Safety Checklists | Safety checklist template register |
 | Reports | The seven standard reports, each with Excel (.xlsx) export |
 | Administration | Users and roles, audit log, and settings |
 
@@ -134,8 +137,8 @@ The Administration screen contains an "RBAC Configuration" panel that lists thes
 |---|---|
 | Requester | Raise work orders, report problems, track their progress, read the registers and reports |
 | Technician | Execute work orders: operations, labor, materials, services, checklists, comments, attachments |
-| Maintenance Supervisor | Everything a Technician does, plus approve and close work orders, convert notifications, **delete notifications**, run the reports |
-| Maintenance Planner | Everything a Supervisor does, plus own the preventive maintenance plans |
+| Maintenance Supervisor | Everything a Technician does, plus approve and close work orders, **delete notifications**, run the reports |
+| Maintenance Planner | Everything a Supervisor does, plus convert notifications into work orders and own the preventive maintenance plans |
 | Administrator | Everything a Planner does, plus user administration and the audit log |
 | View-Only | Read everything, change nothing |
 
@@ -154,7 +157,7 @@ You can raise a work order for maintenance, repair, or a request.
    - **Type** - `CM` corrective, `PM` preventive, `PdM` predictive, `EM` emergency, or `CAL` calibration.
    - **Priority** - `High`, `Medium`, or `Low`.
    - **Equipment** and **Functional Location** - link the job to the asset.
-   - **Reported By** - defaults to you; change it to attribute the report correctly.
+   - **Reported By** is set to you automatically; there is no field to change it on this form.
    - **Description of the problem / details**, and the planned dates if you know them.
 4. Select **Create**.
 
@@ -169,6 +172,8 @@ The work order is created in status **Draft** and appears in the list. Record th
 3. Select the row to open it.
 
 The detail screen shows the current status, and the **History** tab shows every status change with its date and time.
+
+**List scoping:** Technicians and Maintenance Supervisors see only work orders belonging to their own work center; Requesters see only the work orders they raised. A job outside those scopes will not appear in the list - ask a Planner or Administrator to reassign it if you need access.
 
 ![Work orders list](images/g5_3_02_work_orders_list.png)
 
@@ -186,7 +191,7 @@ The same operation is available as `POST /api/notifications` for Requesters and 
 2. Filter by **Status** to narrow to `Open`, `In Process`, `Completed`, or `Converted`, or use the search box.
 3. Select a row to open it. The detail screen shows the reporter, the equipment or location, and the full history.
 
-**Important:** the Notifications list is scoped to your role. A Requester sees only the notifications they raised; a Technician and every role above sees the whole backlog. `[screenshot pending]`
+**Important:** the Notifications list is scoped to your role. A Requester sees only the notifications they raised; every other role sees the whole backlog. `[screenshot pending]`
 
 ### 5.5 Other things you can do
 
@@ -202,9 +207,9 @@ The same operation is available as `POST /api/notifications` for Requesters and 
 ### 6.1 Open a work order assigned to you
 
 1. Select **Work Orders**.
-2. Search or filter to find the job, then select it to open the detail screen.
+2. Search or filter to find the job, then select it to open the detail screen. (Your list is scoped to your own work center.)
 
-The detail screen has eight tabs: **Operations, Materials, Labor, Services, Checklists, Comments, Attachments, History**. See [section 13](#13-reference-work-order-detail-tabs).
+The detail screen has eleven tabs: **Operations, Materials, Labor, Services, Costs, Checklists, Notifications, Comments, Attachments, Failure, Cause & Notes, History**. See [section 13](#13-reference-work-order-detail-tabs).
 
 ### 6.2 Record the work
 
@@ -272,7 +277,7 @@ You can also close from the work orders list: use the close control on the row, 
 
 ### 7.3 Convert a notification into a work order
 
-This is how a reported problem becomes tracked work.
+This is how a reported problem becomes tracked work. Conversion requires the **Maintenance Planner** role or above.
 
 1. Select **Notifications**.
 2. Open the notification you want to action.
@@ -357,7 +362,7 @@ Select **Administration**. The screen has three tabs:
 
 - **Users & Roles** - a list of every user with username, full name, email, role, active flag, and last sign-in. It carries an **Add User** form and a per-row **Deactivate** control ([9.2](#92-create-a-user), [9.3](#93-disable-a-user)). Editing an existing user's role, work center, name or email has no UI control and is done through `PUT /api/users/{userId}`.
 - **Audit Log** - every recorded change, filterable by table, action, and free text, and paginated. Only Administrators can read it; any other role selecting this tab receives an error.
-- **Settings** - shows configuration. The two number-prefix rows (`wo_number_prefix`, `notif_number_prefix`) load from `GET /api/system-config` and are editable by an Administrator (saved via `PUT /api/system-config`); the remaining rows are a read-only display of static values.
+- **Settings** - shows configuration. Three rows load from `GET /api/system-config` and are editable by an Administrator (saved via `PUT /api/system-config`): the two number-prefix rows (`wo_number_prefix`, `notif_number_prefix`) and the audit retention window (`audit_retention_years`); the remaining rows are a read-only display of static values.
 
 ### 9.2 Create a user
 
@@ -414,7 +419,7 @@ The audit log is append-only through the application: there is no API to edit or
 
 A View-Only user is a reader.
 
-- You see all eleven navigation sections and can open every screen: Dashboard, all registers, all work orders and their detail tabs, notifications, the PM plan register, and all seven reports with Excel (.xlsx) export.
+- You see all thirteen navigation sections available to your role (fourteen for an Administrator) and can open every screen: Dashboard, all registers, all work orders and their detail tabs, notifications, the PM plan register, and all seven reports with Excel (.xlsx) export.
 - **Every write is refused by the server.** Opening a form, selecting a tab, or seeing an upload or create control does not mean the action will succeed; the save will be rejected. This is expected, not a fault.
 - Only Administrators can read the audit log, so the **Audit Log** tab will return an error for you.
 - Do not use a View-Only account to test changes, even on a development system: nothing you attempt will take effect, which can waste troubleshooting time.
@@ -444,6 +449,7 @@ Notes that matter day to day:
 - **Closed is final.** There is no reopen transition, so confirm the job is truly finished before closing it.
 - Moving to **In Progress** and **Completed** records actual start and finish timestamps, which is what the cost and duration figures are calculated from.
 - Cancelling from Draft, Planned, Scheduled, or Suspended is allowed; cancelling an In Progress job is not - finish or suspend it first.
+- A transition can still be **refused with HTTP 409** even when the table above allows it, if the job is missing data the target status requires: leaving Draft needs at least one operation; moving to In Progress needs every mandatory checklist completed and every item answered; a breakdown job cannot be Completed without a cause code; a calibration job cannot be Completed without a pass/fail result. The error message names what is missing - record it and try again.
 
 ---
 
@@ -473,12 +479,15 @@ All seven are on the **Reports** screen, all are available to every signed-in ro
 | Materials | Parts and consumables issued, with quantity and cost | Technician |
 | Labor | Time booked, by person and craft, with cost | Technician |
 | Services | External contractor work, with cost | Technician |
+| Costs | Cost splits across cost centers | Planner |
 | Checklists | Safety and quality checklist responses | Technician |
-| Comments | Free-text notes and discussion | Everyone |
+| Notifications | Notifications linked to this work order | Read only |
+| Comments | Free-text notes and discussion | Everyone can add; only the author or an Administrator can delete |
 | Attachments | Uploaded files; delete limited to Supervisor and Administrator | Everyone uploads, Supervisor+ deletes |
+| Failure, Cause & Notes | Breakdown flag, cause code, failure code, long notes | Technician |
 | History | Every status change, with timestamp and user | Read only |
 
-Each of the first six tabs has its own add form, so you stay on the work order while you work. The **History** tab is the authoritative record of what changed and when - use it instead of asking colleagues when something happened.
+**Operations, Materials, Labor, Services, Checklists and Comments** each have their own add form, so you stay on the work order while you work; **Costs** is edited in place and **Notifications** is a read-only list. The **History** tab is the authoritative record of what changed and when - use it instead of asking colleagues when something happened.
 
 ---
 
@@ -492,7 +501,7 @@ These operations exist in the system but have no screen. This section exists so 
 | Re-enable a disabled user | No | `PUT /api/users/{userId}` with `isActive: true` - Administrator |
 | Edit a user's role, work center, name or email | No | `PUT /api/users/{userId}` - Administrator |
 | Clear a lockout early | No | **No API exists.** Database update - see the [Administrator Guide](ADMIN_GUIDE.md#64-clear-an-account-lockout) |
-| Edit a number-prefix setting | Yes (Administrator) | `PUT /api/system-config`; other settings come from environment variables - see the [Administrator Guide](ADMIN_GUIDE.md#3-configuration) |
+| Edit a system setting (number prefixes, audit retention) | Yes (Administrator) | `PUT /api/system-config`; other settings come from environment variables - see the [Administrator Guide](ADMIN_GUIDE.md#3-configuration) |
 
 *Updated 2026-10-19 (C6, register D6): the "Raise a notification", "Create / edit / delete a PM plan" and "Run the PM scheduler manually" rows were removed because those operations now have screens, and an "Edit a user's role, work center, name or email" row was added because editing an existing user still has no UI control.*
 
