@@ -21,10 +21,12 @@ import {
   HardHat,
   Tags,
   ListChecks,
+  KeyRound,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { hasMinRole, routeFloor } from '@/lib/rbac';
 import { useState } from 'react';
+import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 
 interface SidebarProps {
   onOpenCommandPalette: () => void;
@@ -52,6 +54,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const [collapsed, setCollapsed] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   return (
     <div
@@ -150,6 +153,28 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
             </div>
           )}
         </button>
+
+        {/* Self-service credential rotation (G2). Available to every role;
+            the API accepts a self-change with currentPassword for any caller. */}
+        <button
+          onClick={() => setPasswordOpen(true)}
+          className={`w-full flex items-center gap-2 px-2 py-1.5 mt-1 rounded text-xs text-secondary hover:text-primary hover:bg-surface-tertiary transition-all ${
+            collapsed ? 'justify-center' : ''
+          }`}
+          aria-label="Change password"
+          title={collapsed ? 'Change password' : undefined}
+        >
+          <KeyRound className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
+          {!collapsed && <span>Change password</span>}
+        </button>
+
+        {user && (
+          <ChangePasswordDialog
+            userId={user.userId}
+            open={passwordOpen}
+            onClose={() => setPasswordOpen(false)}
+          />
+        )}
       </div>
 
       {/* Collapse Toggle */}
