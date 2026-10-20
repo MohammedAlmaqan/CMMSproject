@@ -16,6 +16,10 @@ import {
 import Header from '@/components/layout/Header';
 import { reportService } from '@/services/reportService';
 import { api } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { useAppStore } from '@/store/appStore';
+import { hasMinRole } from '@/lib/rbac';
+import { useAuthStore } from '@/store/authStore';
 import type {
   BacklogReport,
   PMComplianceReport,
@@ -59,33 +63,76 @@ export default function ReportsPage() {
   const [reportData, setReportData] = useState<Partial<ReportData>>({});
   const [reportError, setReportError] = useState<Partial<Record<ReportType, string>>>({});
 
+  // G8: the report routes accept from/to, functionalLocationId,
+  // includeDescendantLocations, equipmentId and workCenterId, and return a 400
+  // with reasons on a bad filter. The UI holds the raw inputs, converts them to
+  // the query the API expects, and surfaces any rejection in the report pane.
+  const locations = useAppStore((s) => s.locations);
+  const equipmentList = useAppStore((s) => s.equipment);
+  const workCenters = useAppStore((s) => s.workCenters);
+  const canFilter = hasMinRole(useAuthStore((s) => s.user?.role), 'Requester');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+  const [filterLocation, setFilterLocation] = useState('');
+  const [filterEquipment, setFilterEquipment] = useState('');
+  const [filterWorkCenter, setFilterWorkCenter] = useState('');
+  const [includeDescendants, setIncludeDescendants] = useState(false);
+
+  const filterParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (filterFrom) params.from = filterFrom;
+    if (filterTo) params.to = filterTo;
+    if (filterLocation) {
+      params.functionalLocationId = filterLocation;
+      params.includeDescendantLocations = includeDescendants ? 'true' : 'false';
+    }
+    if (filterEquipment) params.equipmentId = filterEquipment;
+    if (filterWorkCenter) params.workCenterId = filterWorkCenter;
+    return params;
+  }, [filterFrom, filterTo, filterLocation, filterEquipment, filterWorkCenter, includeDescendants]);
+
+  const clearFilters = () => {
+    setFilterFrom('');
+    setFilterTo('');
+    setFilterLocation('');
+    setFilterEquipment('');
+    setFilterWorkCenter('');
+    setIncludeDescendants(false);
+  };
+
+  const hasActiveFilter = Object.keys(filterParams).length > 0;
+
   useEffect(() => {
-    if (reportData[activeReport] !== undefined) return;
+    // A filter change invalidates every cached report, so the fetch key is the
+    // filter itself: when it moves, refetch the active report even if it has
+    // data already.
     let cancelled = false;
     const fetchers: Record<ReportType, () => Promise<unknown>> = {
-      backlog: () => reportService.getBacklog(),
-      'pm-compliance': () => reportService.getPMCompliance(),
-      mtbf: () => reportService.getMTBF(),
-      mttr: () => reportService.getMTTR(),
-      'cost-summary': () => reportService.getCostSummary(),
-      downtime: () => reportService.getDowntime(),
-      'material-consumption': () => reportService.getMaterialConsumption(),
+      backlog: () => reportService.getBacklog(filterParams),
+      'pm-compliance': () => reportService.getPMCompliance(filterParams),
+      mtbf: () => reportService.getMTBF(filterParams),
+      mttr: () => reportService.getMTTR(filterParams),
+      'cost-summary': () => reportService.getCostSummary(filterParams),
+      downtime: () => reportService.getDowntime(filterParams),
+      'material-consumption': () => reportService.getMaterialConsumption(filterParams),
     };
     fetchers[activeReport]()
       .then((data) => {
         if (!cancelled) {
           setReportData((prev) => ({ ...prev, [activeReport]: data }));
+          setReportError((prev) => ({ ...prev, [activeReport]: undefined }));
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
-          setReportError((prev) => ({ ...prev, [activeReport]: 'Failed to load report data. Please try again.' }));
+          const message = err instanceof ApiError ? err.message : 'Failed to load report data. Please try again.';
+          setReportError((prev) => ({ ...prev, [activeReport]: message }));
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [activeReport, reportData]);
+  }, [activeReport, filterParams]);
 
   // Report 1: Work Order Backlog (row 60) — one backlog, sliced three ways.
   const backlog = (reportData.backlog ?? {}) as Partial<BacklogReport>;
@@ -224,7 +271,12 @@ export default function ReportsPage() {
   }, [activeReport, backlogData, pmComplianceSlice, mtbfData, mttrData, costData, downtimeData, materialConsumption]);
 
   const exportXlsx = () => {
-    void api.download(`/reports/${activeReport}/export.xlsx`, undefined, `${activeReport}-report.xlsx`);
+    // The export must serialise the same figures the screen shows, so it carries
+    // the active filter through to the route rather than re-issuing an
+    // unfiltered request.
+    const qs = new URLSearchParams(filterParams).toString();
+    const path = `/reports/${activeReport}/export.xlsx${qs ? `?${qs}` : ''}`;
+    void api.download(path, undefined, `${activeReport}-report.xlsx`);
   };
 
   const reportLoading = reportData[activeReport] === undefined && reportError[activeReport] == null;
@@ -269,9 +321,106 @@ export default function ReportsPage() {
 
         {/* Report Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {canFilter && (
+            <div className="mb-4 industrial-card rounded p-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="text-xs text-secondary">
+                  From
+                  <input
+                    type="date"
+                    aria-label="Report from date"
+                    value={filterFrom}
+                    onChange={(e) => setFilterFrom(e.target.value)}
+                    className="mt-1 block rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
+                    style={{ backgroundColor: '#27272A' }}
+                  />
+                </label>
+                <label className="text-xs text-secondary">
+                  To
+                  <input
+                    type="date"
+                    aria-label="Report to date"
+                    value={filterTo}
+                    onChange={(e) => setFilterTo(e.target.value)}
+                    className="mt-1 block rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
+                    style={{ backgroundColor: '#27272A' }}
+                  />
+                </label>
+                <label className="text-xs text-secondary">
+                  Functional location
+                  <select
+                    aria-label="Report functional location"
+                    value={filterLocation}
+                    onChange={(e) => setFilterLocation(e.target.value)}
+                    className="mt-1 block rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
+                    style={{ backgroundColor: '#27272A' }}
+                  >
+                    <option value="">All locations</option>
+                    {locations.map((l) => (
+                      <option key={l.functionalLocationId} value={l.functionalLocationId}>
+                        {l.locationCode} — {l.description}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs text-secondary">
+                  Equipment
+                  <select
+                    aria-label="Report equipment"
+                    value={filterEquipment}
+                    onChange={(e) => setFilterEquipment(e.target.value)}
+                    className="mt-1 block rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
+                    style={{ backgroundColor: '#27272A' }}
+                  >
+                    <option value="">All equipment</option>
+                    {equipmentList.map((eq) => (
+                      <option key={eq.equipmentId} value={eq.equipmentId}>
+                        {eq.equipmentCode} — {eq.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs text-secondary">
+                  Work centre
+                  <select
+                    aria-label="Report work centre"
+                    value={filterWorkCenter}
+                    onChange={(e) => setFilterWorkCenter(e.target.value)}
+                    className="mt-1 block rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
+                    style={{ backgroundColor: '#27272A' }}
+                  >
+                    <option value="">All work centres</option>
+                    {workCenters.map((wc) => (
+                      <option key={wc.workCenterId} value={wc.workCenterId}>
+                        {wc.code} — {wc.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-secondary pb-1.5">
+                  <input
+                    type="checkbox"
+                    checked={includeDescendants}
+                    onChange={(e) => setIncludeDescendants(e.target.checked)}
+                    disabled={!filterLocation}
+                    className="accent-amber"
+                  />
+                  Include sub-locations
+                </label>
+                {hasActiveFilter && (
+                  <button
+                    onClick={clearFilters}
+                    className="mb-1.5 px-2 py-1.5 rounded text-xs text-secondary border border-subtle hover:border-highlight"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {activeReport === 'backlog' && (
             <ReportContainer title="Work Order Backlog" icon={<ClipboardList className="w-5 h-5" />} onExport={exportXlsx}>
-              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState message={reportError[activeReport]} /> : isEmpty ? <EmptyState /> : (
               <>
               <div className="grid grid-cols-3 gap-4">
                 <div>
@@ -347,7 +496,7 @@ export default function ReportsPage() {
 
           {activeReport === 'pm-compliance' && (
             <ReportContainer title="PM Compliance" icon={<ClipboardCheck className="w-5 h-5" />} onExport={exportXlsx}>
-              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState message={reportError[activeReport]} /> : isEmpty ? <EmptyState /> : (
               <>
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#151517' }}>
@@ -379,7 +528,7 @@ export default function ReportsPage() {
 
           {activeReport === 'mtbf' && (
             <ReportContainer title="Mean Time Between Failures (MTBF)" icon={<Clock className="w-5 h-5" />} onExport={exportXlsx}>
-              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState message={reportError[activeReport]} /> : isEmpty ? <EmptyState /> : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={mtbfData}>
@@ -397,7 +546,7 @@ export default function ReportsPage() {
 
           {activeReport === 'mttr' && (
             <ReportContainer title="Mean Time To Repair (MTTR)" icon={<Timer className="w-5 h-5" />} onExport={exportXlsx}>
-              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState message={reportError[activeReport]} /> : isEmpty ? <EmptyState /> : (
               <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -441,7 +590,7 @@ export default function ReportsPage() {
 
           {activeReport === 'cost-summary' && (
             <ReportContainer title="Maintenance Cost Summary" icon={<DollarSign className="w-5 h-5" />} onExport={exportXlsx}>
-              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState message={reportError[activeReport]} /> : isEmpty ? <EmptyState /> : (
               <>
               {costSummary.budgetNote && (
                 <p className="text-tertiary mb-3" style={{ fontSize: '11px' }}>{costSummary.budgetNote}</p>
@@ -514,7 +663,7 @@ export default function ReportsPage() {
 
           {activeReport === 'downtime' && (
             <ReportContainer title="Equipment Downtime Report" icon={<AlertTriangle className="w-5 h-5" />} onExport={exportXlsx}>
-              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState message={reportError[activeReport]} /> : isEmpty ? <EmptyState /> : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={downtimeData}>
@@ -532,7 +681,7 @@ export default function ReportsPage() {
 
           {activeReport === 'material-consumption' && (
             <ReportContainer title="Material Consumption Report" icon={<Package className="w-5 h-5" />} onExport={exportXlsx}>
-              {isLoading ? <LoadingState /> : hasError ? <ErrorState /> : isEmpty ? <EmptyState /> : (
+              {isLoading ? <LoadingState /> : hasError ? <ErrorState message={reportError[activeReport]} /> : isEmpty ? <EmptyState /> : (
               <>
               <h4 className="text-secondary text-xs font-medium mb-2">By Material</h4>
               <div className="industrial-card rounded overflow-hidden">
@@ -631,10 +780,10 @@ function LoadingState() {
   );
 }
 
-function ErrorState() {
+function ErrorState({ message }: { message?: string }) {
   return (
-    <div className="flex items-center justify-center h-32 text-red-status text-sm">
-      Failed to load report data. Please try again.
+    <div role="alert" className="flex items-center justify-center h-32 text-red-status text-sm">
+      {message || 'Failed to load report data. Please try again.'}
     </div>
   );
 }
