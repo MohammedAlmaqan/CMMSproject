@@ -6,7 +6,7 @@ Reference documentation for the CMMS REST API, version 1.0.0.
 - **Interactive UI:** `/api-docs` (Swagger UI)
 - **Machine-readable spec:** [`openapi.json`](./openapi.json) (OpenAPI 3.0.0, also served live at `/api-docs.json`)
 
-The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The repository routers and the live spec agree at **146 operations across 92 paths and 27 routers**, re-derived from the route annotations and re-exported into `docs/openapi.json` on 2026-10-15. The five operations added since the 2026-10-06 reading of 141 operations / 87 paths are `POST /api/auth/refresh` and `POST /api/auth/logout` (C1, 2026-10-15), plus `POST /api/audit-log/purge`, `POST /api/functional-locations/import.csv` and `POST /api/work-orders/import.csv`; the intervening OData query parameters (C4c) also reached the snapshot at this refresh. *Superseded: this note previously read 141 operations across 87 paths as of the 2026-10-06 snapshot and said the correction was tracked under `v1.1-8` and not yet done.* The checked-in `docs/openapi.json` must not be edited by hand: regenerate it with `python scripts/verify/verify_openapi.py --write` (or `npx tsx scripts/openapi.ts --write` from `backend/`), and `scripts/verify/verify_openapi.py` fails when the snapshot and the route annotations drift apart. Earlier exports lagged (the 2026-10-02 export showed 114 operations / 71 paths).
+The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The repository routers and the live spec agree at **148 operations across 93 paths and 27 routers**, re-derived from the route annotations and re-exported into `docs/openapi.json` on 2026-10-18. The two operations added since the 2026-10-15 reading of 146 operations / 92 paths are `PUT /api/safety-checklists/templates/{id}` and `DELETE /api/safety-checklists/templates/{id}` (C3, 2026-10-18). Before that, five operations were added since the 2026-10-06 reading of 141 operations / 87 paths: `POST /api/auth/refresh` and `POST /api/auth/logout` (C1, 2026-10-15), plus `POST /api/audit-log/purge`, `POST /api/functional-locations/import.csv` and `POST /api/work-orders/import.csv`; the intervening OData query parameters (C4c) also reached the snapshot at the 2026-10-15 refresh. *Superseded readings, kept: this note previously read 146 operations across 92 paths (2026-10-15) and, before that, 141 operations across 87 paths (2026-10-06); the earlier 2026-09 snapshot showed 114 operations / 71 paths.* The checked-in `docs/openapi.json` must not be edited by hand: regenerate it with `python scripts/verify/verify_openapi.py --write` (or `npx tsx scripts/openapi.ts --write` from `backend/`), and `scripts/verify/verify_openapi.py` fails when the snapshot and the route annotations drift apart.
 
 ## Authentication
 
@@ -44,7 +44,7 @@ Roles form a hierarchy. A role satisfies a minimum-role check if its level is gr
 | Maintenance Planner | 5 | Import master data, generate work orders, run schedules |
 | Administrator | 6 | Full access, user administration, audit log, manual scheduler run |
 
-The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `authorizeMinRole('X')` accept X and every higher role; endpoints guarded with `authorize('X')` accept only that exact role. Where a guard is not applied, any authenticated user may call the endpoint. The required role for each operation is stated in its operation description.
+The hierarchy is defined in `src/utils/roles.ts` (`roleHierarchy`), consumed by `authorizeMinRole` in `src/middleware/auth.ts`. Endpoints guarded with `authorizeMinRole('X')` accept X and every higher role; endpoints guarded with `authorize('X')` accept only that exact role. Where a guard is not applied, any authenticated user may call the endpoint. The required role for each operation is stated in its operation description.
 
 ## Conventions
 
@@ -63,7 +63,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 
 ## Endpoint groups
 
-146 operations across 92 paths and 27 routers, re-derived from the running server's `/api-docs.json` on 2026-10-15 (superseding the 2026-10-06 reading of 141 operations / 87 paths). The repository routers and the live spec agree at 146. The previous 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
+148 operations across 93 paths and 27 routers, re-derived from the route annotations and the checked-in `docs/openapi.json` on 2026-10-18 (superseding the 2026-10-15 reading of 146 operations / 92 paths, which itself superseded the 2026-10-06 reading of 141 operations / 87 paths). The repository routers and the live spec agree at 148. The previous 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
 
 | Group | Base path | Operations |
 | --- | --- | --- |
@@ -85,7 +85,7 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 | External Services | `/api/external-services` | 4 |
 | Crafts | `/api/crafts` | 5 |
 | Maintenance Plans | `/api/maintenance-plans` | 7 |
-| Safety Checklists | `/api/safety-checklists` | 7 |
+| Safety Checklists | `/api/safety-checklists` | 9 |
 | Reports | `/api/reports` | 11 |
 | Alerts | `/api/alerts` | 4 |
 | Comments | `/api/comments` | 3 |
@@ -94,6 +94,8 @@ The hierarchy is defined in `src/middleware/auth.ts`. Endpoints guarded with `au
 | Users | `/api/users` | 7 |
 | Dashboard | `/api/dashboard` | 3 |
 | System Config | `/api/system-config` | 2 |
+
+Two operational endpoints are defined inline in `index.ts`, mounted on the same router (so they answer under both `/api` and `/api/v1`), and are deliberately outside the OpenAPI contract: `GET /health` (public, liveness `{"status":"ok","timestamp":...}`) and `GET /health/scheduler` (any authenticated role; `200` healthy / `503` stale).
 
 ### Authentication
 
@@ -286,7 +288,7 @@ The split is used to allocate a work order's cost across internal orders or cost
 | PUT | `/api/external-services/{id}` | Update an external service cost line |
 | DELETE | `/api/external-services/{id}` | Delete an external service cost line |
 
-`GET` requires `workOrderId`. Vendor invoice lines are hard deleted.
+`GET` requires `workOrderId`. Vendor invoice lines are soft deleted (`isDeleted = true`), like every other work-order cost line, and the work order's costs are recomputed on delete.
 
 ### Crafts
 
@@ -320,6 +322,8 @@ A generation that fails — an invalid plan status or priority, a missing target
 | --- | --- | --- |
 | GET | `/api/safety-checklists/templates` | List safety checklist templates |
 | POST | `/api/safety-checklists/templates` | Create a safety checklist template |
+| PUT | `/api/safety-checklists/templates/{id}` | Update a safety checklist template (Maintenance Planner and above) |
+| DELETE | `/api/safety-checklists/templates/{id}` | Soft delete a safety checklist template (Maintenance Supervisor and above) |
 | GET | `/api/safety-checklists/work-order/{woId}` | List the checklists attached to a work order |
 | POST | `/api/safety-checklists/work-order/{woId}/attach` | Attach a checklist template to a work order |
 | PUT | `/api/safety-checklists/work-order-checklist/{id}` | Update the status of a work order checklist |
