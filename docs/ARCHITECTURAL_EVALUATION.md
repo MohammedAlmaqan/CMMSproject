@@ -5,7 +5,7 @@
 **Evaluated commit:** `1721c1290edbf775cf853594d6f38d7d9177ae43` (`main`, equal to `origin/main` at the time of writing)
 **Evaluation date:** 2026-10-20 (host local time, UTC+3)
 **Report file:** `docs/ARCHITECTURAL_EVALUATION.md`
-**Status:** Documentation only. No Cons or Recommendation in this report has been implemented.
+**Status:** Revision 1.1, documentation only. No Cons, Recommendation or Appendix D gap has been implemented. The Build Now items are a proposal awaiting the owner's decision; no code was written for them.
 
 **Safety declaration:** No application code, configuration, schema, test, seed, migration
 or script was changed or executed as part of this evaluation. No statement was run against
@@ -376,3 +376,460 @@ Per owner instruction (2026-10-20), no tag was created by this evaluation.
 | Date | Revision | Note |
 |---|---|---|
 | 2026-10-20 | 1.0 | Initial evaluation at `1721c12`. Documentation only; no fixes, no tags. |
+| 2026-10-20 | 1.1 | Appendix D (functional completeness audit) appended, derived from source only. Discovery and proposal only; no code written. |
+
+---
+
+## Appendix D - Functional Completeness Audit (2026-10-20)
+
+### D.1 Method and scope
+
+This audit was derived from source code alone. `GAP_REGISTER.md`,
+`CMMS_FINALIZATION_TRACKER.md`, the USER_MANUAL and every other historical document
+were deliberately not consulted; where a finding is stated, it cites a file and line
+that was read on 2026-10-20.
+
+Method: enumerate the 20 frontend routes and 27 backend routers; extract every
+service call actually made by each page; extract every HTTP operation the API
+exposes; diff the two sets; then verify each candidate gap by reading the page code.
+A gap counts only when it impairs a user's ability to manage the system through the
+application - a missing button that the API already supports, or a screen that
+silently cannot perform a task the role is meant to do.
+
+A cross-cutting observation, and the reason several gaps below are cheap: in almost
+every case the frontend service layer already wraps the missing operation
+(`materialService.create/update/delete`, `equipmentService.create/update/delete`,
+`workCenterService.create/update/delete`, `notificationService.update`,
+`userService.update/changePassword` all exist and are exported), but no page calls
+them. The client plumbing is finished; the screens are not.
+
+### D.2 Gap inventory
+
+Each gap carries raw evidence (file and line, read today), the operational impact,
+and the verdict.
+
+---
+
+**G1. Non-administrator users cannot log labor (core technician workflow).**
+
+Evidence: `app/src/pages/WorkOrderDetailPage.tsx:344-349` loads `users` via
+`userService.getAll()` only when `hasPermission(['Administrator'])`, else
+`Promise.resolve([])`. The Log Labor form's technician select maps that list
+(`:1558-1562`) and the submit button is disabled while `laborForm.userId` is empty
+(`:1576`). For a Technician, Supervisor or Planner the list is empty, so the button
+can never enable. The backend expects exactly the opposite:
+`POST /api/labor` defaults `userId` to the authenticated caller and only requires it
+for a supervisor booking on someone else's behalf
+(`backend/src/routes/labor.ts:90,143-145`, schema at
+`backend/src/utils/validation.ts:213-222`).
+
+Impact: labor entry - the primary technician activity, and the source of the
+completion and cost figures the reports use - is impossible from the UI for every
+role except Administrator. Technicians can only be recorded by an admin.
+
+Verdict: **Build Now (P0).**
+
+---
+
+**G2. There is no password change surface anywhere in the application.**
+
+Evidence: the API implements `PUT /api/users/:id/password` with self-service
+(current password required) and administrator reset semantics
+(`backend/src/routes/users.ts:449-548`); the frontend service wraps it
+(`app/src/services/userService.ts:21-22`); no page or component calls it. A search of
+`app/src` for `password`, `currentPassword`, `newPassword` or "Change Password"
+returns only that service line. There is no profile screen; the header has no user
+menu (`app/src/components/layout/Header.tsx`).
+
+Impact: a forgotten or leaked password has no recovery path inside the product. The
+administrator cannot reset an account and the user cannot rotate their own credential;
+the only remedies are a database edit or a seed script, both of which are prohibited
+against the live `cmms` database. On a system with 11 live users this is an operational
+dead end the first time it happens.
+
+Verdict: **Build Now (P0).**
+
+---
+
+**G3. Users can be created and deactivated but never edited.**
+
+Evidence: `app/src/pages/AdministrationPage.tsx` calls only `userService.create`
+(`:591`) and `userService.remove` (`:118`). The API supports partial update of
+fullName, email, role, workCentreId and isActive
+(`backend/src/routes/users.ts:327-351`, `userUpdateSchema` at
+`backend/src/utils/validation.ts:690-698`), and the frontend wraps it
+(`app/src/services/userService.ts:19`) unused. The row actions column offers only
+Deactivate (`AdministrationPage.tsx:304-317`).
+
+Impact: a role change, a work-centre reassignment, an email correction or a temporary
+deactivation/reactivation of a still-present account all require database access. Role
+changes are frequent in maintenance organisations (technician promoted to planner).
+
+Note: Deactivate is soft-delete (`isDeleted = true, isActive = false`,
+`users.ts:434`), so a deactivated user is invisible to `GET /users` (`:57`) and cannot
+be restored by the update endpoint. Reactivation of a soft-deleted account is a
+separate API change and is listed under Defer (D.3) because the partial unique index
+allows the username to be re-registered as a new account, which is a workable
+operational workaround today.
+
+Verdict: **Build Now for edit (P1). Restore/undelete: Defer.**
+
+---
+
+**G4. Equipment records cannot be created or edited from the UI.**
+
+Evidence: `app/src/pages/EquipmentPage.tsx` offers Import/Export CSV only
+(`:355-369`); `EquipmentDetailPage.tsx` renders every field read-only via `InfoItem`
+(`:415-425`) and manages only BOM, meters and attachments. No page calls
+`equipmentService.create` or `equipmentService.update`, both of which exist
+(`app/src/services/equipmentService.ts`), against API routes that exist
+(`backend/src/routes/equipment.ts` POST at `:715`, PUT at `:745`, validated by
+`equipmentUpdateSchema`). The command palette even advertises "Add Equipment"
+(`app/src/components/layout/CommandPalette.tsx:72`) which merely navigates to the
+list page, where there is no add control.
+
+Impact: adding one asset, correcting a serial number, moving an asset to another
+location or downgrading a criticality requires assembling a CSV and re-importing the
+catalogue. Equipment is the anchor of most work orders; its master data will be
+edited routinely.
+
+Verdict: **Build Now (P1).**
+
+---
+
+**G5. Materials cannot be created, edited or deleted from the UI; stock can only
+change through a full CSV re-import.**
+
+Evidence: `app/src/pages/MaterialsPage.tsx` offers Import/Export CSV only
+(`:158-173`); no create/edit/delete control exists on the page.
+`materialService.create/update/delete` are exported and unused. The API supports the
+full CRUD (`backend/src/routes/materials.ts` POST, PUT, DELETE). Stock is not
+cosmetic: `backend/src/utils/materialAvailability.ts:113-130` enforces
+`currentStock` as a hard reservation ceiling when work-order material lines are
+added, and nothing else in the backend ever writes `currentStock` (grep of
+`backend/src` shows writes only in the materials routes and the importer).
+
+Impact: goods receipt (stock up), a stock correction, a standard-cost fix or retiring
+a part all require a CSV round-trip of the entire catalogue. A planner who cannot
+raise stock cannot add the part to a work order, because the reservation check will
+reject it.
+
+Verdict: **Build Now (P1).**
+
+---
+
+**G6. Work centres cannot be created, edited or deactivated from the UI.**
+
+Evidence: `app/src/pages/WorkCentersPage.tsx` is a read-only grid (no service calls
+at all; it renders the store). `WorkCentersPage` is the only surface for work centres.
+`crafts.ts` and `code-lists` manage crafts and codes, but not the work centre itself.
+The API implements POST/PUT/DELETE (`backend/src/routes/workCenters.ts:334,413,496`)
+and the frontend service wraps all three
+(`app/src/services/workCenterService.ts:17-21`) unused.
+
+Impact: onboarding a new team, adjusting `dailyCapacityHours` or `costRatePerHour`
+(these drive the capacity board and the cost reports) is impossible without SQL. The
+crafts page already depends on work centres as its parent, so a new team cannot even
+be scaffolded completely from the UI.
+
+Verdict: **Build Now (P1).**
+
+---
+
+**G7. Meter readings cannot be recorded; only the latest reading can be overwritten.**
+
+Evidence: the API implements `POST /api/equipment-meters/:id/readings`
+(`backend/src/routes/equipmentMeters.ts:434-459`) which appends a reading row and
+advances `lastReading`. No frontend service wraps it
+(`app/src/services/equipmentMeterService.ts` exposes `getAll` only), and
+`EquipmentDetailPage` can only overwrite `lastReading`/`lastReadingDate` through the
+meter edit form (`:311-325`) while displaying the readings list read-only
+(`:683-694`).
+
+Impact: meter-based preventive maintenance is a first-class feature of the PM page
+(plans can target meters, `PreventiveMaintenancePage.tsx:212`), but the readings that
+would drive it cannot be entered as a series. Overwriting the latest value loses
+history and defeats interval-based triggering.
+
+Verdict: **Build Now (P2).**
+
+---
+
+**G8. Reports cannot be filtered.**
+
+Evidence: every report handler accepts `from`, `to`, `functionalLocationId`,
+`includeDescendantLocations`, `equipmentId` and `workCenterId`
+(`backend/src/routes/reports.ts:44-85`, `parseReportFilter`). The Reports page has
+no inputs at all - the only `<input>`/`<select>` elements on
+`app/src/pages/ReportsPage.tsx` are the report selector's buttons; the export button
+re-issues the unfiltered request (`:226-227`).
+
+Impact: a monthly backlog review, a post-incident MTBF for one asset, a cost summary
+for one location or a date-bounded compliance report - the normal management uses of
+a reporting module - are impossible. Users get one default window with no way to
+scope it.
+
+Verdict: **Build Now (P2).**
+
+---
+
+**G9. Notifications cannot be edited.**
+
+Evidence: create (`NotificationsPage.tsx:175`), delete (`:191`, detail `:87`) and
+convert-to-WO (detail `:72`) exist; `notificationService.update` is exported
+(`app/src/services/notificationService.ts:9`) and never called. The API implements
+`PUT /api/notifications/:id` with type, priority, description, location, equipment,
+reporter, damages observations, breakdown flag and status
+(`backend/src/utils/validation.ts:366-382`).
+
+Impact: a mistyped description or wrong equipment on a notification can only be
+deleted and re-raised (losing the notification number and audit continuity), or left
+wrong until it becomes a work order. Low risk of data loss, but a daily annoyance for
+requesters and a correctness issue for anything that reports on notification fields.
+
+Verdict: **Build Now (P2).**
+
+---
+
+**G10. The global header renders two dead controls on every page.**
+
+Evidence: `app/src/components/layout/Header.tsx:106-114` renders "Filter" and
+"Export" buttons with no `onClick` handler on every authenticated page.
+
+Impact: not a data-loss risk, but every user on every screen sees two buttons that
+do nothing, which reads as a broken product. Removing or wiring them is trivial.
+
+Verdict: **Build Now (P3, trivial).**
+
+---
+
+**G11. Deactivated users cannot be restored (API cannot undelete).**
+
+Evidence: DELETE sets `isDeleted = true` (`backend/src/routes/users.ts:434`); the
+update route never clears it; `GET /users` filters `isDeleted = false` (`:57`). The
+partial unique index on username ignores soft-deleted rows, so re-registering the
+same username as a new account is permitted.
+
+Impact: restoring an account requires a DB update or creating a new user. Creating a
+new user is a workable workaround (audit history attaches to the old id, but the
+person gets access). Restoring would need an API change with a collision pre-check.
+
+Verdict: **Defer** (operational workaround exists; API change with edge cases).
+
+---
+
+**G12. Work-order CSV import has no UI.**
+
+Evidence: `POST /api/work-orders/import.csv` exists
+(`backend/src/routes/workOrders.ts`, csvUpload) with no caller in `app/src`;
+equipment and materials both expose their importers.
+
+Impact: bulk WO load matters for migration and rare bulk planning, not for daily
+operation. Low frequency, high blast radius if done wrong.
+
+Verdict: **Defer.**
+
+---
+
+**G13. The audit log UI offers only free-text search.**
+
+Evidence: the UI passes only `search`, `skip`, `take`
+(`AdministrationPage.tsx:135-140`); the API also accepts `tableName` and `action`
+(`backend/src/routes/auditLog.ts:90-100`) and has no date filter at all; there is no
+export and no manual purge button (purge exists as `POST /api/audit-log/purge` and as
+an automated retention job).
+
+Impact: investigating "who changed this record" is slower than it needs to be, and a
+forensic export must be scraped. Automated retention covers the growth concern.
+
+Verdict: **Defer** (post-release enhancement; add date filter to API in the same
+change).
+
+---
+
+**G14. The alert bell counts system alerts but navigates to the notifications list;
+there is no alert list page.**
+
+Evidence: the bell reads `getUnreadAlertCount()` and calls `markAllAlertsRead` then
+`navigate('/notifications')` (`Header.tsx:90-94`); system alerts are only displayed as
+the six most recent on the dashboard (`DashboardPage.tsx:425-436`). `SystemAlert` and
+`Notification` are different tables with different semantics.
+
+Impact: a user who clicks the bell expecting the seven unseen alerts is shown the
+notifications list instead, and older alerts age off the dashboard silently. Annoying
+but not blocking; the alerts are at least visible and markable.
+
+Verdict: **Defer.**
+
+---
+
+**G15. Bulk notification-to-WO conversion has no UI.**
+
+Evidence: `POST /api/notifications/convert-to-wo` (bulk, `convertNotificationsSchema`)
+exists; only the single-notification endpoint is called
+(`NotificationDetailPage.tsx:72`).
+
+Impact: converting a backlog of notifications requires one click each. Convenience,
+not correctness.
+
+Verdict: **Defer.**
+
+---
+
+**G16. Equipment and material delete have no UI.**
+
+Evidence: both APIs implement soft DELETE; neither page exposes a delete control
+(equipment delete is Supervisor+ at `equipment.ts`, materials Supervisor+ at
+`materials.ts`). Equipment offers `operationalStatus: Decommissioned` as a
+non-destructive alternative.
+
+Impact: retirement can be modelled via status/soft-delete at the API; day-to-day
+management does not need a delete button, and a stray delete is high-blast-radius.
+
+Verdict: **Defer** (deliberate; revisit only with an owner decision).
+
+---
+
+**G17. No global entity search; the command palette is navigation-only.**
+
+Evidence: `CommandPalette.tsx` matches static navigation and action labels only
+(`:61-73`); no page offers cross-entity search.
+
+Impact: users search within each module (each list has its own search box). A global
+search is a convenience at this data volume.
+
+Verdict: **Defer.**
+
+---
+
+**G18. No work-order export on the list page.**
+
+Evidence: `WorkOrdersPage.tsx` has no export control; the header Export button is
+dead (G10); WO data reaches reports and XLSX exports through the reports module.
+
+Impact: reporting needs are met by the reports module; bespoke WO dumps can be taken
+from the database by an administrator.
+
+Verdict: **Defer.**
+
+---
+
+### D.3 Verdict summary
+
+| # | Gap | Verdict |
+|---|---|---|
+| G1 | Labor logging impossible for non-admins | Build Now (P0) |
+| G2 | No password change/reset UI | Build Now (P0) |
+| G3 | No user edit UI | Build Now (P1) |
+| G4 | No equipment create/edit UI | Build Now (P1) |
+| G5 | No material create/edit/delete UI (stock locked to CSV) | Build Now (P1) |
+| G6 | No work-centre CRUD UI | Build Now (P1) |
+| G7 | Meter readings cannot be recorded | Build Now (P2) |
+| G8 | Reports have no filter UI | Build Now (P2) |
+| G9 | Notifications cannot be edited | Build Now (P2) |
+| G10 | Dead Header Filter/Export buttons | Build Now (P3) |
+| G11 | Deactivated users cannot be restored | Defer |
+| G12 | Work-order CSV import has no UI | Defer |
+| G13 | Audit log UI: search only, no date filter or export | Defer |
+| G14 | Alert bell mis-targets notifications; no alert list page | Defer |
+| G15 | Bulk notification conversion has no UI | Defer |
+| G16 | Equipment/material delete have no UI | Defer (deliberate) |
+| G17 | No global entity search | Defer |
+| G18 | No work-order list export | Defer |
+
+### D.4 Recommendation
+
+Build Now: G1 through G10. Ten items, every one of them a frontend screen against an
+API that already exists, validated and audited. The two P0 items are not conveniences:
+G1 removes the ability for the workforce to record its own work, and G2 removes the
+only safe recovery path for a lost credential on a live system. The P1 items (G3-G6)
+are the master-data loop - equipment, materials, work centres and users are the four
+things a maintenance organisation edits weekly, and today three of them require CSV
+surgery and the fourth requires SQL.
+
+Defer: G11 through G18. Each has either a workable operational workaround (re-register
+a deleted user, convert notifications one at a time, retire equipment by status), a
+lower-frequency need (bulk WO import), or is a deliberate design choice (no delete
+buttons, no global search).
+
+### D.5 Execution plan for the Build Now set
+
+Every Build Now item is a change to `app/src` only. None of them requires a database
+change: no migration, no schema edit, no data backfill, no new table, no new column,
+no index. Each reuses an existing endpoint that is already covered by backend tests
+and the audit trail, and in most cases the frontend service method already exists and
+is merely uncalled. The one exception is G7, which needs a new
+`equipmentMeterService.addReading` wrapper - still a frontend-only addition over an
+existing, tested endpoint.
+
+Proposed order, each concern as its own commit (one logical concern per commit, per
+standing rules), each landing green:
+
+1. **G1 - labor attribution.** Replace the admin-only `users` load with
+   `userService.getOptions()` (already Requester+, used by WorkOrderCreatePage) for
+   the technician select, and default the form's `userId` to the signed-in user. For
+   supervisors who may book on behalf of others the options list is the right payload.
+   Delete the unused `isAdmin ? getAll : []` branch. Frontend only.
+
+2. **G2 - password change.** Add a "Change password" dialog reachable from the
+   header user block (Administration page side bar already shows the signed-in user at
+   `AdministrationPage.tsx:200-215`, and the header is global). Self-service calls
+   `PUT /users/{self}/password` with `currentPassword`; an Administrator resetting
+   another user does the same call without `currentPassword` (the route already
+   permits this, `users.ts:513`). New dialog component plus one call site in the
+   Administration row actions for admins.
+
+3. **G3 - user edit.** An edit dialog on the Administration users tab (role,
+   full name, email, work centre, active toggle) calling `userService.update`. Mirror
+   the create form's fields minus username/password.
+
+4. **G4 - equipment edit.** An edit form on `EquipmentDetailPage` covering the
+   `equipmentUpdateSchema` fields, plus an "Add Equipment" dialog on `EquipmentPage`
+   calling `equipmentService.create`. This also makes the command palette's
+   "Add Equipment" action truthful.
+
+5. **G5 - material CRUD.** Row-level edit and add controls on `MaterialsPage`
+   (code, description, unit of measure, standard cost, current stock) calling
+   `materialService.create/update`. Omit a delete button deliberately (see G16).
+
+6. **G6 - work-centre CRUD.** Add/edit controls on `WorkCentersPage` (code, name,
+   daily capacity hours, cost rate, active) calling `workCenterService.create/update`.
+   Omit delete deliberately; deactivate via `isActive` is enough for v1.
+
+7. **G7 - meter readings.** An "Add reading" form in the meter card of
+   `EquipmentDetailPage` (value, date, notes) calling a new
+   `equipmentMeterService.addReading` -> `POST /equipment-meters/{id}/readings`; the
+   readings list already renders the history, so the screen gains the series for free.
+
+8. **G8 - report filters.** A filter bar on `ReportsPage` (from/to dates, location,
+   equipment, work centre, include-descendant toggle) threaded into the existing
+   `reportService` parameter objects. The backend parses and validates these today and
+   returns a 400 with reasons on a bad filter, so the UI can simply surface the error.
+
+9. **G9 - notification edit.** An edit form on `NotificationDetailPage` (and an
+   edit affordance in the list) reusing the create form's field set, calling
+   `notificationService.update`, disabled once the notification is `Converted` since
+   the linked work order owns the truth from that point.
+
+10. **G10 - header dead buttons.** Remove the two inert buttons. (Wiring them is
+    out of scope; a page-local filter control already exists where it matters, and
+    export belongs to the reports module.)
+
+Test strategy for all of the above: follow the existing frontend pattern - vitest
+component tests with the service layer mocked, as in
+`WorkOrderDetailPage.test.tsx` and `WorkOrderCreatePage.test.tsx`. Each commit adds
+tests for the new control (happy path, API error surfaced, role floor hides the
+control) and keeps the suite green. Verification per commit: `npm run build` and
+`npm test` in `app`, plus both mandatory gates, plus green CI at the exact SHA before
+anything is called done. No backend test changes are needed because no backend
+behaviour changes.
+
+Database-safety confirmation: **no Build Now item touches the database schema or
+requires a migration.** They are read/write calls against endpoints that already
+exist and already run in production. Nothing in this plan executes against `cmms`;
+verification happens in CI and, if any local run is needed, against a throwaway
+database.
+
+Deferred items (G11-G18) are explicitly out of this plan and should be re-evaluated
+after the first period of live use, when their frequency can be measured rather than
+guessed.
