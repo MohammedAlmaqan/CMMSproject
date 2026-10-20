@@ -3,7 +3,7 @@
 // ============================================================
 
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Filter, Download, Plus, ChevronRight } from 'lucide-react';
+import { Bell, Plus, ChevronRight } from 'lucide-react';
 import { useAppStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
 import { hasMinRole } from '@/lib/rbac';
@@ -101,16 +101,6 @@ export default function Header({ title, onCreate, tabs, showActions = true }: He
                 {unreadCount}
               </span>
             )}
-          </button>
-
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-secondary border border-subtle rounded hover:border-highlight hover:text-primary transition-all">
-            <Filter className="w-3.5 h-3.5" />
-            <span>Filter</span>
-          </button>
-
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-secondary border border-subtle rounded hover:border-highlight hover:text-primary transition-all">
-            <Download className="w-3.5 h-3.5" />
-            <span>Export</span>
           </button>
 
           {onCreate && (

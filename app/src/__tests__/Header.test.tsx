@@ -67,3 +67,23 @@ describe('Header alerts bell gating (N12)', () => {
     expect(markAll).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('Header dead controls (G10)', () => {
+  beforeEach(() => {
+    useAppStore.setState({ getUnreadAlertCount: () => 0 });
+    useAuthStore.setState({
+      user: adminUser,
+      isAuthenticated: true,
+      loading: false,
+      error: null,
+    });
+  });
+
+  it('does not render the dead Filter and Export buttons', () => {
+    renderHeader();
+
+    // The global header used to render these with no click handler on every page.
+    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+  });
+});
