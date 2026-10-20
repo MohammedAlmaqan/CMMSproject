@@ -3,7 +3,7 @@
 **Source of truth:** [`backend/prisma/schema.prisma`](../backend/prisma/schema.prisma)
 **Database:** PostgreSQL
 **Scope:** all 38 models, grouped into 7 domains, one row per model. Verified against the
-schema on 2026-09-25; re-verified against 38 models on 2026-09-29 (additions: `TaskListMaterial`, `MaintenancePlanTarget`, `WorkOrderSnapshot`); re-verified again on 2026-10-06 (the primary-key exceptions count below corrected from three to two).
+schema on 2026-09-25; re-verified against 38 models on 2026-09-29 (additions: `TaskListMaterial`, `MaintenancePlanTarget`, `WorkOrderSnapshot`); re-verified again on 2026-10-06 (the primary-key exceptions count below corrected from three to two); re-verified 2026-10-20 against the 38-model schema through the `alert_type_scheduler_stale` migration (the CHECK-constraint convention, the `TaskListMaterial` partial unique, and the `MaintenancePlanTarget` "exactly one" wording were corrected at this pass).
 **Companion:** [`ER_DIAGRAM.md`](./ER_DIAGRAM.md)
 
 ## Conventions
@@ -20,7 +20,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | `modifiedDate` | `DateTime @updatedAt` on soft-deleted tables, so the application must set the value. `Attachment` deviates — see its row. |
 | `createdBy` / `modifiedBy` | Free-text `String @default("system")`, holding a user id or the literal `system`. **Not** a foreign key, so a deleted or bad actor id will not be rejected. |
 | Monetary values | `Decimal(12,2)` since D-17/E.13 (`costRatePerHour`, `hourlyRate`, `standardCost`, `plannedCost`, `actualCost`, `unitCost`, `ExternalServiceCost.cost`). Quantity / duration / percentage values stay `Float`; exact-currency arithmetic on those still drifts, but monetary figures now round-trip exactly. |
-| Status and type columns | Free-text `String`; allowed values are recorded only as schema comments, not as enums or check constraints. |
+| Status and type columns | Free-text `String`; allowed values are recorded as schema comments **and pinned by database CHECK constraints** on thirteen tables (migration `20261009120000_status_and_type_check_constraints`, widened for `SystemAlert` by `20261015120000_alert_type_scheduler_stale`). Only `ExternalServiceCost.category` remains comment-only. |
 | Polymorphic links | `Comment` and `Attachment` point at their target via `entityType` + `entityId` with no foreign key. Integrity is the application's responsibility. |
 
 ### Audit coverage across the 38 tables
@@ -62,7 +62,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | `CauseCode` | Cause classification — referenced by `WorkOrder.causeCodeId` (SOW 3.1.4, H.4). | `causeCodeId` PK; `code`; `description` | none (referenced by `WorkOrder`; holds no FK of its own) | Soft |
 | `TaskList` | Reusable standard job, scoped to a work centre. | `taskListId` PK; `code` (partial unique); `description`; `equipmentClass?`; `equipmentId?` | `workCenterId` → `WorkCenter`, required; `equipmentId` → `Equipment`, nullable | Soft |
 | `TaskListOperation` | Ordered step in a task list. | `taskOperationId` PK; `sequenceNumber Int`; `description`; `plannedHours Float`; `numberOfTechnicians Int` | `taskListId` → `TaskList`; `craftId` → `Craft`, both required | Soft |
-| `TaskListMaterial` | Material planned for a task-list operation. | `taskListMaterialId` PK; `quantity Float` | `taskOperationId` → `TaskListOperation`; `materialId` → `Material`, both required. Unique on `(taskOperationId, materialId)` | Soft |
+| `TaskListMaterial` | Material planned for a task-list operation. | `taskListMaterialId` PK; `quantity Float` | `taskOperationId` → `TaskListOperation`; `materialId` → `Material`, both required. Partial unique on `(taskOperationId, materialId)` where `isDeleted = false` (the unconditional unique index was dropped in the E.12 soft-delete sweep) | Soft |
 
 ## Work Management
 
@@ -92,7 +92,7 @@ These hold across the tables below. "Audit set" means `createdBy`, `createdDate`
 | --- | --- | --- | --- | --- |
 | `MaintenancePlan` | Preventive strategy producing scheduled work orders. | `planId` PK; `planCode` (partial unique on active rows only); `description`; `strategyType` Time/Meter/Combined; `intervalValue Int`; `intervalUnit` Days/Weeks/Months; `callHorizonValue Int` (default 7); `callHorizonUnit` Days/Units (default Days); `startDate`; `endDate?`; `priority` (default Medium; SOW 3.4.1); `generatedWorkOrderStatus` (default Draft; SOW 3.4.3); `notificationId?` (SOW 3.4.1/3.4.3 — a plan's associated notification); `activeFlag` (default true); `functionalLocationId?` | `workCenterId` → `WorkCenter` and `taskListId` → `TaskList`, both **required**; `equipmentId` → `Equipment`, nullable; `notificationId` → `Notification`, nullable (SOW 3.4.1/3.4.3). `functionalLocationId` is a plain nullable column with **no** relation. | Soft |
 | `MaintenancePlanMeter` | Meter trigger interval for a plan. | `planMeterId` PK; `meterInterval Float` | `planId` → `MaintenancePlan`; `meterId` → `EquipmentMeter`, both required | Soft |
-| `MaintenancePlanTarget` | Equipment or location a plan schedules against. | `planTargetId` PK; `equipmentId?`; `functionalLocationId?`. CASCADE: deleting the plan takes its targeting with it — the row is only meaningful as part of the plan's definition. NULLs not part of a unique constraint, and a CHECK requires at least one target (see [Known gaps](#known-gaps)). | `planId` → `MaintenancePlan` (`onDelete: Cascade`); `equipmentId` → `Equipment`, `functionalLocationId` → `FunctionalLocation`, both nullable | Soft |
+| `MaintenancePlanTarget` | Equipment or location a plan schedules against. | `planTargetId` PK; `equipmentId?`; `functionalLocationId?`. CASCADE: deleting the plan takes its targeting with it — the row is only meaningful as part of the plan's definition. NULLs not part of a unique constraint, and a CHECK requires exactly one target — one of `equipmentId`/`functionalLocationId` must be set and both may not be set at once (see [Known gaps](#known-gaps)). | `planId` → `MaintenancePlan` (`onDelete: Cascade`); `equipmentId` → `Equipment`, `functionalLocationId` → `FunctionalLocation`, both nullable | Soft |
 
 ## System
 
@@ -122,8 +122,7 @@ enforce what the domain implies.
    `relatedEntity*` pair on `SystemAlert` can point at a missing or wrong-type row. The
    same applies to `createdBy`/`modifiedBy`/`uploadedByUserId`, which are free text.
 4. **Monetary columns are `DECIMAL(12,2)`; quantity columns remain `Float`.** The seven monetary columns (`standardCost`, `unitCost`, `plannedCost`, `actualCost`, `cost`, `hourlyRate`, `costRatePerHour`) are exact `Decimal(12,2)` since D-17/E.13 and round-trip exactly. `currentStock` and the quantity / duration hours / `percentage` columns are still binary floating point, so arithmetic on those drifts and needs `roundMoney`. |
-5. **Status and type columns are unenforced free text.** The permitted values live only in
-   schema comments; nothing at the database level rejects an unexpected value.
+5. **Status and type domains were historically unenforced free text; this gap is now closed at the database level.** The permitted values still live in schema comments, but since migration `20261009120000_status_and_type_check_constraints` (widened for `SystemAlert` by `20261015120000_alert_type_scheduler_stale`) CHECK constraints on thirteen tables reject unexpected values. The one domain that remains comment-only is `ExternalServiceCost.category`, validated in the application by zod (`backend/src/utils/validation.ts`) but not by the database. *Superseded wording, kept: "The permitted values live only in schema comments; nothing at the database level rejects an unexpected value."*
 6. **Four tables are not soft-deletable by design.** The E.12 sweep brought every remaining child, join and configuration table onto `isDeleted`, so the former hard-deleted-children gap is closed. The only exceptions are `RefreshToken` (revoked, never deleted), `SequenceCounter` (a numeric semaphore), and the immutable append-only `AuditLogEntry` and `WorkOrderSnapshot` (§3.6). The §4.3 retention job is implemented: `backend/src/services/auditRetention.ts` purges audit rows older than the configured window (`SystemConfig` `audit_retention_years`, default 7), on a nightly cron (`AUDIT_RETENTION_CRON`, default `0 4 * * *`) and on demand via `POST /api/audit-log/purge` (`backend/src/routes/auditLog.ts:159`, Administrator only). Each purge writes its own `AuditLogEntry`.
 
 ## Verification
