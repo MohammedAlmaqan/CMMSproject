@@ -59,7 +59,7 @@ import type {
   WorkOrderSnapshotEntry,
   Comment,
   LaborEntry,
-  User,
+  UserOption,
   Craft,
   Material,
   SafetyChecklistTemplate,
@@ -237,7 +237,7 @@ export default function WorkOrderDetailPage() {
   const [wo, setWo] = useState<WorkOrderDetail | null>(null);
   const [labor, setLabor] = useState<LaborEntryDetail[]>([]);
   const [history, setHistory] = useState<WorkOrderSnapshotEntry[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
   const [crafts, setCrafts] = useState<Craft[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [causeCodes, setCauseCodes] = useState<CauseCode[]>([]);
@@ -341,12 +341,15 @@ export default function WorkOrderDetailPage() {
     setLoading(true);
     setLoadError(null);
     try {
-const isAdmin = hasPermission(['Administrator']);
+      // /users/options is Requester+ and carries every active user's id, name
+      // and role. The old admin-only /users read left this list empty for every
+      // other role, which made the technician select on Log Labor impossible to
+      // fill and silently blocked labor entry for technicians and supervisors.
       const [woData, laborData, historyData, usersData, craftsData, materialsData, templatesData, attachmentsData, causeCodesData, failureCodesData, costsData] = await Promise.all([
         workOrderService.getById(id!),
         laborService.getByWorkOrder(id!),
         workOrderService.getHistory(id!),
-        isAdmin ? userService.getAll() : Promise.resolve([]),
+        userService.getOptions(),
         craftService.getAll(),
         materialService.getAllPages(),
         safetyChecklistService.getTemplates(),
@@ -393,7 +396,7 @@ const isAdmin = hasPermission(['Administrator']);
     } finally {
       setLoading(false);
     }
-  }, [id, hasPermission]);
+  }, [id]);
 
   useEffect(() => {
     if (id) reload();
@@ -1528,7 +1531,7 @@ const isAdmin = hasPermission(['Administrator']);
             <div className="flex justify-end">
               {canEdit && !laborAdding && (
                 <button
-                  onClick={() => { setEditingLaborId(null); setLaborForm({ ...emptyLaborForm, hoursWorked: '1' }); setLaborAdding(true); }}
+                  onClick={() => { setEditingLaborId(null); setLaborForm({ ...emptyLaborForm, hoursWorked: '1', userId: currentUser?.userId ?? '' }); setLaborAdding(true); }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" /> Log Labor

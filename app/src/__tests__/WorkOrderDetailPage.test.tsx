@@ -38,7 +38,7 @@ vi.mock('@/services/auditLogService', () => ({
 }));
 
 vi.mock('@/services/userService', () => ({
-  userService: { getAll: vi.fn(), getById: vi.fn(), update: vi.fn(), updatePassword: vi.fn() },
+  userService: { getAll: vi.fn(), getOptions: vi.fn(), getById: vi.fn(), update: vi.fn(), updatePassword: vi.fn(), changePassword: vi.fn() },
 }));
 
 vi.mock('@/services/craftService', () => ({
@@ -170,6 +170,7 @@ describe('WorkOrderDetailPage', () => {
     vi.mocked(laborService.getByWorkOrder).mockResolvedValue([]);
     vi.mocked(auditLogService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 100 });
     vi.mocked(userService.getAll).mockResolvedValue([]);
+    vi.mocked(userService.getOptions).mockResolvedValue([]);
     vi.mocked(craftService.getAll).mockResolvedValue([]);
     vi.mocked(materialService.getAll).mockResolvedValue({data:[],total:0,skip:0,take:0});
     vi.mocked(materialService.getAllPages).mockResolvedValue([]);
@@ -561,5 +562,43 @@ describe('WorkOrderDetailPage', () => {
 
     expect(screen.getByRole('button', { name: 'Plan' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+  });
+
+  it('lets a Technician log labor against themselves (G1 regression)', async () => {
+    // G1: the technician picker used to come from the Administrator-only
+    // /users read, so every other role saw an empty select and the Log button
+    // could never enable. It now comes from /users/options (Requester+) and
+    // defaults to the signed-in user, which is also what the API attributes
+    // the entry to when userId is omitted.
+    vi.mocked(workOrderService.getById).mockResolvedValue({
+      ...baseWo,
+      operations: [
+        { operationId: 'op-1', workOrderId: 'wo-1', sequenceNumber: 1, description: 'Isolate supply', craftId: 'cf-1', plannedHours: 2, numberOfTechnicians: 1, actualHours: null, status: 'Pending', craft: null },
+      ],
+    } as WorkOrder);
+    vi.mocked(userService.getOptions).mockResolvedValue([
+      { userId: 'u-tech', username: 'tech', fullName: 'TechUser', role: 'Technician' },
+    ]);
+    vi.mocked(laborService.create).mockResolvedValue({} as LaborEntry);
+    useAuthStore.setState({ user: technicianUser, isAuthenticated: true, loading: false, error: null });
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: /^Labor/ }));
+    await user.click(screen.getByRole('button', { name: 'Log Labor' }));
+
+    const technicianSelect = await screen.findByLabelText('Technician');
+    expect(technicianSelect).toHaveValue('u-tech');
+    expect(screen.getByRole('button', { name: 'Log' })).toBeDisabled();
+
+    await user.selectOptions(screen.getByLabelText('Operation'), 'op-1');
+    await user.click(screen.getByRole('button', { name: 'Log' }));
+
+    await waitFor(() =>
+      expect(vi.mocked(laborService.create)).toHaveBeenCalledWith(
+        expect.objectContaining({ operationId: 'op-1', userId: 'u-tech' })
+      )
+    );
   });
 });
