@@ -16,6 +16,7 @@ import {
   XCircle,
   Eye,
   UserPlus,
+  Pencil,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
@@ -61,9 +62,15 @@ export default function AdministrationPage() {
   const [auditError, setAuditError] = useState('');
 
   // Row 60: an Administrator can onboard a user and deactivate one from the UI.
+  // G3 closes the edit half: fullName, email, role, work centre and active flag
+  // are editable via PUT /users/:id (userUpdateSchema). Username is immutable
+  // server-side and passwords go through the dedicated /password route, so
+  // neither appears here.
   const addUser = useAppStore((s) => s.addUser);
   const removeUser = useAppStore((s) => s.removeUser);
+  const updateUser = useAppStore((s) => s.updateUser);
   const [showUserForm, setShowUserForm] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deactivatingId, setDeactivatingId] = useState('');
   const [userActionError, setUserActionError] = useState('');
 
@@ -262,6 +269,17 @@ export default function AdministrationPage() {
                   onCreated={(created) => { addUser(created); setShowUserForm(false); }}
                 />
               )}
+              {editingUser && (
+                <EditUserForm
+                  user={editingUser}
+                  workCenters={workCenters}
+                  onCancel={() => setEditingUser(null)}
+                  onSaved={(saved) => {
+                    updateUser(saved.userId, saved);
+                    setEditingUser(null);
+                  }}
+                />
+              )}
               {!loading && !storeError && users.length === 0 && (
                 <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No users found in the system.</div>
               )}
@@ -302,18 +320,27 @@ export default function AdministrationPage() {
                             {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'}
                           </td>
                           <td className="px-4 py-2.5">
-                            {u.userId === user?.userId ? (
-                              <span className="text-tertiary text-xs">You</span>
-                            ) : (
+                            <div className="flex items-center gap-1.5">
                               <button
-                                onClick={() => deactivateUser(u.userId, u.fullName)}
-                                disabled={!u.isActive || deactivatingId === u.userId}
-                                aria-label={`Deactivate ${u.fullName}`}
-                                className="text-xs px-2 py-1 rounded border border-subtle text-red-status hover:border-red-status disabled:opacity-40 disabled:text-tertiary"
+                                onClick={() => { setEditingUser(editingUser?.userId === u.userId ? null : u); setUserActionError(''); }}
+                                aria-label={`Edit ${u.fullName}`}
+                                className="text-xs px-2 py-1 rounded border border-subtle text-primary hover:border-amber"
                               >
-                                {deactivatingId === u.userId ? '...' : 'Deactivate'}
+                                {editingUser?.userId === u.userId ? 'Close' : 'Edit'}
                               </button>
-                            )}
+                              {u.userId === user?.userId ? (
+                                <span className="text-tertiary text-xs">You</span>
+                              ) : (
+                                <button
+                                  onClick={() => deactivateUser(u.userId, u.fullName)}
+                                  disabled={!u.isActive || deactivatingId === u.userId}
+                                  aria-label={`Deactivate ${u.fullName}`}
+                                  className="text-xs px-2 py-1 rounded border border-subtle text-red-status hover:border-red-status disabled:opacity-40 disabled:text-tertiary"
+                                >
+                                  {deactivatingId === u.userId ? '...' : 'Deactivate'}
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -696,6 +723,142 @@ function UserForm({
           style={{ color: '#111113' }}
         >
           {submitting ? 'Creating...' : 'Create User'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-xs px-3 py-1.5 rounded border border-subtle text-secondary hover:text-primary"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// G3: the edit half of the admin user lifecycle. PUT /users/:id accepts only
+// fullName, email, role, workCenterId and isActive (userUpdateSchema), so
+// username and password are deliberately absent — the former is immutable and
+// the latter belongs to the /password route (G2).
+function EditUserForm({
+  user,
+  workCenters,
+  onCancel,
+  onSaved,
+}: {
+  user: User;
+  workCenters: WorkCenter[];
+  onCancel: () => void;
+  onSaved: (user: User) => void;
+}) {
+  const [form, setForm] = useState({
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role,
+    workCenterId: user.workCenterId ?? '',
+    isActive: user.isActive,
+  });
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const saved = await userService.update(user.userId, {
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        role: form.role,
+        workCenterId: form.workCenterId || null,
+        isActive: form.isActive,
+      });
+      onSaved(saved);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="industrial-card rounded p-4 mb-4 space-y-3">
+      <h3 className="text-primary text-sm font-semibold flex items-center gap-2">
+        <Pencil className="w-4 h-4 text-amber" /> Edit User — {user.username}
+      </h3>
+      {error && <p className="text-xs text-red-400" role="alert">{error}</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1 text-xs text-secondary">
+          Full Name
+          <input
+            value={form.fullName}
+            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            required
+            aria-label="Edit user full name"
+            className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-secondary">
+          Email
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            required
+            aria-label="Edit user email"
+            className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+            style={{ backgroundColor: '#27272A' }}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-secondary">
+          Role
+          <select
+            value={form.role}
+            onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+            aria-label="Edit user role"
+            className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+            style={{ backgroundColor: '#27272A' }}
+          >
+            {USER_ROLES.map((role) => (
+              <option key={role} value={role}>{role}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-secondary">
+          Work Center
+          <select
+            value={form.workCenterId}
+            onChange={(e) => setForm({ ...form, workCenterId: e.target.value })}
+            aria-label="Edit user work center"
+            className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+            style={{ backgroundColor: '#27272A' }}
+          >
+            <option value="">Unassigned</option>
+            {workCenters.map((wc) => (
+              <option key={wc.workCenterId} value={wc.workCenterId}>{wc.code} — {wc.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-xs text-secondary">
+          <input
+            type="checkbox"
+            checked={form.isActive}
+            onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+            aria-label="Edit user active status"
+            className="rounded border-subtle"
+          />
+          Active (may sign in)
+        </label>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="text-xs px-3 py-1.5 rounded bg-amber font-medium disabled:opacity-50"
+          style={{ color: '#111113' }}
+        >
+          {submitting ? 'Saving...' : 'Save Changes'}
         </button>
         <button
           type="button"
