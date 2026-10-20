@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import EquipmentDetailPage from '@/pages/EquipmentDetailPage';
 import { useAuthStore } from '@/store/authStore';
 import { equipmentService } from '@/services/equipmentService';
+import { equipmentMeterService } from '@/services/equipmentMeterService';
 import { functionalLocationService } from '@/services/functionalLocationService';
 import { materialService } from '@/services/materialService';
 import { attachmentService } from '@/services/attachmentService';
@@ -34,6 +35,10 @@ vi.mock('@/services/materialService', () => ({
 
 vi.mock('@/services/functionalLocationService', () => ({
   functionalLocationService: { getAllPages: vi.fn() },
+}));
+
+vi.mock('@/services/equipmentMeterService', () => ({
+  equipmentMeterService: { getAll: vi.fn(), addReading: vi.fn() },
 }));
 
 vi.mock('@/services/attachmentService', () => ({
@@ -299,5 +304,85 @@ describe('EquipmentDetailPage master-data edit (G4)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Equipment code already exists');
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
+  }, 20000);
+});
+
+describe('EquipmentDetailPage meter readings (G7)', () => {
+  const withMeter: Equipment = {
+    ...equipment,
+    meters: [
+      {
+        ...audit,
+        meterId: 'meter-1',
+        equipmentId: 'eq-1',
+        meterName: 'Running hours',
+        unitOfMeasure: 'h',
+        lastReading: 1200,
+        lastReadingDate: '2026-09-01T00:00:00.000Z',
+        readings: [],
+      },
+    ],
+  };
+
+  const openMetersTab = async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: /^Meters$/ }));
+    await screen.findByText('Running hours');
+    return user;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
+    vi.mocked(equipmentService.getById).mockResolvedValue(withMeter);
+    vi.mocked(equipmentService.getHistory).mockResolvedValue({ data: [], total: 0, skip: 0, take: 200 });
+    vi.mocked(materialService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 50 });
+    vi.mocked(materialService.getAllPages).mockResolvedValue([]);
+    vi.mocked(attachmentService.getByEntity).mockResolvedValue([]);
+  });
+
+  it('records a reading through equipmentMeterService.addReading and reloads', async () => {
+    vi.mocked(equipmentMeterService.addReading).mockResolvedValue({
+      ...audit,
+      readingId: 'r-1',
+      meterId: 'meter-1',
+      readingValue: 1234,
+      readingDate: '2026-10-20T00:00:00.000Z',
+      notes: 'shift check',
+    });
+    const user = await openMetersTab();
+
+    await user.click(screen.getByRole('button', { name: 'Add reading' }));
+    await user.type(screen.getByLabelText('Value'), '1234');
+    await user.type(screen.getByLabelText('Notes'), 'shift check');
+    await user.click(screen.getByRole('button', { name: 'Record reading' }));
+
+    await waitFor(() =>
+      expect(vi.mocked(equipmentMeterService.addReading)).toHaveBeenCalledWith(
+        'meter-1',
+        expect.objectContaining({ readingValue: 1234, notes: 'shift check' })
+      )
+    );
+    expect(await screen.findByText('Reading recorded')).toBeInTheDocument();
+  }, 20000);
+
+  it('surfaces the API rejection and keeps the reading form open', async () => {
+    vi.mocked(equipmentMeterService.addReading).mockRejectedValue(new ApiError(400, 'Reading value must be monotonic'));
+    const user = await openMetersTab();
+
+    await user.click(screen.getByRole('button', { name: 'Add reading' }));
+    await user.type(screen.getByLabelText('Value'), '5');
+    await user.click(screen.getByRole('button', { name: 'Record reading' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Reading value must be monotonic');
+    expect(screen.getByRole('button', { name: 'Record reading' })).toBeInTheDocument();
+  }, 20000);
+
+  it('hides the Add reading control from a View-Only user', async () => {
+    useAuthStore.setState({ user: { ...adminUser, role: 'View-Only' }, isAuthenticated: true, loading: false, error: null });
+    await openMetersTab();
+
+    expect(screen.queryByRole('button', { name: 'Add reading' })).not.toBeInTheDocument();
   }, 20000);
 });

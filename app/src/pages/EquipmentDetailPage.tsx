@@ -28,6 +28,7 @@ import {
 import Header from '@/components/layout/Header';
 import EquipmentForm from '@/components/EquipmentForm';
 import { equipmentService } from '@/services/equipmentService';
+import { equipmentMeterService } from '@/services/equipmentMeterService';
 import { functionalLocationService } from '@/services/functionalLocationService';
 import { materialService } from '@/services/materialService';
 import { attachmentService } from '@/services/attachmentService';
@@ -107,6 +108,13 @@ export default function EquipmentDetailPage() {
   const [meterLastReading, setMeterLastReading] = useState('');
   const [meterLastReadingDate, setMeterLastReadingDate] = useState('');
   const [meterBusy, setMeterBusy] = useState<string | null>(null);
+  // Per-meter reading form (G7): one open form at a time, keyed by meterId.
+  const [readingFormFor, setReadingFormFor] = useState<string | null>(null);
+  const [readingValue, setReadingValue] = useState('');
+  const [readingDate, setReadingDate] = useState('');
+  const [readingNotes, setReadingNotes] = useState('');
+  const [readingBusy, setReadingBusy] = useState(false);
+  const [readingError, setReadingError] = useState<string | null>(null);
   const [meterError, setMeterError] = useState<string | null>(null);
   const [meterSuccess, setMeterSuccess] = useState<string | null>(null);
 
@@ -356,6 +364,39 @@ export default function EquipmentDetailPage() {
       setMeterError(err instanceof ApiError ? err.message : 'Delete failed');
     } finally {
       setMeterBusy(null);
+    }
+  };
+
+  const openReadingForm = (meterId: string) => {
+    setReadingFormFor(meterId);
+    setReadingValue('');
+    setReadingDate('');
+    setReadingNotes('');
+    setReadingError(null);
+  };
+
+  const saveReading = async (e: React.FormEvent, meterId: string) => {
+    e.preventDefault();
+    const value = Number(readingValue);
+    if (readingValue === '' || !Number.isFinite(value) || value < 0) {
+      setReadingError('Reading value must be zero or greater');
+      return;
+    }
+    setReadingBusy(true);
+    setReadingError(null);
+    try {
+      await equipmentMeterService.addReading(meterId, {
+        readingValue: value,
+        readingDate: readingDate || undefined,
+        notes: readingNotes.trim() || null,
+      });
+      setReadingFormFor(null);
+      setMeterSuccess('Reading recorded');
+      await reload();
+    } catch (err) {
+      setReadingError(err instanceof ApiError ? err.message : 'Save failed');
+    } finally {
+      setReadingBusy(false);
     }
   };
 
@@ -768,7 +809,55 @@ export default function EquipmentDetailPage() {
                         )}
                       </div>
                       <div className="border-t border-subtle pt-3">
-                        <h4 className="text-secondary text-xs font-medium mb-2">Recent Readings</h4>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-secondary text-xs font-medium">Recent Readings</h4>
+                          {canEditMeter && readingFormFor !== meter.meterId && (
+                            <button
+                              onClick={() => openReadingForm(meter.meterId)}
+                              className="flex items-center gap-1 text-xs text-amber hover:underline"
+                            >
+                              <Plus className="w-3 h-3" /> Add reading
+                            </button>
+                          )}
+                        </div>
+                        {readingFormFor === meter.meterId && (
+                          <form onSubmit={(e) => saveReading(e, meter.meterId)} className="mb-3 rounded border border-subtle p-3 space-y-2">
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className={labelCls} htmlFor={`reading-value-${meter.meterId}`}>Value</label>
+                                <input id={`reading-value-${meter.meterId}`} type="number" min="0" step="any" value={readingValue} onChange={(e) => setReadingValue(e.target.value)} className={inputCls} />
+                              </div>
+                              <div>
+                                <label className={labelCls} htmlFor={`reading-date-${meter.meterId}`}>Date</label>
+                                <input id={`reading-date-${meter.meterId}`} type="date" value={readingDate} onChange={(e) => setReadingDate(e.target.value)} className={inputCls} />
+                              </div>
+                              <div>
+                                <label className={labelCls} htmlFor={`reading-notes-${meter.meterId}`}>Notes</label>
+                                <input id={`reading-notes-${meter.meterId}`} value={readingNotes} onChange={(e) => setReadingNotes(e.target.value)} className={inputCls} />
+                              </div>
+                            </div>
+                            {readingError && (
+                              <div role="alert" className="rounded border border-red-900/50 bg-red-950/30 px-2 py-1 text-xs text-red-300">{readingError}</div>
+                            )}
+                            <div className="flex items-center gap-2 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => setReadingFormFor(null)}
+                                className="px-2.5 py-1 rounded text-xs text-secondary border border-subtle hover:border-highlight"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={readingBusy}
+                                className="px-2.5 py-1 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
+                                style={{ backgroundColor: '#D97706', color: '#111113' }}
+                              >
+                                {readingBusy ? 'Saving…' : 'Record reading'}
+                              </button>
+                            </div>
+                          </form>
+                        )}
                         {readings.length === 0 ? (
                           <p className="text-tertiary text-xs">No readings recorded</p>
                         ) : (
