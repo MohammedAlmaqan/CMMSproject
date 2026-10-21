@@ -18,4 +18,7 @@ backups/
 # Local k6 portable binary (67 MB) — fetch it with the documented download command
 scripts/k6/k6.exe
 
+# Installer build output
+installer/out/
+
 __pycache__/
