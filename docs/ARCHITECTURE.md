@@ -264,10 +264,10 @@ Names and purposes only. No values are reproduced here, and no `.env` file was r
 
 Two gaps in this table's own coverage:
 
-- `PM_SCHEDULER_CRON` is now present in `backend/.env.example`. Note that the unquoted value `0 2 * * *` is parsed correctly by Node's `--env-file`, but any tooling that treats spaces as value separators will mangle it; quote it if you introduce such a tool.
+- `PM_SCHEDULER_CRON` is now present in `backend/.env.example`. Note that the unquoted value `0 2 * * *` is parsed correctly by the Prisma-bundled `.env` loader (dotenv), but any tooling that treats spaces as value separators will mangle it; quote it if you introduce such a tool.
 - `SEED_DEMO` is not an API variable. `seed.ts` refuses to run without it and a non-production `NODE_ENV`, and exits 0 with a skip message otherwise. The supported entry point is `scripts\seed-demo.bat`.
 
-`backend/.env` is loaded by Node's own `--env-file` flag at launch; no `dotenv` dependency is present. Consequently the API reads no configuration file itself — omitting `--env-file` means the process starts with defaults and, for `JWT_SECRET`, fails fast rather than running insecurely.
+`backend/.env` is loaded into the process environment by Prisma Client — importing `@prisma/client` (through `src/utils/prisma.ts`) reads `backend/.env` via its bundled dotenv loader before any application code reads a variable. No `dotenv` call exists in the application itself and no `--env-file` flag is passed at launch; the loader is Prisma's. Two consequences follow. (1) The file is resolved relative to the process working directory, so the API must be launched from `backend/` (PM2's `ecosystem.config.cjs` does this) or the variables are absent. (2) A variable omitted from `.env` falls back to its code default, except `JWT_SECRET`, which `src/utils/config.ts` requires and which fails fast rather than running insecurely.
 
 The batch scripts use a separate set of PostgreSQL client variables — `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD`, which must be supplied by the scheduled-task environment.
 

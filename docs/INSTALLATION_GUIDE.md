@@ -245,10 +245,22 @@ The command must return HTTP 200 with the health payload. `-k` is required only 
 These ten are the variables `backend\.env.example` documents, and the table matches it
 line for line. The scheduler worker additionally reads two cron variables omitted here
 only because they have safe defaults: `OVERDUE_SWEEP_CRON` (default `0 3 * * *`) and
-`AUDIT_RETENTION_CRON` (default `0 4 * * *`). `backend\.env` is loaded by Node's own
-`--env-file` flag at launch rather than by a dotenv library, so a missing
-variable silently falls back to its default, except `JWT_SECRET`, which
-fails fast rather than starting insecurely.
+`AUDIT_RETENTION_CRON` (default `0 4 * * *`). `backend\.env` is loaded into the
+process environment by Prisma Client: importing `@prisma/client` (via
+`backend\src\utils\prisma.ts`) reads `backend\.env` as a side effect before any
+application code reads a variable, so a missing variable silently falls back to its
+default, except `JWT_SECRET`, which `backend\src\utils\config.ts` requires and which
+fails fast rather than starting insecurely. There is no `dotenv` dependency in the
+application and no `--env-file` flag is passed at launch; the loader is the one
+bundled with Prisma.
+
+> **This has one deployment consequence.** Because the loader resolves `backend\.env`
+> relative to the process working directory, PM2 (or any launcher) must start the API
+> from `backend\` — for example `pm2 start ecosystem.config.cjs` run in `backend\`.
+> Launching `node dist\index.js` from another directory finds no `.env`, leaves
+> `JWT_SECRET` unset, and the API exits at boot. Confirmed on 2026-10-21 by import
+> order: `process.env.DATABASE_URL` and `process.env.JWT_SECRET` are both `undefined`
+> before `import('@prisma/client')` and both populated immediately after.
 
 `BIND_HOST` and `PM_SCHEDULER_CRON` need care on a server. See
 [Enabling HTTPS / TLS](#step-7-enable-https--tls-iis-reverse-proxy) before
@@ -481,8 +493,12 @@ The login endpoint allows 20 attempts per 15 minutes per source IP, which a 50-V
 ```cmd
 cd C:\CMMSproject\backend
 set K6_MODE=1
-node --env-file=.env dist\index.js
+node dist\index.js
 ```
+
+Run this from `backend\`: Prisma Client loads `backend\.env` from the working directory,
+and `set K6_MODE=1` exports the override into the process environment, which the loader
+does not overwrite.
 
 The override requires `NODE_ENV !== 'production'`; setting `K6_MODE=1` on a production host has no effect. It activates only when `K6_MODE` is exactly `1` **and** `NODE_ENV` is not `production`; on a production host the limit stays at 20 regardless. **Never set `K6_MODE` on a production host** — it weakens brute-force protection that the account lockout depends on. Remove it with `set K6_MODE=` when finished.
 
