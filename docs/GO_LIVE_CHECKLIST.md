@@ -155,3 +155,26 @@ position is a deployment step recorded here, not a reopening of the row.
     critical (`proxy-addr`) was cleared at `89585f8`, and the sole residual is the dev-only
     `deepmerge-ts` advisory (unreachable at runtime) accepted in C21. No open Critical/Major
     defect remains. *Superseded open check (kept): re-check to be performed at go-live.*
+
+## Security controls
+
+12. **Restrict filesystem access to the live `backend\.env` (and the bundle `.env.deploy`).**
+    `backend\.env` holds `JWT_SECRET`, the sole signing key for every access token; there is
+    no access-token denylist and no signing-key rotation, so anyone who can read the file can
+    mint a token for any user, including an Administrator. Both `backend\.env` and the
+    bundle's `backend\.env.deploy` inherited ACEs granting non-administrator local groups
+    `Modify` and `Read` respectively. Restrict each to **SYSTEM**, **Administrators** and the
+    service/logon account (**Injaz** on this host), with inheritance disabled so the inherited
+    group ACEs are removed. Run PowerShell as Administrator (substitute the target host's
+    service account for `Injaz`):
+
+    ```powershell
+    icacls backend\.env /inheritance:r /grant:r "SYSTEM:F" "Administrators:F" "Injaz:F"
+    ```
+
+    Verify with `icacls backend\.env` that only those three principals remain and no
+    `(I)`-inherited ACE is listed. *Closed 2026-10-21 (live):* the live `backend\.env` and the
+    v1.6.2 bundle's `backend\.env.deploy` were both restricted to SYSTEM / Administrators /
+    Injaz with inheritance removed; `icacls` confirmed the `CodexSandboxUsers` and the
+    unresolved-SID ACEs are gone. The live `JWT_SECRET` was rotated in the same change and PM2
+    restarted, invalidating all pre-existing sessions.
