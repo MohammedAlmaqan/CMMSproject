@@ -153,8 +153,7 @@ IIS terminates TLS and forwards plaintext to the Express API on loopback. The AP
 **Bind the API to loopback first.** The API sets `trust proxy = 1`, which makes it trust one hop of `X-Forwarded-For`. That is correct behind a proxy, but it also means any client that can reach port 4000 *directly* can forge that header and defeat the login rate limiter entirely. Binding to loopback removes the direct route. Before starting the API behind IIS, set this in `backend\.env`:
 
 ```ini
-# Use 127.0.0.1 so port 4000 is not externally reachable. Leave the 0.0.0.0
-# default only for direct-access development.
+# 127.0.0.1 is the default, so port 4000 is not externally reachable.
 BIND_HOST=127.0.0.1
 ```
 
@@ -164,7 +163,7 @@ Restart the API after changing it and confirm the startup log records the bind a
 CMMS API server running on port 4000 (bound to 127.0.0.1)
 ```
 
-> Leave `BIND_HOST=0.0.0.0` only for local development with no reverse proxy. It is the default in `.env.example` purely so a fresh dev checkout works without extra steps — it is **not** a safe production value.
+> `BIND_HOST=127.0.0.1` is the code default (`backend/src/index.ts`) and the value in `.env.example`, so a production install is loopback-only without extra steps. Set `BIND_HOST=0.0.0.0` **only** for local development with no reverse proxy — it is not a safe production value.
 
 **Firewall rule (defense-in-depth).** Block inbound TCP 4000 from non-loopback addresses so the port stays unreachable even if `BIND_HOST` is later mis-set or IIS is removed. Run PowerShell as Administrator:
 
@@ -239,7 +238,7 @@ The command must return HTTP 200 with the health payload. `-k` is required only 
 | `PORT` | API server port | 4000 |
 | `CORS_ORIGINS` | Comma-separated browser origins allowed to call the API | http://localhost:3000 |
 | `LOG_LEVEL` | Pino log level | info |
-| `BIND_HOST` | Interface the API listens on | 0.0.0.0 |
+| `BIND_HOST` | Interface the API listens on | 127.0.0.1 |
 | `PM_SCHEDULER_CRON` | Cron expression driving the PM scheduler worker | 0 2 * * * |
 
 These ten are the variables `backend\.env.example` documents, and the table matches it

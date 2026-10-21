@@ -94,7 +94,7 @@ Configuration is mostly by environment variable. The backend reads `backend/.env
 | `SESSION_IDLE_MS` | Server-side idle window in **milliseconds** | `1800000` (30 minutes) | The server refuses a session idle longer than this, independently of the browser. Keep it in step with the browser idle timeout |
 | `PORT` | TCP port the API listens on | `4000` | When another service already owns 4000. The frontend's `VITE_API_URL` and the IIS proxy rule must be changed to match |
 | `CORS_ORIGINS` | Comma-separated list of browser origins permitted to call the API | `http://localhost:3000` | **Always**, when the frontend is served from anywhere other than `http://localhost:3000`. Use full origins including scheme, host, and port, with no trailing slash. A mismatch produces a blank screen with no data and a CORS error in the browser console |
-| `BIND_HOST` | Interface the API binds to | `0.0.0.0` | Set to `127.0.0.1` whenever the API sits behind IIS on the same host. This is what keeps port 4000 off the network. See [12.1](#121-network-exposure) |
+| `BIND_HOST` | Interface the API binds to | `127.0.0.1` | Set to `0.0.0.0` only for direct-access development with no reverse proxy. The loopback default is what keeps port 4000 off the network behind IIS. See [12.1](#121-network-exposure) |
 | `LOG_LEVEL` | Log verbosity. One of `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` | `info` | Raise to `debug` only while diagnosing. `silent` disables logging entirely. An unrecognised value is ignored and falls back to `info` rather than failing to start |
 | `PM_SCHEDULER_CRON` | Cron expression for the nightly PM generation run (read by `cmms-worker`) | `0 2 * * *` (02:00 daily, **server local time**) | When the plant's maintenance window differs from 02:00, or to run more or less often. Five-field `node-cron` syntax. **The scheduler evaluates due dates, not a rolling window, so changing this does not backfill missed runs** - see [5.4](#54-when-a-run-is-missed). Restart `cmms-worker` after the change |
 
@@ -605,7 +605,7 @@ Stated plainly, including the gaps. This is a defensible baseline for an interna
 
 ### 12.1 Network exposure
 
-- The API binds `0.0.0.0` by default, which exposes port 4000 to the network. **Set `BIND_HOST=127.0.0.1` when IIS proxies on the same host**, so the port is reachable only from the loopback interface. The installation guide's IIS section makes this change; keep it in place.
+- The API binds `127.0.0.1` by default (`backend/src/index.ts`), so port 4000 is reachable only from the loopback interface. **Set `BIND_HOST=0.0.0.0` only when no reverse proxy is used**, e.g. direct-access development; doing so on a production host exposes port 4000 to the network.
 - Serve the frontend over HTTPS via IIS. Tokens travel in an `Authorization` header on every request, so plain HTTP exposes them to anyone on the path.
 - Helmet is enabled, which sets the standard hardening headers. **Content-Security-Policy is deliberately disabled**, so the application does not set a CSP. The application is a static SPA with no inline scripts and would support a strict policy; adding one is a reasonable hardening step, but it is not configured today.
 

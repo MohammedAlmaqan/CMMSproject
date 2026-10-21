@@ -41,11 +41,11 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 // `trust proxy = 1` means the API trusts one hop of X-Forwarded-For, so a client
 // able to reach port 4000 directly can spoof its source IP and defeat the login
-// rate limiter. Binding to loopback removes that route entirely. The default stays
-// 0.0.0.0 for direct-access dev; deployments behind a reverse proxy MUST set
-// BIND_HOST=127.0.0.1 in backend/.env. See INSTALLATION_GUIDE.md and the Windows
-// Firewall rule documented there.
-const BIND_HOST = process.env.BIND_HOST ?? '0.0.0.0';
+// rate limiter. Binding to loopback removes that route entirely. The default is
+// 127.0.0.1 (fail-safe): the API is unreachable off-host unless an operator
+// explicitly opts in with BIND_HOST=0.0.0.0 for direct-access dev with no reverse
+// proxy. See INSTALLATION_GUIDE.md and the Windows Firewall rule documented there.
+const BIND_HOST = process.env.BIND_HOST ?? '127.0.0.1';
 
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
