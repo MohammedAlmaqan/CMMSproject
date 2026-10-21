@@ -4,6 +4,26 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.6.1
+
+Documentation corrections after v1.6.0. No code, schema, endpoint or behaviour
+change; the release touches `docs/` and the root `README.md` only.
+
+- **`.env` loading corrected.** `docs/ARCHITECTURE.md` and
+  `docs/INSTALLATION_GUIDE.md` said `backend/.env` was loaded by Node's
+  `--env-file` flag. It is loaded by Prisma Client's bundled dotenv loader at
+  `new PrismaClient()`; no application `dotenv` call and no `--env-file` flag
+  exist. The working-directory consequence (`.env` resolves against the
+  process cwd, so the API must launch from `backend/` or `JWT_SECRET` is
+  absent and the process exits at boot) is now recorded. `0bbb940`.
+- **Project-layout claim corrected.** The root `README.md` project tree called
+  `README.md` "the only .md at the root"; `RELEASE_NOTES.md` has been there
+  since v1.6.0 and `AGENTS.md` is also present. `69e4ecc`.
+
+The handover bundle for this release additionally ships `IT_DEPLOYMENT_GUIDE.md`
+and `backend/.env.deploy` (bundle-only, not tracked in git) and refreshes the
+bundled `docs/` copies to match this tree.
+
 ## v1.6.0
 
 The **Build Now** set from the Functional Completeness Audit
