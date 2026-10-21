@@ -309,7 +309,7 @@ CMMSproject/
 │   │   └── seed.ts             # guarded demo seed
 │   └── tests/                  # 88 test files + 3 support = 91 tracked
 ├── scripts/                    # Windows batch scripts, k6, verify scripts
-├── docs/                        # all documentation; README.md is the only .md at the root
+├── docs/                        # all documentation; the root .md files are README.md, RELEASE_NOTES.md and AGENTS.md
 │   ├── CMMS_FINALIZATION_TRACKER.md
 │   ├── INSTALLATION_GUIDE.md
 │   └── ...                      # SOW_COMPLIANCE, API_REFERENCE, ARCHITECTURE, USER_MANUAL, ADMIN_GUIDE, DECISION_REGISTER, DATA_DICTIONARY, ER_DIAGRAM, WCAG-AUDIT, HANDOFF
