@@ -4,6 +4,32 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.6.2
+
+A security patch: one code default made fail-safe, and the filesystem access to
+the credentials file restricted. Behaviour is unchanged for the documented
+IIS-behind-reverse-proxy deployment.
+
+- **`BIND_HOST` defaults to `127.0.0.1`.** `backend/src/index.ts` bound `0.0.0.0`
+  by default, relying on `backend/.env` (or the PM2 ecosystem file) to set
+  loopback. A deployment that omitted the variable — or launched the API from a
+  working directory where `.env` is not picked up — bound every interface and
+  exposed port 4000. With `trust proxy = 1`, a client that can reach port 4000
+  directly can spoof `X-Forwarded-For` and defeat the login rate limiter, so the
+  default is now loopback-only and `0.0.0.0` is an explicit opt-in for
+  direct-access development. `d4288bc`.
+- **`.env` access restricted.** `backend/.env` holds `JWT_SECRET`, the sole
+  access-token signing key (no denylist, no rotation), so read access to the file
+  is privilege escalation. `docs/GO_LIVE_CHECKLIST.md` gains a Security controls
+  item restricting `backend/.env` and the bundle's `backend/.env.deploy` to
+  SYSTEM / Administrators / the service account with inheritance removed.
+  `a8a4223`.
+
+Operational closure on the live host (2026-10-21), recorded in go-live item 12:
+the live `JWT_SECRET` was rotated and PM2 restarted, so all pre-existing sessions
+are invalidated; both `.env` files were re-ACL'd, dropping the non-administrator
+local-group ACEs.
+
 ## v1.6.1
 
 Documentation corrections after v1.6.0. No code, schema, endpoint or behaviour
