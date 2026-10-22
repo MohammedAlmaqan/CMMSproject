@@ -86,7 +86,7 @@ begin
   // Database page
   PageDB := CreateInputQueryPage(PageBundle.ID,
     'PostgreSQL Configuration', 'Configure the database connection',
-    'Use a throwaway database for testing. The engine will never target the live cmms database.');
+    'Use a new database name. This wizard refuses the live database name cmms.');
   PageDB.Add('&Host:', False);
   PageDB.Add('&Port:', False);
   PageDB.Add('&User:', False);
@@ -96,7 +96,7 @@ begin
   EditPgPort := TEdit(PageDB.Edits[1]); EditPgPort.Text := '5432';
   EditPgUser := TEdit(PageDB.Edits[2]); EditPgUser.Text := 'postgres';
   EditPgPass := TEdit(PageDB.Edits[3]); EditPgPass.PasswordChar := '*';
-  EditDbName := TEdit(PageDB.Edits[4]); EditDbName.Text := 'cmms';
+  EditDbName := TEdit(PageDB.Edits[4]); EditDbName.Text := 'cmms_install';
 
   // App page
   PageApp := CreateInputQueryPage(PageDB.ID,
@@ -132,6 +132,16 @@ begin
     if EditPgPass.Text = '' then
     begin
       MsgBox('PostgreSQL password is required.', mbError, MB_OK);
+      Result := False;
+    end;
+    if Trim(EditDbName.Text) = '' then
+    begin
+      MsgBox('Database name is required.', mbError, MB_OK);
+      Result := False;
+    end;
+    if CompareText(Trim(EditDbName.Text), 'cmms') = 0 then
+    begin
+      MsgBox('The database name "cmms" is the live production database on the existing host and is not a blank-install target. Choose a new name.', mbError, MB_OK);
       Result := False;
     end;
   end;
