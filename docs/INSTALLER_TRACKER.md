@@ -28,7 +28,7 @@ and the table is wrong.
 | I-05 | Wizard writes the PostgreSQL password to an unrestricted plaintext temp file | Closed | Installer | this commit |
 | I-06 | Wizard payload ships the engine test harness to the production target | Closed | Installer | this commit |
 | I-07 | Wizard shortcuts and uninstall icon point at files the wizard never installs | Closed | Installer | this commit |
-| I-08 | Wizard bundle-path default assumes the `.exe` sits inside the bundle | Open | Installer | - |
+| I-08 | Wizard bundle-path default assumes the `.exe` sits inside the bundle | Closed | Installer | this commit |
 | I-09 | Harness verdict and throwaway database name are not persisted | Open | Installer | - |
 | I-10 | No CI job covers `installer/` | Open | Installer | - |
 | I-11 | Existing `%ProgramData%\CommandPulse\logs` files hold the PostgreSQL password in plaintext | Open | Installer | - |

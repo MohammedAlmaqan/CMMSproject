@@ -4,6 +4,7 @@
 
 #define MyAppName "CommandPulse CMMS"
 #define MyAppVersion "1.6.2"
+#define BundleDir "CommandPulse-CMMS-v" + MyAppVersion
 #define MyAppPublisher "CommandPulse"
 #define MyAppURL "https://github.com/MohammedAlmaqan/CMMSproject"
 
@@ -70,12 +71,12 @@ begin
   // Bundle page
   PageBundle := CreateInputQueryPage(wpWelcome,
     'Source Bundle', 'Select the CommandPulse CMMS bundle location',
-    'Provide the full path to the extracted bundle containing SHA256SUMS.txt.');
+    'Provide the full path to the extracted bundle containing SHA256SUMS.txt. The Setup program is normally distributed next to that folder.');
   PageBundle.Add('&Bundle Path:', False);
   PageBundle.Add('&Install Root:', False);
   EditBundle := TEdit(PageBundle.Edits[0]);
   EditInstallRoot := TEdit(PageBundle.Edits[1]);
-  EditBundle.Text := ExpandConstant('{src}\..\CommandPulse-CMMS-v1.6.2');
+  EditBundle.Text := ExpandConstant('{src}\{#BundleDir}');
   EditInstallRoot.Text := ExpandConstant('{pf}\CommandPulse\CMMS');
 
   // Database page
