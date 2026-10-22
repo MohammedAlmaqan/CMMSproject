@@ -25,13 +25,9 @@ SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
 SetupLogging=yes
-UninstallDisplayIcon={app}\backend\dist\index.js
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-
-[Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 ; Engine and supporting files
@@ -46,7 +42,6 @@ Source: ".gitkeep"; DestDir: "{app}\installer\wizard"; Flags: ignoreversion
 
 [Dirs]
 Name: "{app}\bundle"
-Name: "{app}\installer\out"
 
 [Code]
 var
@@ -225,8 +220,3 @@ begin
   if PwFileToDelete <> '' then
     DeleteFile(PwFileToDelete);
 end;
-
-[Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\installer\install.ps1"
-Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\installer\install.ps1"; Tasks: desktopicon
