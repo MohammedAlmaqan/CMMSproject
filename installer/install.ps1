@@ -17,8 +17,11 @@
     * No developer-machine paths anywhere. Every input is a parameter or comes
       from the supplied bundle, so the engine runs unchanged on a client server.
     * Secrets are never written to the log and never echoed to the console.
-    * The live `cmms` database is never a target: the engine only ever writes to
-      the database named by -DbName.
+    * The engine writes only to the database named by -DbName. That parameter
+      defaults to `cmms`, which is the live production database name on the
+      existing host, so every side-by-side or test install must pass a new
+      name; the harness uses cmms_installer_test_<random>. On a host that
+      already runs CommandPulse the engine warns when -DbName is `cmms`.
 
 .PARAMETER SourceBundle
   Path to the extracted release bundle. Must contain backend/, frontend/, ops/,
@@ -45,7 +48,9 @@
   Name of an environment variable holding the PostgreSQL password.
 
 .PARAMETER DbName
-  Database the application connects to. Default cmms.
+  Database the application connects to. Default cmms. On a host that already
+  runs CommandPulse, `cmms` is the live database: pass a new name for a test or
+  side-by-side install. The engine warns when this value is `cmms`.
 
 .PARAMETER ApiPort
   TCP port the API listens on. Default 4000. The value is written to .env AND
@@ -715,6 +720,9 @@ try {
   Log "INFO" "Install root : $InstallRoot"
   Log "INFO" "Bundle       : $SourceBundle"
   Log "INFO" "Database     : $DbName on $PgHost`:$PgPort as $PgUser"
+  if ($DbName -eq "cmms") {
+    Log "WARN" "-DbName is 'cmms'. On a host that already runs CommandPulse this is the LIVE database; pass a new name for a test or side-by-side install."
+  }
   Log "INFO" "API endpoint : http://$BindHost`:$ApiPort"
   Log "INFO" "Identity     : $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"
 

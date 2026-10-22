@@ -88,7 +88,7 @@ names. Uninstall deletes only the names that install owns; it never runs
 ## Security
 - `.env` is generated with a fresh CSPRNG JWT_SECRET and ACL-locked to SYSTEM, BUILTIN\Administrators, and the dynamically resolved current user. No hardcoded usernames.
 - The resolved PostgreSQL password is redacted from the install log and from every captured command-output file. `pm2 jlist` is not used: PM2 returns the full environment block of every application, which is how an earlier revision wrote `PGPASSWORD` to disk.
-- The live database `cmms` is never targeted by tests; use a throwaway database.
+- The live database `cmms` is never targeted by tests; the harness creates and drops a throwaway database. The engine itself writes only to `-DbName`, which defaults to `cmms` - on the live host that is the production database, so a test or side-by-side install must pass a new name, and the engine warns when `cmms` is selected.
 - No dumps, client data, or production secrets are copied. The `database\` folder is excluded and the Prisma migrations under `backend\prisma\migrations\` are kept, because they are the schema history the install applies.
 
 ## Timeouts
