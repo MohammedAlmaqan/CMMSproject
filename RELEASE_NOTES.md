@@ -4,11 +4,41 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
-## Unreleased — installer workstream
+## v1.6.3
 
-The standalone installer under `installer/` is tracked in
-`docs/INSTALLER_TRACKER.md`. This entry records the corrective work; it is not
-tagged.
+The installer workstream, closed. The standalone installer under `installer/` is
+tracked in `docs/INSTALLER_TRACKER.md`. Application code (`backend/`, `app/`) is
+unchanged from v1.6.2; this release is the installer and the bundle it delivers.
+This section was listed as `Unreleased — installer workstream` before the tag
+was cut.
+
+- **The wizard now runs its page setup.** It declared `OnInitializeWizard`, which
+  Inno never calls, and cast each page edit to `TEdit`, which raised
+  `Cannot cast an object`; the defaults were written to a `TEdit` that does not
+  exist and the password read back from it was always empty. The setup is now an
+  `InitializeWizard` procedure, and every default and read uses `Page*.Values`.
+  `9de8853`.
+- **The install step no longer fails with a type mismatch.** The password temp
+  file name used `GetDateTimeString('hhmmss', '', '')`; the separator and
+  placeholder arguments must be characters, so the Install click aborted with
+  `Type Mismatch`. It now passes `#0, #0`. `9de8853`.
+- **The wizard finds its bundle beside or inside the setup program.** When the
+  compiled setup sits at the bundle root, the old unconditional
+  `<setup folder>\CommandPulse-CMMS-v<version>` default pointed at a folder that
+  cannot exist; the default now prefers that sibling folder when it exists and
+  falls back to the setup program's own folder. `4bc446f`.
+- **Verified end to end on 2026-10-22.** The compiled wizard was driven through
+  every page; the engine log records the values the GUI collected (database
+  `cmms_wizard_test`, API `http://127.0.0.1:4111`, a scratch install root), the
+  health check returned 200, and the throwaway applications, database and files
+  were removed afterwards. Evidence: `9de8853`.
+- **The bundle ships the verified setup artifact.** From this release
+  `Setup_CommandPulse.exe` is published at the bundle root and listed in
+  `SHA256SUMS.txt`, so the artifact that was tested is the artifact the client
+  receives. This supersedes the v1.6.2 posture, where the exe was deliberately
+  left outside the manifest (tracker I-20).
+
+Earlier corrective work in this workstream:
 
 - **Credentials are redacted from install logs**, and logs written before the
   fix are scrubbed by `installer/tools/Redact-InstallerLogs.ps1` (report by

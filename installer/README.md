@@ -26,11 +26,12 @@ or in Program Files) and compiles to `installer\out\`:
 # or: & ".\installer\build-wizard.ps1" -OutputDir "D:\build\cmms" -IsccPath "C:\path\to\ISCC.exe"
 ```
 
-The compiled `Setup_CommandPulse.exe` is gitignored. It is **not** part of the release
-bundle and is **not** listed in the bundle's `SHA256SUMS.txt`; distribute it *next to*
-the extracted bundle folder. The wizard looks for `<setup folder>\CommandPulse-CMMS-v<version>`
-first and falls back to the setup program's own folder, so it also works when the setup
-program is placed inside the bundle.
+The compiled `Setup_CommandPulse.exe` is gitignored. From v1.6.3 it is published at the
+root of the release bundle and listed in that bundle's `SHA256SUMS.txt`, so the
+verified artifact travels with the files it installs. The wizard looks for
+`<setup folder>\CommandPulse-CMMS-v<version>` first and falls back to the setup
+program's own folder, so it works both when the setup program sits beside the
+extracted bundle and when it sits inside it.
 
 ## Quick start (blank install)
 ```powershell

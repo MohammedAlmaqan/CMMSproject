@@ -6,9 +6,8 @@
 .DESCRIPTION
   Finds ISCC.exe on PATH, in Program Files, or in the per-user Inno Setup 6
   install, then compiles. The output directory is installer/out, which is
-  gitignored: the compiled .exe is never committed and never added to the
-  application bundle, because the bundle is verified by SHA256SUMS and the .exe
-  is not part of that manifest.
+  gitignored: the compiled .exe is never committed. It is published at the root
+  of the release bundle and listed in that bundle's SHA256SUMS.txt.
 #>
 [CmdletBinding()]
 param(

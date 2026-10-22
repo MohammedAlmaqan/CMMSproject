@@ -43,8 +43,24 @@ and the table is wrong.
 | I-20 | Release bundle contained the compiled `.exe` and was outside `SHA256SUMS.txt` | Closed | Owner | Exe moved out 2026-10-22; verified 453 files / 13.66 MB with 452 hashes and 0 problems |
 | I-21 | Harness default `-SourceBundle` was a developer-machine path | Closed | Installer | this commit |
 | I-22 | The PostgreSQL credential was exposed on disk and must be rotated | Closed | Owner | Closed 2026-10-22 — reset to the owner-supplied value. Temporary `pg_hba` trust entries, `ALTER ROLE` OK, original 5,649-byte `pg_hba.conf` restored with an identical SHA-256, scram login verified (`postgres super=true`); `backend\.env` and the Machine `PGPASSWORD` updated; PM2 restarted (new PIDs); `backup.bat` OK, 9,325,169 bytes. |
+| I-23 | The compiled wizard could not complete an install: `OnInitializeWizard` is never called, the `TEdit` casts are invalid, and `GetDateTimeString` is called with string separators | Closed | Installer | Fixed in 9de8853; driven end to end 2026-10-22 — engine log `install-20261022-213838.log` records database `cmms_wizard_test`, API `http://127.0.0.1:4111` and a scratch install root, health check 200, then the throwaway PM2 apps, database and directories were removed |
+| I-24 | A release bundle must carry the verified setup artifact and a manifest that covers it | Closed | Owner | Closed 2026-10-22 with tag `v1.6.3`: `CommandPulse-CMMS-v1.6.3` in `C:\Users\Injaz\Documents\Default Project` carries `Setup_CommandPulse.exe` at its root and a regenerated `SHA256SUMS.txt`; the previous bundle is preserved unchanged beside it |
 
 ## Closed history
 
 Rows are kept above so the whole workstream is visible in one place. This section records
 what a closure actually changed, in order, once the closing commit exists.
+
+- **I-23, 2026-10-22, `9de8853`.** `installer/wizard/CommandPulse.iss` gained a real
+  `InitializeWizard` procedure, sets page defaults and reads values through
+  `Page*.Values`, and calls `GetDateTimeString('hhmmss', #0, #0)`. The compiled wizard
+  was then driven through every page: the engine received the GUI values, the API
+  answered `/api/health` with 200, and the test database `cmms_wizard_test`, the prefixed
+  PM2 applications and the scratch install root were removed afterwards. The live `cmms`
+  database, `cmms-api` and `cmms-worker` were not touched.
+- **I-24, 2026-10-22, tag `v1.6.3`.** The bundle now carries the setup program it was
+  verified with. `CommandPulse-CMMS-v1.6.3` is assembled beside the preserved
+  `CommandPulse-CMMS-v1.6.2`: the two differ in `RELEASE_NOTES.md`,
+  `RELEASE_MANIFEST.md`, the added `Setup_CommandPulse.exe`, and `SHA256SUMS.txt`, which
+  is regenerated over every file including the executable and re-verified entry by entry
+  before handover.
