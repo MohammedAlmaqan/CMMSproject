@@ -30,7 +30,7 @@ and the table is wrong.
 | I-07 | Wizard shortcuts and uninstall icon point at files the wizard never installs | Closed | Installer | this commit |
 | I-08 | Wizard bundle-path default assumes the `.exe` sits inside the bundle | Closed | Installer | this commit |
 | I-09 | Harness verdict and throwaway database name are not persisted | Closed | Installer | this commit |
-| I-10 | No CI job covers `installer/` | Open | Installer | - |
+| I-10 | No CI job covers `installer/` | Closed | Installer | this commit |
 | I-11 | Existing `%ProgramData%\CommandPulse\logs` files hold the PostgreSQL password in plaintext | Open | Installer | - |
 | I-12 | `docs/GO_LIVE_CHECKLIST.md` says go-live has not happened and that the live DB is at 19/22 migrations | Open | Installer | - |
 | I-13 | `docs/CMMS_FINALIZATION_TRACKER.md` headline status and v1.1-23 backlog are stale | Open | Installer | - |
@@ -41,6 +41,7 @@ and the table is wrong.
 | I-18 | Throwaway databases left on the host: `cmms_cutover_clone`, `cmms_cutover_rehearsal`, `cmms_e2e`, `cmms_gate`, `cmms_gate_fresh`, `cmms_installer_test_983071564` | Open | Owner | - |
 | I-19 | Wizard compile path is not reproducible; `ISCC.exe` is only at `%LOCALAPPDATA%\Programs\Inno Setup 6` and `OutputDir` was a developer temp path | Closed | Installer | this commit |
 | I-20 | Release bundle contained the compiled `.exe` and was outside `SHA256SUMS.txt` | Closed | Owner | Exe moved out 2026-10-22; verified 453 files / 13.66 MB with 452 hashes and 0 problems |
+| I-21 | Harness default `-SourceBundle` was a developer-machine path | Closed | Installer | this commit |
 
 ## Closed history
 

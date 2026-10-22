@@ -14,7 +14,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$SourceBundle = "C:\Users\Injaz\Documents\Default Project\CommandPulse-CMMS-v1.6.2",
+  [string]$SourceBundle = "",
   [string]$PgHost = "localhost",
   [int]$PgPort = 5432,
   [string]$PgUser = "postgres",
@@ -51,6 +51,15 @@ function Get-PsqlPath {
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $engine = Join-Path $repoRoot "installer\install.ps1"
+if (-not $SourceBundle) {
+  # The published bundle is distributed beside the repository checkout, so the
+  # default is derived, not a developer-machine path.
+  $siblingBundle = Join-Path (Split-Path -Parent $repoRoot) "CommandPulse-CMMS-v1.6.2"
+  if (Test-Path -LiteralPath $siblingBundle) { $SourceBundle = $siblingBundle }
+}
+if (-not $SourceBundle) {
+  throw "No -SourceBundle supplied and no bundle found beside the repository. Pass -SourceBundle explicitly."
+}
 if (-not $PrismaEnginesPath) {
   # Default to the engines already downloaded in this repository's own
   # node_modules, so the test does not depend on binaries.prisma.sh.
