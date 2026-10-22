@@ -2,10 +2,17 @@
 
 This is the durable go-live checklist for CommandPulse CMMS. It records the steps that
 must be completed **at the go-live event**, as distinct from the acceptance milestone.
-Go-live has not happened yet: `v1.1.0` (`5e2c478`) is the acceptance snapshot and
-`v1.2.1` (`2313b02`, cut 2026-10-17) is the current deployment anchor. The steps below are
-forward-looking and are re-verified on the target host, not assumed from the rehearsal
-host.
+Go-live **happened on 2026-10-17**. `v1.1.0` (`5e2c478`) is the acceptance snapshot;
+`v1.2.1` (`2313b02`) was the deployment anchor at cutover; `v1.6.2` (`a8a4223`) is the
+current code anchor. The steps below were executed on this host and each item carries its
+recorded evidence.
+
+*Superseded 2026-10-22 - pointer, original kept: this paragraph read "Go-live has not
+happened yet: `v1.1.0` (`5e2c478`) is the acceptance snapshot and `v1.2.1` (`2313b02`, cut
+2026-10-17) is the current deployment anchor. The steps below are forward-looking and are
+re-verified on the target host, not assumed from the rehearsal host." The cutover ran on
+2026-10-17: 20,333 of 20,333 rows created, 0 rejected, one transaction
+(`docs/migration-templates/CUTOVER_REPORT_LIVE.md`).*
 
 *Superseded 2026-10-17 - pointer, original kept: this line read "`v1.2.0` (`a995e77`) is
 the current deployment anchor". `v1.2.0` is now historical and is not moved, nor are
@@ -83,14 +90,17 @@ position is a deployment step recorded here, not a reopening of the row.
    accepted for the backup task — and a pre-logon boot task would need a stored password or
    an S4U principal. *Superseded open check (kept): no `dump.pm2` on this host.*
 
-5. **Apply the pending migrations to the live `cmms` database.** The live `cmms`
-   database is behind the repository schema by **three** migrations — not one. Applied:
-   19 of 22. Pending: `20261009120000_status_and_type_check_constraints` (C15),
+5. **Apply the pending migrations to the live `cmms` database.** *Closed 2026-10-22.* The
+   live `cmms` database has **22 of 22** finished migrations; the three that were pending
+   at cutover - `20261009120000_status_and_type_check_constraints` (C15),
    `20261014120000_refresh_token_last_used` (**the C1 migration**), and
-   `20261015120000_alert_type_scheduler_stale`. Apply them with `prisma migrate deploy`
-   as part of the cutover (or as the pre-migration step in `migration-runbook.md` §3).
-   *Verified: live `cmms` lacks `RefreshToken.lastUsedAt`, the `WorkOrder_status_check`
-   constraint and the widened `SystemAlert_alertType_check`.*
+   `20261015120000_alert_type_scheduler_stale` - are all recorded `applied` in
+   `_prisma_migrations`, verified read-only against `cmms` (39 public tables).
+   *Superseded 2026-10-22 - pointer, original kept: this item read "The live `cmms`
+   database is behind the repository schema by **three** migrations - not one. Applied:
+   19 of 22. Pending: ... *Verified: live `cmms` lacks `RefreshToken.lastUsedAt`, the
+   `WorkOrder_status_check` constraint and the widened `SystemAlert_alertType_check`.*"
+   The cutover applied them on 2026-10-17.*
 
 6. **Hosts entry for `cmms.local` on the target host.** `127.0.0.1 cmms.local` is already
    present in this host's hosts file; add the same line on the target host if it differs.
