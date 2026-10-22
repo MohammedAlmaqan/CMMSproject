@@ -1,11 +1,34 @@
-# CommandPulse CMMS Installer (Engine Only)
+# CommandPulse CMMS installer
 
-This directory contains the installer engine for a blank CMMS instance.
-The wizard (.exe) is not included yet; run the engine directly with PowerShell.
+This directory contains the installer for a blank CMMS instance, in three layers:
 
-The engine is a single self-contained script with no dependency on the wizard.
-It is parameterised end to end, so the same engine can later be driven by an
-Inno Setup `.iss` wrapper, by a CI job, or by an IT runbook.
+| Layer | Path | What it is |
+|---|---|---|
+| Engine | `install.ps1` | One self-contained PowerShell script: detect-and-report preflight, bundle integrity, copy, `.env`, npm/Prisma/migrate, PM2, health. |
+| Harness | `tests\run-tests.ps1` | Runs the engine against a throwaway database and asserts the contract. Never part of a production install. |
+| Wizard | `wizard\CommandPulse.iss` | Inno Setup 6 wrapper that collects the parameters and calls the engine. |
+
+The wizard is optional: the engine is parameterised end to end, so the same script
+runs from the wizard, from an IT runbook, or from a CI job.
+
+The wizard refuses the database name `cmms` and a database page whose name is empty,
+validates the API port range, and stops with a non-zero engine exit code instead of
+reporting a successful install. The engine itself also refuses an API port that is
+already listening, so the health check cannot be answered by another service.
+
+## Build the wizard
+
+`build-wizard.ps1` locates `ISCC.exe` (on `PATH`, in `%LOCALAPPDATA%\Programs\Inno Setup 6`,
+or in Program Files) and compiles to `installer\out\`:
+
+```powershell
+& ".\installer\build-wizard.ps1"
+# or: & ".\installer\build-wizard.ps1" -OutputDir "D:\build\cmms" -IsccPath "C:\path\to\ISCC.exe"
+```
+
+The compiled `Setup_CommandPulse.exe` is gitignored. It is **not** part of the release
+bundle and is **not** listed in the bundle's `SHA256SUMS.txt`; distribute it *next to*
+the extracted bundle folder, which is the wizard's default bundle path.
 
 ## Quick start (blank install)
 ```powershell
