@@ -51,6 +51,7 @@ Name: "{app}\installer\out"
 
 [Code]
 var
+  PwFileToDelete: String;
   PageBundle: TInputQueryWizardPage;
   PageDB: TInputQueryWizardPage;
   PageApp: TInputQueryWizardPage;
@@ -171,14 +172,22 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
+  TmpResult: Integer;
   Cmd: String;
   PwFile: String;
 begin
   if CurStep = ssPostInstall then
   begin
-    // Write password to secure temp file, set env var, run engine
-    PwFile := ExpandConstant('{tmp}\cmms_pgpass.tmp');
+    // The password reaches the engine through a file because Inno cannot hand a
+    // SecureString to a child process. The file is random-named, ACL-restricted
+    // to the installing account, and deleted after the engine exits and again
+    // in DeinitializeSetup if setup is aborted in between.
+    PwFile := ExpandConstant('{tmp}\cmms_pgpass_' + GetDateTimeString('hhmmss', '', '') + '.tmp');
+    PwFileToDelete := PwFile;
     SaveStringToFile(PwFile, EditPgPass.Text, False);
+    Exec(ExpandConstant('{sys}\icacls.exe'),
+         '"' + PwFile + '" /inheritance:r /grant:r "' + GetUserNameString() + ':R"',
+         '', SW_HIDE, ewWaitUntilTerminated, TmpResult);
     
     Cmd := 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + 
            ExpandConstant('{app}\installer\wizard\scripts\Invoke-InstallerWizard.ps1') + '" ' +
@@ -211,6 +220,13 @@ begin
     end;
   end;
 end;
+
+procedure DeinitializeSetup();
+begin
+  if PwFileToDelete <> '' then
+    DeleteFile(PwFileToDelete);
+end;
+
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\installer\install.ps1"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
