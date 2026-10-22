@@ -1,389 +1,719 @@
 #requires -version 5.1
 <#
 .SYNOPSIS
-  CommandPulse CMMS Installer Engine (engine-only). 
+  CommandPulse CMMS installer engine.
+
 .DESCRIPTION
-  Installs a blank CMMS instance from a compiled bundle. No downloads, no bundled runtimes.
-  Uses dynamic ACLs (SYSTEM, BUILTIN\Administrators, current user). Never touches live cmms.
+  Installs a BLANK CommandPulse CMMS instance from a compiled release bundle.
+  It reproduces, unattended, the procedure documented in IT_DEPLOYMENT_GUIDE.md
+  section 5: preflight, integrity verification, file copy, .env generation,
+  dependency install, Prisma client generation, schema migration, PM2 start and
+  a first-run health check.
+
+  Design rules:
+    * Detect-and-report for prerequisites. The engine never downloads or installs
+      Node.js, PostgreSQL, PM2 or IIS. Missing hard prerequisites abort with the
+      fix; missing optional ones are warnings.
+    * No developer-machine paths anywhere. Every input is a parameter or comes
+      from the supplied bundle, so the engine runs unchanged on a client server.
+    * Secrets are never written to the log and never echoed to the console.
+    * The live `cmms` database is never a target: the engine only ever writes to
+      the database named by -DbName.
+
 .PARAMETER SourceBundle
-  Path to extracted bundle (must contain backend/, frontend/, ops/, docs/, SHA256SUMS.txt).
+  Path to the extracted release bundle. Must contain backend/, frontend/, ops/,
+  docs/ and SHA256SUMS.txt.
+
 .PARAMETER InstallRoot
-  Target install root (default C:\CMMS).
+  Directory the application is installed into.
+
 .PARAMETER PgHost
-  PostgreSQL host (default localhost).
+  PostgreSQL host. Default localhost.
+
 .PARAMETER PgPort
-  PostgreSQL port (default 5432).
+  PostgreSQL port. Default 5432.
+
 .PARAMETER PgUser
-  PostgreSQL user (default postgres).
+  PostgreSQL role used by the application. Default postgres.
+
 .PARAMETER PgPassword
-  PostgreSQL password (required for full/migrate steps).
+  PostgreSQL password as a SecureString. Alternatively set -PgPasswordEnv to the
+  name of an environment variable holding it, or leave both unset in
+  interactive mode to be prompted (the input is masked).
+
+.PARAMETER PgPasswordEnv
+  Name of an environment variable holding the PostgreSQL password.
+
 .PARAMETER DbName
-  Database name (default cmms).
+  Database the application connects to. Default cmms.
+
+.PARAMETER ApiPort
+  TCP port the API listens on. Default 4000. The value is written to .env AND
+  applied to the generated install-local PM2 ecosystem file, because the shipped
+  ecosystem.config.cjs pins PORT and PM2's ecosystem env wins over the process
+  environment.
+
+.PARAMETER BindHost
+  Address the API binds to. Default 127.0.0.1 (loopback, reverse-proxy only).
+
 .PARAMETER SiteName
-  IIS site name (default cmms).
-.PARAMETER HostHeader
-  Host header (default cmms.local).
+  Host name used for CORS and for the optional IIS site. Default cmms.local.
+
+.PARAMETER AppNamePrefix
+  Prefix for the names this install registers with PM2. The shipped names are
+  "cmms-api" and "cmms-worker"; with a prefix they become "<prefix>api" and
+  "<prefix>worker". Set this when the host already runs a CommandPulse CMMS
+  under PM2, or when more than one instance is installed side by side. On
+  Windows PM2 keeps a single daemon per user account, so the name is the only
+  thing that keeps two installs apart.
+
+.PARAMETER PrismaEnginesPath
+  Optional folder containing prebuilt Prisma engine binaries
+  (query_engine-windows.dll.node and schema-engine-windows.exe). When present
+  the engine copies them into the install so the installation does not depend
+  on downloading them from binaries.prisma.sh. When absent, the engine lets
+  npm/prisma fetch them and reports a clear error if that fails.
+
 .PARAMETER Mode
-  full | verify | uninstall
+  full   - install from the bundle (default)
+  verify - health-check an existing install only
+  uninstall - remove engine-created artifacts only; never drops the database
+
 .PARAMETER NonInteractive
-  Run without prompts.
+  Never prompt. Fails instead of asking.
 #>
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory=$false)] [string]$SourceBundle = "",
-  [Parameter(Mandatory=$false)] [string]$InstallRoot = "C:\CMMS",
-  [Parameter(Mandatory=$false)] [string]$PgHost = "localhost",
-  [Parameter(Mandatory=$false)] [int]$PgPort = 5432,
-  [Parameter(Mandatory=$false)] [string]$PgUser = "postgres",
-  [Parameter(Mandatory=$false)] [SecureString]$PgPassword,
-  [Parameter(Mandatory=$false)] [string]$PgPasswordPlain = "",
-  [Parameter(Mandatory=$false)] [string]$DbName = "cmms",
-  [Parameter(Mandatory=$false)] [string]$SiteName = "cmms",
-  [Parameter(Mandatory=$false)] [string]$HostHeader = "cmms.local",
-  [Parameter(Mandatory=$false)] [ValidateSet("full","verify","uninstall")] [string]$Mode = "full",
-  [Parameter(Mandatory=$false)] [switch]$NonInteractive,
-  [Parameter(Mandatory=$false)] [int]$AccessTokenTTL = 900,
-  [Parameter(Mandatory=$false)] [int]$RefreshTokenTTL = 28800,
-  [Parameter(Mandatory=$false)] [int]$SessionIdleMS = 1800000,
-  [Parameter(Mandatory=$false)] [int]$Port = 4000,
-  [Parameter(Mandatory=$false)] [string]$CorsOrigins = "",
-  [Parameter(Mandatory=$false)] [string]$LogLevel = "info",
-  [Parameter(Mandatory=$false)] [string]$BindHost = "127.0.0.1",
-  [Parameter(Mandatory=$false)] [string]$PMSchedulerCron = "0 2 * * *"
+  [string]$SourceBundle = "",
+  [string]$InstallRoot = "C:\CMMS",
+  [string]$PgHost = "localhost",
+  [int]$PgPort = 5432,
+  [string]$PgUser = "postgres",
+  [SecureString]$PgPassword,
+  [string]$PgPasswordEnv = "",
+  [string]$DbName = "cmms",
+  [int]$ApiPort = 4000,
+  [string]$BindHost = "127.0.0.1",
+  [string]$SiteName = "cmms.local",
+  [string]$CorsOrigins = "",
+  [string]$AppNamePrefix = "",
+  [string]$PrismaEnginesPath = "",
+  [ValidateSet("full","verify","uninstall")][string]$Mode = "full",
+  [int]$AccessTokenTTL = 900,
+  [int]$RefreshTokenTTL = 28800,
+  [int]$SessionIdleMs = 1800000,
+  [string]$LogLevel = "info",
+  [string]$PMSchedulerCron = "0 2 * * *",
+  [switch]$NonInteractive
 )
 
 $ErrorActionPreference = "Stop"
+# Native command output is decoded with the console output encoding. On
+# Windows PowerShell 5.1 that defaults to the OEM code page, which turns the
+# box-drawing characters PM2 uses into mojibake. The tools write UTF-8.
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 $script:LogDir = Join-Path $env:ProgramData "CommandPulse\logs"
 New-Item -ItemType Directory -Force -Path $script:LogDir | Out-Null
-$ts = (Get-Date).ToString("yyyyMMdd-HHmmss")
-$script:LogFile = Join-Path $script:LogDir "install-$ts.log"
+$script:RunStamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
+$script:LogFile = Join-Path $script:LogDir "install-$script:RunStamp.log"
+
+# ---------------------------------------------------------------- logging ---
 
 function Log {
-  param([string]$Level, [string]$Msg)
-  $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [$Level] $Msg"
+  param([string]$Level, [string]$Message)
+  $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [$Level] $Message"
   Write-Host $line
-  try { Add-Content -Path $script:LogFile -Value $line -Encoding UTF8 } catch {}
+  try { Add-Content -LiteralPath $script:LogFile -Value $line -Encoding UTF8 } catch { }
 }
 
-function Get-PgPasswordPlain {
-  if ($PgPasswordPlain -and $PgPasswordPlain -ne "") { return $PgPasswordPlain }
+# PM2 colours its output with ANSI escape sequences. They make the log
+# unreadable and they break any attempt to parse the output, so they are
+# removed before the text is used. The escape character is built from its
+# code point: writing it as a literal in the source would depend on how the
+# file is read.
+$script:AnsiRegex = [string][char]27 + '\[[0-9;?]*[ -/]*[@-~]'
+
+function Remove-Ansi {
+  param([string]$Text)
+  if (-not $Text) { return $Text }
+  return [regex]::Replace($Text, $script:AnsiRegex, "")
+}
+
+# ------------------------------------------------------- external commands ---
+
+# Runs a native command with a hard timeout while streaming its output into the
+# install log. A hung child (a stalled npm download, for example) is killed
+# rather than leaving the wizard looking frozen.
+function Invoke-External {
+  param(
+    [Parameter(Mandatory)][string]$FilePath,
+    [string[]]$ArgumentList = @(),
+    [string]$WorkingDirectory = "",
+    [int]$TimeoutSeconds = 1800,
+    [string]$LogTag = "EXEC",
+    [switch]$Quiet
+  )
+  $ts = (Get-Date).ToString("yyyyMMdd-HHmmss")
+  $outFile = Join-Path $script:LogDir "$LogTag-out-$ts.txt"
+  $errFile = Join-Path $script:LogDir "$LogTag-err-$ts.txt"
+  $startParams = @{
+    FilePath               = $FilePath
+    ArgumentList           = $ArgumentList
+    NoNewWindow            = $true
+    PassThru               = $true
+    RedirectStandardOutput = $outFile
+    RedirectStandardError  = $errFile
+  }
+  if ($WorkingDirectory) { $startParams["WorkingDirectory"] = $WorkingDirectory }
+  Log "INFO" "$LogTag : $FilePath $($ArgumentList -join ' ')"
+  $proc = Start-Process @startParams
+  # Touching .Handle caches the process handle. Without it, PowerShell can
+  # return a null ExitCode for a process that has already exited.
+  $null = $proc.Handle
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  $outPos = 0
+  $errPos = 0
+  while (-not $proc.HasExited) {
+    Start-Sleep -Milliseconds 700
+    foreach ($pair in @(@($outFile, [ref]$outPos, $LogTag), @($errFile, [ref]$errPos, "$LogTag-ERR"))) {
+      $f = $pair[0]; $posRef = $pair[1]; $tag = $pair[2]
+      if (-not (Test-Path $f)) { continue }
+      try {
+        $content = [System.IO.File]::ReadAllText($f)
+        if ($content.Length -gt $posRef.Value) {
+          $new = $content.Substring($posRef.Value)
+          $posRef.Value = $content.Length
+          foreach ($l in ($new -split "`r?`n")) {
+            if ($l -and $l.Trim() -ne "") { Log $tag $l }
+          }
+        }
+      } catch { }
+    }
+    if ((Get-Date) -gt $deadline) {
+      Log "ERR" "$LogTag timed out after $TimeoutSeconds seconds; terminating"
+      try { & taskkill /PID $proc.Id /T /F 2>&1 | Out-Null } catch { }
+      try { $proc.WaitForExit(10000) | Out-Null } catch { }
+      throw "$LogTag timed out after $TimeoutSeconds seconds."
+    }
+  }
+  $proc.WaitForExit()
+  $proc.Refresh()
+  foreach ($pair in @(@($outFile, [ref]$outPos, $LogTag), @($errFile, [ref]$errPos, "$LogTag-ERR"))) {
+    $f = $pair[0]; $posRef = $pair[1]; $tag = $pair[2]
+    if (-not (Test-Path $f)) { continue }
+    try {
+      $content = [System.IO.File]::ReadAllText($f)
+      if ($content.Length -gt $posRef.Value) {
+        $new = $content.Substring($posRef.Value)
+        $posRef.Value = $content.Length
+        foreach ($l in ($new -split "`r?`n")) {
+          if ($l -and $l.Trim() -ne "") { Log $tag $l }
+        }
+      }
+    } catch { }
+  }
+  $code = $proc.ExitCode
+  Log "INFO" "$LogTag exit code $code"
+  if ($Quiet) {
+    $lines = @()
+    if (Test-Path $outFile) { $lines += [System.IO.File]::ReadAllLines($outFile) }
+    if (Test-Path $errFile) { $lines += [System.IO.File]::ReadAllLines($errFile) }
+    return [pscustomobject]@{ ExitCode = $code; Lines = $lines }
+  }
+  return $code
+}
+
+function Get-CmdPath {
+  param([string[]]$Names)
+  foreach ($n in $Names) {
+    $c = Get-Command $n -ErrorAction SilentlyContinue
+    if ($c) { return $c.Source }
+  }
+  return $null
+}
+
+# ------------------------------------------------------------- credentials ---
+
+function Resolve-PgPassword {
   if ($PgPassword) {
     $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($PgPassword)
     try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }
   }
-  return $null
+  if ($PgPasswordEnv) {
+    $v = [Environment]::GetEnvironmentVariable($PgPasswordEnv)
+    if ($v) { return $v }
+    throw "Environment variable $PgPasswordEnv is not set."
+  }
+  if ($NonInteractive) { throw "No PostgreSQL password supplied (-PgPassword or -PgPasswordEnv) and -NonInteractive was specified." }
+  $secure = Read-Host -AsSecureString "PostgreSQL password for role '$PgUser'"
+  $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+  try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }
 }
 
+# ------------------------------------------------------------- preflight ----
+
 function Get-PsqlPath {
-  $cmd = Get-Command psql -ErrorAction SilentlyContinue
-  if ($cmd) { return $cmd.Source }
-  $cands = @(
+  $c = Get-Command psql -ErrorAction SilentlyContinue
+  if ($c) { return $c.Source }
+  foreach ($p in @(
     "C:\Program Files\PostgreSQL\18\bin\psql.exe",
     "C:\Program Files\PostgreSQL\17\bin\psql.exe",
     "C:\Program Files\PostgreSQL\16\bin\psql.exe",
-    "C:\Program Files\PostgreSQL\15\bin\psql.exe"
-  )
-  foreach ($c in $cands) { if (Test-Path $c) { return $c } }
+    "C:\Program Files\PostgreSQL\15\bin\psql.exe")) {
+    if (Test-Path $p) { return $p }
+  }
   return $null
 }
 
-function Get-CurrentUserSid {
-  $id = [System.Security.Principal.WindowsIdentity]::GetCurrent()
-  return $id.User.Value
-}
-
-function Get-CurrentUserName {
-  return [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-}
-
-function New-RandomJwtSecret {
-  $bytes = New-Object byte[] 48
-  [System.Security.Cryptography.RNGCryptoServiceProvider]::Create().GetBytes($bytes)
-  return [Convert]::ToBase64String($bytes)
-}
-
-function Test-Admin {
-  $id = [Security.Principal.WindowsIdentity]::GetCurrent()
-  $p = New-Object Security.Principal.WindowsPrincipal($id)
-  return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
-
-function Set-EnvFileAcl {
-  param([string]$EnvFile)
-  if (-not (Test-Path $EnvFile)) { throw "EnvFile not found: $EnvFile" }
-  Log "INFO" "Setting ACLs on $EnvFile (SYSTEM, Administrators, current user only)"
-  try {
-    $acl = Get-Acl -Path $EnvFile
-    $acl.SetAccessRuleProtection($true, $false) # remove inherited
-    $ruleSystem = New-Object System.Security.AccessControl.FileSystemAccessRule("NT AUTHORITY\SYSTEM","FullControl","Allow")
-    $ruleAdmin = New-Object System.Security.AccessControl.FileSystemAccessRule("BUILTIN\Administrators","FullControl","Allow")
-    $cur = Get-CurrentUserName
-    $ruleUser = New-Object System.Security.AccessControl.FileSystemAccessRule($cur,"FullControl","Allow")
-    $acl.SetAccessRule($ruleSystem)
-    $acl.SetAccessRule($ruleAdmin)
-    $acl.SetAccessRule($ruleUser)
-    Set-Acl -Path $EnvFile -AclObject $acl
-    Log "INFO" "ACLs applied for $cur"
-  } catch {
-    Log "WARN" "Failed to set ACLs: $($_.Exception.Message)"
-    throw
+function Test-Prerequisites {
+  Log "INFO" "=== Preflight (detect and report; nothing is installed) ==="
+  $hard = $false
+  $node = Get-CmdPath @("node.exe", "node")
+  if (-not $node) { Log "ERR" "Node.js not found. Install Node.js 24 LTS from https://nodejs.org/ and re-run."; $hard = $true }
+  else {
+    $v = (& $node --version 2>&1 | Select-Object -First 1)
+    Log "OK" "Node.js $v"
+    if ("$v" -notmatch '^v(2[4-9]|[3-9][0-9])\.') { Log "WARN" "Node.js 24 LTS or newer is recommended; found $v" }
   }
+  $npm = Get-CmdPath @("npm.cmd", "npm")
+  if (-not $npm) { Log "ERR" "npm not found. It ships with Node.js."; $hard = $true } else { Log "OK" "npm $(& $npm --version 2>&1 | Select-Object -First 1)" }
+  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
+  if (-not $pm2) { Log "WARN" "PM2 not found. Install it with: npm install -g pm2" } else { Log "OK" "PM2 at $pm2" }
+  $psql = Get-PsqlPath
+  if (-not $psql) { Log "ERR" "psql not found. Install PostgreSQL 15+ and add its bin folder to PATH."; $hard = $true }
+  else { Log "OK" "psql $psql ($(& $psql --version 2>&1 | Select-Object -First 1))" }
+  if (Test-Path "$env:windir\System32\inetsrv\appcmd.exe") { Log "OK" "IIS detected" } else { Log "WARN" "IIS not detected. The API still installs; serving the frontend via IIS is a separate step." }
+  if (Test-Path "$env:windir\System32\inetsrv\rewrite.dll") { Log "OK" "IIS URL Rewrite detected" } else { Log "WARN" "IIS URL Rewrite not detected. Required only if the frontend is served through IIS." }
+  $arr = Get-ChildItem "C:\Program Files" -Filter "*Application Request Routing*" -Directory -ErrorAction SilentlyContinue
+  if ($arr) { Log "OK" "IIS Application Request Routing detected" } else { Log "WARN" "IIS Application Request Routing not detected. Required only for an IIS reverse proxy." }
+  if ($hard) { throw "Preflight failed. Fix the errors above and re-run the installer." }
+  Log "OK" "Preflight passed"
 }
 
-function Invoke-Preflight {
-  Log "INFO" "=== Preflight (detect-and-report only) ==="
-  $ok = $true
-  # Node
-  $node = Get-Command node -ErrorAction SilentlyContinue
-  if (-not $node) { Log "ERR" "Node.js not found"; $ok = $false } else {
-    $v = & node --version 2>&1
-    Log "OK" "node $v"
-    if ($v -notmatch 'v(2[4-9]|[3-9][0-9])\.') { Log "WARN" "Node < 24 may be unsupported" }
-  }
-  # npm
-  $npm = Get-Command npm -ErrorAction SilentlyContinue
-  if (-not $npm) { Log "ERR" "npm not found"; $ok = $false } else { Log "OK" "npm $(& npm --version 2>&1)" }
-  # pm2
-  $pm2 = Get-Command pm2 -ErrorAction SilentlyContinue
-  if (-not $pm2) { Log "WARN" "pm2 not found (global). Install with: npm install -g pm2" } else { Log "OK" "pm2 $(& pm2 --version 2>&1)" }
-  # psql
-  $psqlp = Get-PsqlPath
-  if (-not $psqlp) { Log "ERR" "psql not found on PATH or known locations"; $ok = $false } else { Log "OK" "psql: $psqlp"; $pv = & $psqlp --version 2>&1; Log "OK" "$pv" }
-  # IIS
-  if (Test-Path "$env:windir\System32\inetsrv\appcmd.exe") { Log "OK" "IIS appcmd found" } else { Log "WARN" "IIS not detected (optional)" }
-  if (Test-Path "$env:windir\System32\inetsrv\rewrite.dll") { Log "OK" "URL Rewrite detected" } else { Log "WARN" "URL Rewrite not detected (optional)" }
-  if (Test-Path "C:\Program Files\IIS Application Request Routing") { Log "OK" "ARR detected" } else { Log "WARN" "ARR not detected (optional)" }
-  # W3SVC
-  $w3 = Get-Service W3SVC -ErrorAction SilentlyContinue
-  if ($w3) { Log "OK" "W3SVC: $($w3.Status)" } else { Log "WARN" "W3SVC service not found" }
-  if (-not $ok) { throw "Preflight failed (see log). Hard stops: Node.js and PostgreSQL client tools." }
-  Log "INFO" "Preflight passed"
-}
+# ------------------------------------------------------------- integrity ----
 
 function Test-BundleIntegrity {
   param([string]$Bundle)
-  if (-not $Bundle -or -not (Test-Path $Bundle)) { throw "SourceBundle not specified or not found: $Bundle" }
+  if (-not $Bundle) { throw "No -SourceBundle was supplied." }
+  if (-not (Test-Path -LiteralPath $Bundle)) { throw "Source bundle not found: $Bundle" }
   $sha = Join-Path $Bundle "SHA256SUMS.txt"
-  if (-not (Test-Path $sha)) { throw "SHA256SUMS.txt not found in bundle: $sha" }
-  Log "INFO" "Verifying bundle integrity from $sha"
+  if (-not (Test-Path -LiteralPath $sha)) { throw "SHA256SUMS.txt not found in the bundle: $Bundle" }
+  Log "INFO" "Verifying bundle integrity"
+  $checked = 0
   $bad = 0
-  $count = 0
-  $lines = Get-Content $sha
-  foreach ($l in $lines) {
-    if ($l.Trim() -eq "") { continue }
-    # format: hash  path (two spaces)
-    $parts = $l -split '\s{2}', 2
+  foreach ($line in (Get-Content -LiteralPath $sha)) {
+    if (-not $line.Trim()) { continue }
+    $parts = $line -split '\s{2}', 2
     if ($parts.Count -ne 2) { continue }
-    $h = $parts[0].Trim().ToUpper()
-    $p = $parts[1].Trim()
-    $fp = Join-Path $Bundle $p
-    if (-not (Test-Path $fp)) { Log "WARN" "Missing file: $p"; $bad++; continue }
-    $calc = (Get-FileHash -Algorithm SHA256 -LiteralPath $fp).Hash.ToUpper()
-    $count++
-    if ($calc -ne $h) { Log "ERR" "MISMATCH: $p"; $bad++ }
+    $expected = $parts[0].Trim().ToUpperInvariant()
+    $rel = $parts[1].Trim()
+    $full = Join-Path $Bundle $rel
+    if (-not (Test-Path -LiteralPath $full)) { Log "ERR" "Missing from bundle: $rel"; $bad++; continue }
+    $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $full).Hash.ToUpperInvariant()
+    $checked++
+    if ($actual -ne $expected) { Log "ERR" "Checksum mismatch: $rel"; $bad++ }
   }
-  Log "INFO" "Integrity check: checked $count files, mismatches $bad"
-  if ($bad -gt 0) { throw "Bundle integrity failed ($bad mismatches)" }
-  Log "OK" "Bundle integrity OK"
+  Log "INFO" "Integrity check: $checked files verified, $bad problem(s)"
+  if ($bad -gt 0) { throw "Bundle integrity check failed ($bad problem(s)). Re-copy the bundle and try again." }
+  Log "OK" "Bundle integrity verified"
 }
+
+# ------------------------------------------------------------------ copy ----
 
 function Copy-Bundle {
   param([string]$Bundle, [string]$Root)
-  Log "INFO" "Copying bundle to $Root"
+  Log "INFO" "Copying application files to $Root"
   New-Item -ItemType Directory -Force -Path $Root | Out-Null
-  $items = @("backend","frontend","ops","docs","migration-templates")
-  foreach ($it in $items) {
-    $src = Join-Path $Bundle $it
-    if (Test-Path $src) {
-      Log "INFO" "  Copying $it"
-      Copy-Item -Path $src -Destination $Root -Recurse -Force
+  foreach ($item in @("backend", "frontend", "ops", "docs", "migration-templates")) {
+    $src = Join-Path $Bundle $item
+    if (Test-Path -LiteralPath $src) {
+      Copy-Item -LiteralPath $src -Destination $Root -Recurse -Force
+      Log "INFO" "  copied $item"
     } else {
-      Log "WARN" "  Missing $it in bundle (skipping)"
+      Log "WARN" "  bundle has no $item folder; skipped"
     }
   }
-  foreach ($f in @("RELEASE_NOTES.md","RELEASE_MANIFEST.md","SHA256SUMS.txt","IT_DEPLOYMENT_GUIDE.md")) {
-    $sf = Join-Path $Bundle $f
-    if (Test-Path $sf) { Copy-Item -Path $sf -Destination $Root -Force; Log "INFO" "  Copied $f" }
+  foreach ($f in @("RELEASE_NOTES.md", "RELEASE_MANIFEST.md", "SHA256SUMS.txt", "IT_DEPLOYMENT_GUIDE.md")) {
+    $src = Join-Path $Bundle $f
+    if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination $Root -Force; Log "INFO" "  copied $f" }
   }
-  # Never copy database/ or dumps
-  if (Test-Path (Join-Path $Root "database")) { Remove-Item -Recurse -Force (Join-Path $Root "database"); Log "INFO" "  Removed database/ (excluded)" }
+  # A blank instance must never receive a database dump or any client data.
+  # The `database\` folder is where a published bundle keeps a full dump; it is
+  # removed wholesale. Stray .sql files elsewhere are removed too, EXCEPT the
+  # Prisma migrations under backend\prisma\migrations\, which are the schema
+  # history the install needs in order to apply the database.
+  $dumpDir = Join-Path $Root "database"
+  if (Test-Path -LiteralPath $dumpDir) { Remove-Item -LiteralPath $dumpDir -Recurse -Force; Log "INFO" "  removed database\ (excluded: a blank instance carries no data)" }
+  Get-ChildItem -LiteralPath $Root -Recurse -File -Filter "*.sql" -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($_.FullName -match '[\\/]prisma[\\/]migrations[\\/]') { return }
+    Log "INFO" "  excluded dump file $($_.FullName)"
+    Remove-Item -LiteralPath $_.FullName -Force
+  }
+  # The published bundle ships backend\.env.deploy as a template. The install
+  # generates its own .env, so the template is not copied into the install root.
+  $deployTemplate = Join-Path $Root "backend\.env.deploy"
+  if (Test-Path -LiteralPath $deployTemplate) { Remove-Item -LiteralPath $deployTemplate -Force; Log "INFO" "  removed backend\.env.deploy (replaced by the generated .env)" }
 }
 
-function New-EnvFile {
-  param([string]$BackendDir, [string]$DbName)
-  Log "INFO" "Generating .env in $BackendDir"
-  $tmpl = Join-Path $PSScriptRoot "templates\backend.env.template"
-  if (-not (Test-Path $tmpl)) { throw "Template not found: $tmpl" }
-  $template = Get-Content $tmpl -Raw
-  $jwt = New-RandomJwtSecret
-  $cors = if ($CorsOrigins -and $CorsOrigins -ne "") { $CorsOrigins } else { "https://$HostHeader" }
-  $pgpw = Get-PgPasswordPlain
-  if (-not $pgpw) { $pgpw = "" }
-  # URL-encode password simply (common cases)
-  $pgpwEnc = [Uri]::EscapeDataString($pgpw)
-  $dbUrl = "postgresql://$PgUser`:$pgpwEnc@$PgHost`:$PgPort/$DbName`?connection_limit=20&pool_timeout=30000"
-  $envContent = $template
-  $envContent = $envContent.Replace("__DATABASE_URL__", $dbUrl)
-  $envContent = $envContent.Replace("__JWT_SECRET__", $jwt)
-  $envContent = $envContent.Replace("__ACCESS_TOKEN_TTL__", "$AccessTokenTTL")
-  $envContent = $envContent.Replace("__REFRESH_TOKEN_TTL__", "$RefreshTokenTTL")
-  $envContent = $envContent.Replace("__SESSION_IDLE_MS__", "$SessionIdleMS")
-  $envContent = $envContent.Replace("__PORT__", "$Port")
-  $envContent = $envContent.Replace("__CORS_ORIGINS__", $cors)
-  $envContent = $envContent.Replace("__LOG_LEVEL__", $LogLevel)
-  $envContent = $envContent.Replace("__BIND_HOST__", $BindHost)
-  $envContent = $envContent.Replace("__PM_SCHEDULER_CRON__", $PMSchedulerCron)
+# Build the folder the web server points at: the compiled frontend files and
+# web.config side by side, which is the arrangement the reverse proxy needs.
+function New-SiteFolder {
+  param([string]$Root)
+  $srcDist = Join-Path $Root "frontend\dist"
+  $srcWebConfig = Join-Path $Root "frontend\web.config"
+  $site = Join-Path $Root "site"
+  if (-not (Test-Path -LiteralPath $srcDist)) { Log "WARN" "frontend\dist not found; no site folder created"; return $null }
+  New-Item -ItemType Directory -Force -Path $site | Out-Null
+  Copy-Item -Path (Join-Path $srcDist "*") -Destination $site -Recurse -Force
+  if (Test-Path -LiteralPath $srcWebConfig) { Copy-Item -LiteralPath $srcWebConfig -Destination $site -Force }
+  Log "OK" "Site folder prepared at $site"
+  return $site
+}
+
+# ------------------------------------------------------------------ .env ----
+
+function New-BackendEnv {
+  param([string]$BackendDir, [string]$PlainPassword)
+  $template = Join-Path $PSScriptRoot "templates\backend.env.template"
+  if (-not (Test-Path -LiteralPath $template)) { throw "Env template not found: $template" }
+  $bytes = New-Object byte[] 48
+  [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+  $jwt = [Convert]::ToBase64String($bytes)
+  $encodedPassword = [Uri]::EscapeDataString($PlainPassword)
+  $dbUrl = "postgresql://$PgUser`:$encodedPassword@$PgHost`:$PgPort/$DbName`?connection_limit=20&pool_timeout=30000"
+  $cors = if ($CorsOrigins -and $CorsOrigins.Trim()) { $CorsOrigins.Trim() } else { "https://$SiteName" }
+  $content = [System.IO.File]::ReadAllText($template)
+  $content = $content.Replace("__DATABASE_URL__", $dbUrl)
+  $content = $content.Replace("__JWT_SECRET__", $jwt)
+  $content = $content.Replace("__ACCESS_TOKEN_TTL__", "$AccessTokenTTL")
+  $content = $content.Replace("__REFRESH_TOKEN_TTL__", "$RefreshTokenTTL")
+  $content = $content.Replace("__SESSION_IDLE_MS__", "$SessionIdleMs")
+  $content = $content.Replace("__PORT__", "$ApiPort")
+  $content = $content.Replace("__CORS_ORIGINS__", $cors)
+  $content = $content.Replace("__LOG_LEVEL__", $LogLevel)
+  $content = $content.Replace("__BIND_HOST__", $BindHost)
+  $content = $content.Replace("__PM_SCHEDULER_CRON__", $PMSchedulerCron)
   $envPath = Join-Path $BackendDir ".env"
-  if (Test-Path $envPath) {
-    $bak = "$envPath.bak.$ts"
-    Copy-Item $envPath $bak -Force
-    Log "INFO" "Backed up existing .env to $bak"
+  if (Test-Path -LiteralPath $envPath) {
+    $backup = "$envPath.bak.$script:RunStamp"
+    Copy-Item -LiteralPath $envPath -Destination $backup -Force
+    Log "INFO" "Existing .env backed up to $backup"
   }
-  [System.IO.File]::WriteAllText($envPath, $envContent)
-  Log "OK" "Wrote $envPath"
-  Set-EnvFileAcl -EnvFile $envPath
+  [System.IO.File]::WriteAllText($envPath, $content)
+  Log "OK" "Generated $envPath with a fresh random JWT secret"
+  Protect-EnvFile -EnvFile $envPath
   return $envPath
 }
 
-function Invoke-BackendSetup {
-  param([string]$BackendDir)
-  if (-not (Test-Path $BackendDir)) { throw "BackendDir not found: $BackendDir" }
-  Log "INFO" "=== Backend setup (npm ci, prisma generate, migrate deploy) ==="
-  $ts2 = (Get-Date).ToString("yyyyMMdd-HHmmss")
-  try {
-    Log "INFO" "Running npm ci --foreground-scripts (in $BackendDir)"
-    $npmCmd = (Get-Command npm.cmd -ErrorAction SilentlyContinue)
-    if (-not $npmCmd) { $npmCmd = (Get-Command npm -ErrorAction SilentlyContinue) }
-    $npxCmd = (Get-Command npx.cmd -ErrorAction SilentlyContinue)
-    if (-not $npxCmd) { $npxCmd = (Get-Command npx -ErrorAction SilentlyContinue) }
-    $outN = Join-Path $script:LogDir "npm-ci-out-$ts2.txt"
-    $errN = Join-Path $script:LogDir "npm-ci-err-$ts2.txt"
-    $p1 = Start-Process -FilePath $npmCmd.Source -ArgumentList "ci","--foreground-scripts" -WorkingDirectory $BackendDir -NoNewWindow -PassThru -Wait -RedirectStandardOutput $outN -RedirectStandardError $errN
-    if (Test-Path $outN) { Get-Content $outN | ForEach-Object { if ($_) { Log "NPM" $_ } } }
-    if (Test-Path $errN) { Get-Content $errN | ForEach-Object { if ($_) { Log "NPM-ERR" $_ } } }
-    if ($p1.ExitCode -ne 0) { throw "npm ci failed with code $($p1.ExitCode)" }
-    # Ensure Prisma engines present (bundle may not include them)
-    $srcPrismaClient = "C:\Users\Injaz\Documents\Default Project\CMMSproject\backend\node_modules\.prisma"
-    $dstPrismaClient = Join-Path $BackendDir "node_modules\.prisma"
-    if (Test-Path $srcPrismaClient) {
-      try { Copy-Item "$srcPrismaClient\*" $dstPrismaClient -Recurse -Force -ErrorAction SilentlyContinue; Log "INFO" "Ensured .prisma engines" } catch { Log "WARN" "Failed to copy .prisma: $($_.Exception.Message)" }
-    }
-    $srcAtPrisma = "C:\Users\Injaz\Documents\Default Project\CMMSproject\backend\node_modules\@prisma"
-    $dstAtPrisma = Join-Path $BackendDir "node_modules\@prisma"
-    if (Test-Path $srcAtPrisma) {
-      try { Copy-Item "$srcAtPrisma\*" $dstAtPrisma -Recurse -Force -ErrorAction SilentlyContinue; Log "INFO" "Ensured @prisma engines" } catch { Log "WARN" "Failed to copy @prisma: $($_.Exception.Message)" }
-    }
-    Log "INFO" "Running npx prisma generate"
-    $outP = Join-Path $script:LogDir "prisma-gen-out-$ts2.txt"
-    $errP = Join-Path $script:LogDir "prisma-gen-err-$ts2.txt"
-    $p2 = Start-Process -FilePath $npxCmd.Source -ArgumentList "prisma","generate" -WorkingDirectory $BackendDir -NoNewWindow -PassThru -Wait -RedirectStandardOutput $outP -RedirectStandardError $errP
-    if (Test-Path $outP) { Get-Content $outP | ForEach-Object { if ($_) { Log "PRISMA" $_ } } }
-    if (Test-Path $errP) { Get-Content $errP | ForEach-Object { if ($_) { Log "PRISMA-ERR" $_ } } }
-    if ($p2.ExitCode -ne 0) { throw "prisma generate failed with code $($p2.ExitCode)" }
-    Log "INFO" "Running npx prisma migrate deploy"
-    $outM = Join-Path $script:LogDir "prisma-migrate-out-$ts2.txt"
-    $errM = Join-Path $script:LogDir "prisma-migrate-err-$ts2.txt"
-    $p3 = Start-Process -FilePath $npxCmd.Source -ArgumentList "prisma","migrate","deploy" -WorkingDirectory $BackendDir -NoNewWindow -PassThru -Wait -RedirectStandardOutput $outM -RedirectStandardError $errM
-    if (Test-Path $outM) { Get-Content $outM | ForEach-Object { if ($_) { Log "MIGRATE" $_ } } }
-    if (Test-Path $errM) { Get-Content $errM | ForEach-Object { if ($_) { Log "MIGRATE-ERR" $_ } } }
-    if ($p3.ExitCode -ne 0) { 
-      Log "WARN" "prisma migrate deploy failed (exit $($p3.ExitCode)); trying prisma db push as fallback"
-      $outP2 = Join-Path $script:LogDir "prisma-push-out-$ts2.txt"
-      $errP2 = Join-Path $script:LogDir "prisma-push-err-$ts2.txt"
-      $p4 = Start-Process -FilePath $npxCmd.Source -ArgumentList "prisma","db","push","--accept-data-loss" -WorkingDirectory $BackendDir -NoNewWindow -PassThru -Wait -RedirectStandardOutput $outP2 -RedirectStandardError $errP2
-      if (Test-Path $outP2) { Get-Content $outP2 | ForEach-Object { if ($_) { Log "PUSH" $_ } } }
-      if (Test-Path $errP2) { Get-Content $errP2 | ForEach-Object { if ($_) { Log "PUSH-ERR" $_ } } }
-      if ($p4.ExitCode -ne 0) { throw "prisma db push failed with code $($p4.ExitCode)" }
-    }
-    Log "OK" "Backend setup complete"
-  } finally {
+# The installer's security control: the .env holds the only JWT signing key and
+# the database password, so it is readable by exactly three principals:
+# SYSTEM, BUILTIN\Administrators and the account running the installer. The
+# account is resolved at run time - it is never hardcoded - so the same
+# installer works on any client server under whatever local account the IT
+# administrator uses.
+function Protect-EnvFile {
+  param([string]$EnvFile)
+  $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+  $currentSid = $identity.User
+  $currentName = $identity.Name
+  Log "INFO" "Restricting $EnvFile to SYSTEM, BUILTIN\Administrators and $currentName"
+  $acl = New-Object System.Security.AccessControl.FileSecurity
+  $acl.SetAccessRuleProtection($true, $false)
+  $rights = [System.Security.AccessControl.FileSystemRights]::FullControl
+  $allow = [System.Security.AccessControl.AccessControlType]::Allow
+  foreach ($sid in @(
+      (New-Object System.Security.Principal.SecurityIdentifier("S-1-5-18")),
+      (New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-544")),
+      $currentSid)) {
+    $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($sid, $rights, $allow)))
   }
+  try { $acl.SetOwner($currentSid) } catch { Log "WARN" "Could not set the file owner: $($_.Exception.Message)" }
+  Set-Acl -LiteralPath $EnvFile -AclObject $acl
+  $verify = Get-Acl -LiteralPath $EnvFile
+  $trustees = @($verify.Access | ForEach-Object { $_.IdentityReference.Value })
+  $expected = @("NT AUTHORITY\SYSTEM", "BUILTIN\Administrators", $currentName)
+  $missing = @($expected | Where-Object { $trustees -notcontains $_ })
+  $extra = @($trustees | Where-Object { $expected -notcontains $_ })
+  if ($missing.Count -gt 0) { throw "Could not grant the required access to: $($missing -join ', ')" }
+  if ($extra.Count -gt 0) { throw "Unexpected access remains on the .env: $($extra -join ', ')" }
+  Log "OK" "Access restricted to: $($trustees -join ', ')"
 }
 
-function Invoke-Pm2Start {
-  param([string]$BackendDir)
-  Log "INFO" "=== PM2 start ==="
-  $pm2 = Get-Command pm2 -ErrorAction SilentlyContinue
-  if (-not $pm2) { throw "pm2 not found" }
-  Push-Location $BackendDir
-  try {
-    & pm2 start ecosystem.config.cjs 2>&1 | ForEach-Object { Log "PM2" $_ }
-    if ($LASTEXITCODE -ne 0) { Log "WARN" "pm2 start returned $LASTEXITCODE" }
-    & pm2 save 2>&1 | ForEach-Object { Log "PM2" $_ }
-    Start-Sleep -Seconds 3
-    & pm2 list 2>&1 | ForEach-Object { Log "PM2" $_ }
-    Log "OK" "PM2 commands executed"
-  } finally {
-    Pop-Location
-  }
+# ---------------------------------------------------------- PM2 ecosystem ---
+
+# The names this install registers with PM2.
+#
+# On Windows PM2 keeps a SINGLE daemon per user account. PM2_HOME relocates the
+# logs and dump.pm2 but it does NOT give a second daemon, so two installs on one
+# host share one process table. The application name is therefore the only
+# thing that keeps them apart: an install that reuses the shipped names
+# replaces whatever already holds them.
+function Get-AppNames {
+  param([string]$Prefix)
+  if ($Prefix) { return @("$Prefix" + "api", "$Prefix" + "worker") }
+  return @("cmms-api", "cmms-worker")
 }
 
-function Invoke-HealthCheck {
+# The shipped ecosystem.config.cjs pins PORT and BIND_HOST, and PM2 applies the
+# ecosystem env over the process environment. An install that needs a different
+# port therefore needs an install-local ecosystem file. The shipped file is left
+# untouched; this generated one imports it and overrides the API entry.
+#
+# The generated file MUST keep the ".config.cjs" naming. PM2 only treats a file
+# whose name follows that pattern as an ecosystem definition; a plain ".cjs"
+# file is started as an application script, which would start an app named after
+# the file, exit immediately, and look like a silent install failure.
+function New-InstallEcosystem {
+  param([string]$BackendDir)
+  $target = Join-Path $BackendDir "ecosystem.install.config.cjs"
+  $prefix = $AppNamePrefix
+  $js = @"
+module.exports = {
+  apps: require('./ecosystem.config.cjs').apps.map(function (app) {
+    var renamed = app.name;
+    if ('$prefix') {
+      var bare = app.name.indexOf('cmms-') === 0 ? app.name.substring(5) : app.name;
+      renamed = '$prefix' + bare;
+    }
+    var env = Object.assign({}, app.env);
+    if (app.name === 'cmms-api') { env.PORT = $ApiPort; env.BIND_HOST = '$BindHost'; }
+    return Object.assign({}, app, { name: renamed, env: env });
+  }),
+};
+"@
+  [System.IO.File]::WriteAllText($target, ($js -replace "`r?`n", "`n"))
+  Log "INFO" "Generated $target (PORT=$ApiPort, BIND_HOST=$BindHost, names: $((Get-AppNames -Prefix $prefix) -join ', '))"
+  return $target
+}
+
+# -------------------------------------------------------- backend setup -----
+
+function Install-PrismaEngines {
+  param([string]$BackendDir)
+  $clientDir = Join-Path $BackendDir "node_modules\.prisma\client"
+  $engineFile = Join-Path $clientDir "query_engine-windows.dll.node"
+  if (Test-Path -LiteralPath $engineFile) { Log "OK" "Prisma query engine already present"; return $true }
+  if (-not $PrismaEnginesPath) { return $false }
+  if (-not (Test-Path -LiteralPath $PrismaEnginesPath)) { Log "WARN" "PrismaEnginesPath does not exist: $PrismaEnginesPath"; return $false }
+  Log "INFO" "Copying Prisma engines from $PrismaEnginesPath"
+  New-Item -ItemType Directory -Force -Path $clientDir | Out-Null
+  foreach ($name in @("query_engine-windows.dll.node", "schema-engine-windows.exe", "libquery_engine-windows.dll.node", "query_engine_bg.js", "query_engine_bg.wasm")) {
+    $src = Join-Path $PrismaEnginesPath $name
+    if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination $clientDir -Force; Log "INFO" "  copied $name" }
+  }
+  $atPrisma = Join-Path $BackendDir "node_modules\@prisma\engines"
+  New-Item -ItemType Directory -Force -Path $atPrisma | Out-Null
+  foreach ($name in @("query_engine-windows.dll.node", "schema-engine-windows.exe")) {
+    $src = Join-Path $PrismaEnginesPath $name
+    if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination $atPrisma -Force }
+  }
+  if (Test-Path -LiteralPath $engineFile) { Log "OK" "Prisma engines installed"; return $true }
+  Log "WARN" "Prisma engines could not be installed from $PrismaEnginesPath"
+  return $false
+}
+
+function Install-Backend {
+  param([string]$BackendDir)
+  Log "INFO" "=== Backend setup ==="
+  $npm = Get-CmdPath @("npm.cmd", "npm")
+  $npx = Get-CmdPath @("npx.cmd", "npx")
+  if (-not $npm) { throw "npm not found" }
+  $code = Invoke-External -FilePath $npm -ArgumentList @("ci", "--foreground-scripts") -WorkingDirectory $BackendDir -TimeoutSeconds 1800 -LogTag "NPMCI"
+  if ($code -ne 0) { throw "npm ci failed with exit code $code" }
+  Log "OK" "Dependencies installed"
+  $enginesOk = Install-PrismaEngines -BackendDir $BackendDir
+  if (-not $npx) { throw "npx not found" }
+  $code = Invoke-External -FilePath $npx -ArgumentList @("prisma", "generate") -WorkingDirectory $BackendDir -TimeoutSeconds 900 -LogTag "PRISMA"
+  if ($code -ne 0) {
+    if ($enginesOk) { throw "prisma generate failed with exit code $code" }
+    throw "prisma generate failed with exit code $code. The Prisma engine binaries could not be downloaded from binaries.prisma.sh. Re-run with -PrismaEnginesPath pointing at a folder holding the prebuilt engines, on a host with access to binaries.prisma.sh, or copy node_modules\.prisma from a prepared install."
+  }
+  Log "OK" "Prisma client generated"
+  $code = Invoke-External -FilePath $npx -ArgumentList @("prisma", "migrate", "deploy") -WorkingDirectory $BackendDir -TimeoutSeconds 900 -LogTag "MIGRATE"
+  if ($code -ne 0) { throw "prisma migrate deploy failed with exit code $code" }
+  Log "OK" "Database schema applied"
+}
+
+# ------------------------------------------------------------- PM2 / app ----
+
+function Start-Application {
+  param([string]$BackendDir)
+  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
+  if (-not $pm2) { throw "PM2 not found. Install it with: npm install -g pm2" }
+  $ecosystem = New-InstallEcosystem -BackendDir $BackendDir
+  $names = Get-AppNames -Prefix $AppNamePrefix
+  Log "INFO" "=== Starting the application with PM2 ==="
+
+  # An install owns its own application names. If a previous install (or an
+  # unrelated process) already holds one of them in this PM2 daemon, it is
+  # replaced rather than left running alongside and fighting over the port.
+  foreach ($name in $names) {
+    $clash = Get-Pm2AppState -Pm2Path $pm2 -WorkingDir $backendDir -Name $name
+    if ($clash) {
+      Log "WARN" "PM2 already has an application named '$name' (status $($clash.Status)); replacing it"
+      Invoke-External -FilePath $pm2 -ArgumentList @("delete", $name) -WorkingDirectory $backendDir -TimeoutSeconds 120 -LogTag "PM2DEL" | Out-Null
+    }
+  }
+
+  $code = Invoke-External -FilePath $pm2 -ArgumentList @("start", $ecosystem) -WorkingDirectory $BackendDir -TimeoutSeconds 300 -LogTag "PM2START"
+  if ($code -ne 0) { Log "WARN" "pm2 start returned $code" }
+  $code = Invoke-External -FilePath $pm2 -ArgumentList @("save") -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2SAVE"
+  if ($code -ne 0) { Log "WARN" "pm2 save returned $code" }
+  Start-Sleep -Seconds 4
+  Invoke-External -FilePath $pm2 -ArgumentList @("list") -WorkingDirectory $BackendDir -TimeoutSeconds 60 -LogTag "PM2LIST" | Out-Null
+}
+
+# `pm2 jlist` cannot be used to read the process table here. PM2 returns the
+# full environment block of every application, and on Windows that block holds
+# keys that differ only in case (`username` and `USERNAME`). Windows
+# PowerShell 5.1 resolves dictionary keys case-insensitively and throws
+# "duplicated keys" on ConvertFrom-Json, so the JSON is unusable. The text
+# output of `pm2 describe` is parsed instead.
+# PM2 draws its `describe` table with box-drawing characters (U+2502) and
+# colours it with ANSI sequences. The status is read from the "status" row
+# after the colour codes are removed, and it is only accepted when it is a
+# status PM2 actually reports.
+function Get-Pm2StatusFromText {
+  param([string]$Text)
+  $clean = Remove-Ansi $Text
+  $line = ($clean -split "`r?`n" | Where-Object { $_ -match '\bstatus\b' } | Select-Object -First 1)
+  if (-not $line) { return "unknown" }
+  if ($line -match 'status[^A-Za-z0-9]*([A-Za-z]+)') {
+    $word = $Matches[1]
+    if ($word -match '^(online|stopped|errored|launching|launched|created|deleting|zombie|unknown|waiting)$') { return $word }
+  }
+  return "unknown"
+}
+
+function Get-Pm2AppState {
+  param([string]$Pm2Path, [string]$WorkingDir, [string]$Name)
+  $desc = Invoke-External -FilePath $Pm2Path -ArgumentList @("describe", $Name) -WorkingDirectory $WorkingDir -TimeoutSeconds 60 -LogTag "PM2DESC" -Quiet
+  $text = Remove-Ansi (($desc.Lines -join "`n"))
+  if ($desc.ExitCode -ne 0 -or $text -match "doesn't exist") { return $null }
+  $status = Get-Pm2StatusFromText -Text $text
+  $procId = 0
+  $pidOut = Invoke-External -FilePath $Pm2Path -ArgumentList @("pid", $Name) -WorkingDirectory $WorkingDir -TimeoutSeconds 30 -LogTag "PM2PID" -Quiet
+  $pidText = (($pidOut.Lines -join "`n")).Trim()
+  if ($pidText -match '^\d+$') { $procId = [int]$pidText }
+  return [pscustomobject]@{ Name = $Name; Status = $status; Pid = $procId }
+}
+
+function Test-Pm2Apps {
+  param([string]$Pm2Path, [string]$WorkingDir)
+  $expected = Get-AppNames -Prefix $AppNamePrefix
+  $allOnline = $true
+  foreach ($name in $expected) {
+    $app = Get-Pm2AppState -Pm2Path $Pm2Path -WorkingDir $WorkingDir -Name $name
+    if (-not $app) { Log "ERR" "PM2 has no application named '$name'"; $allOnline = $false; continue }
+    if ($app.Status -ne "online") {
+      Log "ERR" "PM2 application '$name' is '$($app.Status)', not 'online'"
+      $allOnline = $false
+    } else {
+      Log "OK" "PM2 application '$name' is online (pid $($app.Pid))"
+    }
+  }
+  return $allOnline
+}
+
+function Test-Health {
+  param([int]$Port)
   Log "INFO" "=== Health check ==="
-  try {
-    $r = Invoke-WebRequest -Uri "http://localhost:4000/api/health" -UseBasicParsing -TimeoutSec 30
-    Log "OK" "http://localhost:4000/api/health -> $($r.StatusCode)"
-    Log "INFO" $r.Content
-    return $true
-  } catch {
-    Log "WARN" "Health check failed: $($_.Exception.Message)"
-    return $false
+  $url = "http://127.0.0.1:$Port/api/health"
+  for ($i = 1; $i -le 12; $i++) {
+    try {
+      $resp = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 20
+      if ($resp.StatusCode -eq 200) {
+        Log "OK" "$url returned 200"
+        Log "INFO" "  body: $($resp.Content)"
+        return $true
+      }
+    } catch {
+      Log "INFO" "  attempt $i of 12: $($_.Exception.Message)"
+    }
+    Start-Sleep -Seconds 5
   }
+  Log "ERR" "The API did not answer on $url. Check the logs in $InstallRoot\backend\logs."
+  return $false
 }
+
+# ------------------------------------------------------------ uninstall -----
 
 function Invoke-Uninstall {
   param([string]$Root)
   Log "INFO" "=== Uninstall (engine-created artifacts only) ==="
-  if (-not (Test-Path $Root)) { Log "WARN" "InstallRoot not found: $Root"; return }
-  # Stop pm2 apps if running from this backend
-  $bdir = Join-Path $Root "backend"
-  if (Test-Path $bdir) {
-    Push-Location $bdir
-    try { & pm2 delete cmms-api cmms-worker 2>&1 | ForEach-Object { Log "PM2" $_ } } catch {}
-    try { & pm2 save 2>&1 | ForEach-Object { Log "PM2" $_ } } catch {}
-    Pop-Location
+  $backendDir = Join-Path $Root "backend"
+  if (Test-Path -LiteralPath $backendDir) {
+    $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
+    if ($pm2) {
+      # Only this install's own application names are deleted. `pm2 kill` is
+      # deliberately NOT used: on Windows it would stop every application in
+      # the daemon, including ones this install does not own.
+      $names = Get-AppNames -Prefix $AppNamePrefix
+      Invoke-External -FilePath $pm2 -ArgumentList (@("delete") + $names) -WorkingDirectory $backendDir -TimeoutSeconds 120 -LogTag "PM2DEL" | Out-Null
+      Invoke-External -FilePath $pm2 -ArgumentList @("save") -WorkingDirectory $backendDir -TimeoutSeconds 60 -LogTag "PM2SAVE" | Out-Null
+    }
   }
-  Log "WARN" "Uninstall does not drop the database. Remove files manually if desired: $Root"
-  Log "INFO" "Uninstall complete"
+  if (Test-Path -LiteralPath $Root) {
+    Log "WARN" "Removing $Root"
+    Remove-Item -LiteralPath $Root -Recurse -Force
+  }
+  Log "WARN" "The database '$DbName' was NOT dropped. Remove it yourself if it is no longer needed."
+  Log "OK" "Uninstall complete"
 }
 
-# Main
-try {
-  Log "INFO" "CommandPulse CMMS Installer Engine starting (Mode: $Mode)"
-  Log "INFO" "InstallRoot: $InstallRoot | Bundle: $SourceBundle | DB: $DbName@$PgHost`:$PgPort"
-  Log "INFO" "Current user: $(Get-CurrentUserName)"
+# ------------------------------------------------------------------ main ----
 
-  if (-not (Test-Admin)) {
-    Log "WARN" "Not running as Administrator. Some steps (ACLs, PM2 system tasks) may fail."
-  }
+try {
+  Log "INFO" "CommandPulse CMMS installer engine starting (mode: $Mode)"
+  Log "INFO" "Install root : $InstallRoot"
+  Log "INFO" "Bundle       : $SourceBundle"
+  Log "INFO" "Database     : $DbName on $PgHost`:$PgPort as $PgUser"
+  Log "INFO" "API endpoint : http://$BindHost`:$ApiPort"
+  Log "INFO" "Identity     : $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"
 
   if ($Mode -eq "verify") {
-    Invoke-HealthCheck
-    Log "INFO" "Engine finished (verify)"
-    exit 0
+    if (Test-Health -Port $ApiPort) { Log "INFO" "Engine finished (verify)"; exit 0 }
+    Log "ERR" "Health check failed"; exit 2
   }
 
   if ($Mode -eq "uninstall") {
     Invoke-Uninstall -Root $InstallRoot
-    Log "INFO" "Engine finished (uninstall)"
-    exit 0
+    Log "INFO" "Engine finished (uninstall)"; exit 0
   }
 
-  # full
-  Invoke-Preflight
+  Test-Prerequisites
   Test-BundleIntegrity -Bundle $SourceBundle
   Copy-Bundle -Bundle $SourceBundle -Root $InstallRoot
-  $bdir = Join-Path $InstallRoot "backend"
-  $envp = New-EnvFile -BackendDir $bdir -DbName $DbName
-  Invoke-BackendSetup -BackendDir $bdir
-  Invoke-Pm2Start -BackendDir $bdir
-  $hc = Invoke-HealthCheck
-  if (-not $hc) { Log "WARN" "Health check did not return 200 yet; check PM2 logs in $bdir\logs" }
-  Log "INFO" "Engine finished (full). Log: $script:LogFile"
-  exit 0
-} catch {
+
+  $backendDir = Join-Path $InstallRoot "backend"
+  if (-not (Test-Path -LiteralPath $backendDir)) { throw "The bundle has no backend\ folder; $InstallRoot is not a valid install root." }
+  New-SiteFolder -Root $InstallRoot | Out-Null
+  New-Item -ItemType Directory -Force -Path (Join-Path $backendDir "logs") | Out-Null
+  New-Item -ItemType Directory -Force -Path (Join-Path $backendDir "uploads") | Out-Null
+
+  $plainPassword = Resolve-PgPassword
+  New-BackendEnv -BackendDir $backendDir -PlainPassword $plainPassword | Out-Null
+  $plainPassword = $null
+
+  Install-Backend -BackendDir $backendDir
+  Start-Application -BackendDir $backendDir
+
+  # `pm2 start` exits 0 even when an application crashes on its first tick, so
+  # the process table is checked before the health check. A stopped application
+  # is reported as a failed install rather than being left to time out.
+  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
+  $appsOnline = Test-Pm2Apps -Pm2Path $pm2 -WorkingDir $backendDir
+
+  $healthy = Test-Health -Port $ApiPort
+
+  Log "INFO" "Install log: $script:LogFile"
+  if (-not $appsOnline) { Log "ERR" "The PM2 applications are not all online. See the log for the PM2 output."; exit 3 }
+  if ($healthy) { Log "INFO" "Engine finished (full)"; exit 0 }
+  Log "ERR" "The installation completed but the API is not answering yet."; exit 3
+}
+catch {
   Log "ERR" $_.Exception.Message
-  Log "ERR" $_.ScriptStackTrace
-  Log "INFO" "Engine failed. Log: $script:LogFile"
+  if ($_.ScriptStackTrace) { Log "ERR" $_.ScriptStackTrace }
+  Log "INFO" "Install log: $script:LogFile"
   exit 1
 }
