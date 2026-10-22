@@ -36,6 +36,8 @@ function Assert-True {
   param([string]$Name, [bool]$Condition, [string]$Detail = "")
   if ($Condition) { $script:Passes++; Write-Host "  PASS  $Name" -ForegroundColor Green }
   else { $script:Failures += "$Name $Detail"; Write-Host "  FAIL  $Name $Detail" -ForegroundColor Red }
+  $verdict = if ($Condition) { "PASS" } else { "FAIL" }
+  Write-Summary "$verdict $Name $Detail"
 }
 
 function Get-PsqlPath {
@@ -59,20 +61,43 @@ $scratch = Join-Path $env:TEMP ("cmms-installer-test-" + (Get-Date -Format "yyyy
 $installRoot = Join-Path $scratch "install"
 $pm2Home = Join-Path $scratch "pm2-home"
 $dbName = "cmms_installer_test_" + (Get-Random)
-$psql = Get-PsqlPath
-if (-not $psql) { throw "psql not found" }
-if (-not $PgPassword) { $PgPassword = $env:PGPASSWORD }
-if (-not $PgPassword) { throw "No PostgreSQL password supplied (-PgPassword or PGPASSWORD env)" }
 
-Write-Host "=== CommandPulse CMMS installer engine tests ===" -ForegroundColor Cyan
-Write-Host "scratch : $scratch"
-Write-Host "database: $dbName (throwaway)"
+# The engine logs to %ProgramData%\CommandPulse\logs. The harness writes its
+# verdict next to those logs: a PASS/FAIL line printed to a console is not
+# evidence once the window closes. The throwaway database name is recorded in
+# the first block so the verdict and the engine log can be tied together.
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$summaryRoot = if ($env:ProgramData) { Join-Path $env:ProgramData "CommandPulse\logs" } else { $scratch }
+New-Item -ItemType Directory -Force -Path $summaryRoot | Out-Null
+$script:SummaryFile = Join-Path $summaryRoot "installer-test-$stamp.log"
+function Write-Summary {
+  param([string]$Line)
+  try { Add-Content -LiteralPath $script:SummaryFile -Value $Line -Encoding UTF8 } catch { }
+}
 
 # A unique PM2 application name prefix. PM2 on Windows has one daemon per
 # user, so the prefix is what keeps the test off the live CMMS application
 # names.
 $appPrefix = "cmmstest" + (Get-Random -Minimum 100000 -Maximum 999999) + "-"
 $testAppNames = @("$($appPrefix)api", "$($appPrefix)worker")
+
+Write-Host "=== CommandPulse CMMS installer engine tests ===" -ForegroundColor Cyan
+Write-Host "scratch : $scratch"
+Write-Host "database: $dbName (throwaway)"
+Write-Host "summary : $script:SummaryFile"
+
+Write-Summary "=== CommandPulse CMMS installer engine tests ==="
+Write-Summary "started   : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+Write-Summary "scratch   : $scratch"
+Write-Summary "database  : $dbName (throwaway)"
+Write-Summary "pm2 prefix: $appPrefix"
+Write-Summary "bundle    : $SourceBundle"
+Write-Summary "port      : $TestPort"
+
+$psql = Get-PsqlPath
+if (-not $psql) { Write-Summary "ERROR: psql not found"; throw "psql not found" }
+if (-not $PgPassword) { $PgPassword = $env:PGPASSWORD }
+if (-not $PgPassword) { Write-Summary "ERROR: no PostgreSQL password supplied"; throw "No PostgreSQL password supplied (-PgPassword or PGPASSWORD env)" }
 
 # An isolated PM2_HOME relocates PM2's logs and dump.pm2. It does NOT create a
 # second daemon, so it is not isolation on its own.
@@ -210,6 +235,11 @@ try {
   $liveCount = (& $psql -U $PgUser -h $PgHost -p $PgPort -d cmms -At -c "select count(*) from pg_tables where schemaname='public';" 2>$null | Select-Object -First 1)
   Assert-True "live cmms schema count unchanged (39)" ([int]$liveCount -eq 39) "(got $liveCount)"
 }
+catch {
+  Write-Summary "ERROR: $($_.Exception.Message)"
+  Write-Host "summary : $script:SummaryFile"
+  throw
+}
 finally {
   Write-Host "`n-- cleanup --" -ForegroundColor Cyan
   $env:PM2_HOME = $pm2Home
@@ -232,6 +262,9 @@ finally {
 }
 
 Write-Host "`n=== RESULT: $($script:Passes) passed, $($script:Failures.Count) failed ===" -ForegroundColor Cyan
+Write-Summary "finished  : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+Write-Summary "RESULT: $($script:Passes) passed, $($script:Failures.Count) failed"
+Write-Host "summary : $script:SummaryFile"
 if ($script:Failures.Count -gt 0) {
   $script:Failures | ForEach-Object { Write-Host "  FAILED: $_" -ForegroundColor Red }
   exit 1

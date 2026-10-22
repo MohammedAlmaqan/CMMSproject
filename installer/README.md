@@ -128,3 +128,8 @@ scratch install root, then asserts the contract. It gives the install a unique
 PM2 application name prefix and deletes only those names afterwards; it never
 runs `pm2 kill`, and it asserts that the live `cmms-api` / `cmms-worker` are
 untouched and still serving.
+
+The verdict is written to `%ProgramData%\CommandPulse\logs\installer-test-<timestamp>.log`
+next to the engine log. That file starts with the throwaway database name and the
+PM2 prefix, then records every assertion and the final `RESULT:` line, so a run
+is auditable after the console closes.
