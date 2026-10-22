@@ -199,6 +199,16 @@ begin
     Exec(ExpandConstant('{sys}\cmd.exe'), '/c ' + Cmd, '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
     
     DeleteFile(PwFile);
+    // The engine reports failure with a non-zero exit code. Reporting that as a
+    // successful install is the exact failure mode the engine logs showed nine
+    // times, so the wizard stops instead of finishing.
+    if ResultCode <> 0 then
+    begin
+      MsgBox('The installer engine failed with exit code ' + IntToStr(ResultCode) + '.' + #13#10 +
+             'Review the logs in %ProgramData%\CommandPulse\logs and re-run the wizard.',
+             mbError, MB_OK);
+      Abort;
+    end;
   end;
 end;
 [Icons]

@@ -24,7 +24,7 @@ and the table is wrong.
 | I-01 | Engine log can carry a child process environment block, including `PGPASSWORD` | Closed | Installer | this commit |
 | I-02 | Engine claims the live `cmms` database "is never a target" while defaulting `-DbName` to `cmms` | Closed | Installer | this commit |
 | I-03 | Wizard defaults the database name to `cmms` and the API port to `4000`, both of which collide with the live host | Closed | Installer | Default changed to `cmms_install` and `cmms` refused in 678c0fb; occupied-port guard and wizard port validation in this commit |
-| I-04 | Wizard ignores the engine exit code and can report success after a failed install | Open | Installer | - |
+| I-04 | Wizard ignores the engine exit code and can report success after a failed install | Closed | Installer | this commit |
 | I-05 | Wizard writes the PostgreSQL password to an unrestricted plaintext temp file | Open | Installer | - |
 | I-06 | Wizard payload ships the engine test harness to the production target | Open | Installer | - |
 | I-07 | Wizard shortcuts and uninstall icon point at files the wizard never installs | Open | Installer | - |
