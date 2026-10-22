@@ -57,10 +57,13 @@ begin
   // Bundle page
   PageBundle := CreateInputQueryPage(wpWelcome,
     'Source Bundle', 'Select the CommandPulse CMMS bundle location',
-    'Provide the full path to the extracted bundle containing SHA256SUMS.txt. The Setup program is normally distributed next to that folder.');
+    'Provide the full path to the extracted bundle containing SHA256SUMS.txt. The Setup program is distributed beside that folder or inside it.');
   PageBundle.Add('&Bundle Path:', False);
   PageBundle.Add('&Install Root:', False);
-  PageBundle.Values[0] := ExpandConstant('{src}\{#BundleDir}');
+  if DirExists(ExpandConstant('{src}\{#BundleDir}')) then
+    PageBundle.Values[0] := ExpandConstant('{src}\{#BundleDir}')
+  else
+    PageBundle.Values[0] := ExpandConstant('{src}');
   PageBundle.Values[1] := ExpandConstant('{pf}\CommandPulse\CMMS');
 
   // Database page

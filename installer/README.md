@@ -28,7 +28,9 @@ or in Program Files) and compiles to `installer\out\`:
 
 The compiled `Setup_CommandPulse.exe` is gitignored. It is **not** part of the release
 bundle and is **not** listed in the bundle's `SHA256SUMS.txt`; distribute it *next to*
-the extracted bundle folder, which is the wizard's default bundle path.
+the extracted bundle folder. The wizard looks for `<setup folder>\CommandPulse-CMMS-v<version>`
+first and falls back to the setup program's own folder, so it also works when the setup
+program is placed inside the bundle.
 
 ## Quick start (blank install)
 ```powershell
