@@ -21,7 +21,7 @@ and the table is wrong.
 
 | ID | Concern | State | Owner | Evidence |
 |---|---|---|---|---|
-| I-01 | Engine log can carry a child process environment block, including `PGPASSWORD` | Open | Installer | - |
+| I-01 | Engine log can carry a child process environment block, including `PGPASSWORD` | Closed | Installer | this commit |
 | I-02 | Engine claims the live `cmms` database "is never a target" while defaulting `-DbName` to `cmms` | Open | Installer | - |
 | I-03 | Wizard defaults the database name to `cmms` and the API port to `4000`, both of which collide with the live host | Open | Installer | - |
 | I-04 | Wizard ignores the engine exit code and can report success after a failed install | Open | Installer | - |

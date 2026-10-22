@@ -122,6 +122,7 @@ $script:LogFile = Join-Path $script:LogDir "install-$script:RunStamp.log"
 function Log {
   param([string]$Level, [string]$Message)
   $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [$Level] $Message"
+  $line = Redact-Secrets $line
   Write-Host $line
   try { Add-Content -LiteralPath $script:LogFile -Value $line -Encoding UTF8 } catch { }
 }
@@ -137,6 +138,47 @@ function Remove-Ansi {
   param([string]$Text)
   if (-not $Text) { return $Text }
   return [regex]::Replace($Text, $script:AnsiRegex, "")
+}
+
+# ------------------------------------------------------------- redaction ---
+
+# The engine resolves the PostgreSQL password into memory to build DATABASE_URL.
+# A native tool that echoes its own environment would put the value in the log:
+# PM2's `jlist` did exactly that. Every line and every captured output file is
+# passed through Redact-Secrets, and the value is registered as soon as it is
+# resolved. The patterns below are a second line of defence for the shapes a
+# credential takes in tool output, so a future command that prints one is
+# scrubbed even if it was never registered.
+$script:Secrets = New-Object System.Collections.Generic.List[string]
+
+function Add-Secret {
+  param([string]$Value)
+  if ($Value -and $Value.Length -ge 4 -and -not $script:Secrets.Contains($Value)) {
+    $script:Secrets.Add($Value) | Out-Null
+  }
+}
+
+function Redact-Secrets {
+  param([string]$Text)
+  if (-not $Text) { return $Text }
+  foreach ($s in $script:Secrets) {
+    if ($s) { $Text = $Text.Replace($s, "***") }
+  }
+  $Text = [regex]::Replace($Text, '(?i)(PGPASSWORD\s*[=:]\s*)\S+', '$1***')
+  $Text = [regex]::Replace($Text, '(?i)(postgres(?:ql)?://[^:/@\s]+:)[^@\s]+(@)', '$1***$2')
+  $Text = [regex]::Replace($Text, '(?i)("(?:password|pgpassword)"\s*:\s*")[^"]+(")', '$1***$2')
+  return $Text
+}
+
+function Redact-File {
+  param([string]$File)
+  if (-not $File -or $script:Secrets.Count -eq 0) { return }
+  if (-not (Test-Path -LiteralPath $File)) { return }
+  try {
+    $raw = [System.IO.File]::ReadAllText($File)
+    $clean = Redact-Secrets $raw
+    if ($clean -ne $raw) { [System.IO.File]::WriteAllText($File, $clean) }
+  } catch { }
 }
 
 # ------------------------------------------------------- external commands ---
@@ -214,6 +256,11 @@ function Invoke-External {
   }
   $code = $proc.ExitCode
   Log "INFO" "$LogTag exit code $code"
+  # The streamed lines were redacted on the way into the log; the captured
+  # files are scrubbed here so a tool that dumped its environment leaves no
+  # copy behind.
+  Redact-File $outFile
+  Redact-File $errFile
   if ($Quiet) {
     $lines = @()
     if (Test-Path $outFile) { $lines += [System.IO.File]::ReadAllLines($outFile) }
@@ -692,6 +739,7 @@ try {
   New-Item -ItemType Directory -Force -Path (Join-Path $backendDir "uploads") | Out-Null
 
   $plainPassword = Resolve-PgPassword
+  Add-Secret $plainPassword
   New-BackendEnv -BackendDir $backendDir -PlainPassword $plainPassword | Out-Null
   $plainPassword = $null
 
