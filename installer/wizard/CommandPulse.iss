@@ -1,0 +1,189 @@
+; CommandPulse CMMS Installer Wizard (Layer 2)
+; Wraps the tested installer/install.ps1 engine
+; Compiles to Setup_CommandPulse.exe (do NOT commit .exe)
+
+#define MyAppName "CommandPulse CMMS"
+#define MyAppVersion "1.6.2"
+#define MyAppPublisher "CommandPulse"
+#define MyAppURL "https://github.com/MohammedAlmaqan/CMMSproject"
+
+[Setup]
+AppId={{B8F3E9A2-7C42-4D81-9B26-8A1E7F42C956}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+AppPublisherURL={#MyAppURL}
+AppSupportURL={#MyAppURL}
+AppUpdatesURL={#MyAppURL}
+DefaultDirName={pf}\CommandPulse\CMMS
+DefaultGroupName={#MyAppName}
+AllowNoIcons=yes
+OutputDir=C:\Users\Injaz\AppData\Local\Temp\opencode\dist
+OutputBaseFilename=Setup_CommandPulse
+Compression=lzma2
+SolidCompression=yes
+WizardStyle=modern
+PrivilegesRequired=admin
+SetupLogging=yes
+UninstallDisplayIcon={app}\backend\dist\index.js
+
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
+[Files]
+; Engine and supporting files
+Source: "..\install.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
+Source: "..\README.md"; DestDir: "{app}\installer"; Flags: ignoreversion
+Source: "..\templates\*"; DestDir: "{app}\installer\templates"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\tests\*"; DestDir: "{app}\installer\tests"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Wizard orchestration script
+Source: "scripts\Invoke-InstallerWizard.ps1"; DestDir: "{app}\installer\wizard\scripts"; Flags: ignoreversion
+; Bundle placeholder (IT will provide or use existing)
+Source: ".gitkeep"; DestDir: "{app}\bundle"; Flags: ignoreversion
+Source: ".gitkeep"; DestDir: "{app}\installer\wizard"; Flags: ignoreversion
+
+[Dirs]
+Name: "{app}\bundle"
+Name: "{app}\installer\out"
+
+[Code]
+var
+  PageBundle: TInputQueryWizardPage;
+  PageDB: TInputQueryWizardPage;
+  PageApp: TInputQueryWizardPage;
+  PagePM2: TInputQueryWizardPage;
+  
+  EditBundle: TEdit;
+  EditInstallRoot: TEdit;
+  EditPgHost: TEdit;
+  EditPgPort: TEdit;
+  EditPgUser: TEdit;
+  EditPgPass: TEdit;
+  EditDbName: TEdit;
+  EditApiPort: TEdit;
+  EditBindHost: TEdit;
+  EditSiteName: TEdit;
+  EditAppPrefix: TEdit;
+  EditPrismaPath: TEdit;
+  EditCors: TEdit;
+
+function OnInitializeWizard(): Boolean;
+begin
+  // Bundle page
+  PageBundle := CreateInputQueryPage(wpWelcome,
+    'Source Bundle', 'Select the CommandPulse CMMS bundle location',
+    'Provide the full path to the extracted bundle containing SHA256SUMS.txt.');
+  PageBundle.Add('&Bundle Path:', False);
+  PageBundle.Add('&Install Root:', False);
+  EditBundle := TEdit(PageBundle.Edits[0]);
+  EditInstallRoot := TEdit(PageBundle.Edits[1]);
+  EditBundle.Text := ExpandConstant('{src}\..\CommandPulse-CMMS-v1.6.2');
+  EditInstallRoot.Text := ExpandConstant('{pf}\CommandPulse\CMMS');
+
+  // Database page
+  PageDB := CreateInputQueryPage(PageBundle.ID,
+    'PostgreSQL Configuration', 'Configure the database connection',
+    'Use a throwaway database for testing. The engine will never target the live cmms database.');
+  PageDB.Add('&Host:', False);
+  PageDB.Add('&Port:', False);
+  PageDB.Add('&User:', False);
+  PageDB.Add('&Password:', True);
+  PageDB.Add('&Database Name:', False);
+  EditPgHost := TEdit(PageDB.Edits[0]); EditPgHost.Text := 'localhost';
+  EditPgPort := TEdit(PageDB.Edits[1]); EditPgPort.Text := '5432';
+  EditPgUser := TEdit(PageDB.Edits[2]); EditPgUser.Text := 'postgres';
+  EditPgPass := TEdit(PageDB.Edits[3]); EditPgPass.PasswordChar := '*';
+  EditDbName := TEdit(PageDB.Edits[4]); EditDbName.Text := 'cmms';
+
+  // App page
+  PageApp := CreateInputQueryPage(PageDB.ID,
+    'Application Settings', 'Configure API and site settings',
+    'BindHost should remain 127.0.0.1 for security.');
+  PageApp.Add('API &Port:', False);
+  PageApp.Add('&Bind Host:', False);
+  PageApp.Add('Site &Name:', False);
+  PageApp.Add('CORS &Origins (optional):', False);
+  EditApiPort := TEdit(PageApp.Edits[0]); EditApiPort.Text := '4000';
+  EditBindHost := TEdit(PageApp.Edits[1]); EditBindHost.Text := '127.0.0.1';
+  EditSiteName := TEdit(PageApp.Edits[2]); EditSiteName.Text := 'cmms.local';
+  EditCors := TEdit(PageApp.Edits[3]); EditCors.Text := '';
+
+  // PM2/Prisma page
+  PagePM2 := CreateInputQueryPage(PageApp.ID,
+    'PM2 & Prisma Settings', 'Advanced options for multi-instance or offline installs',
+    'Use App Name Prefix if running alongside an existing CMMS instance on the same Windows user.');
+  PagePM2.Add('PM2 App &Name Prefix (optional):', False);
+  PagePM2.Add('Prisma Engines &Path (optional):', False);
+  EditAppPrefix := TEdit(PagePM2.Edits[0]); EditAppPrefix.Text := '';
+  EditPrismaPath := TEdit(PagePM2.Edits[1]); EditPrismaPath.Text := '';
+
+  Result := True;
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  // Basic validation
+  if CurPageID = PageDB.ID then
+  begin
+    if EditPgPass.Text = '' then
+    begin
+      MsgBox('PostgreSQL password is required.', mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+  if CurPageID = PageBundle.ID then
+  begin
+    if EditBundle.Text = '' then
+    begin
+      MsgBox('Source bundle path is required.', mbError, MB_OK);
+      Result := False;
+    end;
+    if EditInstallRoot.Text = '' then
+    begin
+      MsgBox('Install root is required.', mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+  Cmd: String;
+  PwFile: String;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    // Write password to secure temp file, set env var, run engine
+    PwFile := ExpandConstant('{tmp}\cmms_pgpass.tmp');
+    SaveStringToFile(PwFile, EditPgPass.Text, False);
+    
+    Cmd := 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + 
+           ExpandConstant('{app}\installer\wizard\scripts\Invoke-InstallerWizard.ps1') + '" ' +
+           '-BundlePath "' + EditBundle.Text + '" ' +
+           '-InstallRoot "' + EditInstallRoot.Text + '" ' +
+           '-PgHost "' + EditPgHost.Text + '" ' +
+           '-PgPort "' + EditPgPort.Text + '" ' +
+           '-PgUser "' + EditPgUser.Text + '" ' +
+           '-PgPassFile "' + PwFile + '" ' +
+           '-DbName "' + EditDbName.Text + '" ' +
+           '-ApiPort "' + EditApiPort.Text + '" ' +
+           '-BindHost "' + EditBindHost.Text + '" ' +
+           '-SiteName "' + EditSiteName.Text + '" ' +
+           '-CorsOrigins "' + EditCors.Text + '" ' +
+           '-AppNamePrefix "' + EditAppPrefix.Text + '" ' +
+           '-PrismaEnginesPath "' + EditPrismaPath.Text + '"';
+    
+    Exec(ExpandConstant('{sys}\cmd.exe'), '/c ' + Cmd, '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
+    
+    DeleteFile(PwFile);
+  end;
+end;
+[Icons]
+Name: "{group}\{#MyAppName}"; Filename: "{app}\installer\install.ps1"
+Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
+Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\installer\install.ps1"; Tasks: desktopicon
