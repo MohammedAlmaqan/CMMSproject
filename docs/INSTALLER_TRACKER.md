@@ -42,7 +42,7 @@ and the table is wrong.
 | I-19 | Wizard compile path is not reproducible; `ISCC.exe` is only at `%LOCALAPPDATA%\Programs\Inno Setup 6` and `OutputDir` was a developer temp path | Closed | Installer | this commit |
 | I-20 | Release bundle contained the compiled `.exe` and was outside `SHA256SUMS.txt` | Closed | Owner | Exe moved out 2026-10-22; verified 453 files / 13.66 MB with 452 hashes and 0 problems |
 | I-21 | Harness default `-SourceBundle` was a developer-machine path | Closed | Installer | this commit |
-| I-22 | The PostgreSQL credential was exposed on disk and must be rotated | Open | Owner | - |
+| I-22 | The PostgreSQL credential was exposed on disk and must be rotated | Closed | Owner | Closed 2026-10-22 — reset to the owner-supplied value. Temporary `pg_hba` trust entries, `ALTER ROLE` OK, original 5,649-byte `pg_hba.conf` restored with an identical SHA-256, scram login verified (`postgres super=true`); `backend\.env` and the Machine `PGPASSWORD` updated; PM2 restarted (new PIDs); `backup.bat` OK, 9,325,169 bytes. |
 
 ## Closed history
 
