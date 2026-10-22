@@ -309,6 +309,11 @@ CMMSproject/
 │   │   └── seed.ts             # guarded demo seed
 │   └── tests/                  # 88 test files + 3 support = 91 tracked
 ├── scripts/                    # Windows batch scripts, k6, verify scripts
+├── installer/                  # standalone installer: engine, wizard, harness
+│   ├── install.ps1             # the engine (build, migrate, install, PM2)
+│   ├── wizard/                 # Inno Setup wrapper
+│   ├── tests/                  # engine harness + tracker check
+│   └── build-wizard.ps1        # reproducible ISCC compile
 ├── docs/                        # all documentation; the root .md files are README.md, RELEASE_NOTES.md and AGENTS.md
 │   ├── CMMS_FINALIZATION_TRACKER.md
 │   ├── INSTALLATION_GUIDE.md
@@ -322,3 +327,4 @@ CMMSproject/
 - `RELEASE_NOTES.md` — what changed in each release, most recent first.
 - `docs/INSTALLATION_GUIDE.md` — full Windows/IIS deployment, PM2, backup/restore, and k6 instructions.
 - `docs/CMMS_FINALIZATION_TRACKER.md` — per-phase status, verification evidence, and deferred items.
+- `docs/INSTALLER_TRACKER.md` — installer workstream status and the evidence for each closed item.
