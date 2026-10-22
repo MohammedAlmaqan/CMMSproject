@@ -37,7 +37,7 @@ and the table is wrong.
 | I-14 | `docs/DECISION_REGISTER.md` still names `v1.2.1` as the current deployment anchor | Closed | Installer | this commit |
 | I-15 | `docs/HANDOFF.md` state block predates v1.5/v1.6 and the installer workstream | Closed | Installer | this commit |
 | I-16 | `README.md` project layout omits `installer/` | Closed | Installer | this commit |
-| I-17 | `RELEASE_NOTES.md` has no installer entry | Open | Installer | - |
+| I-17 | `RELEASE_NOTES.md` has no installer entry | Closed | Installer | this commit |
 | I-18 | Throwaway databases left on the host: `cmms_cutover_clone`, `cmms_cutover_rehearsal`, `cmms_e2e`, `cmms_gate`, `cmms_gate_fresh`, `cmms_installer_test_983071564` | Open | Owner | - |
 | I-19 | Wizard compile path is not reproducible; `ISCC.exe` is only at `%LOCALAPPDATA%\Programs\Inno Setup 6` and `OutputDir` was a developer temp path | Closed | Installer | this commit |
 | I-20 | Release bundle contained the compiled `.exe` and was outside `SHA256SUMS.txt` | Closed | Owner | Exe moved out 2026-10-22; verified 453 files / 13.66 MB with 452 hashes and 0 problems |

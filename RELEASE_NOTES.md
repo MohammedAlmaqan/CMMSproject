@@ -4,6 +4,32 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## Unreleased — installer workstream
+
+The standalone installer under `installer/` is tracked in
+`docs/INSTALLER_TRACKER.md`. This entry records the corrective work; it is not
+tagged.
+
+- **Credentials are redacted from install logs**, and logs written before the
+  fix are scrubbed by `installer/tools/Redact-InstallerLogs.ps1` (report by
+  default, `-Apply` to rewrite). `474490f`, `a812729`.
+- **The engine states that `cmms` is its default target** instead of claiming the
+  live database is never touched. `e64ed82`.
+- **The wizard no longer defaults to the live database** (`cmms_install`, with
+  `cmms` refused), refuses a port that is already serving, aborts when the engine
+  fails, hands the password over in a randomly named ACL-locked temp file, ships
+  no test harness and no shortcuts to files it does not install, resolves the
+  default bundle beside Setup, and builds reproducibly into `installer/out`.
+  `678c0fb`, `5b32a30`, `2000964`, `1a845dd`, `75a4146`, `bfc0a24`, `851520f`,
+  `51ed695`.
+- **The harness persists its verdict** next to the engine log and derives the
+  bundle path instead of hardcoding a developer machine. `4caab81`, `ac26583`.
+- **CI has an Installer job**: every `installer/*.ps1` must parse, no `C:\Users\`
+  developer path may appear, and the tracker must validate. `ac26583`.
+- **Docs reconciled with the live host**: go-live ran 2026-10-17, `cmms` is 22/22
+  migrations, the finalization tracker headline is current, and the decision
+  register names `v1.6.2` (`a8a4223`) as the code anchor.
+
 ## v1.6.2
 
 A security patch: one code default made fail-safe, and the filesystem access to
