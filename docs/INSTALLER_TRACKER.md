@@ -34,7 +34,7 @@ and the table is wrong.
 | I-11 | Existing `%ProgramData%\CommandPulse\logs` files hold the PostgreSQL password in plaintext | Closed | Installer | this commit; `tools\Redact-InstallerLogs.ps1 -Apply` redacted 80 occurrences in 8 files, re-scan clean |
 | I-12 | `docs/GO_LIVE_CHECKLIST.md` says go-live has not happened and that the live DB is at 19/22 migrations | Closed | Installer | this commit |
 | I-13 | `docs/CMMS_FINALIZATION_TRACKER.md` headline status and v1.1-23 backlog are stale | Closed | Installer | this commit; G.1 marked resolved by G.6, Phase F counts labelled historical with the R.8 recount, v1.1-23 recorded as partly delivered |
-| I-14 | `docs/DECISION_REGISTER.md` still names `v1.2.1` as the current deployment anchor | Open | Installer | - |
+| I-14 | `docs/DECISION_REGISTER.md` still names `v1.2.1` as the current deployment anchor | Closed | Installer | this commit |
 | I-15 | `docs/HANDOFF.md` state block predates v1.5/v1.6 and the installer workstream | Open | Installer | - |
 | I-16 | `README.md` project layout omits `installer/` | Open | Installer | - |
 | I-17 | `RELEASE_NOTES.md` has no installer entry | Open | Installer | - |

@@ -305,6 +305,10 @@ delegated.
    The current deployment anchor is `v1.2.1`, cut 2026-10-17 at `2313b02` (annotated tag object
    `882965d`), carrying the 2026-10-16 verification reconciliation and the section-3 matrix
    count fix on top of `v1.2.0`. `v1.2.0`, `v1.1.0` and `v1.0.0` are not moved or re-cut.*
+   *Superseded 2026-10-22 — pointer, original kept; the sentence above was written 2026-10-17.
+   `v1.2.1` remains the tag go-live ran from on 2026-10-17. The current code anchor is `v1.6.2`,
+   cut 2026-10-21 at `a8a4223`; no later tag has been deployed. `v1.2.1`, `v1.2.0`, `v1.1.0` and
+   `v1.0.0` are not moved or re-cut.*
 
 ### 6.4 Flagged items - answered 2026-09-26
 
