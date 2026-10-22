@@ -145,6 +145,14 @@ begin
       Result := False;
     end;
   end;
+  if CurPageID = PageApp.ID then
+  begin
+    if (StrToIntDef(Trim(EditApiPort.Text), 0) < 1) or (StrToIntDef(Trim(EditApiPort.Text), 0) > 65535) then
+    begin
+      MsgBox('API port must be a number between 1 and 65535.', mbError, MB_OK);
+      Result := False;
+    end;
+  end;
   if CurPageID = PageBundle.ID then
   begin
     if EditBundle.Text = '' then

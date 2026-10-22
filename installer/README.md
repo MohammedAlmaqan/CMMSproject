@@ -42,7 +42,7 @@ visible in the process list. Supply it either as a `SecureString`
 | `-Mode` | `full` | `full`, `verify` or `uninstall` |
 
 ## Modes
-- `full` - preflight, verify bundle, copy files, generate .env (ACL-locked), npm ci, prisma generate, prisma migrate deploy, pm2 start+save, verify health.
+- `full` - preflight, verify bundle, copy files, generate .env (ACL-locked), npm ci, prisma generate, prisma migrate deploy, pm2 start+save, verify health. It refuses an API port that is already listening, so the health check cannot be answered by another service.
 - `verify` - run health checks against an existing install (no file copy, no migrations).
 - `uninstall` - remove engine-created artifacts only (does not drop the database).
 

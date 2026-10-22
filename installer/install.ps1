@@ -56,7 +56,8 @@
   TCP port the API listens on. Default 4000. The value is written to .env AND
   applied to the generated install-local PM2 ecosystem file, because the shipped
   ecosystem.config.cjs pins PORT and PM2's ecosystem env wins over the process
-  environment.
+  environment. In `full` mode the engine refuses a port that is already
+  listening: otherwise the health check could be answered by another service.
 
 .PARAMETER BindHost
   Address the API binds to. Default 127.0.0.1 (loopback, reverse-proxy only).
@@ -303,6 +304,24 @@ function Resolve-PgPassword {
 }
 
 # ------------------------------------------------------------- preflight ----
+
+# A blank install must own its API port. Without this check the health test can
+# be satisfied by an unrelated service already listening there - on the live
+# host, `cmms-api` itself - and a failed install would look successful.
+function Test-PortInUse {
+  param([int]$Port)
+  $client = New-Object System.Net.Sockets.TcpClient
+  try {
+    $iar = $client.BeginConnect("127.0.0.1", $Port, $null, $null)
+    if (-not $iar.AsyncWaitHandle.WaitOne(2000)) { return $false }
+    $client.EndConnect($iar)
+    return $true
+  } catch {
+    return $false
+  } finally {
+    try { $client.Close() } catch { }
+  }
+}
 
 function Get-PsqlPath {
   $c = Get-Command psql -ErrorAction SilentlyContinue
@@ -737,6 +756,10 @@ try {
   }
 
   Test-Prerequisites
+  if (Test-PortInUse -Port $ApiPort) {
+    throw "TCP port $ApiPort is already in use on 127.0.0.1. This engine installs a blank instance; pass a free -ApiPort so the health check cannot be answered by a different service."
+  }
+  Log "OK" "API port $ApiPort is free"
   Test-BundleIntegrity -Bundle $SourceBundle
   Copy-Bundle -Bundle $SourceBundle -Root $InstallRoot
 
