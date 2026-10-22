@@ -51,22 +51,8 @@ var
   PageDB: TInputQueryWizardPage;
   PageApp: TInputQueryWizardPage;
   PagePM2: TInputQueryWizardPage;
-  
-  EditBundle: TEdit;
-  EditInstallRoot: TEdit;
-  EditPgHost: TEdit;
-  EditPgPort: TEdit;
-  EditPgUser: TEdit;
-  EditPgPass: TEdit;
-  EditDbName: TEdit;
-  EditApiPort: TEdit;
-  EditBindHost: TEdit;
-  EditSiteName: TEdit;
-  EditAppPrefix: TEdit;
-  EditPrismaPath: TEdit;
-  EditCors: TEdit;
 
-function OnInitializeWizard(): Boolean;
+procedure InitializeWizard();
 begin
   // Bundle page
   PageBundle := CreateInputQueryPage(wpWelcome,
@@ -74,10 +60,8 @@ begin
     'Provide the full path to the extracted bundle containing SHA256SUMS.txt. The Setup program is normally distributed next to that folder.');
   PageBundle.Add('&Bundle Path:', False);
   PageBundle.Add('&Install Root:', False);
-  EditBundle := TEdit(PageBundle.Edits[0]);
-  EditInstallRoot := TEdit(PageBundle.Edits[1]);
-  EditBundle.Text := ExpandConstant('{src}\{#BundleDir}');
-  EditInstallRoot.Text := ExpandConstant('{pf}\CommandPulse\CMMS');
+  PageBundle.Values[0] := ExpandConstant('{src}\{#BundleDir}');
+  PageBundle.Values[1] := ExpandConstant('{pf}\CommandPulse\CMMS');
 
   // Database page
   PageDB := CreateInputQueryPage(PageBundle.ID,
@@ -88,11 +72,10 @@ begin
   PageDB.Add('&User:', False);
   PageDB.Add('&Password:', True);
   PageDB.Add('&Database Name:', False);
-  EditPgHost := TEdit(PageDB.Edits[0]); EditPgHost.Text := 'localhost';
-  EditPgPort := TEdit(PageDB.Edits[1]); EditPgPort.Text := '5432';
-  EditPgUser := TEdit(PageDB.Edits[2]); EditPgUser.Text := 'postgres';
-  EditPgPass := TEdit(PageDB.Edits[3]); EditPgPass.PasswordChar := '*';
-  EditDbName := TEdit(PageDB.Edits[4]); EditDbName.Text := 'cmms_install';
+  PageDB.Values[0] := 'localhost';
+  PageDB.Values[1] := '5432';
+  PageDB.Values[2] := 'postgres';
+  PageDB.Values[4] := 'cmms_install';
 
   // App page
   PageApp := CreateInputQueryPage(PageDB.ID,
@@ -102,10 +85,9 @@ begin
   PageApp.Add('&Bind Host:', False);
   PageApp.Add('Site &Name:', False);
   PageApp.Add('CORS &Origins (optional):', False);
-  EditApiPort := TEdit(PageApp.Edits[0]); EditApiPort.Text := '4000';
-  EditBindHost := TEdit(PageApp.Edits[1]); EditBindHost.Text := '127.0.0.1';
-  EditSiteName := TEdit(PageApp.Edits[2]); EditSiteName.Text := 'cmms.local';
-  EditCors := TEdit(PageApp.Edits[3]); EditCors.Text := '';
+  PageApp.Values[0] := '4000';
+  PageApp.Values[1] := '127.0.0.1';
+  PageApp.Values[2] := 'cmms.local';
 
   // PM2/Prisma page
   PagePM2 := CreateInputQueryPage(PageApp.ID,
@@ -113,10 +95,6 @@ begin
     'Use App Name Prefix if running alongside an existing CMMS instance on the same Windows user.');
   PagePM2.Add('PM2 App &Name Prefix (optional):', False);
   PagePM2.Add('Prisma Engines &Path (optional):', False);
-  EditAppPrefix := TEdit(PagePM2.Edits[0]); EditAppPrefix.Text := '';
-  EditPrismaPath := TEdit(PagePM2.Edits[1]); EditPrismaPath.Text := '';
-
-  Result := True;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -125,17 +103,17 @@ begin
   // Basic validation
   if CurPageID = PageDB.ID then
   begin
-    if EditPgPass.Text = '' then
+    if PageDB.Values[3] = '' then
     begin
       MsgBox('PostgreSQL password is required.', mbError, MB_OK);
       Result := False;
     end;
-    if Trim(EditDbName.Text) = '' then
+    if Trim(PageDB.Values[4]) = '' then
     begin
       MsgBox('Database name is required.', mbError, MB_OK);
       Result := False;
     end;
-    if CompareText(Trim(EditDbName.Text), 'cmms') = 0 then
+    if CompareText(Trim(PageDB.Values[4]), 'cmms') = 0 then
     begin
       MsgBox('The database name "cmms" is the live production database on the existing host and is not a blank-install target. Choose a new name.', mbError, MB_OK);
       Result := False;
@@ -143,7 +121,7 @@ begin
   end;
   if CurPageID = PageApp.ID then
   begin
-    if (StrToIntDef(Trim(EditApiPort.Text), 0) < 1) or (StrToIntDef(Trim(EditApiPort.Text), 0) > 65535) then
+    if (StrToIntDef(Trim(PageApp.Values[0]), 0) < 1) or (StrToIntDef(Trim(PageApp.Values[0]), 0) > 65535) then
     begin
       MsgBox('API port must be a number between 1 and 65535.', mbError, MB_OK);
       Result := False;
@@ -151,12 +129,12 @@ begin
   end;
   if CurPageID = PageBundle.ID then
   begin
-    if EditBundle.Text = '' then
+    if PageBundle.Values[0] = '' then
     begin
       MsgBox('Source bundle path is required.', mbError, MB_OK);
       Result := False;
     end;
-    if EditInstallRoot.Text = '' then
+    if PageBundle.Values[1] = '' then
     begin
       MsgBox('Install root is required.', mbError, MB_OK);
       Result := False;
@@ -177,28 +155,28 @@ begin
     // SecureString to a child process. The file is random-named, ACL-restricted
     // to the installing account, and deleted after the engine exits and again
     // in DeinitializeSetup if setup is aborted in between.
-    PwFile := ExpandConstant('{tmp}\cmms_pgpass_' + GetDateTimeString('hhmmss', '', '') + '.tmp');
+    PwFile := ExpandConstant('{tmp}\cmms_pgpass_' + GetDateTimeString('hhmmss', #0, #0) + '.tmp');
     PwFileToDelete := PwFile;
-    SaveStringToFile(PwFile, EditPgPass.Text, False);
+    SaveStringToFile(PwFile, PageDB.Values[3], False);
     Exec(ExpandConstant('{sys}\icacls.exe'),
          '"' + PwFile + '" /inheritance:r /grant:r "' + GetUserNameString() + ':R"',
          '', SW_HIDE, ewWaitUntilTerminated, TmpResult);
     
     Cmd := 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + 
            ExpandConstant('{app}\installer\wizard\scripts\Invoke-InstallerWizard.ps1') + '" ' +
-           '-BundlePath "' + EditBundle.Text + '" ' +
-           '-InstallRoot "' + EditInstallRoot.Text + '" ' +
-           '-PgHost "' + EditPgHost.Text + '" ' +
-           '-PgPort "' + EditPgPort.Text + '" ' +
-           '-PgUser "' + EditPgUser.Text + '" ' +
+           '-BundlePath "' + PageBundle.Values[0] + '" ' +
+           '-InstallRoot "' + PageBundle.Values[1] + '" ' +
+           '-PgHost "' + PageDB.Values[0] + '" ' +
+           '-PgPort "' + PageDB.Values[1] + '" ' +
+           '-PgUser "' + PageDB.Values[2] + '" ' +
            '-PgPassFile "' + PwFile + '" ' +
-           '-DbName "' + EditDbName.Text + '" ' +
-           '-ApiPort "' + EditApiPort.Text + '" ' +
-           '-BindHost "' + EditBindHost.Text + '" ' +
-           '-SiteName "' + EditSiteName.Text + '" ' +
-           '-CorsOrigins "' + EditCors.Text + '" ' +
-           '-AppNamePrefix "' + EditAppPrefix.Text + '" ' +
-           '-PrismaEnginesPath "' + EditPrismaPath.Text + '"';
+           '-DbName "' + PageDB.Values[4] + '" ' +
+           '-ApiPort "' + PageApp.Values[0] + '" ' +
+           '-BindHost "' + PageApp.Values[1] + '" ' +
+           '-SiteName "' + PageApp.Values[2] + '" ' +
+           '-CorsOrigins "' + PageApp.Values[3] + '" ' +
+           '-AppNamePrefix "' + PagePM2.Values[0] + '" ' +
+           '-PrismaEnginesPath "' + PagePM2.Values[1] + '"';
     
     Exec(ExpandConstant('{sys}\cmd.exe'), '/c ' + Cmd, '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
     
