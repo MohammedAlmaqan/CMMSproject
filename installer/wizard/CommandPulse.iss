@@ -38,7 +38,6 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "..\install.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}\installer"; Flags: ignoreversion
 Source: "..\templates\*"; DestDir: "{app}\installer\templates"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\tests\*"; DestDir: "{app}\installer\tests"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Wizard orchestration script
 Source: "scripts\Invoke-InstallerWizard.ps1"; DestDir: "{app}\installer\wizard\scripts"; Flags: ignoreversion
 ; Bundle placeholder (IT will provide or use existing)

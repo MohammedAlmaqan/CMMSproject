@@ -26,7 +26,7 @@ and the table is wrong.
 | I-03 | Wizard defaults the database name to `cmms` and the API port to `4000`, both of which collide with the live host | Closed | Installer | Default changed to `cmms_install` and `cmms` refused in 678c0fb; occupied-port guard and wizard port validation in this commit |
 | I-04 | Wizard ignores the engine exit code and can report success after a failed install | Closed | Installer | this commit |
 | I-05 | Wizard writes the PostgreSQL password to an unrestricted plaintext temp file | Closed | Installer | this commit |
-| I-06 | Wizard payload ships the engine test harness to the production target | Open | Installer | - |
+| I-06 | Wizard payload ships the engine test harness to the production target | Closed | Installer | this commit |
 | I-07 | Wizard shortcuts and uninstall icon point at files the wizard never installs | Open | Installer | - |
 | I-08 | Wizard bundle-path default assumes the `.exe` sits inside the bundle | Open | Installer | - |
 | I-09 | Harness verdict and throwaway database name are not persisted | Open | Installer | - |
