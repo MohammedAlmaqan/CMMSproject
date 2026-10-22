@@ -122,6 +122,11 @@ it, so a stalled download cannot leave the installer hanging: `npm ci` 1800s,
 ## Logs
 Logs are written to `%ProgramData%\CommandPulse\logs\install-<timestamp>.log`.
 
+Logs written before the redaction fix still contain the PostgreSQL password.
+`tools\Redact-InstallerLogs.ps1` reports them by file name and occurrence count;
+`-Apply` rewrites the value to `***`. Redaction does not make a leaked password
+safe, so rotate the database credential after running it.
+
 ## Tests
 `tests\run-tests.ps1` runs the engine against a throwaway database and a
 scratch install root, then asserts the contract. It gives the install a unique
