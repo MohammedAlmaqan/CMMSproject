@@ -1,4 +1,4 @@
-# CommandPulse CMMS — Installation & Deployment Guide
+# CommandPulse CMMS â€” Installation & Deployment Guide
 
 ## 1. System Requirements
 
@@ -163,7 +163,7 @@ Restart the API after changing it and confirm the startup log records the bind a
 CMMS API server running on port 4000 (bound to 127.0.0.1)
 ```
 
-> `BIND_HOST=127.0.0.1` is the code default (`backend/src/index.ts`) and the value in `.env.example`, so a production install is loopback-only without extra steps. Set `BIND_HOST=0.0.0.0` **only** for local development with no reverse proxy — it is not a safe production value.
+> `BIND_HOST=127.0.0.1` is the code default (`backend/src/index.ts`) and the value in `.env.example`, so a production install is loopback-only without extra steps. Set `BIND_HOST=0.0.0.0` **only** for local development with no reverse proxy â€” it is not a safe production value.
 
 **Firewall rule (defense-in-depth).** Block inbound TCP 4000 from non-loopback addresses so the port stays unreachable even if `BIND_HOST` is later mis-set or IIS is removed. Run PowerShell as Administrator:
 
@@ -171,13 +171,13 @@ CMMS API server running on port 4000 (bound to 127.0.0.1)
 New-NetFirewallRule -DisplayName "CMMS API 4000 block external" -Direction Inbound -Action Block -Protocol TCP -LocalPort 4000 -RemoteAddress Any -Profile Any
 ```
 
-One rule is enough. Windows Firewall does **not** apply inbound block rules to loopback traffic, so the IIS reverse proxy — which connects to `127.0.0.1:4000` — keeps working while every external address is denied. Do **not** add a companion rule scoped to `-RemoteAddress 127.0.0.1,::1`: `New-NetFirewallRule` rejects the loopback IPv6 literal with *"An unspecified, multicast, broadcast, or loopback IPv6 address was specified"* (`0x80070057`), and even a corrected `-Action Allow` rule would not re-open loopback, because block rules take precedence over allow rules. Verify the effective state with:
+One rule is enough. Windows Firewall does **not** apply inbound block rules to loopback traffic, so the IIS reverse proxy â€” which connects to `127.0.0.1:4000` â€” keeps working while every external address is denied. Do **not** add a companion rule scoped to `-RemoteAddress 127.0.0.1,::1`: `New-NetFirewallRule` rejects the loopback IPv6 literal with *"An unspecified, multicast, broadcast, or loopback IPv6 address was specified"* (`0x80070057`), and even a corrected `-Action Allow` rule would not re-open loopback, because block rules take precedence over allow rules. Verify the effective state with:
 
 ```powershell
 Get-NetFirewallRule -DisplayName "CMMS API 4000*" | Get-NetFirewallPortFilter
 ```
 
-**Prerequisites** — install both features (Server Manager > Add Features):
+**Prerequisites** â€” install both features (Server Manager > Add Features):
 
 | Feature | Purpose |
 |---------|---------|
@@ -186,7 +186,7 @@ Get-NetFirewallRule -DisplayName "CMMS API 4000*" | Get-NetFirewallPortFilter
 
 After installing ARR, open **IIS Manager > Server > Application Request Routing Cache > Proxy Settings**, tick **Enable proxy**, then set the action to **Rewrite to** `http://localhost:4000/api/*`.
 
-**Test certificate** — for evaluation hosts create a self-signed certificate on the machine. Run PowerShell as Administrator, and replace the subject name if you use a different host:
+**Test certificate** â€” for evaluation hosts create a self-signed certificate on the machine. Run PowerShell as Administrator, and replace the subject name if you use a different host:
 
 ```powershell
 New-SelfSignedCertificate -DnsName "cmms.local" -CertStoreLocation "Cert:\LocalMachine\My" -NotAfter (Get-Date).AddYears(5)
@@ -194,7 +194,7 @@ New-SelfSignedCertificate -DnsName "cmms.local" -CertStoreLocation "Cert:\LocalM
 
 For production, request a certificate from a public CA instead and never commit certificate files or private keys to this repository.
 
-**Site binding** — create the site in IIS Manager with:
+**Site binding** â€” create the site in IIS Manager with:
 
 | Setting | Value |
 |---------|-------|
@@ -203,18 +203,18 @@ For production, request a certificate from a public CA instead and never commit 
 | Binding | HTTPS, port 443, host header `cmms.local`, the certificate from the previous step |
 | Backend | Node.js API already listening on `http://localhost:4000` |
 
-**URL Rewrite rules** — add the following in IIS Manager under **cmms.local > URL Rewrite**, in this order:
+**URL Rewrite rules** â€” add the following in IIS Manager under **cmms.local > URL Rewrite**, in this order:
 
 1. Proxy API traffic (match URL `api/(.*)`, action **Rewrite** to `http://localhost:4000/api/{R:1}`).
 2. SPA fallback for client-side routes (match URL `.*`, action **Rewrite** to `C:\CMMSproject\app\dist\index.html`, using the same deployed path as the site binding).
 
 The first rule must stay above the second, otherwise every API call is rewritten to `index.html` and returns HTML instead of JSON.
 
-**Forwarded headers** — IIS must tell the app that the original request was HTTPS, so add custom headers on the site: `X-Forwarded-Proto = https` and `X-Forwarded-For = {REMOTE_ADDR}`. The API already sets Express `trust proxy = 1` (one hop), which is what lets `req.ip` and the login rate limiter see the real client behind the proxy rather than the proxy's own address.
+**Forwarded headers** â€” IIS must tell the app that the original request was HTTPS, so add custom headers on the site: `X-Forwarded-Proto = https` and `X-Forwarded-For = {REMOTE_ADDR}`. The API already sets Express `trust proxy = 1` (one hop), which is what lets `req.ip` and the login rate limiter see the real client behind the proxy rather than the proxy's own address.
 
 **ARR must overwrite `X-Forwarded-For`, not append to it.** With exactly one hop trusted, a client that can reach the API *directly* and supply its own `X-Forwarded-For` bypasses the login rate limiter completely. An appending proxy is worse than no proxy: it lets a client prepend a forged value that the single trusted hop still resolves to the attacker. Set `BIND_HOST=127.0.0.1` so port 4000 is unreachable except through IIS, and confirm the ARR rewrite replaces the inbound header rather than adding to it.
 
-**Verify** — open the site over HTTPS and confirm the API is reachable through the proxy:
+**Verify** â€” open the site over HTTPS and confirm the API is reachable through the proxy:
 
 ```cmd
 curl -k https://cmms.local/api/health
@@ -255,7 +255,7 @@ bundled with Prisma.
 
 > **This has one deployment consequence.** Because the loader resolves `backend\.env`
 > relative to the process working directory, PM2 (or any launcher) must start the API
-> from `backend\` — for example `pm2 start ecosystem.config.cjs` run in `backend\`.
+> from `backend\` â€” for example `pm2 start ecosystem.config.cjs` run in `backend\`.
 > Launching `node dist\index.js` from another directory finds no `.env`, leaves
 > `JWT_SECRET` unset, and the API exits at boot. Confirmed on 2026-10-21 by import
 > order: `process.env.DATABASE_URL` and `process.env.JWT_SECRET` are both `undefined`
@@ -285,11 +285,29 @@ curl http://localhost:4000/api/health
 REM Check API docs
 curl http://localhost:4000/api-docs
 
-REM Test login
+REM Test login with the Administrator created by the installer
 curl -X POST http://localhost:4000/api/auth/login ^
   -H "Content-Type: application/json" ^
-  -d "{\"username\":\"admin\",\"password\":\"password\"}"
+  -d "{\"username\":\"<Administrator username>\",\"password\":\"<password>\"}"
 ```
+
+### First sign-in
+
+A freshly migrated database has no users, and the API only lets an existing
+Administrator create accounts. The installer closes this: its **Administrator
+Account** page collects a username, full name, email and password, and the
+engine creates that account with the Administrator role after the schema is
+applied and before the API starts. Sign in at the web UI with those details.
+
+The installer enforces a 12-character minimum and refuses the username itself
+and common defaults. The password is not written to the install log and is not
+recoverable from it; if it is lost, an existing Administrator has to reset the
+account, because the app has no self-service password reset.
+
+If the database was prepared some other way, for example `npx prisma db seed`
+during development, remember that the seed creates the demo account
+`admin` / `password`. Never leave that account in place on a real deployment:
+sign in and change or remove it before handover.
 
 ---
 
@@ -316,7 +334,7 @@ The supported PostgreSQL server baseline is 15+. The backup script resolves `pg_
 
 ### Application Files (attachments)
 
-A PostgreSQL dump contains only `Attachment.storagePath` — a relative pointer. The attachment **bytes** live on disk under `backend\uploads\<EntityType>\<entityId>\`, so a SQL dump alone cannot restore them.
+A PostgreSQL dump contains only `Attachment.storagePath` â€” a relative pointer. The attachment **bytes** live on disk under `backend\uploads\<EntityType>\<entityId>\`, so a SQL dump alone cannot restore them.
 
 `scripts\backup.bat` therefore snapshots that directory in the same run, immediately after the SQL dump is finalised, into a folder whose name pairs with the dump:
 
@@ -347,7 +365,7 @@ schtasks /Create /TN "CommandPulse CMMS Daily Backup" /TR "%CMMSPROJECT%\scripts
 > (9,254,347 bytes) with its paired `-uploads` snapshot, and `PGPASSWORD` was read from
 > the existing machine-scoped variable, so no credential is embedded in the task. Two
 > deviations from the template are recorded rather than left silent. (1) The task runs as
-> the **interactive user** rather than a dedicated service account — accepted by the owner
+> the **interactive user** rather than a dedicated service account â€” accepted by the owner
 > for this single-user laptop deployment; the dedicated-service-account form above remains
 > the template for a shared host. (2) Because this host is a laptop, the `schtasks`-default
 > power conditions were cleared (`DisallowStartIfOnBatteries=false`,
@@ -366,18 +384,18 @@ scripts\restore-drill.bat
 
 The script selects the newest valid timestamped dump, restores it only into the disposable `cmms_restore_test` database, runs `SELECT count(*) FROM "WorkOrder";`, records elapsed restore time, drops the drill database, and verifies that it no longer exists. It never restores over the live `cmms` database.
 
-It also asserts the paired attachment snapshot. After the `WorkOrder` query it measures file counts in the `-uploads` folder belonging to the same timestamp and in the live `backend\uploads\` tree. If attachments exist live but the paired snapshot is missing or empty, the drill **fails** — a green SQL restore is not evidence that the backup is complete. A dataset with no attachments at all passes with an explicit "nothing to assert" note, so fresh installs do not report a false red.
+It also asserts the paired attachment snapshot. After the `WorkOrder` query it measures file counts in the `-uploads` folder belonging to the same timestamp and in the live `backend\uploads\` tree. If attachments exist live but the paired snapshot is missing or empty, the drill **fails** â€” a green SQL restore is not evidence that the backup is complete. A dataset with no attachments at all passes with an explicit "nothing to assert" note, so fresh installs do not report a false red.
 
 ### Recovery Objectives
 
-- **RPO:** ≤ 24 hours because the database backup runs daily. *Updated 2026-10-17:* WAL
+- **RPO:** â‰¤ 24 hours because the database backup runs daily. *Updated 2026-10-17:* WAL
   archiving is now enabled on this host (see `ADMIN_GUIDE.md` 7.8), which narrows the live
   worst case to 5 minutes; the 24-hour figure is the daily-backup-only bound.
 - **RTO:** 5.35 seconds measured on 2026-09-25 from drill start through the successful `WorkOrder` count query on the local dataset (84 rows; 306,826-byte dump). Re-run the drill after material database growth or infrastructure changes and update this measurement.
 
 ### Application Files
 
-See [Application Files (attachments)](#application-files-attachments) above — attachment snapshots are now produced automatically by `scripts\backup.bat` and verified by the restore drill.
+See [Application Files (attachments)](#application-files-attachments) above â€” attachment snapshots are now produced automatically by `scripts\backup.bat` and verified by the restore drill.
 
 
 ---
@@ -429,7 +447,7 @@ CMMSproject\backend\logs\worker-out.log
 CMMSproject\backend\logs\worker-err.log
 ```
 
-`ecosystem.config.cjs` sets `merge_logs: true`, so PM2 keeps one combined stream per app; the `*-err.log` files only receive entries PM2 itself routes to stderr (for example, crashes before the logger is ready). The scheduler's `[scheduler] …` lines are in the **worker** logs, not the API logs.
+`ecosystem.config.cjs` sets `merge_logs: true`, so PM2 keeps one combined stream per app; the `*-err.log` files only receive entries PM2 itself routes to stderr (for example, crashes before the logger is ready). The scheduler's `[scheduler] â€¦` lines are in the **worker** logs, not the API logs.
 
 ### Log Rotation (pm2-logrotate)
 
@@ -499,7 +517,7 @@ Run this from `backend\`: Prisma Client loads `backend\.env` from the working di
 and `set K6_MODE=1` exports the override into the process environment, which the loader
 does not overwrite.
 
-The override requires `NODE_ENV !== 'production'`; setting `K6_MODE=1` on a production host has no effect. It activates only when `K6_MODE` is exactly `1` **and** `NODE_ENV` is not `production`; on a production host the limit stays at 20 regardless. **Never set `K6_MODE` on a production host** — it weakens brute-force protection that the account lockout depends on. Remove it with `set K6_MODE=` when finished.
+The override requires `NODE_ENV !== 'production'`; setting `K6_MODE=1` on a production host has no effect. It activates only when `K6_MODE` is exactly `1` **and** `NODE_ENV` is not `production`; on a production host the limit stays at 20 regardless. **Never set `K6_MODE` on a production host** â€” it weakens brute-force protection that the account lockout depends on. Remove it with `set K6_MODE=` when finished.
 
 ### Run the smoke test
 
@@ -508,22 +526,22 @@ cd C:\CMMSproject
 scripts\k6\k6.exe run scripts\k6\smoke.js
 ```
 
-The script drives 50 VUs through a 2-minute ramp, 5 minutes at steady state, and a 1-minute ramp-down, exercising login → `GET /api/work-orders?take=10` → `GET /api/work-orders/:id`. Each VU signs in once and then loops the read path; signing in on every iteration would exceed even the 200/15min ceiling. The script does not call a logout endpoint and simply stops driving the read path in `teardown()`; the sessions it created expire on their own. (A logout endpoint was added in C1, after this script was written.) Override the target and credentials with `BASE_URL`, `CMMS_USER`, `CMMS_PASS`, and `THINK_TIME`.
+The script drives 50 VUs through a 2-minute ramp, 5 minutes at steady state, and a 1-minute ramp-down, exercising login â†’ `GET /api/work-orders?take=10` â†’ `GET /api/work-orders/:id`. Each VU signs in once and then loops the read path; signing in on every iteration would exceed even the 200/15min ceiling. The script does not call a logout endpoint and simply stops driving the read path in `teardown()`; the sessions it created expire on their own. (A logout endpoint was added in C1, after this script was written.) Override the target and credentials with `BASE_URL`, `CMMS_USER`, `CMMS_PASS`, and `THINK_TIME`.
 
-The **100-VU acceptance run** (SOW §6.4.3) is the same login → list → detail path at 100 VUs — `scripts\k6\k6.exe run scripts\k6\acceptance.js`. It executes 2026-09-29 as **one ramp-hold-down scenario** (2-minute ramp to 100, 5-minute hold, 1-minute ramp-down) so only ~100 VUs exist and the run stays inside the 200/15-min `K6_MODE` login ceiling without tripping it; **do not** re-add a multi-scenario layout, as three fresh 100-VU pools sign in ~300 times and trip that limiter. The post-fix (G.6) run passed cleanly: `http_req_failed` 0.00%, p(95) 235.65 ms, 0 P2028. Ensure the target database schema is current (`npx prisma migrate deploy`) before treating the read results as authoritative.
+The **100-VU acceptance run** (SOW Â§6.4.3) is the same login â†’ list â†’ detail path at 100 VUs â€” `scripts\k6\k6.exe run scripts\k6\acceptance.js`. It executes 2026-09-29 as **one ramp-hold-down scenario** (2-minute ramp to 100, 5-minute hold, 1-minute ramp-down) so only ~100 VUs exist and the run stays inside the 200/15-min `K6_MODE` login ceiling without tripping it; **do not** re-add a multi-scenario layout, as three fresh 100-VU pools sign in ~300 times and trip that limiter. The post-fix (G.6) run passed cleanly: `http_req_failed` 0.00%, p(95) 235.65 ms, 0 P2028. Ensure the target database schema is current (`npx prisma migrate deploy`) before treating the read results as authoritative.
 
 Thresholds that fail the run: `http_req_duration{scenario:load}` p95 must stay under 2000 ms, and `http_req_failed` must stay under 1%.
 
-### Scope: these k6 runs are not the SOW §4.1 capacity proof
+### Scope: these k6 runs are not the SOW Â§4.1 capacity proof
 
-SOW §4.1 requires the system to support **200 concurrent users**. The formal 200-user
+SOW Â§4.1 requires the system to support **200 concurrent users**. The formal 200-user
 capacity exercise was executed and passed on 2026-10-03 (tracker G.5; the
 transactional-save limb was measured separately at C12 on 2026-10-10) - the earlier
 "deferred to post-go-live" reading recorded here is superseded. The 50-VU smoke and
 100-VU acceptance runs above are read-path sanity checks against a single local
 backend, not the capacity/saturation measurement; their numbers must not be quoted as
 evidence for the 200-user clause. The capacity evidence is the `scripts\k6\capacity.js`
-and `scripts\k6\write.js` runs recorded in `docs/SOW_COMPLIANCE.md` §4.1.
+and `scripts\k6\write.js` runs recorded in `docs/SOW_COMPLIANCE.md` Â§4.1.
 
 ---
 
