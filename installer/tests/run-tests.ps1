@@ -1,4 +1,4 @@
-#requires -version 5.1
+﻿#requires -version 5.1
 <#
 .SYNOPSIS
   Engine test harness for the CommandPulse CMMS installer.
@@ -53,9 +53,12 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $engine = Join-Path $repoRoot "installer\install.ps1"
 if (-not $SourceBundle) {
   # The published bundle is distributed beside the repository checkout, so the
-  # default is derived, not a developer-machine path.
-  $siblingBundle = Join-Path (Split-Path -Parent $repoRoot) "CommandPulse-CMMS-v1.6.2"
-  if (Test-Path -LiteralPath $siblingBundle) { $SourceBundle = $siblingBundle }
+  # default is the newest sibling bundle that is actually present, not a
+  # developer-machine path or a version that has to be edited each release.
+  $parent = Split-Path -Parent $repoRoot
+  $candidates = @(Get-ChildItem -LiteralPath $parent -Directory -Filter "CommandPulse-CMMS-v*" -ErrorAction SilentlyContinue |
+    Sort-Object { [version]($_.Name -replace '^CommandPulse-CMMS-v', '') } -Descending)
+  if ($candidates.Count -gt 0) { $SourceBundle = $candidates[0].FullName }
 }
 if (-not $SourceBundle) {
   throw "No -SourceBundle supplied and no bundle found beside the repository. Pass -SourceBundle explicitly."
@@ -70,6 +73,18 @@ $scratch = Join-Path $env:TEMP ("cmms-installer-test-" + (Get-Date -Format "yyyy
 $installRoot = Join-Path $scratch "install"
 $pm2Home = Join-Path $scratch "pm2-home"
 $dbName = "cmms_installer_test_" + (Get-Random)
+
+# The first-Administrator contract. A random password keeps the "not in the log"
+# assertion meaningful; the fixed username and email make the database row and
+# the sign-in assertion unambiguous.
+$adminUsername = "installeradmin"
+$adminFullName = "Installer Administrator"
+$adminEmail = "installeradmin@example.test"
+$adminPassword = "Adm1n-" + [guid]::NewGuid().ToString("N").Substring(0, 12) + "!"
+$adminFile = Join-Path $scratch "admin.json"
+New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+$adminJson = @{ username = $adminUsername; fullName = $adminFullName; email = $adminEmail; password = $adminPassword } | ConvertTo-Json -Compress
+[System.IO.File]::WriteAllText($adminFile, $adminJson, (New-Object System.Text.UTF8Encoding($false)))
 
 # The engine logs to %ProgramData%\CommandPulse\logs. The harness writes its
 # verdict next to those logs: a PASS/FAIL line printed to a console is not
@@ -102,6 +117,7 @@ Write-Summary "database  : $dbName (throwaway)"
 Write-Summary "pm2 prefix: $appPrefix"
 Write-Summary "bundle    : $SourceBundle"
 Write-Summary "port      : $TestPort"
+Write-Summary "admin     : $adminUsername (password not recorded)"
 
 $psql = Get-PsqlPath
 if (-not $psql) { Write-Summary "ERROR: psql not found"; throw "psql not found" }
@@ -125,7 +141,8 @@ try {
   & $engine -SourceBundle $SourceBundle -InstallRoot $installRoot `
     -PgHost $PgHost -PgPort $PgPort -PgUser $PgUser -PgPasswordEnv "CMMS_INSTALLER_TEST_PGPASSWORD" `
     -DbName $dbName -ApiPort $TestPort -SiteName "cmms.test.local" `
-    -AppNamePrefix $appPrefix -PrismaEnginesPath $PrismaEnginesPath -Mode full
+    -AppNamePrefix $appPrefix -PrismaEnginesPath $PrismaEnginesPath `
+    -AdminFile $adminFile -Mode full
   $engineExit = $LASTEXITCODE
   Assert-True "engine exits 0" ($engineExit -eq 0) "(exit $engineExit)"
 
@@ -193,6 +210,50 @@ try {
     Assert-True "API health body is ok" ($resp.Content -match '"status"\s*:\s*"ok"')
   } catch {
     Assert-True "API health returns 200" $false "($($_.Exception.Message))"
+  }
+
+  # 8b. First Administrator: the row exists, the hash is bcrypt, and the
+  # account can actually sign in. A blank database with no user is the gap this
+  # step exists to close, so "the installer exited 0" is not enough.
+  # Quoted identifiers (the table is "User") cannot be sent with -c: Windows
+  # PowerShell 5.1 strips embedded double quotes from native command arguments.
+  # The SQL is piped to psql on stdin instead, where nothing rewrites it.
+  function Invoke-ThrowawaySql {
+    param([string]$Sql)
+    return ($Sql | & $psql -U $PgUser -h $PgHost -p $PgPort -d $dbName -At 2>$null | Select-Object -First 1)
+  }
+  $adminRows = Invoke-ThrowawaySql "select count(*) from ""User"" where lower(username) = lower('$adminUsername') and role = 'Administrator' and ""isDeleted"" = false;"
+  Assert-True "first Administrator row exists" ([int]$adminRows -eq 1) "(rows=$adminRows)"
+  $hashPrefix = Invoke-ThrowawaySql "select left(""passwordHash"", 4) from ""User"" where lower(username) = lower('$adminUsername');"
+  Assert-True "Administrator password is bcrypt" ($hashPrefix -eq '$2a$' -or $hashPrefix -eq '$2b$') "(prefix=$hashPrefix)"
+  Assert-True "Administrator file deleted by the engine" (-not (Test-Path -LiteralPath $adminFile))
+
+  $loginBody = @{ username = $adminUsername; password = $adminPassword } | ConvertTo-Json -Compress
+  try {
+    $login = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$TestPort/api/auth/login" -Body $loginBody -ContentType "application/json" -TimeoutSec 30
+    Assert-True "Administrator sign-in returns a token" ([bool]$login.token)
+    Assert-True "Administrator sign-in reports the Administrator role" ($login.user.role -eq "Administrator")
+  } catch {
+    Assert-True "Administrator sign-in returns a token" $false "($($_.Exception.Message))"
+  }
+  $badStatus = 0
+  try {
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$TestPort/api/auth/login" -Body (@{ username = $adminUsername; password = "wrong-" + $adminPassword } | ConvertTo-Json -Compress) -ContentType "application/json" -TimeoutSec 30 | Out-Null
+  } catch {
+    $badStatus = [int]$_.Exception.Response.StatusCode
+  }
+  Assert-True "wrong password is rejected with 401" ($badStatus -eq 401) "(status $badStatus)"
+
+  # 8c. The secret never reaches the install log.
+  $engineLog = Get-ChildItem (Join-Path $env:ProgramData "CommandPulse\logs") -Filter "install-*.log" -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime | Select-Object -Last 1
+  if ($engineLog) {
+    $logText = [System.IO.File]::ReadAllText($engineLog.FullName)
+    Assert-True "Administrator password absent from install log" (-not $logText.Contains($adminPassword))
+    Assert-True "install log records the Administrator step" ($logText -match "First Administrator") "(log $($engineLog.Name))"
+    Assert-True "install log records creation success" ($logText -match "First Administrator '$adminUsername' created")
+  } else {
+    Assert-True "install log found" $false
   }
 
   # 9. PM2 apps online, under the test's own prefixed names.
