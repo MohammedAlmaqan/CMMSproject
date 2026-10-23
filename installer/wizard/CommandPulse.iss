@@ -3,7 +3,7 @@
 ; Compiles to Setup_CommandPulse.exe (do NOT commit .exe)
 
 #define MyAppName "CommandPulse CMMS"
-#define MyAppVersion "1.6.3"
+#define MyAppVersion "1.6.4"
 #define BundleDir "CommandPulse-CMMS-v" + MyAppVersion
 #define MyAppPublisher "CommandPulse"
 #define MyAppURL "https://github.com/MohammedAlmaqan/CMMSproject"
