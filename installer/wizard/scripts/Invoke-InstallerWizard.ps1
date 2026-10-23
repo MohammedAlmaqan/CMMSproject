@@ -20,7 +20,8 @@ param(
   [string]$SiteName = "cmms.local",
   [string]$CorsOrigins = "",
   [string]$AppNamePrefix = "",
-  [string]$PrismaEnginesPath = ""
+  [string]$PrismaEnginesPath = "",
+  [string]$AdminFile = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,6 +56,7 @@ $args = @(
 if ($CorsOrigins) { $args += @("-CorsOrigins", $CorsOrigins) }
 if ($AppNamePrefix) { $args += @("-AppNamePrefix", $AppNamePrefix) }
 if ($PrismaEnginesPath) { $args += @("-PrismaEnginesPath", $PrismaEnginesPath) }
+if ($AdminFile) { $args += @("-AdminFile", $AdminFile) }
 
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $engine @args
 $exitCode = $LASTEXITCODE

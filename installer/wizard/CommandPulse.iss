@@ -35,6 +35,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Source: "..\install.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}\installer"; Flags: ignoreversion
 Source: "..\templates\*"; DestDir: "{app}\installer\templates"; Flags: ignoreversion recursesubdirs createallsubdirs
+; First-Administrator helper (run from the installed backend by the engine)
+Source: "..\admin\create-admin.cjs"; DestDir: "{app}\installer\admin"; Flags: ignoreversion
 ; Wizard orchestration script
 Source: "scripts\Invoke-InstallerWizard.ps1"; DestDir: "{app}\installer\wizard\scripts"; Flags: ignoreversion
 ; Bundle placeholder (IT will provide or use existing)
@@ -47,10 +49,12 @@ Name: "{app}\bundle"
 [Code]
 var
   PwFileToDelete: String;
+  AdminFileToDelete: String;
   PageBundle: TInputQueryWizardPage;
   PageDB: TInputQueryWizardPage;
   PageApp: TInputQueryWizardPage;
   PagePM2: TInputQueryWizardPage;
+  PageAdmin: TInputQueryWizardPage;
 
 procedure InitializeWizard();
 begin
@@ -98,6 +102,74 @@ begin
     'Use App Name Prefix if running alongside an existing CMMS instance on the same Windows user.');
   PagePM2.Add('PM2 App &Name Prefix (optional):', False);
   PagePM2.Add('Prisma Engines &Path (optional):', False);
+
+  // First Administrator page. A blank install has no users, and the
+  // application only lets an existing Administrator create users, so this page
+  // is what makes the finished install signable-into. The password is never
+  // written to the install log and is never passed on a command line.
+  PageAdmin := CreateInputQueryPage(PagePM2.ID,
+    'Administrator Account', 'Create the first Administrator',
+    'This account signs in at the login screen. The password is not written to the install log and cannot be recovered from it.');
+  PageAdmin.Add('&Username:', False);
+  PageAdmin.Add('&Full Name:', False);
+  PageAdmin.Add('&Email:', False);
+  PageAdmin.Add('&Password (at least 12 characters):', True);
+  PageAdmin.Add('Confirm &Password:', True);
+end;
+
+function IsValidAdminUsername(S: String): Boolean;
+var
+  i: Integer;
+  c: Char;
+begin
+  Result := False;
+  if (Length(S) < 3) or (Length(S) > 32) then
+    exit;
+  for i := 1 to Length(S) do
+  begin
+    c := S[i];
+    if not (((c >= 'A') and (c <= 'Z')) or ((c >= 'a') and (c <= 'z')) or
+            ((c >= '0') and (c <= '9')) or (c = '.') or (c = '_') or (c = '-')) then
+      exit;
+  end;
+  Result := True;
+end;
+
+function IsWeakAdminPassword(S: String): Boolean;
+begin
+  Result :=
+    (CompareText(S, 'password') = 0) or
+    (CompareText(S, 'password1') = 0) or
+    (CompareText(S, 'password123') = 0) or
+    (CompareText(S, 'changeme') = 0) or
+    (CompareText(S, 'admin123') = 0) or
+    (CompareText(S, 'administrator') = 0) or
+    (CompareText(S, 'letmein') = 0) or
+    (CompareText(S, 'welcome1') = 0) or
+    (CompareText(S, 'cmms2026') = 0);
+end;
+
+// The Administrator details travel as a JSON file: username, full name, email
+// and password in one ACL-restricted temp file. Building the JSON here means no
+// user-typed value ever has to survive command-line quoting.
+function JsonEscape(S: String): String;
+var
+  i: Integer;
+  c: Char;
+begin
+  Result := '';
+  for i := 1 to Length(S) do
+  begin
+    c := S[i];
+    if c = '\' then
+      Result := Result + '\\'
+    else if c = '"' then
+      Result := Result + '\"'
+    else if Ord(c) < 32 then
+      Result := Result + ' '
+    else
+      Result := Result + c;
+  end;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -143,6 +215,51 @@ begin
       Result := False;
     end;
   end;
+  if CurPageID = PageAdmin.ID then
+  begin
+    if not IsValidAdminUsername(Trim(PageAdmin.Values[0])) then
+    begin
+      MsgBox('Username must be 3-32 characters using only letters, digits, dot, underscore or hyphen.', mbError, MB_OK);
+      Result := False;
+    end
+    else if Trim(PageAdmin.Values[1]) = '' then
+    begin
+      MsgBox('Full name is required.', mbError, MB_OK);
+      Result := False;
+    end
+    else if (Pos('@', PageAdmin.Values[2]) < 2) or
+            (Pos('.', Copy(PageAdmin.Values[2], Pos('@', PageAdmin.Values[2]) + 1, Length(PageAdmin.Values[2]))) < 2) or
+            (Pos(' ', PageAdmin.Values[2]) > 0) then
+    begin
+      MsgBox('Email must be a single address such as name@example.com.', mbError, MB_OK);
+      Result := False;
+    end
+    else if Length(PageAdmin.Values[3]) < 12 then
+    begin
+      MsgBox('Password must be at least 12 characters.', mbError, MB_OK);
+      Result := False;
+    end
+    else if Trim(PageAdmin.Values[3]) <> PageAdmin.Values[3] then
+    begin
+      MsgBox('Password must not start or end with whitespace.', mbError, MB_OK);
+      Result := False;
+    end
+    else if CompareText(PageAdmin.Values[3], PageAdmin.Values[0]) = 0 then
+    begin
+      MsgBox('Password must not be the same as the username.', mbError, MB_OK);
+      Result := False;
+    end
+    else if IsWeakAdminPassword(PageAdmin.Values[3]) then
+    begin
+      MsgBox('That password is too common. Choose something unique.', mbError, MB_OK);
+      Result := False;
+    end
+    else if PageAdmin.Values[3] <> PageAdmin.Values[4] then
+    begin
+      MsgBox('The two passwords do not match.', mbError, MB_OK);
+      Result := False;
+    end;
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -151,6 +268,8 @@ var
   TmpResult: Integer;
   Cmd: String;
   PwFile: String;
+  AdminFile: String;
+  AdminJson: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -164,7 +283,21 @@ begin
     Exec(ExpandConstant('{sys}\icacls.exe'),
          '"' + PwFile + '" /inheritance:r /grant:r "' + GetUserNameString() + ':R"',
          '', SW_HIDE, ewWaitUntilTerminated, TmpResult);
-    
+
+    // Same transport for the Administrator details. The engine reads the file,
+    // pipes the password to the helper on stdin and deletes the file; the
+    // wizard deletes it again after the engine exits and on abort.
+    AdminFile := ExpandConstant('{tmp}\cmms_admin_' + GetDateTimeString('hhmmss', #0, #0) + '.tmp');
+    AdminFileToDelete := AdminFile;
+    AdminJson := '{"username":"' + JsonEscape(Trim(PageAdmin.Values[0])) + '"' +
+                 ',"fullName":"' + JsonEscape(Trim(PageAdmin.Values[1])) + '"' +
+                 ',"email":"' + JsonEscape(Trim(PageAdmin.Values[2])) + '"' +
+                 ',"password":"' + JsonEscape(PageAdmin.Values[3]) + '"}';
+    SaveStringToFile(AdminFile, AdminJson, False);
+    Exec(ExpandConstant('{sys}\icacls.exe'),
+         '"' + AdminFile + '" /inheritance:r /grant:r "' + GetUserNameString() + ':R"',
+         '', SW_HIDE, ewWaitUntilTerminated, TmpResult);
+
     Cmd := 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + 
            ExpandConstant('{app}\installer\wizard\scripts\Invoke-InstallerWizard.ps1') + '" ' +
            '-BundlePath "' + PageBundle.Values[0] + '" ' +
@@ -179,11 +312,13 @@ begin
            '-SiteName "' + PageApp.Values[2] + '" ' +
            '-CorsOrigins "' + PageApp.Values[3] + '" ' +
            '-AppNamePrefix "' + PagePM2.Values[0] + '" ' +
-           '-PrismaEnginesPath "' + PagePM2.Values[1] + '"';
+           '-PrismaEnginesPath "' + PagePM2.Values[1] + '" ' +
+           '-AdminFile "' + AdminFile + '"';
     
     Exec(ExpandConstant('{sys}\cmd.exe'), '/c ' + Cmd, '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
     
     DeleteFile(PwFile);
+    DeleteFile(AdminFile);
     // The engine reports failure with a non-zero exit code. Reporting that as a
     // successful install is the exact failure mode the engine logs showed nine
     // times, so the wizard stops instead of finishing.
@@ -201,4 +336,6 @@ procedure DeinitializeSetup();
 begin
   if PwFileToDelete <> '' then
     DeleteFile(PwFileToDelete);
+  if AdminFileToDelete <> '' then
+    DeleteFile(AdminFileToDelete);
 end;
