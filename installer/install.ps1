@@ -80,6 +80,14 @@
   on downloading them from binaries.prisma.sh. When absent, the engine lets
   npm/prisma fetch them and reports a clear error if that fails.
 
+.PARAMETER AdminFile
+  Optional path to a JSON file holding the first Administrator account:
+  {"username","fullName","email","password"}. The wizard writes it to a
+  random-named, ACL-restricted temp file and deletes it afterwards. The engine
+  pipes the password to the helper on stdin, so it never appears in argv, the
+  environment, or the install log. When the parameter is absent the blank
+  database is left with no user, and the log records that.
+
 .PARAMETER Mode
   full   - install from the bundle (default)
   verify - health-check an existing install only
@@ -104,6 +112,7 @@ param(
   [string]$CorsOrigins = "",
   [string]$AppNamePrefix = "",
   [string]$PrismaEnginesPath = "",
+  [string]$AdminFile = "",
   [ValidateSet("full","verify","uninstall")][string]$Mode = "full",
   [int]$AccessTokenTTL = 900,
   [int]$RefreshTokenTTL = 28800,
@@ -605,6 +614,87 @@ function Install-Backend {
   Log "OK" "Database schema applied"
 }
 
+# ---------------------------------------------------------- administrator ---
+
+# Creates the first Administrator so a blank install can be signed into. The
+# application only lets an existing Administrator create users, so without this
+# step a fresh database has no route to a first login. The helper runs from the
+# installed backend directory and uses the application's own Prisma client and
+# bcrypt version, so the stored hash is exactly what the API expects.
+function New-Administrator {
+  param([string]$BackendDir)
+  Log "INFO" "=== First Administrator ==="
+  if (-not $AdminFile) {
+    Log "WARN" "No -AdminFile supplied; this database has no user until one is provisioned by other means."
+    return
+  }
+  if (-not (Test-Path -LiteralPath $AdminFile)) { throw "Administrator file not found: $AdminFile" }
+
+  $raw = [System.IO.File]::ReadAllText($AdminFile)
+  try { $admin = $raw | ConvertFrom-Json } catch { throw "Administrator file is not valid JSON: $AdminFile" }
+
+  $username = [string]$admin.username
+  $password = [string]$admin.password
+  $payload = @{
+    username = $username
+    fullName = [string]$admin.fullName
+    email    = [string]$admin.email
+    password = $password
+  } | ConvertTo-Json -Compress
+  if ($password) { Add-Secret $password }
+  # The password is in memory from here on; the file has no further use.
+  Remove-Item -LiteralPath $AdminFile -Force -ErrorAction SilentlyContinue
+
+  $helper = Join-Path $PSScriptRoot "admin\create-admin.cjs"
+  if (-not (Test-Path -LiteralPath $helper)) { throw "Administrator helper not found in the bundle: $helper" }
+  $node = Get-CmdPath @("node.exe", "node")
+  if (-not $node) { throw "node not found" }
+
+  # The helper is copied in because the installed bundle does not carry the
+  # installer's admin\ folder, and it is removed again whatever happens so the
+  # install tree is left without installer-only files.
+  $staged = Join-Path $BackendDir ".installer-create-admin.cjs"
+  Copy-Item -LiteralPath $helper -Destination $staged -Force
+  try {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $node
+    $psi.Arguments = '"' + $staged + '"'
+    $psi.WorkingDirectory = $BackendDir
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+    $null = $proc.Start()
+    $proc.StandardInput.Write($payload)
+    $proc.StandardInput.Close()
+    # The helper reads all of stdin before it writes anything and its output is
+    # a few short lines, so waiting for exit before reading cannot fill a pipe.
+    if (-not $proc.WaitForExit(120000)) {
+      try { $proc.Kill() } catch { }
+      throw "Administrator creation timed out after 120 seconds."
+    }
+    $stdout = $proc.StandardOutput.ReadToEnd()
+    $stderr = $proc.StandardError.ReadToEnd()
+    $code = $proc.ExitCode
+  } finally {
+    Remove-Item -LiteralPath $staged -Force -ErrorAction SilentlyContinue
+  }
+
+  $output = @((($stdout + "`n" + $stderr) -split "`r?`n") | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim() })
+  foreach ($line in $output) { Log "INFO" "  $(Redact-Secrets $line)" }
+
+  switch ($code) {
+    0 { Log "OK" "First Administrator '$username' created" }
+    10 { Log "WARN" "An active Administrator already exists in this database; the supplied account was not created." }
+    11 { throw "The username '$username' is already in use in this database." }
+    12 { throw "The Administrator details were rejected: $($output | Select-Object -First 1)" }
+    default { throw "Administrator creation failed with exit code $code. See the helper output above." }
+  }
+}
+
 # ------------------------------------------------------------- PM2 / app ----
 
 function Start-Application {
@@ -775,6 +865,7 @@ try {
   $plainPassword = $null
 
   Install-Backend -BackendDir $backendDir
+  New-Administrator -BackendDir $backendDir
   Start-Application -BackendDir $backendDir
 
   # `pm2 start` exits 0 even when an application crashes on its first tick, so
