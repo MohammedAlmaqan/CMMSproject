@@ -4,7 +4,8 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
-import { validate, schedulerRunSchema, maintenancePlanCreateSchema, maintenancePlanUpdateSchema, planPatchIssues } from '../utils/validation.js';
+import { validate, schedulerRunSchema, maintenancePlanCreateSchema, maintenancePlanUpdateSchema, maintenancePlanImportRowSchema, planPatchIssues } from '../utils/validation.js';
+import { csvDate, csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
 import { runSchedulerOnce } from '../services/scheduler.js';
 import { generatePmWorkOrder, PmGenerationError } from '../services/pmGeneration.js';
 import { createAlert, emitAlertToRolesSafely, ALERT_TYPE_PM_GENERATION_FAILED, TRIAGE_ROLES } from '../services/alertService.js';
@@ -271,6 +272,309 @@ router.post('/run-scheduler', authorizeMinRole('Administrator'), validate(schedu
   }
 });
 
+
+const MAINTENANCE_PLAN_CSV_COLUMNS = [
+  'planCode',
+  'description',
+  'workCenterCode',
+  'taskListCode',
+  'strategyType',
+  'intervalValue',
+  'intervalUnit',
+  'callHorizonValue',
+  'callHorizonUnit',
+  'startDate',
+  'endDate',
+  'priority',
+  'generatedWorkOrderStatus',
+  'equipmentCode',
+  'functionalLocationCode',
+  'notificationNumber',
+  'activeFlag',
+] as const;
+
+/**
+ * @openapi
+ * /api/maintenance-plans/export.csv:
+ *   get:
+ *     summary: Export maintenance-plan headers as CSV
+ *     description: >
+ *       Streams every non-deleted plan as text/csv in plan-code order. Dates are written
+ *       as `YYYY-MM-DD`. The work center, task list, equipment and functional location are
+ *       written by code and the associated notification by number. A plan covering several
+ *       assets exports the target on its legacy columns (the first); the rest of its target
+ *       list and its meter thresholds are not represented. No role restriction beyond
+ *       authentication.
+ *     tags: [Maintenance Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Plan headers as text/csv
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'maintenance plans',
+    filename: 'maintenance-plans',
+    columns: MAINTENANCE_PLAN_CSV_COLUMNS,
+    rows: async () => {
+      // `functionalLocation` has no relation on MaintenancePlan - only the id
+      // column - so the codes are resolved from one lookup rather than per row.
+      const [rows, locations] = await Promise.all([
+        prisma.maintenancePlan.findMany({
+          where: { isDeleted: false },
+          orderBy: { planCode: 'asc' },
+          include: {
+            workCenter: { select: { code: true } },
+            taskList: { select: { code: true } },
+            equipment: { select: { equipmentCode: true } },
+            notification: { select: { notificationNumber: true } },
+          },
+        }),
+        prisma.functionalLocation.findMany({
+          select: { functionalLocationId: true, locationCode: true },
+        }),
+      ]);
+      const locationCodeById = new Map(locations.map((l) => [l.functionalLocationId, l.locationCode]));
+      return rows.map((row) => [
+        row.planCode,
+        row.description,
+        row.workCenter.code,
+        row.taskList.code,
+        row.strategyType,
+        row.intervalValue,
+        row.intervalUnit,
+        row.callHorizonValue,
+        row.callHorizonUnit,
+        csvDate(row.startDate),
+        csvDate(row.endDate),
+        row.priority,
+        row.generatedWorkOrderStatus,
+        row.equipment?.equipmentCode ?? '',
+        row.functionalLocationId ? (locationCodeById.get(row.functionalLocationId) ?? '') : '',
+        row.notification?.notificationNumber ?? '',
+        row.activeFlag ? 'true' : 'false',
+      ]);
+    },
+  })
+);
+
+/**
+ * @openapi
+ * /api/maintenance-plans/import.csv:
+ *   post:
+ *     summary: Import maintenance-plan headers from CSV
+ *     description: >
+ *       Multipart upload with a single `file` part. Requires the Maintenance Planner role.
+ *       Rows are validated by `maintenancePlanImportRowSchema`: every code must name an
+ *       existing record, and exactly one of `equipmentCode` / `functionalLocationCode` is
+ *       required, the same rule the API applies to a plan's target. A new plan is created
+ *       with that one target. An existing plan's target and meter thresholds are never
+ *       changed by an import - a plan may cover several assets and carry several meters,
+ *       and a flat file cannot state either - so they are edited on the plan screen. For
+ *       the same reason a Meter or Combined plan can only be imported if it is new and
+ *       already has meters (it cannot), so those strategies are refused at create time
+ *       instead of storing a plan that can never come due. The import is all-or-nothing:
+ *       the first invalid row rolls the whole file back and returns 400 naming that row.
+ *       Add `?dryRun=1` to report the outcome without writing anything.
+ *     tags: [Maintenance Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema: { type: boolean }
+ *         description: Run the import and roll it back, reporting what it would do
+ *     requestBody:
+ *       required: true
+ *       description: "Multipart form; each CSV row validated by zod `maintenancePlanImportRowSchema`"
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       '200':
+ *         description: Import completed; every row was accepted
+ *       '400':
+ *         description: >
+ *           Malformed CSV, a missing header column, a row that failed validation, a row
+ *           naming an unknown record, or a Meter/Combined plan with no meter thresholds
+ *           (the file is rolled back)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '500':
+ *         description: Internal server error
+ */
+router.post(
+  '/import.csv',
+  ...csvImportRoute({
+    noun: 'maintenance plans',
+    columns: MAINTENANCE_PLAN_CSV_COLUMNS,
+    schema: maintenancePlanImportRowSchema,
+    mode: 'strict',
+    run: async (ctx, rows) => {
+      const [workCenters, taskLists, equipment, locations, notifications] = await Promise.all([
+        ctx.tx.workCenter.findMany({ where: { isDeleted: false }, select: { workCenterId: true, code: true } }),
+        ctx.tx.taskList.findMany({ where: { isDeleted: false }, select: { taskListId: true, code: true } }),
+        ctx.tx.equipment.findMany({ where: { isDeleted: false }, select: { equipmentId: true, equipmentCode: true } }),
+        ctx.tx.functionalLocation.findMany({
+          where: { isDeleted: false },
+          select: { functionalLocationId: true, locationCode: true },
+        }),
+        ctx.tx.notification.findMany({
+          where: { isDeleted: false },
+          select: { notificationId: true, notificationNumber: true },
+        }),
+      ]);
+      const workCenterByCode = new Map(workCenters.map((w) => [w.code, w.workCenterId]));
+      const taskListByCode = new Map(taskLists.map((t) => [t.code, t.taskListId]));
+      const equipmentByCode = new Map(equipment.map((e) => [e.equipmentCode, e.equipmentId]));
+      const locationByCode = new Map(locations.map((l) => [l.locationCode, l.functionalLocationId]));
+      const notificationByNumber = new Map(notifications.map((n) => [n.notificationNumber, n.notificationId]));
+
+      const outcome = { created: 0, updated: 0, rejected: [] as Array<{ row: number; reason: string }> };
+      for (const row of rows) {
+        const d = row.record;
+
+        const workCenterId = workCenterByCode.get(d.workCenterCode);
+        if (!workCenterId) {
+          outcome.rejected.push({ row: row.number, reason: `unknown workCenterCode '${d.workCenterCode}'` });
+          continue;
+        }
+        const taskListId = taskListByCode.get(d.taskListCode);
+        if (!taskListId) {
+          outcome.rejected.push({ row: row.number, reason: `unknown taskListCode '${d.taskListCode}'` });
+          continue;
+        }
+
+        let equipmentId: string | null = null;
+        if (d.equipmentCode) {
+          equipmentId = equipmentByCode.get(d.equipmentCode) ?? null;
+          if (!equipmentId) {
+            outcome.rejected.push({ row: row.number, reason: `unknown equipmentCode '${d.equipmentCode}'` });
+            continue;
+          }
+        }
+        let functionalLocationId: string | null = null;
+        if (d.functionalLocationCode) {
+          functionalLocationId = locationByCode.get(d.functionalLocationCode) ?? null;
+          if (!functionalLocationId) {
+            outcome.rejected.push({ row: row.number, reason: `unknown functionalLocationCode '${d.functionalLocationCode}'` });
+            continue;
+          }
+        }
+
+        let notificationId: string | null = null;
+        if (d.notificationNumber) {
+          notificationId = notificationByNumber.get(d.notificationNumber) ?? null;
+          if (!notificationId) {
+            outcome.rejected.push({ row: row.number, reason: `unknown notificationNumber '${d.notificationNumber}'` });
+            continue;
+          }
+        }
+
+        const existing = await ctx.tx.maintenancePlan.findFirst({
+          where: { planCode: d.planCode, isDeleted: false },
+        });
+
+        // The plan screen owns meter thresholds; a Meter or Combined plan without
+        // them can never come due, which looks like a plan that has not run yet.
+        if (d.strategyType === 'Meter' || d.strategyType === 'Combined') {
+          const meterCount = existing
+            ? await ctx.tx.maintenancePlanMeter.count({ where: { planId: existing.planId, isDeleted: false } })
+            : 0;
+          if (meterCount === 0) {
+            outcome.rejected.push({
+              row: row.number,
+              reason: `strategyType '${d.strategyType}' requires meter thresholds, which a CSV file does not carry`,
+            });
+            continue;
+          }
+        }
+
+        if (existing) {
+          await ctx.tx.maintenancePlan.update({
+            where: { planId: existing.planId },
+            data: {
+              description: d.description,
+              workCenterId,
+              taskListId,
+              strategyType: d.strategyType,
+              intervalValue: d.intervalValue,
+              intervalUnit: d.intervalUnit,
+              ...(d.callHorizonValue !== undefined && { callHorizonValue: d.callHorizonValue }),
+              ...(d.callHorizonUnit !== undefined && { callHorizonUnit: d.callHorizonUnit }),
+              startDate: new Date(d.startDate),
+              ...(d.endDate !== undefined && { endDate: new Date(d.endDate) }),
+              ...(d.priority !== undefined && { priority: d.priority }),
+              ...(d.generatedWorkOrderStatus !== undefined && { generatedWorkOrderStatus: d.generatedWorkOrderStatus }),
+              ...(notificationId !== null && { notificationId }),
+              activeFlag: d.activeFlag ?? existing.activeFlag,
+              modifiedBy: ctx.userId,
+            },
+          });
+          await logAuditAction({
+            table: 'MaintenancePlan',
+            recordId: existing.planId,
+            action: 'Update',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.updated += 1;
+        } else {
+          const created = await ctx.tx.maintenancePlan.create({
+            data: {
+              planCode: d.planCode,
+              description: d.description,
+              equipmentId,
+              functionalLocationId,
+              workCenterId,
+              taskListId,
+              strategyType: d.strategyType,
+              intervalValue: d.intervalValue,
+              intervalUnit: d.intervalUnit,
+              callHorizonValue: d.callHorizonValue ?? 7,
+              callHorizonUnit: d.callHorizonUnit ?? 'Days',
+              startDate: new Date(d.startDate),
+              endDate: d.endDate ? new Date(d.endDate) : null,
+              priority: d.priority ?? 'Medium',
+              generatedWorkOrderStatus: d.generatedWorkOrderStatus ?? 'Draft',
+              notificationId,
+              activeFlag: d.activeFlag ?? true,
+              createdBy: ctx.userId,
+              modifiedBy: ctx.userId,
+              // The legacy columns are only a compatibility mirror of the first
+              // target; generation reads the target list, so a plan created here
+              // has to carry one.
+              targets: { create: [{ equipmentId, functionalLocationId }] },
+            },
+          });
+          await logAuditAction({
+            table: 'MaintenancePlan',
+            recordId: created.planId,
+            action: 'Create',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.created += 1;
+        }
+      }
+      return outcome;
+    },
+  })
+);
 
 /**
  * @openapi
