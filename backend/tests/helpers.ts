@@ -303,14 +303,18 @@ export async function purgeWorkCenters(workCenterIds: (string | null | undefined
   // A work centre is restricted by crafts, plans, task lists and work orders, so
   // everything hanging off it goes first. Scoped to these ids throughout, which
   // is what keeps this from touching seed data at a different centre.
+  //
+  // Plans go before task lists, not after: a plan's task list is RESTRICTed by
+  // the plan, so deleting the task list first fails with P2003 on any centre
+  // that owns both - which is every plan a test creates in one.
   await purgeCrafts(
     (await prisma.craft.findMany({ where: { workCenterId: { in: ids } }, select: { craftId: true } })).map((c) => c.craftId)
   );
-  await purgeTaskLists(
-    (await prisma.taskList.findMany({ where: { workCenterId: { in: ids } }, select: { taskListId: true } })).map((t) => t.taskListId)
-  );
   await purgeMaintenancePlans(
     (await prisma.maintenancePlan.findMany({ where: { workCenterId: { in: ids } }, select: { planId: true } })).map((p) => p.planId)
+  );
+  await purgeTaskLists(
+    (await prisma.taskList.findMany({ where: { workCenterId: { in: ids } }, select: { taskListId: true } })).map((t) => t.taskListId)
   );
   await purgeWorkOrders(
     (await prisma.workOrder.findMany({ where: { workCenterId: { in: ids } }, select: { workOrderId: true } })).map((w) => w.workOrderId)
