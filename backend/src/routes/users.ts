@@ -5,6 +5,7 @@ import { authenticate, authorize, authorizeMinRole } from '../middleware/auth.js
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { userCreateSchema, userUpdateSchema, validate } from '../utils/validation.js';
+import { csvExportRoute } from '../utils/csvRoutes.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -218,6 +219,78 @@ router.get('/options', authorizeMinRole('Requester'), async (_req: Request, res:
   }
 });
 
+
+const USER_CSV_COLUMNS = [
+  'username',
+  'fullName',
+  'email',
+  'role',
+  'workCenterCode',
+  'isActive',
+  'lastLogin',
+  'createdDate',
+] as const;
+
+/**
+ * @openapi
+ * /api/users/export.csv:
+ *   get:
+ *     summary: Export the user register as CSV
+ *     description: >
+ *       Administrator-only, matching the JSON list endpoint. Streams every non-deleted user
+ *       as text/csv in username order with profile, role and work centre. The password hash
+ *       is deliberately absent: a credential column in a spreadsheet is a disclosure
+ *       waiting to happen, and no administrative task needs it. Export only; users are
+ *       created and edited through the API, which hashes passwords and enforces the role
+ *       rules.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: The user register as text/csv
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller is not an Administrator
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/export.csv',
+  authorize('Administrator'),
+  csvExportRoute({
+    noun: 'users',
+    filename: 'users',
+    columns: USER_CSV_COLUMNS,
+    rows: async () => {
+      const rows = await prisma.user.findMany({
+        where: { isDeleted: false },
+        orderBy: { username: 'asc' },
+        select: {
+          username: true,
+          fullName: true,
+          email: true,
+          role: true,
+          isActive: true,
+          lastLogin: true,
+          createdDate: true,
+          workCenter: { select: { code: true } },
+        },
+      });
+      return rows.map((row) => [
+        row.username,
+        row.fullName,
+        row.email,
+        row.role,
+        row.workCenter?.code ?? '',
+        row.isActive ? 'true' : 'false',
+        row.lastLogin ? row.lastLogin.toISOString() : '',
+        row.createdDate.toISOString(),
+      ]);
+    },
+  })
+);
 
 /**
  * @openapi
