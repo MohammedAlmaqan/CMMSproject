@@ -5,6 +5,7 @@ import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction, logAuditFieldChange, logFieldChanges, auditMiddleware } from '../middleware/audit.js';
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { logger } from '../utils/logger.js';
+import { csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
 import {
   validate,
   checklistTemplateCreateSchema,
@@ -12,6 +13,7 @@ import {
   checklistAttachSchema,
   checklistUpdateSchema,
   checklistItemUpdateSchema,
+  checklistImportRowSchema,
 } from '../utils/validation.js';
 
 const router = Router();
@@ -398,6 +400,227 @@ router.delete('/templates/:id', authorizeMinRole('Maintenance Supervisor'), asyn
   }
 });
 
+
+const CHECKLIST_CSV_COLUMNS = [
+  'templateName',
+  'templateDescription',
+  'isMandatory',
+  'sequenceNumber',
+  'itemDescription',
+] as const;
+
+/**
+ * @openapi
+ * /api/safety-checklists/export.csv:
+ *   get:
+ *     summary: Export safety checklist templates as CSV
+ *     description: >
+ *       One row per checklist item, with the template's name, description and
+ *       mandatory flag repeated on each row. A template that has no items yet is
+ *       written as a single row with empty `sequenceNumber` and `itemDescription`, so
+ *       an export/import round trip does not lose it. No role restriction beyond
+ *       authentication.
+ *     tags: [Safety Checklists]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Checklist templates as text/csv
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'safety checklists',
+    filename: 'safety-checklists',
+    columns: CHECKLIST_CSV_COLUMNS,
+    rows: async () => {
+      const templates = await prisma.safetyChecklistTemplate.findMany({
+        where: { isDeleted: false },
+        orderBy: { name: 'asc' },
+        include: {
+          items: {
+            where: { isDeleted: false },
+            orderBy: { sequenceNumber: 'asc' },
+          },
+        },
+      });
+      return templates.flatMap((template) => {
+        const header = [
+          template.name,
+          template.description,
+          template.isMandatory ? 'true' : 'false',
+        ];
+        if (template.items.length === 0) return [[...header, '', '']];
+        return template.items.map((item) => [...header, item.sequenceNumber, item.description]);
+      });
+    },
+  })
+);
+
+/**
+ * @openapi
+ * /api/safety-checklists/import.csv:
+ *   post:
+ *     summary: Import safety checklist templates from CSV
+ *     description: >
+ *       Multipart upload with a single `file` part. Requires the Maintenance Planner role.
+ *       Rows are validated by `checklistImportRowSchema`. A template is matched by `name`
+ *       and an item by its `sequenceNumber` inside that template, so re-uploading an
+ *       edited export updates in place instead of duplicating. Items are never deleted by
+ *       an import: removing an item is refused once it has been answered on a work order,
+ *       and the file is not the place to make that decision. A blank `templateDescription`
+ *       or `isMandatory` leaves the stored value alone; a row with no `sequenceNumber` and
+ *       no `itemDescription` creates or updates only the template itself. The import is
+ *       all-or-nothing: the first invalid row rolls the whole file back and returns 400.
+ *       Add `?dryRun=1` to report the outcome without writing anything.
+ *     tags: [Safety Checklists]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema: { type: boolean }
+ *         description: Run the import and roll it back, reporting what it would do
+ *     requestBody:
+ *       required: true
+ *       description: "Multipart form; each CSV row validated by zod `checklistImportRowSchema`"
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       '200':
+ *         description: Import completed; every row was accepted
+ *       '400':
+ *         description: Malformed CSV, a missing header column, or a row that failed validation (the file is rolled back)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '500':
+ *         description: Internal server error
+ */
+router.post(
+  '/import.csv',
+  ...csvImportRoute({
+    noun: 'safety checklists',
+    columns: CHECKLIST_CSV_COLUMNS,
+    schema: checklistImportRowSchema,
+    mode: 'strict',
+    run: async (ctx, rows) => {
+      const outcome = { created: 0, updated: 0, rejected: [] as Array<{ row: number; reason: string }> };
+      // Template rows repeat their header on every item. Within one file the
+      // template must therefore be resolved once and reused, or the second row
+      // for the same template would try to create it again.
+      const templateByName = new Map<string, string>();
+
+      for (const row of rows) {
+        const d = row.record;
+
+        let templateId = templateByName.get(d.templateName);
+        if (!templateId) {
+          const existing = await ctx.tx.safetyChecklistTemplate.findFirst({
+            where: { name: d.templateName, isDeleted: false },
+          });
+          if (existing) {
+            await ctx.tx.safetyChecklistTemplate.update({
+              where: { checklistTemplateId: existing.checklistTemplateId },
+              data: {
+                description: d.templateDescription || existing.description,
+                isMandatory: d.isMandatory ?? existing.isMandatory,
+                modifiedBy: ctx.userId,
+              },
+            });
+            await logAuditAction({
+              table: 'SafetyChecklistTemplate',
+              recordId: existing.checklistTemplateId,
+              action: 'Update',
+              userId: ctx.userId,
+              ipAddress: ctx.ipAddress,
+              db: ctx.tx,
+            });
+            outcome.updated += 1;
+            templateId = existing.checklistTemplateId;
+          } else {
+            const created = await ctx.tx.safetyChecklistTemplate.create({
+              data: {
+                name: d.templateName,
+                description: d.templateDescription || d.templateName,
+                isMandatory: d.isMandatory ?? false,
+                createdBy: ctx.userId,
+                modifiedBy: ctx.userId,
+              },
+            });
+            await logAuditAction({
+              table: 'SafetyChecklistTemplate',
+              recordId: created.checklistTemplateId,
+              action: 'Create',
+              userId: ctx.userId,
+              ipAddress: ctx.ipAddress,
+              db: ctx.tx,
+            });
+            outcome.created += 1;
+            templateId = created.checklistTemplateId;
+          }
+          templateByName.set(d.templateName, templateId);
+        }
+
+        // A template-only row: no item to write.
+        if (d.sequenceNumber === undefined) continue;
+
+        const existingItem = await ctx.tx.checklistItem.findFirst({
+          where: {
+            checklistTemplateId: templateId,
+            sequenceNumber: d.sequenceNumber,
+            isDeleted: false,
+          },
+        });
+        if (existingItem) {
+          await ctx.tx.checklistItem.update({
+            where: { itemId: existingItem.itemId },
+            data: { description: d.itemDescription as string, modifiedBy: ctx.userId },
+          });
+          await logAuditAction({
+            table: 'ChecklistItem',
+            recordId: existingItem.itemId,
+            action: 'Update',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.updated += 1;
+        } else {
+          const created = await ctx.tx.checklistItem.create({
+            data: {
+              checklistTemplateId: templateId,
+              sequenceNumber: d.sequenceNumber,
+              description: d.itemDescription as string,
+              createdBy: ctx.userId,
+              modifiedBy: ctx.userId,
+            },
+          });
+          await logAuditAction({
+            table: 'ChecklistItem',
+            recordId: created.itemId,
+            action: 'Create',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.created += 1;
+        }
+      }
+      return outcome;
+    },
+  })
+);
 
 /**
  * @openapi
