@@ -22,6 +22,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import CsvToolbar from '@/components/CsvToolbar';
 import { useAppStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
 import { maintenancePlanService } from '@/services/maintenancePlanService';
@@ -104,6 +105,9 @@ export default function PreventiveMaintenancePage() {
   const canRunScheduler = hasPermission(['Administrator']);
   // POST /maintenance-plans/:id/generate-wo is Maintenance Planner+ on the API.
   const canGenerate = hasPermission(['Maintenance Planner', 'Administrator']);
+  // The CSV import is Maintenance Planner+ too, but kept separate: they are two
+  // permissions that happen to share a floor, not one gate.
+  const canImport = hasPermission(['Maintenance Planner', 'Administrator']);
 
   const notify = useCallback((text: string, error = false) => setToast({ text, error }), []);
 
@@ -455,6 +459,13 @@ export default function PreventiveMaintenancePage() {
             <option value="Inactive">Inactive</option>
           </select>
           <span className="text-tertiary text-xs ml-auto">{filtered.length} plans</span>
+          <CsvToolbar
+            noun="maintenance plans"
+            importPath="/maintenance-plans/import.csv"
+            exportPath="/maintenance-plans/export.csv"
+            canImport={canImport}
+            onImported={loadFromApi}
+          />
           {canRunScheduler && (
             <button
               onClick={runScheduler}

@@ -22,6 +22,7 @@ import {
   GitBranch,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import CsvToolbar from '@/components/CsvToolbar';
 import { causeCodeService } from '@/services/causeCodeService';
 import { failureCodeService } from '@/services/failureCodeService';
 import { useAuthStore } from '@/store/authStore';
@@ -46,6 +47,9 @@ function CodeSection({ kind, noun, codeLabel, descriptionLabel, codePlaceholder,
   // Both APIs (causeCodes.ts, failureCodes.ts): POST/PUT Requester+, DELETE Supervisor+.
   const canWrite = hasPermission(['Requester', 'Technician', 'Maintenance Supervisor', 'Maintenance Planner', 'Administrator']);
   const canDelete = hasPermission(['Maintenance Supervisor', 'Maintenance Planner', 'Administrator']);
+  // The CSV import is Maintenance Planner+ (shared factory floor), higher than
+  // this module's Requester+ write floor, so it needs its own gate.
+  const canImport = hasPermission(['Maintenance Planner', 'Administrator']);
 
   const [items, setItems] = useState<(CauseCode | FailureCode)[]>([]);
   const [loading, setLoading] = useState(true);
@@ -232,15 +236,25 @@ function CodeSection({ kind, noun, codeLabel, descriptionLabel, codePlaceholder,
       </div>
 
       <div className="px-3 py-2 border-b border-subtle">
-        <div className="relative max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-tertiary" />
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={`Search ${noun}s...`}
-            aria-label={`Search ${noun}s`}
-            className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+        <div className="flex items-center gap-3">
+          <div className="relative max-w-xs flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-tertiary" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={`Search ${noun}s...`}
+              aria-label={`Search ${noun}s`}
+              className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
+              style={{ backgroundColor: '#27272A' }}
+            />
+          </div>
+          <CsvToolbar
+            noun={kind === 'cause' ? 'cause codes' : 'failure codes'}
+            importPath={kind === 'cause' ? '/cause-codes/import.csv' : '/failure-codes/import.csv'}
+            exportPath={kind === 'cause' ? '/cause-codes/export.csv' : '/failure-codes/export.csv'}
+            canImport={canImport}
+            onImported={reload}
+            className="ml-auto"
           />
         </div>
       </div>

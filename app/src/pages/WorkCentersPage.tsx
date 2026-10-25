@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Clock, DollarSign, ChevronDown, ChevronRight, Plus, Pencil } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import CapacityBoardPanel from '@/components/capacity/CapacityBoardPanel';
+import CsvToolbar from '@/components/CsvToolbar';
 import { useAppStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
 import { hasMinRole } from '@/lib/rbac';
@@ -142,6 +143,8 @@ export default function WorkCentersPage() {
   // POST/PUT /work-centers are Requester+ on the API; delete is deliberately omitted
   // (isActive deactivation covers the v1 need — see the audit's G6 note).
   const canManage = hasMinRole(role, 'Requester');
+  // The CSV import is Maintenance Planner+; the export is authentication only.
+  const canImport = hasMinRole(role, 'Maintenance Planner');
   const [expandedWC, setExpandedWC] = useState<Set<string>>(new Set());
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editing, setEditing] = useState<WorkCenter | null>(null);
@@ -182,8 +185,15 @@ export default function WorkCentersPage() {
           <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No work centers found in the system.</div>
         )}
         <CapacityBoardPanel crafts={crafts} />
-        {canManage && (
-          <div className="flex items-center justify-end mb-4">
+        <div className="flex items-center gap-2 justify-end mb-4">
+          <CsvToolbar
+            noun="work centers"
+            importPath="/work-centers/import.csv"
+            exportPath="/work-centers/export.csv"
+            canImport={canImport}
+            onImported={() => useAppStore.getState().loadFromApi()}
+          />
+          {canManage && (
             <button
               onClick={() => { setEditing(null); setShowCreateForm(true); }}
               aria-label="Add work center"
@@ -191,8 +201,8 @@ export default function WorkCentersPage() {
             >
               <Plus className="w-3.5 h-3.5" /> Add Work Center
             </button>
-          </div>
-        )}
+          )}
+        </div>
         {(showCreateForm || editing) && canManage && (
           <WorkCenterForm initial={editing} onCancel={() => { setShowCreateForm(false); setEditing(null); }} onSaved={handleSaved} />
         )}

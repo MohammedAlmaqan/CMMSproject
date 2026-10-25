@@ -26,6 +26,7 @@ import { userService } from '@/services/userService';
 import { auditLogService } from '@/services/auditLogService';
 import type { AuditLogEntry, User, UserRole, WorkCenter } from '@/types';
 import Header from '@/components/layout/Header';
+import CsvToolbar from '@/components/CsvToolbar';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 
 type AdminTab = 'users' | 'audit' | 'settings';
@@ -263,6 +264,9 @@ export default function AdministrationPage() {
                 >
                   <UserPlus className="w-3.5 h-3.5" /> Add User
                 </button>
+                {/* Export only, and Administrator-only like the JSON list: a user
+                    file must never carry a credential column (F7). */}
+                <CsvToolbar noun="users" exportPath="/users/export.csv" />
                 <span className="text-tertiary text-xs ml-auto">{filteredUsers.length} users</span>
               </div>
               {userActionError && (

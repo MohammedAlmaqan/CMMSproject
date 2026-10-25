@@ -20,6 +20,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import CsvToolbar from '@/components/CsvToolbar';
 import { craftService } from '@/services/craftService';
 import { workCenterService } from '@/services/workCenterService';
 import { useAuthStore } from '@/store/authStore';
@@ -200,6 +201,13 @@ export default function CraftsPage() {
           <span className="text-tertiary text-xs ml-auto">
             {loading ? 'Loading…' : `${crafts.length} crafts`}
           </span>
+          <CsvToolbar
+            noun="crafts"
+            importPath="/crafts/import.csv"
+            exportPath="/crafts/export.csv"
+            canImport={canWrite}
+            onImported={reload}
+          />
           {loadError && (
             <button
               onClick={reload}

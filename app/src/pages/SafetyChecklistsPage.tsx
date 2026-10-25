@@ -23,6 +23,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import CsvToolbar from '@/components/CsvToolbar';
 import { safetyChecklistService } from '@/services/safetyChecklistService';
 import { useAuthStore } from '@/store/authStore';
 import { ApiError } from '@/lib/api';
@@ -227,6 +228,13 @@ export default function SafetyChecklistsPage() {
           <span className="text-tertiary text-xs ml-auto">
             {loading ? 'Loading…' : `${templates.length} templates`}
           </span>
+          <CsvToolbar
+            noun="safety checklists"
+            importPath="/safety-checklists/import.csv"
+            exportPath="/safety-checklists/export.csv"
+            canImport={canWrite}
+            onImported={reload}
+          />
           {loadError && (
             <button
               onClick={reload}

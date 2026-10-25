@@ -19,6 +19,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import CsvToolbar from '@/components/CsvToolbar';
 import { useAppStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
 import { taskListService } from '@/services/taskListService';
@@ -76,6 +77,9 @@ export default function TaskListsPage() {
   // API would reject rather than offering a button that always fails.
   const canWrite = hasPermission(['Requester', 'Technician', 'Maintenance Supervisor', 'Administrator']);
   const canDelete = hasPermission(['Maintenance Supervisor', 'Administrator']);
+  // The CSV import is Maintenance Planner+ (the shared factory's floor), which is
+  // higher than this module's own write floor, so it needs its own gate.
+  const canImport = hasPermission(['Maintenance Planner', 'Administrator']);
 
   const notify = useCallback((text: string, error = false) => {
     setToast({ text, error });
@@ -346,6 +350,14 @@ export default function TaskListsPage() {
               className={`${inputCls} pl-8`}
             />
           </div>
+          <CsvToolbar
+            noun="task lists"
+            importPath="/task-lists/import.csv"
+            exportPath="/task-lists/export.csv"
+            canImport={canImport}
+            onImported={() => useAppStore.getState().loadFromApi()}
+            className="ml-auto"
+          />
           {canWrite && (
             <button
               onClick={openCreate}

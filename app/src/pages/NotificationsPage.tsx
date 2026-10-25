@@ -19,6 +19,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import CsvToolbar from '@/components/CsvToolbar';
 import { notificationService } from '@/services/notificationService';
 import { useAppStore } from '@/store/appStore';
 import { useAuthStore } from '@/store/authStore';
@@ -276,6 +277,9 @@ export default function NotificationsPage() {
           <span className="text-tertiary text-xs ml-auto">
             {loading ? 'Loading…' : `${total} notifications`}
           </span>
+          {/* Export only: a notification's lifecycle is the workflow, not master
+              data, so there is no import route to offer (F7). */}
+          <CsvToolbar noun="notifications" exportPath="/notifications/export.csv" />
           {loadError && (
             <button
               onClick={reload}
