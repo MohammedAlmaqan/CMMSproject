@@ -6,7 +6,7 @@ import { JWT_SECRET } from '../../src/utils/config.js';
 import { allocate } from '../../src/utils/costSplits.js';
 
 // SOW 3.5.2 (matrix :175): cost-split validation and read-back over the
-// route â€” the percentage allocation of the work order's own actualCost across
+// route — the percentage allocation of the work order's own actualCost across
 // cost centres, verified against live rows. The pure allocate/checkAllocation
 // and the zod schemas had unit coverage; the write path had only static
 // source-regex tests. These cases drive PUT/GET/DELETE

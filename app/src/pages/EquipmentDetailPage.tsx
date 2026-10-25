@@ -1,5 +1,5 @@
 ﻿// ============================================================
-// Equipment Detail Page â€” Live API
+// Equipment Detail Page — Live API
 // ============================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -550,7 +550,7 @@ export default function EquipmentDetailPage() {
                             <option value="">Select...</option>
                             {materials.map((m) => (
                               <option key={m.materialId} value={m.materialId}>
-                                {m.materialCode} â€” {m.description}
+                                {m.materialCode} — {m.description}
                               </option>
                             ))}
                           </select>
@@ -927,7 +927,7 @@ export default function EquipmentDetailPage() {
                         <div className="min-w-0">
                           <p className="text-primary text-xs font-mono truncate">{att.originalName}</p>
                           <p className="text-tertiary text-xs mt-0.5">
-                            {formatBytes(att.sizeBytes)} Â· {att.createdBy} Â· {new Date(att.createdDate).toLocaleString()}
+                            {formatBytes(att.sizeBytes)} · {att.createdBy} · {new Date(att.createdDate).toLocaleString()}
                           </p>
                         </div>
                       </div>

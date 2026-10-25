@@ -9,7 +9,7 @@ was green when the tag was cut.
 The installer workstream, closed. The standalone installer under `installer/` is
 tracked in `docs/INSTALLER_TRACKER.md`. Application code (`backend/`, `app/`) is
 unchanged from v1.6.2; this release is the installer and the bundle it delivers.
-This section was listed as `Unreleased â€” installer workstream` before the tag
+This section was listed as `Unreleased — installer workstream` before the tag
 was cut.
 
 - **The wizard now runs its page setup.** It declared `OnInitializeWizard`, which
@@ -68,8 +68,8 @@ IIS-behind-reverse-proxy deployment.
 
 - **`BIND_HOST` defaults to `127.0.0.1`.** `backend/src/index.ts` bound `0.0.0.0`
   by default, relying on `backend/.env` (or the PM2 ecosystem file) to set
-  loopback. A deployment that omitted the variable â€” or launched the API from a
-  working directory where `.env` is not picked up â€” bound every interface and
+  loopback. A deployment that omitted the variable — or launched the API from a
+  working directory where `.env` is not picked up — bound every interface and
   exposed port 4000. With `trust proxy = 1`, a client that can reach port 4000
   directly can spoof `X-Forwarded-For` and defeat the login rate limiter, so the
   default is now loopback-only and `0.0.0.0` is an explicit opt-in for
