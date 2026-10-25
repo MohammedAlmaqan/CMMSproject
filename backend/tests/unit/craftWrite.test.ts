@@ -110,7 +110,7 @@ describe('craft write path, SOW 3.1.3', () => {
     expect(craftsRoute).toMatch(/still referenced by a work order operation/);
   });
 
-  it('audits each of the three writes, and leaves the read unaudited', () => {
+  it('audits every write, and leaves the read unaudited', () => {
     const create = craftsRoute.match(/table: 'Craft', recordId: craft\.craftId, action: 'Create'/g) ?? [];
     // The update path is a field diff, so it names the table and the record but
     // carries no action: logFieldChanges is only ever an update.
@@ -119,8 +119,10 @@ describe('craft write path, SOW 3.1.3', () => {
     expect(create).toHaveLength(1);
     expect(update).toHaveLength(1);
     expect(remove).toHaveLength(1);
-    // Three writes, three audit entries: a silent unaudited mutation is the
-    // failure this guards, so the count is pinned exactly rather than loosely.
-    expect((craftsRoute.match(/table: 'Craft'/g) ?? [])).toHaveLength(3);
+    // Five writes, five audit entries: create, field-diff update and delete,
+    // plus the CSV import's create and update. A silent unaudited mutation is
+    // the failure this guards, so the count is pinned exactly rather than
+    // loosely - a new write path has to be counted here deliberately.
+    expect((craftsRoute.match(/table: 'Craft'/g) ?? [])).toHaveLength(5);
   });
 });
