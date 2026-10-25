@@ -1,14 +1,6 @@
-import { api, getAuthToken, ApiError, notifyApiActivity, fetchAllPages } from '@/lib/api';
+import { api, fetchAllPages } from '@/lib/api';
 import type { PaginatedResponse } from '@/lib/api';
 import type { Equipment, EquipmentHistoryEntry, EquipmentBOM, EquipmentMeter } from '@/types';
-
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
-
-export interface CsvImportResult {
-  created: number;
-  updated: number;
-  failed: unknown[];
-}
 
 export const equipmentService = {
   getAll: (params?: Record<string, string | number | boolean | undefined>) =>
@@ -39,41 +31,4 @@ export const equipmentService = {
   updateMeter: (meterId: string, data: Partial<Pick<EquipmentMeter, 'meterName' | 'unitOfMeasure' | 'lastReading' | 'lastReadingDate'>>) =>
     api.put<EquipmentMeter>(`/equipment-meters/${meterId}`, data),
   deleteMeter: (meterId: string) => api.delete(`/equipment-meters/${meterId}`),
-
-  exportCsv: async () => {
-    const res = await fetch(`${API_BASE}/equipment/export.csv`, {
-      headers: { Authorization: `Bearer ${getAuthToken()}` },
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({ error: res.statusText }));
-      throw new ApiError(res.status, body.error || res.statusText);
-    }
-    notifyApiActivity();
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `equipment-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  },
-
-  importCsv: (file: File) => {
-    const fd = new FormData();
-    fd.append('file', file);
-    return fetch(`${API_BASE}/equipment/import.csv`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getAuthToken()}` },
-      body: fd,
-    }).then(async (res) => {
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: res.statusText }));
-        throw new ApiError(res.status, body.error || res.statusText);
-      }
-      notifyApiActivity();
-      return res.json() as Promise<CsvImportResult>;
-    });
-  },
 };

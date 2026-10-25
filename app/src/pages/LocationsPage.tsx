@@ -22,6 +22,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import CsvToolbar from '@/components/CsvToolbar';
 import { functionalLocationService } from '@/services/functionalLocationService';
 import { equipmentService } from '@/services/equipmentService';
 import { useAuthStore } from '@/store/authStore';
@@ -61,6 +62,8 @@ export default function LocationsPage() {
   // Supervisor. Controls the API would reject are hidden, not disabled.
   const canWrite = hasPermission(['Technician', 'Maintenance Supervisor', 'Maintenance Planner', 'Administrator']);
   const canDelete = hasPermission(['Maintenance Supervisor', 'Maintenance Planner', 'Administrator']);
+  // POST /functional-locations/import.csv is Maintenance Planner+ on the API.
+  const canImport = hasPermission(['Maintenance Planner', 'Administrator']);
 
   const [formCode, setFormCode] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -383,6 +386,13 @@ export default function LocationsPage() {
               <RefreshCw className="w-3 h-3" /> Retry
             </button>
           )}
+          <CsvToolbar
+            noun="functional locations"
+            importPath="/functional-locations/import.csv"
+            exportPath="/functional-locations/export.csv"
+            canImport={canImport}
+            onImported={reload}
+          />
           {canWrite && (
             <button
               onClick={openCreate}

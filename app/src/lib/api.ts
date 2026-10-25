@@ -101,6 +101,10 @@ async function readErrorMessage(res: Response): Promise<string> {
   return (body as { error?: string }).error || res.statusText;
 }
 
+function authHeaders(): Record<string, string> {
+  return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+}
+
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>) {
   if (!params) return path;
   const searchParams = new URLSearchParams();
@@ -170,8 +174,6 @@ export const api = {
     fallbackFilename = 'download'
   ): Promise<void> => {
     const url = buildUrl(`${API_BASE}${path}`, params);
-    const authHeaders = (): Record<string, string> =>
-      authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
     let res = await fetch(url, { headers: authHeaders(), credentials: 'include' });
     // An expired access token shows up here too; refresh once and retry.
@@ -199,6 +201,39 @@ export const api = {
     document.body.removeChild(anchor);
     URL.revokeObjectURL(objectUrl);
     notifyApiActivity();
+  },
+
+  /**
+   * POST a multipart upload with the bearer token. Content-Type is deliberately
+   * left unset: only the browser knows the boundary it wrote. Refresh handling
+   * matches `download`, because a long form fill can outlive an access token just
+   * as a slow export can.
+   */
+  upload: async <T>(path: string, file: File, field = 'file'): Promise<T> => {
+    const body = new FormData();
+    body.append(field, file);
+    const send = () =>
+      fetch(`${API_BASE}${path}`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body,
+        credentials: 'include',
+      });
+
+    let res = await send();
+    if (res.status === 401 && !isAuthPath(path)) {
+      const refreshed = await refreshSession();
+      if (refreshed) {
+        res = await send();
+      } else {
+        notifyAuthFailure();
+      }
+    }
+    if (!res.ok) {
+      throw new ApiError(res.status, await readErrorMessage(res));
+    }
+    notifyApiActivity();
+    return (await res.json()) as T;
   },
 };
 

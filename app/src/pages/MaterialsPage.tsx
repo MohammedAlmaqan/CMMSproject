@@ -2,19 +2,18 @@
 // Materials Page — Spare Parts Catalog
 // ============================================================
 
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Search,
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
-  Upload,
-  Download,
   X,
   Plus,
   Pencil,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import CsvToolbar from '@/components/CsvToolbar';
 import { materialService } from '@/services/materialService';
 import { ApiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
@@ -155,9 +154,6 @@ export default function MaterialsPage() {
   const [page, setPage] = useState(0);
   const [sortField, setSortField] = useState<string>('materialCode');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importBusy, setImportBusy] = useState(false);
-  const [exportBusy, setExportBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [toastError, setToastError] = useState(false);
   // POST/PUT /materials are Requester+ on the API; delete is deliberately omitted
@@ -167,38 +163,6 @@ export default function MaterialsPage() {
   const canManage = hasMinRole(role, 'Requester');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editing, setEditing] = useState<Material | null>(null);
-
-  const handleExport = async () => {
-    setExportBusy(true);
-    try {
-      await materialService.exportCsv();
-      setToastError(false);
-      setToast('Materials CSV exported');
-    } catch (err) {
-      setToastError(true);
-      setToast(err instanceof ApiError ? err.message : 'CSV export failed');
-    } finally {
-      setExportBusy(false);
-    }
-  };
-
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setImportBusy(true);
-    try {
-      const res = await materialService.importCsv(file);
-      await reload();
-      setToastError(false);
-      setToast(`Import complete: ${res.created} created, ${res.updated} updated`);
-    } catch (err) {
-      setToastError(true);
-      setToast(err instanceof ApiError ? err.message : 'CSV import failed');
-    } finally {
-      setImportBusy(false);
-    }
-  };
 
   const queryParams = useMemo(() => {
     const params: Record<string, string | number> = {
@@ -285,30 +249,13 @@ export default function MaterialsPage() {
                 <Plus className="w-3.5 h-3.5" /> Add Material
               </button>
             )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              aria-label="Import materials CSV"
-              onChange={handleImportFile}
+            <CsvToolbar
+              noun="materials"
+              importPath="/materials/import.csv"
+              exportPath="/materials/export.csv"
+              canImport={canImport}
+              onImported={reload}
             />
-            {canImport && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importBusy}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight hover:text-amber disabled:opacity-50"
-              >
-                <Upload className="w-3.5 h-3.5" /> {importBusy ? 'Importing…' : 'Import'}
-              </button>
-            )}
-            <button
-              onClick={handleExport}
-              disabled={exportBusy}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight hover:text-amber disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" /> {exportBusy ? 'Exporting…' : 'Export'}
-            </button>
             <span className="text-tertiary text-xs">{total} materials</span>
           </div>
         </div>

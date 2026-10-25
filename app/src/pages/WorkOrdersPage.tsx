@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import ScheduleWorkOrderDialog from '@/components/ScheduleWorkOrderDialog';
+import CsvToolbar from '@/components/CsvToolbar';
 import type { ScheduleDates } from '@/components/ScheduleWorkOrderDialog';
 import { useAuthStore } from '@/store/authStore';
 import { hasMinRole } from '@/lib/rbac';
@@ -82,6 +83,8 @@ export default function WorkOrdersPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const role = useAuthStore((s) => s.user?.role);
   const canCreate = hasMinRole(role, 'Requester');
+  // POST /work-orders/import.csv is Maintenance Planner+ on the API.
+  const canImport = hasMinRole(role, 'Maintenance Planner');
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [rows, setRows] = useState<WorkOrderRow[]>([]);
@@ -289,7 +292,15 @@ export default function WorkOrdersPage() {
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
           </select>
-          <span className="text-tertiary text-xs ml-auto">
+          <CsvToolbar
+            noun="work orders"
+            importPath="/work-orders/import.csv"
+            exportPath="/work-orders/export.csv"
+            canImport={canImport}
+            onImported={load}
+            className="ml-auto"
+          />
+          <span className="text-tertiary text-xs">
             {totalCount} work orders
           </span>
         </div>
