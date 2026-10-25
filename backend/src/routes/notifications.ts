@@ -14,6 +14,7 @@ import { resolveWorkOrderPriority, highestPriority } from '../utils/workOrderRul
 import { emitAlertToRolesSafely, ALERT_TYPE_HIGH_PRIORITY_NOTIFICATION, TRIAGE_ROLES } from '../services/alertService.js';
 import { logger } from '../utils/logger.js';
 import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
+import { csvExportRoute } from '../utils/csvRoutes.js';
 import {
   validate,
   notificationCreateSchema,
@@ -209,6 +210,77 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+
+const NOTIFICATION_CSV_COLUMNS = [
+  'notificationNumber',
+  'type',
+  'priority',
+  'status',
+  'description',
+  'damagesObservations',
+  'breakdownFlag',
+  'functionalLocationCode',
+  'equipmentCode',
+  'reportedByUsername',
+  'createdDate',
+  'modifiedDate',
+] as const;
+
+/**
+ * @openapi
+ * /api/notifications/export.csv:
+ *   get:
+ *     summary: Export notifications as CSV
+ *     description: >
+ *       Streams every non-deleted notification as text/csv in notification-number order,
+ *       with its location, equipment and reporting user resolved to codes and username.
+ *       Export only: notifications are not importable, because their lifecycle
+ *       (Open -> In Process -> Completed -> Converted) and the conversion to a work order
+ *       are workflow decisions, not master data. No role restriction beyond authentication.
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Notifications as text/csv
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'notifications',
+    filename: 'notifications',
+    columns: NOTIFICATION_CSV_COLUMNS,
+    rows: async () => {
+      const rows = await prisma.notification.findMany({
+        where: { isDeleted: false },
+        orderBy: { notificationNumber: 'asc' },
+        include: {
+          functionalLocation: { select: { locationCode: true } },
+          equipment: { select: { equipmentCode: true } },
+          reportedBy: { select: { username: true } },
+        },
+      });
+      return rows.map((row) => [
+        row.notificationNumber,
+        row.type,
+        row.priority,
+        row.status,
+        row.description,
+        row.damagesObservations ?? '',
+        row.breakdownFlag ? 'true' : 'false',
+        row.functionalLocation.locationCode,
+        row.equipment?.equipmentCode ?? '',
+        row.reportedBy.username,
+        row.createdDate.toISOString(),
+        row.modifiedDate.toISOString(),
+      ]);
+    },
+  })
+);
 
 /**
  * @openapi
