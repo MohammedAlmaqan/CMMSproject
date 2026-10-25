@@ -106,7 +106,7 @@ with this pass.
 
 `scripts/verify/verify_a1.py` (214 clause rows), `verify_a1_dispositions.py`
 (77 of 77 rows dispositioned) and `verify_openapi.py` (150 operations across 95
-paths) pass. Backend suite: 88 files, 1205 tests. App suite: 29 files, 177 tests.
+paths) pass. Backend suite: 88 files, 1207 tests. App suite: 29 files, 177 tests.
 The CI run at the tagged SHA is the evidence, not this paragraph.
 
 ### Known open items
