@@ -83,6 +83,11 @@ export interface CsvImportSpec<T = Record<string, string>> {
   schema?: z.ZodType<T>;
   mode: CsvImportMode;
   /**
+   * Transaction limits, for a module whose writes fan out (a craft rate change
+   * re-costs every work order that uses it). Omitted means Prisma's defaults.
+   */
+  txOptions?: { maxWait?: number; timeout?: number };
+  /**
    * Persists the rows whose shape was accepted. Data problems must be returned
    * in `rejected`, not thrown: in `strict` mode the factory turns the first one
    * into a rollback and a 400, and in `partial` mode it returns them.
@@ -263,7 +268,7 @@ async function executeImport<T>(spec: CsvImportSpec<T>, req: Request): Promise<C
 
       if (dryRun) throw new DryRunRollback(merged);
       return merged;
-    });
+    }, spec.txOptions);
   } catch (error) {
     if (error instanceof DryRunRollback) return error.outcome;
     throw error;
