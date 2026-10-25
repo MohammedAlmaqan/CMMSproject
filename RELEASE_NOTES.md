@@ -4,6 +4,103 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.6.6
+
+`v1.6.5` closed the fourteen findings from the manual end-to-end pass, but it
+also recorded four things it deliberately did *not* change: F5 (scheduling
+without dates), F7 (CSV absent from most registers), F4 (the work-order header
+gate lives only in the UI) and A1 (the credential file inside the v1.6.4
+bundle). The owner reviewed those four on 2026-10-25 and decided each; the
+decisions and the engineering call behind each are recorded in
+`docs/E2E_V164_REMEDIATION_TRACKER.md` under *Approved scope, 2026-10-25
+(second round)*. This release implements three of them and records the fourth
+in these notes rather than in code.
+
+### What a user will notice
+
+- **Import and Export on six more registers.** Work Centers, Crafts, Task
+  Lists, Safety Checklists, Code Lists (cause and failure codes, one pair per
+  tab) and PM Plans now carry the same toolbar as Equipment, Materials, Work
+  Orders and Functional Locations. Notifications and the Users register in
+  Administration are export-only: a notification's lifecycle is the workflow,
+  and a user file must never carry a credential. All seven new imports are
+  all-or-nothing, at the Maintenance Planner floor. `024d476`, `4b552b2`,
+  `c0f96d9`, `0dfa21a`, `2495f82`, `14e9684`, `cb5037a`, `94a7c16`, `b8e1049`,
+  `424e5e7`, `f40c197`. Documented in `docs/USER_MANUAL.md` section 3.4 and
+  `docs/API_REFERENCE.md`.
+- **A work order can no longer be scheduled without a schedule.** `PUT
+  /api/work-orders/{id}/status` refuses a transition *into* `Scheduled` unless
+  both `plannedStart` and `plannedFinish` are present after the update, and
+  `400` names the missing one. The rule applies only to entering `Scheduled`:
+  every transition out of it still works, and a row that is already `Scheduled`
+  without dates is not re-validated, so nothing is trapped and no data was
+  backfilled. The app's Schedule dialog already collected both dates, so the
+  only clients that change behaviour are ones that called the API directly.
+  `febe835`.
+
+### What an operator or reviewer will notice
+
+- **The new imports reuse the v1.6.5 factory rather than a second contract.**
+  Header-by-name matching, the `strict`/`partial` mode, `?dryRun=1` and the
+  `{ created, updated, rejected[{row, reason}] }` result shape are the ones
+  already in `backend/src/utils/csvRoutes.ts`. Notifications and Users have no
+  import route at all, so the workflow and the credential path keep their
+  single entry point.
+- **A craft rate edit made by import re-costs work orders, in the transaction.**
+  A row that changes `hourlyRate` re-prices every live work order using that
+  craft, through the same rollup the Crafts screen calls; the import opts into
+  longer transaction limits for exactly that fan-out. A rate change and the
+  costs derived from it commit together or not at all. `4b552b2`.
+- **Two imports are deliberately narrower than the screen they mirror.** A flat
+  file cannot express a plan's target list or its meter thresholds, so the PM
+  plan import is header-level: it creates one target for generation to read and
+  never moves an existing plan's asset, target list or meters, and it refuses a
+  Meter or Combined plan that has no thresholds rather than storing one that
+  could never come due. The task-list import is header-level for the same
+  reason - operations and materials stay in the screen. `cb5037a`, `c0f96d9`.
+- **Failure codes import in two passes.** Codes are upserted first and
+  `parentCode` is resolved afterwards, so a child may appear above its parent in
+  the file. An unknown parent, a code naming itself as parent, and a pair that
+  would close a cycle are all refused with the whole file rolled back - a cycle
+  would hide both codes from `/tree`. `14e9684`.
+- **The user export carries no credential column.** It lists username, full
+  name, e-mail, role, work-centre code, active flag and the two timestamps;
+  `passwordHash` is neither selected nor written, and a test asserts the file
+  contains no bcrypt-shaped token. `b8e1049`.
+- **A1 is accepted as disclosed, and the live secret is not rotated.** The
+  `v1.6.4` handover bundle contained `backend\.env.deploy`, so anyone holding
+  that bundle holds the `JWT_SECRET` and database password it named. `v1.6.5`
+  removed the file from the bundle and now fails the build if any `.env*` other
+  than the sample ships. **If you still hold the v1.6.4 bundle, treat those
+  credentials as disclosed: delete the copy and install v1.6.5 or later.** The
+  owner's decision on 2026-10-25 was not to rotate the live secret; this note is
+  the disclosure it asked for, not a claim that the v1.6.4 file is safe.
+- **F4 remains a UI-only gate, and why.** The **Edit details** band is gated to
+  Maintenance Supervisor and above, but `PUT /api/work-orders/{id}` keeps its
+  Technician floor: the fields the band gates are also writable at that floor
+  through `PUT /api/work-orders/{id}/status`, so a field-level check on the
+  header route alone would be partial. Recorded in the tracker rather than
+  shipped as a half guard.
+
+### Verification
+
+`scripts/verify/verify_a1.py` (214 clause rows) and
+`verify_a1_dispositions.py` (77 of 77 rows dispositioned) pass, and
+`verify_openapi.py` reports 166 operations across 111 paths matching
+`docs/openapi.json`. Backend suite: 89 files, 1247 tests. App suite: 29 files,
+178 tests. The CI run at the tagged SHA is the evidence, not this paragraph.
+
+### Known open items
+
+- The `JWT_SECRET` and database password in the v1.6.4 bundle are treated as
+  disclosed, not rotated (above). Rotating the live secret is still available
+  as a separate decision.
+- Field-level authorisation on `PUT /api/work-orders/{id}` does not exist; the
+  header gate is UI-only (F4, above).
+- The PM plan and task-list imports are header-level: a plan's targets, target
+  list and meters, and a task list's operations and materials, are not
+  expressible in a file and are unchanged by an import.
+
 ## v1.6.5
 
 A manual end-to-end pass against v1.6.4 (`docs/E2E_V164_FINDINGS_PHASE1.md`)
