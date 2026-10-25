@@ -22,7 +22,8 @@
 # Usage: python scripts/verify/verify_bundle.py --tag v1.6.5
 #        python scripts/verify/verify_bundle.py --tag v1.6.5 --sync
 #        python scripts/verify/verify_bundle.py --tag v1.6.5 --bundle <path>
-# Exit:  0 PASS  1 FAIL (drift or missing file)  2 usage
+#        python scripts/verify/verify_bundle.py --tag v1.6.5 --secrets
+# Exit:  0 PASS  1 FAIL (drift, missing file or a credential file)  2 usage
 # ═══════════════════════════════════════════════════════════════════════
 import argparse
 import os
@@ -54,6 +55,25 @@ NOT_IN_REPOSITORY = ["IT_DEPLOYMENT_GUIDE.md", "RELEASE_MANIFEST.md"]
 
 # Screenshots are shipped from docs/images/ and are not covered by the list above.
 IMAGE_DIR = "docs/images"
+
+# Files whose very presence in a bundle hands the Client a credential. The sample
+# is the one exception: it is shipped on purpose and the installer reads it as a
+# template. `backend/.env.deploy` reached the v1.6.4 bundle this way; the filename
+# rule in .gitignore is the other half of the same guard.
+ENV_ALLOWED = {".env.example"}
+
+
+def secret_paths(bundle_root):
+    """Every `*.env*` file in the bundle that is not the sample."""
+    found = []
+    for dirpath, dirnames, filenames in os.walk(bundle_root):
+        dirnames[:] = [name for name in dirnames if name != "node_modules"]
+        for name in filenames:
+            if not name.startswith(".env") or name in ENV_ALLOWED:
+                continue
+            relative = os.path.relpath(os.path.join(dirpath, name), bundle_root)
+            found.append(relative.replace(os.sep, "/"))
+    return sorted(found)
 
 
 def git(*args):
@@ -95,7 +115,7 @@ def image_paths(tag):
     return [(path, path, "binary") for path in listing]
 
 
-def check(tag, commit, bundle_root, sync):
+def check(tag, commit, bundle_root, sync, secrets):
     entries = DOCUMENTS + image_paths(tag)
     print(f"  bundle : {bundle_root}")
     print(f"  commit : {commit[:7]}  (tag {tag})")
@@ -176,6 +196,18 @@ def check(tag, commit, bundle_root, sync):
     )
     if NOT_IN_REPOSITORY:
         print(f"  not checked (written into the bundle, not in the repository): {', '.join(NOT_IN_REPOSITORY)}")
+
+    leaked = []
+    if secrets:
+        leaked = secret_paths(bundle_root)
+        print()
+        if leaked:
+            for path in leaked:
+                print(f"  CRED    {path:<40} environment file must not ship")
+            failures.extend(leaked)
+        else:
+            print(f"  CRED    none: no environment file except {', '.join(sorted(ENV_ALLOWED))}")
+
     return 0 if not failures else 1
 
 
@@ -188,6 +220,11 @@ def main():
         help="bundle directory (default: <repo parent>/CommandPulse-CMMS-<tag>)",
     )
     parser.add_argument("--sync", action="store_true", help="copy the tag's version into the bundle first")
+    parser.add_argument(
+        "--secrets",
+        action="store_true",
+        help="also fail if the bundle ships an environment file other than .env.example",
+    )
     args = parser.parse_args()
 
     commit = git("rev-parse", "--verify", f"{args.tag}^{{commit}}").decode("utf-8").strip()
@@ -205,11 +242,13 @@ def main():
         print("BUNDLE_DOCS FAIL")
         sys.exit(1)
 
-    result = check(args.tag, commit, bundle_root, args.sync)
+    result = check(args.tag, commit, bundle_root, args.sync, args.secrets)
 
     print()
     if result == 0:
         print(f"BUNDLE_DOCS PASS - every shipped document matches {args.tag}")
+    elif args.sync:
+        print("BUNDLE_DOCS FAIL - review the entries above; --sync does not overwrite a binary")
     else:
         print("BUNDLE_DOCS FAIL - rerun with --sync to take the tag's version, then review the diff")
     sys.exit(result)

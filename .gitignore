@@ -2,7 +2,11 @@ node_modules/
 dist/
 *.tsbuildinfo
 .env
-.env.local
+# Every environment file except the sample. `.env.local` alone was not enough:
+# `backend/.env.deploy` was tracked and reached the v1.6.4 handover bundle with a
+# real PostgreSQL credential in it.
+.env.*
+!.env.example
 *.log
 logs/
 backend-out*.log
