@@ -8,12 +8,20 @@ import type { CsvImportResult } from '@/services/csvService';
 interface CsvToolbarProps {
   /** Lower-case, plural where it reads better: 'work orders', 'equipment'. */
   noun: string;
-  /** e.g. '/work-orders/import.csv'. POST, Maintenance Planner+ on the API. */
-  importPath: string;
+  /**
+   * e.g. '/work-orders/import.csv'. POST, Maintenance Planner+ on the API.
+   * Omitted for an export-only register (notifications, users), whose data is
+   * not master data and has no import route.
+   */
+  importPath?: string;
   /** e.g. '/work-orders/export.csv'. GET, authentication only. */
   exportPath: string;
-  /** False hides Import and leaves Export, matching the API's role floors. */
-  canImport: boolean;
+  /**
+   * False (the default) hides Import and leaves Export, matching the API's
+   * role floors. Import also needs an `importPath`, so a caller that forgets
+   * one cannot render a button that posts nowhere.
+   */
+  canImport?: boolean;
   onImported?: () => void;
   className?: string;
 }
@@ -32,18 +40,22 @@ function describe(result: CsvImportResult): string {
 /**
  * The Import/Export pair for a module's CSV surface (F7).
  *
- * It exists so four pages cannot grow four behaviours again: the same button
- * pair, the same busy labels, the same rule that a rejected row is reported
- * rather than swallowed, and the same reset of the file input (without it,
- * picking the same file twice fires no change event and the second import
- * silently does nothing). The role floor is the caller's to pass, because only
- * the page knows which module it is showing; the API enforces it regardless.
+ * It exists so the pages cannot grow one behaviour each: the same button pair,
+ * the same busy labels, the same rule that a rejected row is reported rather
+ * than swallowed, and the same reset of the file input (without it, picking the
+ * same file twice fires no change event and the second import silently does
+ * nothing). The role floor is the caller's to pass, because only the page knows
+ * which module it is showing; the API enforces it regardless.
+ *
+ * Import is optional because two registers are export-only: notifications,
+ * whose lifecycle is not master data, and users, whose credentials must not
+ * travel in a file. Those callers pass `exportPath` alone.
  */
 export default function CsvToolbar({
   noun,
   importPath,
   exportPath,
-  canImport,
+  canImport = false,
   onImported,
   className,
 }: CsvToolbarProps) {
@@ -51,6 +63,7 @@ export default function CsvToolbar({
   const [importBusy, setImportBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const importable = canImport && importPath !== undefined;
 
   const handleExport = async () => {
     setExportBusy(true);
@@ -69,7 +82,7 @@ export default function CsvToolbar({
     const file = e.target.files?.[0];
     // Always clear the selection: re-choosing the same file must import again.
     e.target.value = '';
-    if (!file) return;
+    if (!file || !importPath) return;
 
     setImportBusy(true);
     setMessage(null);
@@ -89,24 +102,26 @@ export default function CsvToolbar({
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".csv,text/csv"
-        className="hidden"
-        aria-label={`Import ${noun} CSV`}
-        onChange={handleImportFile}
-      />
-      {canImport && (
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={importBusy}
-          className={buttonClass}
-        >
-          {importBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-          {importBusy ? 'Importing…' : 'Import'}
-        </button>
+      {importable && (
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            aria-label={`Import ${noun} CSV`}
+            onChange={handleImportFile}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importBusy}
+            className={buttonClass}
+          >
+            {importBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            {importBusy ? 'Importing…' : 'Import'}
+          </button>
+        </>
       )}
       <button type="button" onClick={handleExport} disabled={exportBusy} className={buttonClass}>
         {exportBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}

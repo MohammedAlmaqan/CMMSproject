@@ -36,6 +36,23 @@ describe('CsvToolbar', () => {
     expect(screen.getByRole('button', { name: /export/i })).toBeInTheDocument();
   });
 
+  it('renders Export alone for an export-only register', async () => {
+    vi.mocked(csvService.exportCsv).mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    // Notifications and users have no import route: no importPath is passed, so
+    // there must be no Import button and no file input to aim at.
+    render(<CsvToolbar noun="notifications" exportPath="/notifications/export.csv" />);
+
+    expect(screen.queryByRole('button', { name: /import/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Import notifications CSV')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /export/i }));
+
+    await waitFor(() =>
+      expect(csvService.exportCsv).toHaveBeenCalledWith('/notifications/export.csv', 'notifications')
+    );
+  });
+
   it('downloads the module export through the shared service', async () => {
     vi.mocked(csvService.exportCsv).mockResolvedValue(undefined);
     const user = userEvent.setup();
