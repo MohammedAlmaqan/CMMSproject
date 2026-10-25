@@ -20,7 +20,7 @@ is only `Closed` when a commit exists that a reviewer can read.
 | F3 | Administrator cannot reset a user's password in the UI | Confirmed | Closed | `f2dac8e` wires the per-row Password action to the existing `adminMode` dialog |
 | F4 | Work-order header (Supervisor, planned dates) cannot be edited | Confirmed | Closed | `a5c31c9` adds the Edit details band. UI gate is Supervisor/Planner/Admin; the API's `PUT /work-orders/:id` floor is deliberately left at Technician+ (no field-level authorisation exists there, and raising it would also block technician edits) - reported, not changed |
 | F5 | "Schedule" sets status without collecting dates | Confirmed | Closed | API `9fac75f` accepts `plannedStart`/`plannedFinish` on the status route and applies them in the same update; app `d66dc84` sends them from one shared dialog. Option C (refusing Scheduled with no dates) left open |
-| F6 | Handover bundle ships stale documentation | Confirmed | In progress | Gate `9450462`: `scripts/verify/verify_bundle.py` compares the 11 shipped documents and `docs/images/*` against `git show <tag>:<path>` and adds `--sync`. Re-derived against the preserved v1.6.4 bundle: 27 OK, 3 drift (`GO_LIVE_CHECKLIST.md`, `INSTALLATION_GUIDE.md`, `RELEASE_NOTES.md`), 0 missing. Row stays open until the v1.6.5 bundle is assembled with `--sync` and passes the gate |
+| F6 | Handover bundle ships stale documentation | Confirmed | Closed | Gate `9450462`: `scripts/verify/verify_bundle.py` compares the 11 shipped documents and `docs/images/*` against `git show <tag>:<path>` and adds `--sync`. Re-derived against the preserved v1.6.4 bundle: 27 OK, 3 drift (`GO_LIVE_CHECKLIST.md`, `INSTALLATION_GUIDE.md`, `RELEASE_NOTES.md`), 0 missing. The v1.6.5 bundle was then assembled from the tag, `--sync` corrected the one document that had drifted since assembly (`RELEASE_NOTES.md`, the corrected test count), and `--tag v1.6.5 --secrets` reports **30 entries, 0 drift, 0 missing, `CRED none`**. Bundle `CommandPulse-CMMS-v1.6.5`: 226 files, 7,144,895 B, `SHA256SUMS.txt` over 225 entries re-verified with 0 mismatches. Row closed after the tag was cut, because the bundle is assembled from the final tree |
 | F7 | Most data pages have no import/export | Confirmed, asymmetric | Closed | P1 `7b85685` gives the four routes one contract (header by name, `strict`/`partial`, `?dryRun=1`, one result shape); P2 `d6eba45` adds `export.csv` for Work Orders and Functional Locations and `258660e` adds the shared toolbar to both, so all four modules now have UI and both directions. Docs `121bf25`, `d46d1cc`. Consequence: equipment and materials report CSV outcomes in the toolbar, not the page toast. Six modules remain out of scope (above) |
 | A1 | Bundle ships `backend/.env.deploy` with a concrete JWT secret | Confirmed (security) | Closed | `3d6126c`: `.gitignore` ignores `.env.*` with `!.env.example`, and `verify_bundle.py --secrets` fails on any `.env*` in a bundle except the sample. Measured against the preserved v1.6.4 bundle it names `backend/.env.deploy`; with that file removed the same run passes. The file was listed in `SHA256SUMS.txt` and carried a 64-character `JWT_SECRET` and a `DATABASE_URL` for database `cmms` - neither value equals the current live one, but both were concrete. The delivered bundle is preserved as-is; whether the copy the Client holds is treated as disclosed is an owner decision (below) |
 | A2 | `backend/.env.example` reaches the install root | Confirmed | Closed | `9c14f53`, same copy rule as F1 |
@@ -35,10 +35,15 @@ States: `Open`, `In progress`, `Blocked`, `Closed`.
 ## Errata
 
 - `96f32dd` ("docs: close seven tracker rows") names "A3-to-be" in its message,
-  but A3 is still `Open` here: that commit closed seven rows, not eight, and A3's
+  but A3 was not closed by it: that commit closed seven rows, not eight, and A3's
   own evidence is the subject of A3 rather than something it can close. The row
   table above is authoritative; the message is left as committed because history
   is not rewritten.
+- The v1.6.4 bundle's `RELEASE_MANIFEST.md` states "453 files, 15.6 MB" and
+  asserts the size in an unclosed parenthesis; the bundle it describes holds 226
+  files totalling 7,083,969 B, and its own `SHA256SUMS.txt` lists 225 of them.
+  Found while assembling v1.6.5, which counts its own contents instead of
+  inheriting the figure. The v1.6.4 bundle is left as delivered.
 
 ## Approved scope
 
