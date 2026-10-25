@@ -555,7 +555,7 @@
     "/api/work-orders/{id}/status": {
       "put": {
         "summary": "Transition work order status",
-        "description": "Applies a valid workflow transition (Draft/Planned/Scheduled/In Progress/Completed/Suspended/Closed/Cancelled). Sets actualStart/actualFinish timestamps. Transitioning to In Progress requires every mandatory safety checklist on the work order to be Completed, otherwise 409. Transitioning to Closed requires the Maintenance Supervisor or Administrator role, otherwise 403.\nOptional plannedStart/plannedFinish values are applied in the same update as the status, so scheduling a work order is one call. The pair that will be stored is validated as a whole: a finish earlier than the start is refused with 400. A work order may still be moved to Scheduled without dates.\nTransitioning to Completed additionally performs, in the same transaction as the status change so the work order can never be Completed without them (SOW 3.2.1 and 3.2.3):\n  - autogenerates an M3 Completion Confirmation notification, open\n    against the work order's location and equipment, raised by the\n    user who completed it (SOW 3.2.1, M3);\n  - moves every notification this work order was converted from from\n    Converted to Completed, so the conversion queue clears\n    (SOW 3.2.3).\nThe work order transition map has no path out of Completed, so both run exactly once per work order.\n",
+        "description": "Applies a valid workflow transition (Draft/Planned/Scheduled/In Progress/Completed/Suspended/Closed/Cancelled). Sets actualStart/actualFinish timestamps. Transitioning to In Progress requires every mandatory safety checklist on the work order to be Completed, otherwise 409. Transitioning to Closed requires the Maintenance Supervisor or Administrator role, otherwise 403.\nOptional plannedStart/plannedFinish values are applied in the same update as the status, so scheduling a work order is one call. The pair that will be stored is validated as a whole: a finish earlier than the start is refused with 400. A transition to Scheduled is refused with 400 unless both dates are present after the update, so a work order cannot be scheduled without a schedule; a work order already in Scheduled without dates is not re-validated and can still leave the state.\nTransitioning to Completed additionally performs, in the same transaction as the status change so the work order can never be Completed without them (SOW 3.2.1 and 3.2.3):\n  - autogenerates an M3 Completion Confirmation notification, open\n    against the work order's location and equipment, raised by the\n    user who completed it (SOW 3.2.1, M3);\n  - moves every notification this work order was converted from from\n    Converted to Completed, so the conversion queue clears\n    (SOW 3.2.3).\nThe work order transition map has no path out of Completed, so both run exactly once per work order.\n",
         "tags": [
           "Work Orders"
         ],
@@ -616,7 +616,7 @@
             }
           },
           "400": {
-            "description": "Invalid status transition, or a planned finish before its start"
+            "description": "Invalid status transition, a planned finish before its start, or a transition to Scheduled with a missing planned date\n"
           },
           "403": {
             "description": "Insufficient permissions (closing requires Maintenance Supervisor or Administrator)"
@@ -1650,6 +1650,92 @@
         }
       }
     },
+    "/api/work-centers/export.csv": {
+      "get": {
+        "summary": "Export the work-center register as CSV",
+        "description": "Streams every non-deleted work center in code order as text/csv with a Content-Disposition filename. No role restriction beyond authentication. `isActive` is written as `true`/`false`, the same two spellings the import accepts, so an exported file can be edited and uploaded back unchanged.\n",
+        "tags": [
+          "Work Centers"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The register as text/csv"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/work-centers/import.csv": {
+      "post": {
+        "summary": "Import work centers from CSV",
+        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Rows are validated by the zod schema `workCenterImportRowSchema`. The import is all-or-nothing: the first invalid row rolls the whole file back and returns 400 naming that row. A row whose `code` already exists is updated rather than duplicated; there is no 409. Add `?dryRun=1` to validate the file and report the outcome without writing anything.\n",
+        "tags": [
+          "Work Centers"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Multipart form; each CSV row validated by zod `workCenterImportRowSchema`",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import completed; every row was accepted"
+          },
+          "400": {
+            "description": "Malformed CSV, a missing header column, or a row that failed validation (the file is rolled back)"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Caller role is below Maintenance Planner"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/work-centers/{id}": {
       "get": {
         "summary": "Get one work center",
@@ -2059,6 +2145,34 @@
           },
           "403": {
             "description": "Caller role is below Requester"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/users/export.csv": {
+      "get": {
+        "summary": "Export the user register as CSV",
+        "description": "Administrator-only, matching the JSON list endpoint. Streams every non-deleted user as text/csv in username order with profile, role and work centre. The password hash is deliberately absent: a credential column in a spreadsheet is a disclosure waiting to happen, and no administrative task needs it. Export only; users are created and edited through the API, which hashes passwords and enforces the role rules.\n",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The user register as text/csv"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Caller is not an Administrator"
           },
           "500": {
             "description": "Internal server error"
@@ -2587,6 +2701,92 @@
           },
           "409": {
             "description": "code already exists among active rows"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/task-lists/export.csv": {
+      "get": {
+        "summary": "Export task-list headers as CSV",
+        "description": "Streams every non-deleted task list as text/csv in code order. Operations and their required materials are not included: a flat file cannot carry a nested step list without inventing a second row shape, so those stay on the task-list screen. The work center and equipment are written by code.\n",
+        "tags": [
+          "Task Lists"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task-list headers as text/csv"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/task-lists/import.csv": {
+      "post": {
+        "summary": "Import task-list headers from CSV",
+        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Rows are validated by `taskListImportRowSchema`; `workCenterCode` must name an existing work center and `equipmentCode`, when given, an existing equipment. A row whose `code` already exists is updated rather than duplicated. A blank optional cell leaves the stored value alone, so an empty `equipmentCode` never clears a task list's equipment. Operations and their required materials are not imported; they stay on the task-list screen. The import is all-or-nothing: the first invalid row rolls the whole file back and returns 400 naming that row. Add `?dryRun=1` to report the outcome without writing anything.\n",
+        "tags": [
+          "Task Lists"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Multipart form; each CSV row validated by zod `taskListImportRowSchema`",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import completed; every row was accepted"
+          },
+          "400": {
+            "description": "Malformed CSV, a missing header column, or a row naming an unknown work center or equipment (the file is rolled back)"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Caller role is below Maintenance Planner"
           },
           "500": {
             "description": "Internal server error"
@@ -3191,6 +3391,92 @@
           },
           "409": {
             "description": "Template is attached to a work order"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/safety-checklists/export.csv": {
+      "get": {
+        "summary": "Export safety checklist templates as CSV",
+        "description": "One row per checklist item, with the template's name, description and mandatory flag repeated on each row. A template that has no items yet is written as a single row with empty `sequenceNumber` and `itemDescription`, so an export/import round trip does not lose it. No role restriction beyond authentication.\n",
+        "tags": [
+          "Safety Checklists"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Checklist templates as text/csv"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/safety-checklists/import.csv": {
+      "post": {
+        "summary": "Import safety checklist templates from CSV",
+        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Rows are validated by `checklistImportRowSchema`. A template is matched by `name` and an item by its `sequenceNumber` inside that template, so re-uploading an edited export updates in place instead of duplicating. Items are never deleted by an import: removing an item is refused once it has been answered on a work order, and the file is not the place to make that decision. A blank `templateDescription` or `isMandatory` leaves the stored value alone; a row with no `sequenceNumber` and no `itemDescription` creates or updates only the template itself. The import is all-or-nothing: the first invalid row rolls the whole file back and returns 400. Add `?dryRun=1` to report the outcome without writing anything.\n",
+        "tags": [
+          "Safety Checklists"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Multipart form; each CSV row validated by zod `checklistImportRowSchema`",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import completed; every row was accepted"
+          },
+          "400": {
+            "description": "Malformed CSV, a missing header column, or a row that failed validation (the file is rolled back)"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Caller role is below Maintenance Planner"
           },
           "500": {
             "description": "Internal server error"
@@ -5248,6 +5534,31 @@
         }
       }
     },
+    "/api/notifications/export.csv": {
+      "get": {
+        "summary": "Export notifications as CSV",
+        "description": "Streams every non-deleted notification as text/csv in notification-number order, with its location, equipment and reporting user resolved to codes and username. Export only: notifications are not importable, because their lifecycle (Open -> In Process -> Completed -> Converted) and the conversion to a work order are workflow decisions, not master data. No role restriction beyond authentication.\n",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications as text/csv"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/notifications/{id}": {
       "get": {
         "summary": "Get one notification",
@@ -6469,6 +6780,92 @@
           },
           "403": {
             "description": "Caller role is below Administrator"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/maintenance-plans/export.csv": {
+      "get": {
+        "summary": "Export maintenance-plan headers as CSV",
+        "description": "Streams every non-deleted plan as text/csv in plan-code order. Dates are written as `YYYY-MM-DD`. The work center, task list, equipment and functional location are written by code and the associated notification by number. A plan covering several assets exports the target on its legacy columns (the first); the rest of its target list and its meter thresholds are not represented. No role restriction beyond authentication.\n",
+        "tags": [
+          "Maintenance Plans"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plan headers as text/csv"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/maintenance-plans/import.csv": {
+      "post": {
+        "summary": "Import maintenance-plan headers from CSV",
+        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Rows are validated by `maintenancePlanImportRowSchema`: every code must name an existing record, and exactly one of `equipmentCode` / `functionalLocationCode` is required, the same rule the API applies to a plan's target. A new plan is created with that one target. An existing plan's target and meter thresholds are never changed by an import - a plan may cover several assets and carry several meters, and a flat file cannot state either - so they are edited on the plan screen. For the same reason a Meter or Combined plan can only be imported if it is new and already has meters (it cannot), so those strategies are refused at create time instead of storing a plan that can never come due. The import is all-or-nothing: the first invalid row rolls the whole file back and returns 400 naming that row. Add `?dryRun=1` to report the outcome without writing anything.\n",
+        "tags": [
+          "Maintenance Plans"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Multipart form; each CSV row validated by zod `maintenancePlanImportRowSchema`",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import completed; every row was accepted"
+          },
+          "400": {
+            "description": "Malformed CSV, a missing header column, a row that failed validation, a row naming an unknown record, or a Meter/Combined plan with no meter thresholds (the file is rolled back)\n"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Caller role is below Maintenance Planner"
           },
           "500": {
             "description": "Internal server error"
@@ -7883,6 +8280,92 @@
           },
           "401": {
             "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/failure-codes/export.csv": {
+      "get": {
+        "summary": "Export failure codes as CSV",
+        "description": "Streams every non-deleted failure code as text/csv in code order. The parent is written by its `code`, not its id, so the hierarchy survives a round trip to another deployment. No role restriction beyond authentication.\n",
+        "tags": [
+          "Failure Codes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Failure codes as text/csv"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/failure-codes/import.csv": {
+      "post": {
+        "summary": "Import failure codes from CSV",
+        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Rows are validated by `failureCodeImportRowSchema`. The file is read in two passes, because a child may name a parent that appears later in it: every code is created or updated first, then each `parentCode` is resolved to the code it names. An unknown parent is rejected, as is a parent that would make a code its own ancestor. A row whose `code` already exists is updated rather than duplicated. The import is all-or-nothing: the first invalid row rolls the whole file back and returns 400 naming that row. Add `?dryRun=1` to report the outcome without writing anything.\n",
+        "tags": [
+          "Failure Codes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Multipart form; each CSV row validated by zod `failureCodeImportRowSchema`",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import completed; every row was accepted"
+          },
+          "400": {
+            "description": "Malformed CSV, a missing header column, a row that failed validation, or a row naming an unknown parent (the file is rolled back)\n"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Caller role is below Maintenance Planner"
           },
           "500": {
             "description": "Internal server error"
@@ -10291,6 +10774,92 @@
         }
       }
     },
+    "/api/crafts/export.csv": {
+      "get": {
+        "summary": "Export the craft register as CSV",
+        "description": "Streams every non-deleted craft as text/csv, in work-center code then craft-code order. The work center is written by its `code`, not its id, so the file is readable and portable across deployments. No role restriction beyond authentication.\n",
+        "tags": [
+          "Crafts"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The craft register as text/csv"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/crafts/import.csv": {
+      "post": {
+        "summary": "Import crafts from CSV",
+        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Rows are validated by `craftImportRowSchema`; `workCenterCode` must name an existing work center. A row whose (workCenterCode, craftCode) pair already exists is updated rather than duplicated. The import is all-or-nothing: the first invalid row rolls the whole file back and returns 400 naming that row. A changed `hourlyRate` re-costs every live work order carrying the craft, exactly as the single-craft update does; the whole import therefore runs in one transaction with the raised ceiling that update already uses. Add `?dryRun=1` to report the outcome without writing anything.\n",
+        "tags": [
+          "Crafts"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Multipart form; each CSV row validated by zod `craftImportRowSchema`",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import completed; every row was accepted"
+          },
+          "400": {
+            "description": "Malformed CSV, a missing header column, or a row naming an unknown work center (the file is rolled back)"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Caller role is below Maintenance Planner"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/crafts/{id}": {
       "get": {
         "summary": "Get one craft",
@@ -10910,6 +11479,92 @@
           },
           "403": {
             "description": "Caller role is below Requester"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/cause-codes/export.csv": {
+      "get": {
+        "summary": "Export cause codes as CSV",
+        "description": "Streams every non-deleted cause code as text/csv in code order. No role restriction beyond authentication.\n",
+        "tags": [
+          "Cause Codes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cause codes as text/csv"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/cause-codes/import.csv": {
+      "post": {
+        "summary": "Import cause codes from CSV",
+        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Rows are validated by `causeCodeImportRowSchema`. A row whose `code` already exists is updated rather than duplicated. The import is all-or-nothing: the first invalid row rolls the whole file back and returns 400 naming that row. Add `?dryRun=1` to report the outcome without writing anything.\n",
+        "tags": [
+          "Cause Codes"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Multipart form; each CSV row validated by zod `causeCodeImportRowSchema`",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import completed; every row was accepted"
+          },
+          "400": {
+            "description": "Malformed CSV, a missing header column, or a row that failed validation (the file is rolled back)"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Caller role is below Maintenance Planner"
           },
           "500": {
             "description": "Internal server error"

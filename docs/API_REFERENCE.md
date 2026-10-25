@@ -6,7 +6,7 @@ Reference documentation for the CMMS REST API, version 1.0.0.
 - **Interactive UI:** `/api-docs` (Swagger UI)
 - **Machine-readable spec:** [`openapi.json`](./openapi.json) (OpenAPI 3.0.0, also served live at `/api-docs.json`)
 
-The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The repository routers and the live spec agree at **150 operations across 95 paths and 27 routers**, re-derived from the route annotations and re-exported into `docs/openapi.json` on 2026-10-25. The two operations added since the 2026-10-18 reading of 148 operations / 93 paths are `GET /api/work-orders/export.csv` and `GET /api/functional-locations/export.csv` (F7, 2026-10-25). The two operations added since the 2026-10-15 reading of 146 operations / 92 paths are `PUT /api/safety-checklists/templates/{id}` and `DELETE /api/safety-checklists/templates/{id}` (C3, 2026-10-18). Before that, five operations were added since the 2026-10-06 reading of 141 operations / 87 paths: `POST /api/auth/refresh` and `POST /api/auth/logout` (C1, 2026-10-15), plus `POST /api/audit-log/purge`, `POST /api/functional-locations/import.csv` and `POST /api/work-orders/import.csv`; the intervening OData query parameters (C4c) also reached the snapshot at the 2026-10-15 refresh. *Superseded readings, kept: this note previously read 146 operations across 92 paths (2026-10-15) and, before that, 141 operations across 87 paths (2026-10-06); the earlier 2026-09 snapshot showed 114 operations / 71 paths.* The checked-in `docs/openapi.json` must not be edited by hand: regenerate it with `python scripts/verify/verify_openapi.py --write` (or `npx tsx scripts/openapi.ts --write` from `backend/`), and `scripts/verify/verify_openapi.py` fails when the snapshot and the route annotations drift apart.
+The spec is generated from `@openapi` annotations in the route source files and served live at `/api-docs.json` by the running server; this document describes the routers as they exist in the repository. The repository routers and the live spec agree at **166 operations across 111 paths and 27 routers**, re-derived from the route annotations and re-exported into `docs/openapi.json` on 2026-10-25. The sixteen operations added since the same day's earlier reading of 150 operations / 95 paths are the F7 CSV routes: `import.csv` and `export.csv` for work centers, crafts, task lists, safety checklists, cause codes, failure codes and maintenance plans (fourteen), plus the export-only `GET /api/notifications/export.csv` and `GET /api/users/export.csv`. The two operations added since the 2026-10-18 reading of 148 operations / 93 paths are `GET /api/work-orders/export.csv` and `GET /api/functional-locations/export.csv` (F7, 2026-10-25). The two operations added since the 2026-10-15 reading of 146 operations / 92 paths are `PUT /api/safety-checklists/templates/{id}` and `DELETE /api/safety-checklists/templates/{id}` (C3, 2026-10-18). Before that, five operations were added since the 2026-10-06 reading of 141 operations / 87 paths: `POST /api/auth/refresh` and `POST /api/auth/logout` (C1, 2026-10-15), plus `POST /api/audit-log/purge`, `POST /api/functional-locations/import.csv` and `POST /api/work-orders/import.csv`; the intervening OData query parameters (C4c) also reached the snapshot at the 2026-10-15 refresh. *Superseded readings, kept: this note previously read 150 operations across 95 paths (2026-10-25), 146 operations across 92 paths (2026-10-15) and, before that, 141 operations across 87 paths (2026-10-06); the earlier 2026-09 snapshot showed 114 operations / 71 paths.* The checked-in `docs/openapi.json` must not be edited by hand: regenerate it with `python scripts/verify/verify_openapi.py --write` (or `npx tsx scripts/openapi.ts --write` from `backend/`), and `scripts/verify/verify_openapi.py` fails when the snapshot and the route annotations drift apart.
 
 ## Authentication
 
@@ -52,6 +52,7 @@ The hierarchy is defined in `src/utils/roles.ts` (`roleHierarchy`), consumed by 
 - **Soft versus hard delete.** All transactional records are soft deleted: an `isDeleted` flag is set, the row is filtered out of later reads, and related rows are soft-deleted or retained as the operation specifies. This covers master data (locations, equipment, work centers, materials, task lists, plans, meters), work-order records (operations, material lines, external service costs, labour, cost splits, checklist instances), notifications, comments and alerts. The only tables never soft-deleted are `RefreshToken` (revoked, not deleted), `SequenceCounter` (a numeric semaphore) and the immutable append-only `AuditLogEntry` and `WorkOrderSnapshot`, whose deletion surfaces the API deliberately does not expose.
 - **Audit log.** Create, update and delete operations on master data and work orders write an `AuditLogEntry` recording the user and originating IP.
 - **Costs.** Work order `plannedCost` and `actualCost` are recomputed server-side from the child records whenever an operation, material line, labor entry or external service cost changes. Clients send quantities and rates, never totals. A craft's `hourlyRate` is one of those rate inputs: editing it re-costs every live work order carrying that craft in the same transaction (soft-deleted work orders are left untouched).
+- **CSV import and export (F7).** Every module below carries an `export.csv` and, except notifications and users, an `import.csv`. Import is a `POST` at `Maintenance Planner` and above; export is a `GET` at the same read floor as the module's JSON list (Administrator-only for users). Upload is `multipart/form-data` with one `file` part of type `text/csv`, capped at 4 MB. Header matching is by column name, trimmed and case-insensitive, so reordering columns in a spreadsheet is harmless; a missing required column refuses the file with `400` naming it, and extra columns are ignored. Cells are the same spellings the export writes, so a file exported from one module is accepted back by that module's import. Rows are keyed on the module's natural key (a code, a name, or a composite of the two), never on an id. Both directions answer with the shared result shape `{ created, updated, rejected: [{ row, reason }] }`, where `row` is the 1-based file line (the header is line 1). The seven newer imports (work centers, crafts, task lists, safety checklists, cause codes, failure codes, maintenance plans) are `strict`, like equipment and materials: the first unacceptable row rolls the whole file back and returns `400 Row N: reason`, so a file is applied completely or not at all. Work orders and functional locations are `partial`: accepted rows are kept and the rest are reported in `rejected`. `?dryRun=1` (also `true` / `yes`) runs the whole import inside a transaction and rolls it back, reporting what it would have done without writing; it is the way to validate a file before committing it.
 - **Not-found handling.** Missing referenced records return `400` (a Prisma foreign-key error translated at the boundary) or `404` depending on the endpoint; the applicable code is listed per operation.
 - **Collection query grammar (SOW 5.4).** GET collection endpoints accept a bounded OData-style grammar alongside their conventional filters:
   - `$filter` — comparisons `eq`, `ne`, `gt`, `ge`, `lt`, `le`, `contains`, joined by `and` / `or` and grouped with parentheses; string values are single-quoted with `''` for an embedded quote. Example: `$filter=priority eq 'High' and status ne 'Closed'`, `$filter=description contains 'pump'`.
@@ -63,35 +64,35 @@ The hierarchy is defined in `src/utils/roles.ts` (`roleHierarchy`), consumed by 
 
 ## Endpoint groups
 
-148 operations across 93 paths and 27 routers, re-derived from the route annotations and the checked-in `docs/openapi.json` on 2026-10-18 (superseding the 2026-10-15 reading of 146 operations / 92 paths, which itself superseded the 2026-10-06 reading of 141 operations / 87 paths). The repository routers and the live spec agree at 148. The previous 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
+166 operations across 111 paths and 27 routers, re-derived from the route annotations and the checked-in `docs/openapi.json` on 2026-10-25 (superseding the 2026-10-18 reading of 148 operations / 93 paths and, before it, the 2026-10-15 reading of 146 operations / 92 paths and the 2026-10-06 reading of 141 operations / 87 paths). The repository routers and the live spec agree at 166. The 2026-10-02 reading was 133 operations / 84 paths / 26 routers; that version of the table omitted Cause Codes entirely and undercounted Notifications and Users.
 
 | Group | Base path | Operations |
 | --- | --- | --- |
 | Authentication | `/api/auth` | 4 |
-| Functional Locations | `/api/functional-locations` | 7 |
+| Functional Locations | `/api/functional-locations` | 8 |
 | Equipment | `/api/equipment` | 11 |
 | Equipment Meters | `/api/equipment-meters` | 6 |
-| Work Centers | `/api/work-centers` | 6 |
+| Work Centers | `/api/work-centers` | 8 |
 | Materials | `/api/materials` | 7 |
-| Failure Codes | `/api/failure-codes` | 6 |
-| Cause Codes | `/api/cause-codes` | 5 |
-| Task Lists | `/api/task-lists` | 5 |
-| Notifications | `/api/notifications` | 7 |
-| Work Orders | `/api/work-orders` | 8 |
+| Failure Codes | `/api/failure-codes` | 8 |
+| Cause Codes | `/api/cause-codes` | 7 |
+| Task Lists | `/api/task-lists` | 7 |
+| Notifications | `/api/notifications` | 8 |
+| Work Orders | `/api/work-orders` | 9 |
 | Work Order Operations | `/api/work-order-operations` | 4 |
 | Work Order Materials | `/api/work-order-materials` | 4 |
 | Work Order Cost Splits | `/api/work-order-cost-splits` | 3 |
 | Labor | `/api/labor` | 4 |
 | External Services | `/api/external-services` | 4 |
-| Crafts | `/api/crafts` | 5 |
-| Maintenance Plans | `/api/maintenance-plans` | 7 |
-| Safety Checklists | `/api/safety-checklists` | 9 |
+| Crafts | `/api/crafts` | 7 |
+| Maintenance Plans | `/api/maintenance-plans` | 9 |
+| Safety Checklists | `/api/safety-checklists` | 11 |
 | Reports | `/api/reports` | 11 |
 | Alerts | `/api/alerts` | 4 |
 | Comments | `/api/comments` | 3 |
 | Attachments | `/api/attachments` | 4 |
 | Audit Log | `/api/audit-log` | 2 |
-| Users | `/api/users` | 7 |
+| Users | `/api/users` | 8 |
 | Dashboard | `/api/dashboard` | 3 |
 | System Config | `/api/system-config` | 2 |
 
@@ -135,7 +136,7 @@ Two operational endpoints are defined inline in `index.ts`, mounted on the same 
 | PUT | `/api/equipment/{id}/bom/{bomId}` | Update a BOM material line |
 | DELETE | `/api/equipment/{id}/bom/{bomId}` | Remove a BOM material line |
 
-CSV import takes a `multipart/form-data` body with a single `file` part. Each row is validated by `equipmentImportRowSchema`; the response reports the outcome per row, so a partial import is still usable. Import requires the Maintenance Planner role.
+CSV import takes a `multipart/form-data` body with a single `file` part. Each row is validated by `equipmentImportRowSchema`; the import is `strict`, so a file containing an unacceptable row is refused whole with `400 Row N: reason` rather than partly applied. Import requires the Maintenance Planner role.
 
 ### Equipment Meters
 
@@ -158,6 +159,8 @@ CSV import takes a `multipart/form-data` body with a single `file` part. Each ro
 | POST | `/api/work-centers` | Create a work center |
 | PUT | `/api/work-centers/{id}` | Update a work center |
 | DELETE | `/api/work-centers/{id}` | Soft delete a work center |
+| GET | `/api/work-centers/export.csv` | Export the work-center register as CSV |
+| POST | `/api/work-centers/import.csv` | Import work centers from CSV |
 
 ### Materials
 
@@ -181,6 +184,8 @@ CSV import takes a `multipart/form-data` body with a single `file` part. Each ro
 | POST | `/api/failure-codes` | Create a failure code |
 | PUT | `/api/failure-codes/{id}` | Update a failure code |
 | DELETE | `/api/failure-codes/{id}` | Soft delete a failure code |
+| GET | `/api/failure-codes/export.csv` | Export failure codes as CSV |
+| POST | `/api/failure-codes/import.csv` | Import failure codes from CSV |
 
 ### Cause Codes
 
@@ -191,6 +196,8 @@ CSV import takes a `multipart/form-data` body with a single `file` part. Each ro
 | POST | `/api/cause-codes` | Create a cause code |
 | PUT | `/api/cause-codes/{id}` | Update a cause code |
 | DELETE | `/api/cause-codes/{id}` | Soft delete a cause code |
+| GET | `/api/cause-codes/export.csv` | Export cause codes as CSV |
+| POST | `/api/cause-codes/import.csv` | Import cause codes from CSV |
 
 Cause codes are the root-cause categories (SOW 3.1.4) a work order can name. The list accepts a `search` filter over code and description.
 
@@ -203,6 +210,8 @@ Cause codes are the root-cause categories (SOW 3.1.4) a work order can name. The
 | POST | `/api/task-lists` | Create a task list |
 | PUT | `/api/task-lists/{id}` | Update a task list |
 | DELETE | `/api/task-lists/{id}` | Soft delete a task list |
+| GET | `/api/task-lists/export.csv` | Export task-list headers as CSV |
+| POST | `/api/task-lists/import.csv` | Import task-list headers from CSV |
 
 ### Notifications
 
@@ -215,6 +224,9 @@ Cause codes are the root-cause categories (SOW 3.1.4) a work order can name. The
 | DELETE | `/api/notifications/{id}` | Soft delete a notification |
 | POST | `/api/notifications/convert-to-wo` | Convert several notifications into one corrective work order |
 | POST | `/api/notifications/{id}/convert-to-wo` | Convert a notification into a corrective work order |
+| GET | `/api/notifications/export.csv` | Export notifications as CSV |
+
+Notifications are export-only (`export.csv`): their lifecycle is the workflow those endpoints already own, so there is no import route and no bulk-create path.
 
 Converting a notification creates a corrective work order — type `EM` when the notification's breakdown flag is set, otherwise `CM` — copies the location and equipment, links the notification to the new work order and sets the notification status to `Converted`. A breakdown conversion is an emergency order, so its priority is raised to `High` regardless of the notification's own priority; a non-breakdown conversion keeps the notification's priority.
 
@@ -301,6 +313,8 @@ The split is used to allocate a work order's cost across internal orders or cost
 | POST | `/api/crafts` | Create a craft |
 | PUT | `/api/crafts/{id}` | Update a craft |
 | DELETE | `/api/crafts/{id}` | Soft delete a craft |
+| GET | `/api/crafts/export.csv` | Export the craft register as CSV |
+| POST | `/api/crafts/import.csv` | Import crafts from CSV |
 
 Crafts are seeded reference data. They are CRUD through the API (write guards: Maintenance Planner for create/update, Maintenance Supervisor for delete).
 
@@ -315,6 +329,8 @@ Crafts are seeded reference data. They are CRUD through the API (write guards: M
 | DELETE | `/api/maintenance-plans/{id}` | Soft delete a maintenance plan |
 | POST | `/api/maintenance-plans/run-scheduler` | Run the PM scheduler immediately (Administrator) |
 | POST | `/api/maintenance-plans/{id}/generate-wo` | Generate a work order from a maintenance plan |
+| GET | `/api/maintenance-plans/export.csv` | Export maintenance-plan headers as CSV |
+| POST | `/api/maintenance-plans/import.csv` | Import maintenance-plan headers from CSV |
 
 A generation that fails — an invalid plan status or priority, a missing target or functional location, or an unexpected error — answers 4xx/5xx and raises a `PM_Generation_Failed` alert to every active Maintenance Planner and Maintenance Supervisor, plus the caller, related to the plan. The nightly scheduler raises the same alert (without a caller) when it fails a plan.
 
@@ -330,6 +346,8 @@ A generation that fails — an invalid plan status or priority, a missing target
 | POST | `/api/safety-checklists/work-order/{woId}/attach` | Attach a checklist template to a work order |
 | PUT | `/api/safety-checklists/work-order-checklist/{id}` | Update the status of a work order checklist |
 | PUT | `/api/safety-checklists/work-order-checklist-item/{id}` | Record the response to a checklist item |
+| GET | `/api/safety-checklists/export.csv` | Export safety checklist templates as CSV |
+| POST | `/api/safety-checklists/import.csv` | Import safety checklist templates from CSV |
 | DELETE | `/api/safety-checklists/work-order-checklist/{id}` | Delete a work order checklist |
 
 Attaching a template instantiates it as a `Pending` checklist and copies each template item into an unanswered item instance. Item responses are `Yes`, `No` or `NA`.
@@ -404,6 +422,9 @@ Upload takes a `multipart/form-data` body with a single `file` part. Files are c
 | PUT | `/api/users/{id}` | Update a user (Administrator only) |
 | DELETE | `/api/users/{id}` | Soft delete a user (Administrator only) |
 | PUT | `/api/users/{id}/password` | Change a password |
+| GET | `/api/users/export.csv` | Export the user register as CSV |
+
+The user register is export-only and Administrator-only, like the JSON list. The file carries username, full name, e-mail, role, work-centre code, active flag and the two timestamps; it never carries `passwordHash` or any other credential column.
 
 Use `/api/users/options` for dropdown and assignee fields; it is available from the Requester role upwards. Password hashes are never returned. Creation (`POST`, validated by `userCreateSchema`) and deletion (`DELETE`, which sets `isDeleted` and `isActive` to `false` rather than removing the row) are Administrator-only. A user may change their own password by supplying `currentPassword`; an Administrator may set any user's password without it.
 
