@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, act } from '@testing-library/react';
+import { screen, act, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import WorkOrdersPage from '@/pages/WorkOrdersPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -144,5 +144,36 @@ describe('WorkOrdersPage', () => {
     expect(screen.queryByRole('button', { name: 'View' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Plan' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+  });
+
+  it('collects the plan before moving a work order to Scheduled (F5)', async () => {
+    vi.mocked(workOrderService.getAll).mockResolvedValue(page([{ ...row, status: 'Planned' }]));
+    const user = userEvent.setup();
+
+    renderWithProviders(<WorkOrdersPage />, { route: '/work-orders' });
+
+    await screen.findByText('WO-0001');
+    await user.click(screen.getByRole('button', { name: 'Schedule WO-0001' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Schedule WO-0001' });
+    // Opening the dialog is not the transition: the dates are collected first.
+    expect(vi.mocked(workOrderService.transitionStatus)).not.toHaveBeenCalled();
+
+    await user.type(within(dialog).getByLabelText('Planned start'), '2026-11-02T08:00');
+    await user.type(within(dialog).getByLabelText('Planned finish'), '2026-11-02T16:00');
+    await user.click(within(dialog).getByRole('button', { name: 'Schedule' }));
+
+    await waitFor(() =>
+      expect(vi.mocked(workOrderService.transitionStatus)).toHaveBeenCalledWith(
+        'wo-1',
+        'Scheduled',
+        {
+          plannedStart: new Date('2026-11-02T08:00').toISOString(),
+          plannedFinish: new Date('2026-11-02T16:00').toISOString(),
+        }
+      )
+    );
+    // The list re-reads rather than assuming the row changed.
+    await waitFor(() => expect(vi.mocked(workOrderService.getAll)).toHaveBeenCalledTimes(2));
   });
 });

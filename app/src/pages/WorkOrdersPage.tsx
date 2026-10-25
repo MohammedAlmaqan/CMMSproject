@@ -22,6 +22,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import ScheduleWorkOrderDialog from '@/components/ScheduleWorkOrderDialog';
+import type { ScheduleDates } from '@/components/ScheduleWorkOrderDialog';
 import { useAuthStore } from '@/store/authStore';
 import { hasMinRole } from '@/lib/rbac';
 import { workOrderService } from '@/services/workOrderService';
@@ -89,6 +91,10 @@ export default function WorkOrdersPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
+  // F5: scheduling collects the plan and sends it with the status, in one call.
+  const [scheduleTarget, setScheduleTarget] = useState<WorkOrderRow | null>(null);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [scheduleBusy, setScheduleBusy] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -164,6 +170,28 @@ export default function WorkOrdersPage() {
       }
     },
     [refresh]
+  );
+
+  // F5: the dates are not a follow-up edit. They travel in the same PUT as the
+  // status, so either both are written or neither is.
+  const handleSchedule = useCallback(
+    async (dates: ScheduleDates) => {
+      if (!scheduleTarget) return;
+      setScheduleError(null);
+      setScheduleBusy(true);
+      try {
+        await workOrderService.transitionStatus(scheduleTarget.workOrderId, 'Scheduled', dates);
+        setScheduleTarget(null);
+        await refresh();
+      } catch (err) {
+        setScheduleError(
+          err instanceof ApiError ? err.message : 'Failed to schedule the work order'
+        );
+      } finally {
+        setScheduleBusy(false);
+      }
+    },
+    [scheduleTarget, refresh]
   );
 
   const totalCount = viewMode === 'list' ? total : boardRows.length;
@@ -410,7 +438,11 @@ export default function WorkOrdersPage() {
                               )}
                               {canTransition(wo, 'Scheduled') && (
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); handleTransition(wo, 'Scheduled'); }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setScheduleError(null);
+                                    setScheduleTarget(wo);
+                                  }}
                                   className="p-1 text-tertiary hover:text-blue-status transition-colors"
                                   aria-label={`Schedule ${wo.woNumber}`}
                                 >
@@ -564,6 +596,20 @@ export default function WorkOrdersPage() {
           </>
         )}
       </div>
+      {scheduleTarget && (
+        <ScheduleWorkOrderDialog
+          woNumber={scheduleTarget.woNumber}
+          plannedStart={scheduleTarget.plannedStart}
+          plannedFinish={scheduleTarget.plannedFinish}
+          busy={scheduleBusy}
+          serverError={scheduleError}
+          onCancel={() => {
+            setScheduleTarget(null);
+            setScheduleError(null);
+          }}
+          onSubmit={handleSchedule}
+        />
+      )}
     </>
   );
 }

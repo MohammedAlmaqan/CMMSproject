@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import WorkOrderDetailPage from '@/pages/WorkOrderDetailPage';
@@ -764,3 +764,91 @@ function toDateTimeLocal(value: string | null | undefined): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+// F5: Schedule used to fire a status-only transition, so a work order could be
+// Scheduled with no dates and the page never asked for them.
+describe('WorkOrderDetailPage schedule dialog (F5)', () => {
+  const plannedWo: WorkOrder = { ...baseWo, status: 'Planned' };
+
+  beforeEach(() => {
+    setupDetailMocks();
+    vi.mocked(workOrderService.getById).mockResolvedValue(plannedWo);
+  });
+
+  it('opens the dialog instead of moving the status straight away', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: 'Schedule' }));
+
+    expect(screen.getByRole('dialog', { name: 'Schedule WO-0099' })).toBeInTheDocument();
+    expect(vi.mocked(workOrderService.transitionStatus)).not.toHaveBeenCalled();
+  });
+
+  it('sends the status and both dates in one request', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: 'Schedule' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Schedule WO-0099' });
+    await user.type(within(dialog).getByLabelText('Planned start'), '2026-11-02T08:00');
+    await user.type(within(dialog).getByLabelText('Planned finish'), '2026-11-02T16:00');
+    await user.click(within(dialog).getByRole('button', { name: 'Schedule' }));
+
+    await waitFor(() =>
+      expect(vi.mocked(workOrderService.transitionStatus)).toHaveBeenCalledWith(
+        'wo-1',
+        'Scheduled',
+        {
+          plannedStart: new Date('2026-11-02T08:00').toISOString(),
+          plannedFinish: new Date('2026-11-02T16:00').toISOString(),
+        }
+      )
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Schedule WO-0099' })).not.toBeInTheDocument()
+    );
+  });
+
+  it('refuses a finish before the start without calling the API', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: 'Schedule' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Schedule WO-0099' });
+    await user.type(within(dialog).getByLabelText('Planned start'), '2026-11-02T16:00');
+    await user.type(within(dialog).getByLabelText('Planned finish'), '2026-11-02T08:00');
+    await user.click(within(dialog).getByRole('button', { name: 'Schedule' }));
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(
+      'Planned finish must be on or after planned start'
+    );
+    expect(vi.mocked(workOrderService.transitionStatus)).not.toHaveBeenCalled();
+  });
+
+  it('prefills the dates already on the work order', async () => {
+    vi.mocked(workOrderService.getById).mockResolvedValue({
+      ...plannedWo,
+      plannedStart: '2026-10-26T06:00:00.000Z',
+      plannedFinish: '2026-10-26T14:00:00.000Z',
+    });
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: 'Schedule' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Schedule WO-0099' });
+    expect(within(dialog).getByLabelText('Planned start')).toHaveValue(
+      toDateTimeLocal('2026-10-26T06:00:00.000Z')
+    );
+    expect(within(dialog).getByLabelText('Planned finish')).toHaveValue(
+      toDateTimeLocal('2026-10-26T14:00:00.000Z')
+    );
+  });
+});

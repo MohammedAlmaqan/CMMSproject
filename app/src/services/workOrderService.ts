@@ -20,6 +20,14 @@ export const workOrderService = {
   create: (data: WorkOrderCreateInput) => api.post<WorkOrder>('/work-orders', data),
   update: (id: string, data: Partial<WorkOrder>) => api.put<WorkOrder>(`/work-orders/${id}`, data),
   delete: (id: string) => api.delete(`/work-orders/${id}`),
-  transitionStatus: (id: string, status: string) =>
-    api.put<WorkOrder>(`/work-orders/${id}/status`, { status }),
+  /**
+   * Move the work order through its lifecycle. The optional dates are applied by
+   * the same update as the status (F5), so scheduling is one request: a second
+   * call could fail and leave a Scheduled work order with no schedule.
+   */
+  transitionStatus: (
+    id: string,
+    status: string,
+    dates?: { plannedStart?: string | null; plannedFinish?: string | null }
+  ) => api.put<WorkOrder>(`/work-orders/${id}/status`, { status, ...dates }),
 };

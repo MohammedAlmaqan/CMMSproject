@@ -37,6 +37,9 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { workOrderService } from '@/services/workOrderService';
+import ScheduleWorkOrderDialog from '@/components/ScheduleWorkOrderDialog';
+import type { ScheduleDates } from '@/components/ScheduleWorkOrderDialog';
+import { toDateTimeLocal } from '@/lib/datetime';
 import { workOrderOperationService } from '@/services/workOrderOperationService';
 import { workOrderMaterialService } from '@/services/workOrderMaterialService';
 import { laborService } from '@/services/laborService';
@@ -275,6 +278,11 @@ export default function WorkOrderDetailPage() {
     plannedStart: string;
     plannedFinish: string;
   }>({ supervisorUserId: '', plannedStart: '', plannedFinish: '' });
+  // F5: the Schedule action collects the plan and sends it with the status in
+  // one request, so a work order cannot end up Scheduled with no schedule.
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [scheduleBusy, setScheduleBusy] = useState(false);
   const [notesForm, setNotesForm] = useState<{
     safetyNotes: string;
     completionRemarks: string;
@@ -559,6 +567,28 @@ export default function WorkOrderDetailPage() {
       } catch (err) {
         setActionError(err instanceof ApiError ? err.message : `Failed to update status to ${newStatus}`);
         setBusy(null);
+      }
+    },
+    [wo, afterMutation]
+  );
+
+  // F5: the dates are not a follow-up edit. They travel in the same PUT as the
+  // status, so either both are written or neither is.
+  const handleSchedule = useCallback(
+    async (dates: ScheduleDates) => {
+      if (!wo) return;
+      setScheduleError(null);
+      setScheduleBusy(true);
+      try {
+        await workOrderService.transitionStatus(wo.workOrderId, 'Scheduled', dates);
+        setScheduleOpen(false);
+        await afterMutation();
+      } catch (err) {
+        setScheduleError(
+          err instanceof ApiError ? err.message : 'Failed to schedule the work order'
+        );
+      } finally {
+        setScheduleBusy(false);
       }
     },
     [wo, afterMutation]
@@ -1174,7 +1204,10 @@ export default function WorkOrderDetailPage() {
                 )}
                 {canChangeStatus && canTransition('Scheduled') && (
                   <button
-                    onClick={() => performTransition('Scheduled')}
+                    onClick={() => {
+                      setScheduleError(null);
+                      setScheduleOpen(true);
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-blue-status border border-blue-status/50 hover:bg-blue-status/10 transition-all"
                   >
                     <CalendarCheck className="w-3.5 h-3.5" /> Schedule
@@ -2716,6 +2749,20 @@ export default function WorkOrderDetailPage() {
           </div>
         )}
       </div>
+      {scheduleOpen && wo && (
+        <ScheduleWorkOrderDialog
+          woNumber={wo.woNumber}
+          plannedStart={wo.plannedStart}
+          plannedFinish={wo.plannedFinish}
+          busy={scheduleBusy}
+          serverError={scheduleError}
+          onCancel={() => {
+            setScheduleOpen(false);
+            setScheduleError(null);
+          }}
+          onSubmit={handleSchedule}
+        />
+      )}
     </div>
   );
 }
@@ -2759,18 +2806,4 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
-}
-
-/**
- * ISO timestamp -> the value a `<input type="datetime-local">` expects, in the
- * viewer's local time. Slicing the ISO string instead would show UTC and then
- * save the shifted time back, so a supervisor in UTC+3 would see their 08:00
- * plan as 05:00 and every edit would move it another three hours.
- */
-function toDateTimeLocal(value: string | null | undefined): string {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
