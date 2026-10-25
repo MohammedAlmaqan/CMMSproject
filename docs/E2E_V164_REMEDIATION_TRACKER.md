@@ -15,20 +15,20 @@ is only `Closed` when a commit exists that a reviewer can read.
 
 | ID | Finding | Phase 1 verdict | State | Commit / evidence |
 |----|---------|-----------------|-------|-------------------|
-| F1 | Installer `.env` reported as containing placeholders | Not reproduced; look-alike sample files ship beside the real `.env` | Open | - |
-| F2 | No Sign Out for non-Administrators | Confirmed | Open | - |
-| F3 | Administrator cannot reset a user's password in the UI | Confirmed | Open | - |
+| F1 | Installer `.env` reported as containing placeholders | Not reproduced; look-alike sample files ship beside the real `.env` | Closed | `9c14f53` removes every `backend\.env.*` and asserts the generated file carries no `__TOKEN__` or sample value |
+| F2 | No Sign Out for non-Administrators | Confirmed | Closed | `d6518d8` adds Sign out to the Sidebar for all roles |
+| F3 | Administrator cannot reset a user's password in the UI | Confirmed | Closed | `f2dac8e` wires the per-row Password action to the existing `adminMode` dialog |
 | F4 | Work-order header (Supervisor, planned dates) cannot be edited | Confirmed | Open | - |
 | F5 | "Schedule" sets status without collecting dates | Confirmed | Open | - |
 | F6 | Handover bundle ships stale documentation | Confirmed | Open | - |
 | F7 | Most data pages have no import/export | Confirmed, asymmetric | Open | - |
 | A1 | Bundle ships `backend/.env.deploy` with a concrete JWT secret | Confirmed (security) | Open | - |
-| A2 | `backend/.env.example` reaches the install root | Confirmed | Open | - |
+| A2 | `backend/.env.example` reaches the install root | Confirmed | Closed | `9c14f53`, same copy rule as F1 |
 | A3 | Two v1.6.4 commit messages describe work not in the commit | Confirmed | Open | - |
 | A4 | Mojibake in tracked handover documents | Confirmed | Open | - |
-| A5 | Two password floors for one credential (12 installer / 8 API) | Confirmed | Open | - |
-| A6 | Installation guide promises a reset path the product lacks | Confirmed | Open | - |
-| A7 | Sidebar profile button is a dead click for five of six roles | Confirmed | Open | - |
+| A5 | Two password floors for one credential (12 installer / 8 API) | Confirmed | Closed | `5e8c062` raises the API and UI to 12 |
+| A6 | Installation guide promises a reset path the product lacks | Confirmed | Closed | Product side `f2dac8e` + `5e8c062`; guide `12ac772` names the path |
+| A7 | Sidebar profile button is a dead click for five of six roles | Confirmed | Closed | `d6518d8` makes the profile block display-only |
 
 States: `Open`, `In progress`, `Blocked`, `Closed`.
 
