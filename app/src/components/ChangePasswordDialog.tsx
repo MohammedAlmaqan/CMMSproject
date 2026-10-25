@@ -4,8 +4,8 @@
 // PUT /api/users/{id}/password accepts either { currentPassword,
 // newPassword } for a self-service change (the route verifies the current
 // password) or { newPassword } alone for an Administrator resetting another
-// account. This dialog is the self-service path; the Administration user
-// table reuses the same component with `adminMode` for the reset path.
+// account. The sidebar uses the self-service path; the Administration user
+// table mounts the same component with `adminMode` for the reset path.
 // ============================================================
 
 import { useState } from 'react';

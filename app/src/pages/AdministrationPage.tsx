@@ -17,6 +17,7 @@ import {
   Eye,
   UserPlus,
   Pencil,
+  KeyRound,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
@@ -25,6 +26,7 @@ import { userService } from '@/services/userService';
 import { auditLogService } from '@/services/auditLogService';
 import type { AuditLogEntry, User, UserRole, WorkCenter } from '@/types';
 import Header from '@/components/layout/Header';
+import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 
 type AdminTab = 'users' | 'audit' | 'settings';
 
@@ -73,6 +75,10 @@ export default function AdministrationPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deactivatingId, setDeactivatingId] = useState('');
   const [userActionError, setUserActionError] = useState('');
+  // F3: the reset path (PUT /users/:id/password with newPassword only) and the
+  // dialog that drives it (`adminMode`) both existed; only this table never used
+  // them, so an Administrator could create an account but never recover one.
+  const [resetUser, setResetUser] = useState<User | null>(null);
 
   // SOW 3.3.3 / 3.2.2: the number prefixes were rendered as fixed text, so the
   // setting looked configurable and was not. They are now loaded from the API
@@ -280,6 +286,14 @@ export default function AdministrationPage() {
                   }}
                 />
               )}
+              {resetUser && (
+                <ChangePasswordDialog
+                  userId={resetUser.userId}
+                  adminMode
+                  open
+                  onClose={() => setResetUser(null)}
+                />
+              )}
               {!loading && !storeError && users.length === 0 && (
                 <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No users found in the system.</div>
               )}
@@ -327,6 +341,13 @@ export default function AdministrationPage() {
                                 className="text-xs px-2 py-1 rounded border border-subtle text-primary hover:border-amber"
                               >
                                 {editingUser?.userId === u.userId ? 'Close' : 'Edit'}
+                              </button>
+                              <button
+                                onClick={() => { setResetUser(u); setUserActionError(''); }}
+                                aria-label={`Reset password for ${u.fullName}`}
+                                className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-subtle text-primary hover:border-amber"
+                              >
+                                <KeyRound className="w-3 h-3" /> Password
                               </button>
                               {u.userId === user?.userId ? (
                                 <span className="text-tertiary text-xs">You</span>

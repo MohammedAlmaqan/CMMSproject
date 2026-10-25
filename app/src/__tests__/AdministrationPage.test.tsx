@@ -12,6 +12,7 @@ import { useAppStore } from '@/store/appStore';
 import { userService } from '@/services/userService';
 import { systemConfigService } from '@/services/systemConfigService';
 import { auditLogService } from '@/services/auditLogService';
+import { ApiError } from '@/lib/api';
 import type { User } from '@/types';
 
 vi.mock('@/services/userService', () => ({
@@ -137,5 +138,62 @@ describe('AdministrationPage user edit (G3)', () => {
     expect(await screen.findByRole('button', { name: 'Deactivate TechUser' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deactivate AdminUser' })).not.toBeInTheDocument();
     expect(screen.getByText('You')).toBeInTheDocument();
+  });
+});
+
+// F3: POST /users, PUT /users/:id and PUT /users/:id/password were all exposed,
+// and ChangePasswordDialog already had an adminMode, but the users table only
+// offered Edit and Deactivate. An Administrator could create an account and then
+// had no way to recover it.
+describe('AdministrationPage password reset (F3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
+    useAppStore.setState({ users: [adminUser, targetUser], workCenters: [], loading: false, error: null });
+    vi.mocked(systemConfigService.getAll).mockResolvedValue([]);
+    vi.mocked(auditLogService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 100 });
+  });
+
+  it('opens the reset dialog in admin mode, without asking for the current password', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Reset password for TechUser' }));
+
+    expect(screen.getByRole('dialog', { name: 'Reset password' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Current password')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('New password')).toBeInTheDocument();
+  });
+
+  it('sends newPassword only, for the row it was opened on', async () => {
+    vi.mocked(userService.changePassword).mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Reset password for TechUser' }));
+    await user.type(screen.getByLabelText('New password'), 'Reset-Pass-123456');
+    await user.type(screen.getByLabelText('Confirm new password'), 'Reset-Pass-123456');
+    await user.click(screen.getByRole('button', { name: 'Reset Password' }));
+
+    await waitFor(() =>
+      expect(vi.mocked(userService.changePassword)).toHaveBeenCalledWith('u-tech', {
+        newPassword: 'Reset-Pass-123456',
+      })
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent('Password updated.');
+  });
+
+  it('keeps the dialog open and shows the message when the API rejects', async () => {
+    vi.mocked(userService.changePassword).mockRejectedValue(new ApiError(400, 'Password does not meet policy'));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Reset password for TechUser' }));
+    await user.type(screen.getByLabelText('New password'), 'Reset-Pass-123456');
+    await user.type(screen.getByLabelText('Confirm new password'), 'Reset-Pass-123456');
+    await user.click(screen.getByRole('button', { name: 'Reset Password' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Password does not meet policy');
+    expect(screen.getByRole('dialog', { name: 'Reset password' })).toBeInTheDocument();
   });
 });
