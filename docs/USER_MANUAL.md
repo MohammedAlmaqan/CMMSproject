@@ -111,19 +111,27 @@ Every register screen follows the same pattern: a search box, a row of filters, 
 
 ### 3.4 Bulk import and export
 
-Four registers - **Equipment**, **Materials**, **Work Orders** and **Functional Locations** - have **Export** and **Import** controls beside the filters. Both work on the whole register, not on the filtered view: the file contains every non-deleted record, and a filter you have set on screen does not narrow it.
+Every register screen has **Export** and **Import** controls beside the filters, with two exceptions that are export-only: **Notifications** and the **Users** register in Administration. Both controls work on the whole register, not on the filtered view: the file contains every non-deleted record, and a filter you have set on screen does not narrow it. On **Code Lists** each of the two tabs - Cause Codes and Failure Codes - has its own pair, so the two files are separate.
 
-- **Export** downloads a comma-separated file (`.csv`) named after the module and today's date. The columns are the ones the import expects, foreign keys are written as the codes and usernames you see on screen, and dates are written `YYYY-MM-DD`, so the file can be edited in Excel and imported back.
+- **Export** downloads a comma-separated file (`.csv`) named after the module and today's date. The columns are the ones the import expects, foreign keys are written as the codes and usernames you see on screen, and dates are written `YYYY-MM-DD`, so the file can be edited in Excel and imported back. The users file carries no password or password hash.
 - **Import** reads the same columns. Columns are matched by name rather than by position, so reordering them in Excel is safe, but the required ones must be present; the upload is refused with a message naming any that are missing.
 
-What a bad row does depends on the module, because the two were built for different jobs:
+What a bad row does depends on the module, because they were built for different jobs:
 
 | Register | A rejected row | Why |
 |---|---|---|
-| Equipment, Materials | Rejects the whole file | Master data is edited in bulk; a half-applied file is harder to reason about than a refused one |
+| Equipment, Materials, Work Centers, Crafts, Task Lists, Safety Checklists, Code Lists, PM Plans | Rejects the whole file | Master data is edited in bulk; a half-applied file is harder to reason about than a refused one |
 | Work Orders, Functional Locations | Keeps the rows it accepted | A converted backlog is often messy; the response names each rejected line and the work already imported stays |
 
-After an import the toolbar shows how many records were created and updated, and names the first rejected line with its reason. A refused file leaves the register exactly as it was. Import is restricted to **Maintenance Planner** and **Administrator**; every signed-in role can export.
+Three of the files carry headers only, because the shape they would need is a list, not a row:
+
+- **PM Plans** creates a plan with a single asset (equipment code or functional-location code, exactly one of the two) and leaves an existing plan's assets, target list and meter thresholds alone; a meter-based plan must already have its meters, so the import creates **Time** plans only.
+- **Task Lists** carries the list's code, description, class and asset; its operations and materials stay on the task-list screen.
+- **Safety Checklists** is one row per item: the template name repeats on each row, and items are matched by their sequence number. Importing a template does not delete items that are absent from the file - remove those in the screen.
+
+Importing crafts can re-cost work: a row that changes a craft's hourly rate re-prices every live work order that uses it, exactly as editing the rate on the Crafts screen does.
+
+After an import the toolbar shows how many records were created and updated, and names the first rejected line with its reason. A refused file leaves the register exactly as it was. Import is restricted to **Maintenance Planner** and **Administrator**; every signed-in role can export, except the Users register, which is Administrator-only like the rest of Administration.
 
 ---
 
