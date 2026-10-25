@@ -4,7 +4,8 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
-import { failureCodeCreateSchema, failureCodeUpdateSchema, validate } from '../utils/validation.js';
+import { failureCodeCreateSchema, failureCodeUpdateSchema, failureCodeImportRowSchema, validate } from '../utils/validation.js';
+import { csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
 import { isPrismaError } from '../utils/prismaErrors.js';
 import { logger } from '../utils/logger.js';
 import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
@@ -221,6 +222,210 @@ router.get('/tree', async (_req: Request, res: Response) => {
   }
 });
 
+
+const FAILURE_CODE_CSV_COLUMNS = ['code', 'description', 'parentCode'] as const;
+
+/**
+ * @openapi
+ * /api/failure-codes/export.csv:
+ *   get:
+ *     summary: Export failure codes as CSV
+ *     description: >
+ *       Streams every non-deleted failure code as text/csv in code order. The parent
+ *       is written by its `code`, not its id, so the hierarchy survives a round trip
+ *       to another deployment. No role restriction beyond authentication.
+ *     tags: [Failure Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Failure codes as text/csv
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'failure codes',
+    filename: 'failure-codes',
+    columns: FAILURE_CODE_CSV_COLUMNS,
+    rows: async () => {
+      const rows = await prisma.failureCode.findMany({
+        where: { isDeleted: false },
+        orderBy: { code: 'asc' },
+        include: { parent: { select: { code: true } } },
+      });
+      return rows.map((row) => [row.code, row.description, row.parent?.code ?? '']);
+    },
+  })
+);
+
+/**
+ * @openapi
+ * /api/failure-codes/import.csv:
+ *   post:
+ *     summary: Import failure codes from CSV
+ *     description: >
+ *       Multipart upload with a single `file` part. Requires the Maintenance Planner role.
+ *       Rows are validated by `failureCodeImportRowSchema`. The file is read in two
+ *       passes, because a child may name a parent that appears later in it: every code is
+ *       created or updated first, then each `parentCode` is resolved to the code it names.
+ *       An unknown parent is rejected, as is a parent that would make a code its own
+ *       ancestor. A row whose `code` already exists is updated rather than duplicated.
+ *       The import is all-or-nothing: the first invalid row rolls the whole file back and
+ *       returns 400 naming that row. Add `?dryRun=1` to report the outcome without writing
+ *       anything.
+ *     tags: [Failure Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema: { type: boolean }
+ *         description: Run the import and roll it back, reporting what it would do
+ *     requestBody:
+ *       required: true
+ *       description: "Multipart form; each CSV row validated by zod `failureCodeImportRowSchema`"
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       '200':
+ *         description: Import completed; every row was accepted
+ *       '400':
+ *         description: >
+ *           Malformed CSV, a missing header column, a row that failed validation, or a row
+ *           naming an unknown parent (the file is rolled back)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '500':
+ *         description: Internal server error
+ */
+router.post(
+  '/import.csv',
+  ...csvImportRoute({
+    noun: 'failure codes',
+    columns: FAILURE_CODE_CSV_COLUMNS,
+    schema: failureCodeImportRowSchema,
+    mode: 'strict',
+    run: async (ctx, rows) => {
+      const existing = await ctx.tx.failureCode.findMany({
+        where: { isDeleted: false },
+        select: { failureCodeId: true, code: true, parentCodeId: true },
+      });
+      const idByCode = new Map(existing.map((c) => [c.code, c.failureCodeId]));
+      const parentById = new Map(existing.map((c) => [c.failureCodeId, c.parentCodeId]));
+
+      const outcome = { created: 0, updated: 0, rejected: [] as Array<{ row: number; reason: string }> };
+
+      // Pass 1: make every code in the file exist. Parents are left alone here,
+      // because the code a row names may not exist until a later row is read.
+      for (const row of rows) {
+        const d = row.record;
+        const existingId = idByCode.get(d.code);
+        if (existingId) {
+          await ctx.tx.failureCode.update({
+            where: { failureCodeId: existingId },
+            data: { description: d.description, modifiedBy: ctx.userId },
+          });
+          await logAuditAction({
+            table: 'FailureCode',
+            recordId: existingId,
+            action: 'Update',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.updated += 1;
+        } else {
+          const created = await ctx.tx.failureCode.create({
+            data: {
+              code: d.code,
+              description: d.description,
+              createdBy: ctx.userId,
+              modifiedBy: ctx.userId,
+            },
+          });
+          await logAuditAction({
+            table: 'FailureCode',
+            recordId: created.failureCodeId,
+            action: 'Create',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.created += 1;
+          idByCode.set(d.code, created.failureCodeId);
+          parentById.set(created.failureCodeId, null);
+        }
+      }
+
+      // Pass 2: resolve the hierarchy now that every code in the file exists.
+      // The counters are not touched here: each row was already counted exactly
+      // once above, and counting the parent write too would report one row as
+      // two changes.
+      for (const row of rows) {
+        const d = row.record;
+        if (!d.parentCode) continue;
+
+        const selfId = idByCode.get(d.code) as string;
+        const parentId = idByCode.get(d.parentCode);
+        if (!parentId) {
+          outcome.rejected.push({ row: row.number, reason: `unknown parentCode '${d.parentCode}'` });
+          continue;
+        }
+        if (parentId === selfId) {
+          outcome.rejected.push({ row: row.number, reason: 'a failure code cannot be its own parent' });
+          continue;
+        }
+
+        // A cycle is not refused by the single-row routes, but an import that
+        // creates one removes both codes from the /tree listing (neither is
+        // reachable from a root), so it is refused here rather than stored.
+        let cursor: string | null = parentId;
+        const seen = new Set<string>();
+        let cycle = false;
+        while (cursor && !seen.has(cursor)) {
+          if (cursor === selfId) {
+            cycle = true;
+            break;
+          }
+          seen.add(cursor);
+          cursor = parentById.get(cursor) ?? null;
+        }
+        if (cycle) {
+          outcome.rejected.push({ row: row.number, reason: `parentCode '${d.parentCode}' would create a cycle` });
+          continue;
+        }
+
+        if (parentById.get(selfId) === parentId) continue;
+        await ctx.tx.failureCode.update({
+          where: { failureCodeId: selfId },
+          data: { parentCodeId: parentId, modifiedBy: ctx.userId },
+        });
+        parentById.set(selfId, parentId);
+        await logAuditAction({
+          table: 'FailureCode',
+          recordId: selfId,
+          action: 'Update',
+          userId: ctx.userId,
+          ipAddress: ctx.ipAddress,
+          db: ctx.tx,
+        });
+      }
+
+      return outcome;
+    },
+  })
+);
 
 /**
  * @openapi
