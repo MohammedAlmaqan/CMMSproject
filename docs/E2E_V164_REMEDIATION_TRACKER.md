@@ -1,13 +1,17 @@
-# v1.6.5 remediation tracker
+# v1.6.4 end-to-end remediation tracker
 
 Tracks the fourteen findings from the v1.6.4 manual end-to-end test
 (`docs/E2E_V164_FINDINGS_PHASE1.md`) through implementation, verification and
-release. One row per finding. The **Commit** column is the durable anchor: a row
+release, plus the four items the owner decided on 2026-10-25 after `v1.6.5`
+shipped. One row per finding. The **Commit** column is the durable anchor: a row
 is only `Closed` when a commit exists that a reviewer can read.
 
 - **Opened:** 2026-10-25
 - **Baseline:** `v1.6.4` (`f245123`)
-- **Release:** `v1.6.5`
+- **Releases:** `v1.6.5` closed all fourteen findings. `v1.6.6` carries the
+  second-round decisions of 2026-10-25: F5 enforced at the API, F7 across the
+  remaining registers, F4 recorded as UI-only, A1 disclosed in the release
+  notes.
 - **Rule:** a row moves to `Closed` in the same commit that closes it, or in the
   next documentation-only commit when the closing work landed in several commits.
 
