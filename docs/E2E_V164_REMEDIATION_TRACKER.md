@@ -18,8 +18,8 @@ is only `Closed` when a commit exists that a reviewer can read.
 | F1 | Installer `.env` reported as containing placeholders | Not reproduced; look-alike sample files ship beside the real `.env` | Closed | `9c14f53` removes every `backend\.env.*` and asserts the generated file carries no `__TOKEN__` or sample value |
 | F2 | No Sign Out for non-Administrators | Confirmed | Closed | `d6518d8` adds Sign out to the Sidebar for all roles |
 | F3 | Administrator cannot reset a user's password in the UI | Confirmed | Closed | `f2dac8e` wires the per-row Password action to the existing `adminMode` dialog |
-| F4 | Work-order header (Supervisor, planned dates) cannot be edited | Confirmed | Open | - |
-| F5 | "Schedule" sets status without collecting dates | Confirmed | Open | - |
+| F4 | Work-order header (Supervisor, planned dates) cannot be edited | Confirmed | Closed | `a5c31c9` adds the Edit details band. UI gate is Supervisor/Planner/Admin; the API's `PUT /work-orders/:id` floor is deliberately left at Technician+ (no field-level authorisation exists there, and raising it would also block technician edits) - reported, not changed |
+| F5 | "Schedule" sets status without collecting dates | Confirmed | Closed | API `9fac75f` accepts `plannedStart`/`plannedFinish` on the status route and applies them in the same update; app `d66dc84` sends them from one shared dialog. Option C (refusing Scheduled with no dates) left open |
 | F6 | Handover bundle ships stale documentation | Confirmed | Open | - |
 | F7 | Most data pages have no import/export | Confirmed, asymmetric | Open | - |
 | A1 | Bundle ships `backend/.env.deploy` with a concrete JWT secret | Confirmed (security) | Open | - |
@@ -32,6 +32,14 @@ is only `Closed` when a commit exists that a reviewer can read.
 
 States: `Open`, `In progress`, `Blocked`, `Closed`.
 
+## Errata
+
+- `96f32dd` ("docs: close seven tracker rows") names "A3-to-be" in its message,
+  but A3 is still `Open` here: that commit closed seven rows, not eight, and A3's
+  own evidence is the subject of A3 rather than something it can close. The row
+  table above is authoritative; the message is left as committed because history
+  is not rewritten.
+
 ## Approved scope
 
 Owner decisions of 2026-10-25, with the engineering call recorded where it
@@ -39,7 +47,7 @@ differs:
 
 | Item | Owner decision | Engineering call |
 |------|----------------|------------------|
-| F2 / A7 | Sign Out in the global Sidebar for all roles; fix the non-admin profile target | Adopted. Profile button opens an account menu instead of navigating |
+| F2 / A7 | Sign Out in the global Sidebar for all roles; fix the non-admin profile target | Adopted; the role-filtered nav list already carries the Administration link, so the profile block became a non-interactive display rather than gaining a menu |
 | F3 | Wire the reset dialog; raise the password floor to 12 | Adopted, API and UI together (A5) |
 | F4 | Supervisor, Planner and Administrator may edit the header | Adopted |
 | F5 | Option B — atomic API extension accepting dates on the status route | Adopted, plus ordered-pair validation on the dates themselves |
