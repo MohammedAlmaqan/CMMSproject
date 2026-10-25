@@ -4,7 +4,8 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
-import { causeCodeCreateSchema, causeCodeUpdateSchema, validate } from '../utils/validation.js';
+import { causeCodeCreateSchema, causeCodeUpdateSchema, causeCodeImportRowSchema, validate } from '../utils/validation.js';
+import { csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
 import { logger } from '../utils/logger.js';
 import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 
@@ -108,6 +109,138 @@ router.get('/', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+const CAUSE_CODE_CSV_COLUMNS = ['code', 'description'] as const;
+
+/**
+ * @openapi
+ * /api/cause-codes/export.csv:
+ *   get:
+ *     summary: Export cause codes as CSV
+ *     description: >
+ *       Streams every non-deleted cause code as text/csv in code order. No role
+ *       restriction beyond authentication.
+ *     tags: [Cause Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Cause codes as text/csv
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'cause codes',
+    filename: 'cause-codes',
+    columns: CAUSE_CODE_CSV_COLUMNS,
+    rows: async () => {
+      const rows = await prisma.causeCode.findMany({
+        where: { isDeleted: false },
+        orderBy: { code: 'asc' },
+      });
+      return rows.map((row) => [row.code, row.description]);
+    },
+  })
+);
+
+/**
+ * @openapi
+ * /api/cause-codes/import.csv:
+ *   post:
+ *     summary: Import cause codes from CSV
+ *     description: >
+ *       Multipart upload with a single `file` part. Requires the Maintenance Planner role.
+ *       Rows are validated by `causeCodeImportRowSchema`. A row whose `code` already
+ *       exists is updated rather than duplicated. The import is all-or-nothing: the first
+ *       invalid row rolls the whole file back and returns 400 naming that row. Add
+ *       `?dryRun=1` to report the outcome without writing anything.
+ *     tags: [Cause Codes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema: { type: boolean }
+ *         description: Run the import and roll it back, reporting what it would do
+ *     requestBody:
+ *       required: true
+ *       description: "Multipart form; each CSV row validated by zod `causeCodeImportRowSchema`"
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       '200':
+ *         description: Import completed; every row was accepted
+ *       '400':
+ *         description: Malformed CSV, a missing header column, or a row that failed validation (the file is rolled back)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '500':
+ *         description: Internal server error
+ */
+router.post(
+  '/import.csv',
+  ...csvImportRoute({
+    noun: 'cause codes',
+    columns: CAUSE_CODE_CSV_COLUMNS,
+    schema: causeCodeImportRowSchema,
+    mode: 'strict',
+    run: async (ctx, rows) => {
+      const outcome = { created: 0, updated: 0, rejected: [] as Array<{ row: number; reason: string }> };
+      for (const row of rows) {
+        const d = row.record;
+        const existing = await ctx.tx.causeCode.findFirst({
+          where: { code: d.code, isDeleted: false },
+        });
+
+        if (existing) {
+          await ctx.tx.causeCode.update({
+            where: { causeCodeId: existing.causeCodeId },
+            data: { description: d.description, modifiedBy: ctx.userId },
+          });
+          await logAuditAction({
+            table: 'CauseCode',
+            recordId: existing.causeCodeId,
+            action: 'Update',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.updated += 1;
+        } else {
+          const created = await ctx.tx.causeCode.create({
+            data: {
+              code: d.code,
+              description: d.description,
+              createdBy: ctx.userId,
+              modifiedBy: ctx.userId,
+            },
+          });
+          await logAuditAction({
+            table: 'CauseCode',
+            recordId: created.causeCodeId,
+            action: 'Create',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.created += 1;
+        }
+      }
+      return outcome;
+    },
+  })
+);
 
 /**
  * @openapi
