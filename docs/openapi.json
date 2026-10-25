@@ -513,7 +513,7 @@
     "/api/work-orders/{id}/status": {
       "put": {
         "summary": "Transition work order status",
-        "description": "Applies a valid workflow transition (Draft/Planned/Scheduled/In Progress/Completed/Suspended/Closed/Cancelled). Sets actualStart/actualFinish timestamps. Transitioning to In Progress requires every mandatory safety checklist on the work order to be Completed, otherwise 409. Transitioning to Closed requires the Maintenance Supervisor or Administrator role, otherwise 403.\nTransitioning to Completed additionally performs, in the same transaction as the status change so the work order can never be Completed without them (SOW 3.2.1 and 3.2.3):\n  - autogenerates an M3 Completion Confirmation notification, open\n    against the work order's location and equipment, raised by the\n    user who completed it (SOW 3.2.1, M3);\n  - moves every notification this work order was converted from from\n    Converted to Completed, so the conversion queue clears\n    (SOW 3.2.3).\nThe work order transition map has no path out of Completed, so both run exactly once per work order.\n",
+        "description": "Applies a valid workflow transition (Draft/Planned/Scheduled/In Progress/Completed/Suspended/Closed/Cancelled). Sets actualStart/actualFinish timestamps. Transitioning to In Progress requires every mandatory safety checklist on the work order to be Completed, otherwise 409. Transitioning to Closed requires the Maintenance Supervisor or Administrator role, otherwise 403.\nOptional plannedStart/plannedFinish values are applied in the same update as the status, so scheduling a work order is one call. The pair that will be stored is validated as a whole: a finish earlier than the start is refused with 400. A work order may still be moved to Scheduled without dates.\nTransitioning to Completed additionally performs, in the same transaction as the status change so the work order can never be Completed without them (SOW 3.2.1 and 3.2.3):\n  - autogenerates an M3 Completion Confirmation notification, open\n    against the work order's location and equipment, raised by the\n    user who completed it (SOW 3.2.1, M3);\n  - moves every notification this work order was converted from from\n    Converted to Completed, so the conversion queue clears\n    (SOW 3.2.3).\nThe work order transition map has no path out of Completed, so both run exactly once per work order.\n",
         "tags": [
           "Work Orders"
         ],
@@ -544,6 +544,18 @@
                 "properties": {
                   "status": {
                     "type": "string"
+                  },
+                  "plannedStart": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true,
+                    "description": "Applied in the same update as the status"
+                  },
+                  "plannedFinish": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true,
+                    "description": "Must not precede plannedStart (or the stored start)"
                   }
                 }
               }
@@ -562,7 +574,7 @@
             }
           },
           "400": {
-            "description": "Invalid status transition"
+            "description": "Invalid status transition, or a planned finish before its start"
           },
           "403": {
             "description": "Insufficient permissions (closing requires Maintenance Supervisor or Administrator)"

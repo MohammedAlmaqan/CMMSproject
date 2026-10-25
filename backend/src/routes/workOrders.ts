@@ -936,6 +936,12 @@ function requireSupervisorForClose(req: Request, res: Response, next: NextFuncti
  *       Completed, otherwise 409. Transitioning to Closed requires the
  *       Maintenance Supervisor or Administrator role, otherwise 403.
  *
+ *       Optional plannedStart/plannedFinish values are applied in the same
+ *       update as the status, so scheduling a work order is one call. The
+ *       pair that will be stored is validated as a whole: a finish earlier
+ *       than the start is refused with 400. A work order may still be moved
+ *       to Scheduled without dates.
+ *
  *       Transitioning to Completed additionally performs, in the same
  *       transaction as the status change so the work order can never be
  *       Completed without them (SOW 3.2.1 and 3.2.3):
@@ -967,6 +973,16 @@ function requireSupervisorForClose(req: Request, res: Response, next: NextFuncti
  *             properties:
  *               status:
  *                 type: string
+ *               plannedStart:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *                 description: Applied in the same update as the status
+ *               plannedFinish:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *                 description: Must not precede plannedStart (or the stored start)
  *     responses:
  *       '200':
  *         description: Updated work order
@@ -975,7 +991,7 @@ function requireSupervisorForClose(req: Request, res: Response, next: NextFuncti
  *             schema:
  *               type: object
  *       '400':
- *         description: Invalid status transition
+ *         description: Invalid status transition, or a planned finish before its start
  *       '403':
  *         description: Insufficient permissions (closing requires Maintenance Supervisor or Administrator)
  *       '409':
@@ -1004,13 +1020,42 @@ router.put(
   async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { status: newStatus } = req.body;
+    const { status: newStatus, plannedStart, plannedFinish } = req.body;
 
     const workOrder = await prisma.workOrder.findFirst({
       where: { workOrderId: id, isDeleted: false },
     });
     if (!workOrder) {
       return res.status(404).json({ error: 'Work order not found' });
+    }
+
+    // F5: a transition may carry the planned dates, so scheduling is one call
+    // rather than a status change and a separate edit. Either date may be sent
+    // on its own; the pair that will actually be stored is what gets checked,
+    // so a finish earlier than the start already on the row is refused instead
+    // of saved. Option C - refusing Scheduled at all without dates - was
+    // considered and deliberately not adopted (owner decision 2026-10-25): a
+    // work order can still be scheduled before its dates are known.
+    const nextPlannedStart =
+      plannedStart !== undefined
+        ? plannedStart
+          ? new Date(plannedStart)
+          : null
+        : workOrder.plannedStart;
+    const nextPlannedFinish =
+      plannedFinish !== undefined
+        ? plannedFinish
+          ? new Date(plannedFinish)
+          : null
+        : workOrder.plannedFinish;
+    if (
+      nextPlannedStart &&
+      nextPlannedFinish &&
+      nextPlannedFinish.getTime() < nextPlannedStart.getTime()
+    ) {
+      return res.status(400).json({
+        error: 'Planned finish must be on or after planned start',
+      });
     }
 
     const allowed = VALID_TRANSITIONS[workOrder.status];
@@ -1139,6 +1184,14 @@ router.put(
     if (newStatus === 'Completed' || newStatus === 'Closed') {
       updateData.actualFinish = new Date();
     }
+    // F5: the dates ride in the same update as the status, so the work order
+    // cannot end up Scheduled with a schedule that was never applied.
+    if (plannedStart !== undefined) {
+      updateData.plannedStart = plannedStart ? new Date(plannedStart) : null;
+    }
+    if (plannedFinish !== undefined) {
+      updateData.plannedFinish = plannedFinish ? new Date(plannedFinish) : null;
+    }
 
     // SOW 3.2.1 and 3.2.3. Completing a work order does two more things, and
     // both are done in the same transaction as the status change so the work
@@ -1252,6 +1305,19 @@ router.put(
     });
 
     await logAuditFieldChange({ table: 'WorkOrder', recordId: id, action: 'Update', field: 'status', oldValue: workOrder.status, newValue: newStatus, userId: req.user!.userId, ipAddress: req.ip });
+
+    // F5: a date carried by a transition is an edit like any other, so it gets
+    // its own per-column row with the real before and after rather than riding
+    // invisibly on the status entry. Only genuine differences produce a row.
+    await logFieldChanges({
+      table: 'WorkOrder',
+      recordId: id,
+      before: workOrder,
+      after: updated,
+      fields: ['plannedStart', 'plannedFinish'],
+      userId: req.user!.userId,
+      ipAddress: req.ip,
+    });
 
     if (newStatus === 'Completed') {
       for (const link of completedLinks) {

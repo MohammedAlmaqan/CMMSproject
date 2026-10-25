@@ -83,8 +83,27 @@ export const workOrderCreateSchema = z.object({
 
 export const workOrderUpdateSchema = workOrderCreateSchema.partial();
 
+/**
+ * A planned date travelling with a status transition (F5). The transition
+ * schema used to carry only `status`, and because `validate()` replaces the body
+ * with the parsed object, any date sent beside the status was silently dropped:
+ * the app could move a work order to Scheduled without ever recording when the
+ * work would happen. Accepting the pair here is what lets the schedule and the
+ * transition be one request and one transaction.
+ */
+const plannedTimestampSchema = z
+  .string()
+  .min(1)
+  .refine((value) => !Number.isNaN(Date.parse(value)), {
+    message: 'must be a valid date',
+  });
+
 export const workOrderStatusBodySchema = z.object({
   status: workOrderStatusSchema,
+  // Nullable so a transition can clear a date it no longer wants; optional so
+  // an ordinary status move does not have to restate the current schedule.
+  plannedStart: plannedTimestampSchema.nullable().optional(),
+  plannedFinish: plannedTimestampSchema.nullable().optional(),
 });
 
 export const operationCreateSchema = z.object({

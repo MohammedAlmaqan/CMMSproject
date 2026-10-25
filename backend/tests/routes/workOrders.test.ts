@@ -192,6 +192,137 @@ describe('work orders routes', () => {
     ).toBeGreaterThanOrEqual(1);
   });
 
+  /**
+   * F5: the Schedule action used to be a status-only call, so a work order could
+   * reach Scheduled with no dates and the app never asked for them. The dates
+   * now travel with the transition, in the same update.
+   */
+  const createPlannedWorkOrder = async (): Promise<string> => {
+    const created = await api()
+      .post('/api/work-orders')
+      .set(authHeaders(ctx.adminToken))
+      .send(body({ description: `schedule test ${Date.now()}` }));
+    expect(created.status).toBe(201);
+    const id = created.body.workOrderId as string;
+    extraIds.push(id);
+    await addOperation(id);
+    const planned = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Planned' });
+    expect(planned.status).toBe(200);
+    return id;
+  };
+
+  it('applies planned dates in the same update as the transition (F5)', async () => {
+    const id = await createPlannedWorkOrder();
+    const start = '2026-11-02T06:00:00.000Z';
+    const finish = '2026-11-02T14:00:00.000Z';
+
+    const res = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Scheduled', plannedStart: start, plannedFinish: finish });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('Scheduled');
+    expect(res.body.plannedStart).toBe(start);
+    expect(res.body.plannedFinish).toBe(finish);
+
+    const stored = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });
+    expect(stored.plannedStart?.toISOString()).toBe(start);
+    expect(stored.plannedFinish?.toISOString()).toBe(finish);
+
+    // A date carried by a transition is an edit, so it is audited on its own
+    // column with the real before/after rather than hidden on the status row.
+    expect(
+      await prisma.auditLogEntry.count({
+        where: {
+          tableName: 'WorkOrder',
+          recordId: id,
+          fieldName: 'plannedStart',
+          oldValue: null,
+          newValue: start,
+        },
+      })
+    ).toBe(1);
+    expect(
+      await prisma.auditLogEntry.count({
+        where: {
+          tableName: 'WorkOrder',
+          recordId: id,
+          fieldName: 'plannedFinish',
+          oldValue: null,
+          newValue: finish,
+        },
+      })
+    ).toBe(1);
+  });
+
+  it('refuses an inverted planned pair and leaves the status and dates alone (F5)', async () => {
+    const id = await createPlannedWorkOrder();
+
+    const res = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({
+        status: 'Scheduled',
+        plannedStart: '2026-11-02T14:00:00.000Z',
+        plannedFinish: '2026-11-02T06:00:00.000Z',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('Planned finish must be on or after planned start');
+
+    // The whole request was refused, not just the dates: the work order is
+    // still Planned, so the app cannot report a successful schedule.
+    const stored = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });
+    expect(stored.status).toBe('Planned');
+    expect(stored.plannedStart).toBeNull();
+    expect(stored.plannedFinish).toBeNull();
+  });
+
+  it('validates a single date against the one already stored (F5)', async () => {
+    const id = await createPlannedWorkOrder();
+    const start = '2026-11-02T06:00:00.000Z';
+
+    // A finish-only update has no start beside it, so the comparison has to
+    // include the value already on the row.
+    const setStart = await api()
+      .put(`/api/work-orders/${id}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ plannedStart: start });
+    expect(setStart.status).toBe(200);
+
+    const tooEarly = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Scheduled', plannedFinish: '2026-11-02T05:00:00.000Z' });
+    expect(tooEarly.status).toBe(400);
+    expect(tooEarly.body.error).toContain('Planned finish must be on or after planned start');
+
+    const ok = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Scheduled', plannedFinish: '2026-11-02T12:00:00.000Z' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.status).toBe('Scheduled');
+    // The stored start survived a request that only named a finish.
+    expect(ok.body.plannedStart).toBe(start);
+  });
+
+  it('rejects a date that is not a date with a 400, not a 500 (F5)', async () => {
+    const id = await createPlannedWorkOrder();
+
+    const res = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Scheduled', plannedStart: 'next tuesday' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('plannedStart');
+  });
+
   it('blocks In Progress while a mandatory safety checklist is incomplete and allows it once Completed', async () => {
     const tpl = await api()
       .post('/api/safety-checklists/templates')
