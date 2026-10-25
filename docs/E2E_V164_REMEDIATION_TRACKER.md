@@ -21,7 +21,7 @@ is only `Closed` when a commit exists that a reviewer can read.
 | F4 | Work-order header (Supervisor, planned dates) cannot be edited | Confirmed | Closed | `a5c31c9` adds the Edit details band. UI gate is Supervisor/Planner/Admin; the API's `PUT /work-orders/:id` floor is deliberately left at Technician+ (no field-level authorisation exists there, and raising it would also block technician edits) - reported, not changed |
 | F5 | "Schedule" sets status without collecting dates | Confirmed | Closed | API `9fac75f` accepts `plannedStart`/`plannedFinish` on the status route and applies them in the same update; app `d66dc84` sends them from one shared dialog. Option C (refusing Scheduled with no dates) left open |
 | F6 | Handover bundle ships stale documentation | Confirmed | Open | - |
-| F7 | Most data pages have no import/export | Confirmed, asymmetric | Open | - |
+| F7 | Most data pages have no import/export | Confirmed, asymmetric | Closed | P1 `7b85685` gives the four routes one contract (header by name, `strict`/`partial`, `?dryRun=1`, one result shape); P2 `d6eba45` adds `export.csv` for Work Orders and Functional Locations and `258660e` adds the shared toolbar to both, so all four modules now have UI and both directions. Docs `121bf25`, `d46d1cc`. Consequence: equipment and materials report CSV outcomes in the toolbar, not the page toast. Six modules remain out of scope (above) |
 | A1 | Bundle ships `backend/.env.deploy` with a concrete JWT secret | Confirmed (security) | Open | - |
 | A2 | `backend/.env.example` reaches the install root | Confirmed | Closed | `9c14f53`, same copy rule as F1 |
 | A3 | Two v1.6.4 commit messages describe work not in the commit | Confirmed | Open | - |
