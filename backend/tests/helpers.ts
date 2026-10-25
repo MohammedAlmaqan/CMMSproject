@@ -11,6 +11,22 @@ export function authHeaders(token: string) {
 }
 
 /**
+ * The body of a status transition. A work order may not enter Scheduled
+ * without a schedule (F5 option C), so every test that walks a work order
+ * through the workflow has to carry one - the same rule the app's Schedule
+ * dialog has always applied. Tests that specifically exercise the refusal send
+ * their own body instead of using this.
+ */
+export const TEST_SCHEDULE = {
+  plannedStart: '2026-11-02T06:00:00.000Z',
+  plannedFinish: '2026-11-02T14:00:00.000Z',
+} as const;
+
+export function statusBody(status: string) {
+  return status === 'Scheduled' ? { status, ...TEST_SCHEDULE } : { status };
+}
+
+/**
  * R.9 D3. Hard-delete helpers for test fixtures.
  *
  * The suite runs against a live database that `prisma/seed.ts` only wipes when

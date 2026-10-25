@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx, purgeWorkOrders } from '../helpers.js';
+import { api, authHeaders, ctx, purgeWorkOrders, statusBody } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 import { CALIBRATION_RESULT_REQUIRED_MESSAGE } from '../../src/utils/workOrderRules.js';
 
@@ -51,7 +51,7 @@ async function addOperation(workOrderId: string): Promise<void> {
 }
 
 async function transition(id: string, status: string) {
-  return api().put(`/api/work-orders/${id}/status`).set(authHeaders(ctx.technicianToken)).send({ status });
+  return api().put(`/api/work-orders/${id}/status`).set(authHeaders(ctx.technicianToken)).send(statusBody(status));
 }
 
 async function walkToInProgress(id: string): Promise<void> {

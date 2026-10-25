@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx, purgeWorkOrders, purgeFailureCodes } from '../helpers.js';
+import { api, authHeaders, ctx, purgeWorkOrders, purgeFailureCodes, statusBody } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 // SOW 3.1.4 (owner decision 2026-10-05), the second half of the clause that
@@ -51,7 +51,7 @@ async function walkToInProgress(id: string): Promise<void> {
     .send({ workOrderId: id, sequenceNumber: 10, description: 'test operation', craftId, plannedHours: 1 });
   expect(op.status).toBe(201);
   for (const step of ['Planned', 'Scheduled', 'In Progress']) {
-    const res = await api().put(`/api/work-orders/${id}/status`).set(authHeaders(ctx.technicianToken)).send({ status: step });
+    const res = await api().put(`/api/work-orders/${id}/status`).set(authHeaders(ctx.technicianToken)).send(statusBody(step));
     expect(res.status).toBe(200);
   }
 }

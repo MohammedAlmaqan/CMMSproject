@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx, purgeWorkOrders, purgeSafetyChecklistTemplates } from '../helpers.js';
+import { api, authHeaders, ctx, purgeWorkOrders, purgeSafetyChecklistTemplates, statusBody } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 let createdId = '';
@@ -323,6 +323,98 @@ describe('work orders routes', () => {
     expect(res.body.error).toContain('plannedStart');
   });
 
+  /**
+   * F5 option C (owner decision 2026-10-25): a work order may not enter
+   * Scheduled without a schedule. Before this the API accepted the transition
+   * on its own, so the app's Schedule dialog was the only thing asking for
+   * dates and any other client could leave a row Scheduled with none.
+   */
+  it('refuses to schedule with neither date and names both (F5)', async () => {
+    const id = await createPlannedWorkOrder();
+
+    const res = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Scheduled' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Scheduling a work order requires plannedStart and plannedFinish');
+
+    // Refused as a whole: nothing was scheduled, and no date was stored.
+    const stored = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });
+    expect(stored.status).toBe('Planned');
+    expect(stored.plannedStart).toBeNull();
+    expect(stored.plannedFinish).toBeNull();
+  });
+
+  it('names only the date a half-supplied schedule is missing (F5)', async () => {
+    const id = await createPlannedWorkOrder();
+
+    const res = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Scheduled', plannedStart: '2026-11-02T06:00:00.000Z' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Scheduling a work order requires plannedFinish');
+
+    // The supplied start is not stored either, because the status change it
+    // travelled with was refused.
+    const stored = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: id } });
+    expect(stored.status).toBe('Planned');
+    expect(stored.plannedStart).toBeNull();
+  });
+
+  it('re-schedules a row that already holds both dates without restating them (F5)', async () => {
+    const id = await createPlannedWorkOrder();
+    const start = '2026-11-02T06:00:00.000Z';
+    const finish = '2026-11-02T14:00:00.000Z';
+
+    const first = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Scheduled', plannedStart: start, plannedFinish: finish });
+    expect(first.status).toBe(200);
+
+    // Out to Planned and back in with no dates in the body: the requirement is
+    // on the pair the row will hold, not on the request, so the schedule that
+    // is already stored satisfies it.
+    const out = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Planned' });
+    expect(out.status).toBe(200);
+
+    const back = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'Scheduled' });
+    expect(back.status).toBe(200);
+    expect(back.body.plannedStart).toBe(start);
+    expect(back.body.plannedFinish).toBe(finish);
+  });
+
+  it('does not trap a Scheduled row that was stored without dates (F5)', async () => {
+    const id = await createPlannedWorkOrder();
+
+    // Live `cmms` holds Scheduled rows dated before this rule, so the state is
+    // reachable from the database even though the API now refuses to create it.
+    // Written directly to reproduce one without a backfill: no such backfill is
+    // needed precisely because the guard only fires on the transition IN.
+    await prisma.workOrder.update({
+      where: { workOrderId: id },
+      data: { status: 'Scheduled', plannedStart: null, plannedFinish: null },
+    });
+
+    const res = await api()
+      .put(`/api/work-orders/${id}/status`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ status: 'In Progress' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('In Progress');
+  });
+
   it('blocks In Progress while a mandatory safety checklist is incomplete and allows it once Completed', async () => {
     const tpl = await api()
       .post('/api/safety-checklists/templates')
@@ -346,7 +438,7 @@ describe('work orders routes', () => {
         const r = await api()
           .put(`/api/work-orders/${id}/status`)
           .set(authHeaders(ctx.technicianToken))
-          .send({ status: step });
+          .send(statusBody(step));
         expect(r.status).toBe(200);
       }
     }
@@ -418,7 +510,7 @@ describe('work orders routes', () => {
       const r = await api()
         .put(`/api/work-orders/${id}/status`)
         .set(authHeaders(ctx.technicianToken))
-        .send({ status: step });
+        .send(statusBody(step));
       expect(r.status).toBe(200);
     }
 
@@ -449,7 +541,7 @@ describe('work orders routes', () => {
       const r = await api()
         .put(`/api/work-orders/${id}/status`)
         .set(authHeaders(ctx.adminToken))
-        .send({ status: step });
+        .send(statusBody(step));
       expect(r.status).toBe(200);
     }
 
@@ -771,7 +863,7 @@ describe('work orders routes', () => {
         const r = await api()
           .put(`/api/work-orders/${id}/status`)
           .set(authHeaders(ctx.technicianToken))
-          .send({ status: step });
+          .send(statusBody(step));
         expect(r.status).toBe(200);
       }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx, purgeWorkOrders, purgeCauseCodes } from '../helpers.js';
+import { api, authHeaders, ctx, purgeWorkOrders, purgeCauseCodes, statusBody } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 // SOW 3.1.4 (matrix row 8, deferred item D5): cause codes as root-cause
@@ -53,7 +53,7 @@ async function addOperation(workOrderId: string): Promise<void> {
 }
 
 async function transition(id: string, status: string, token = ctx.technicianToken) {
-  return api().put(`/api/work-orders/${id}/status`).set(authHeaders(token)).send({ status });
+  return api().put(`/api/work-orders/${id}/status`).set(authHeaders(token)).send(statusBody(status));
 }
 
 async function walkToInProgress(id: string): Promise<void> {

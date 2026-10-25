@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx, purgeSafetyChecklistTemplates, purgeWorkOrders } from '../helpers.js';
+import { api, authHeaders, ctx, purgeSafetyChecklistTemplates, purgeWorkOrders, statusBody } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 let templateId = '';
@@ -244,7 +244,7 @@ afterAll(async () => {
       const res = await api()
         .put(`/api/work-orders/${gateWoId}/status`)
         .set(authHeaders(ctx.adminToken))
-        .send({ status });
+        .send(statusBody(status));
       expect(res.status).toBe(200);
     }
   });

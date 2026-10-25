@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { api, authHeaders, ctx, purgeNotifications, purgeWorkOrders } from '../helpers.js';
+import { api, authHeaders, ctx, purgeNotifications, purgeWorkOrders, statusBody } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
 // SOW 3.2.x (matrix :104, :106, :108, :115, :116): M3 completion confirmation,
@@ -113,7 +113,7 @@ async function walkStatus(token: string, workOrderId: string, path: string[]): P
     const res = await api()
       .put(`/api/work-orders/${workOrderId}/status`)
       .set(authHeaders(token))
-      .send({ status: s });
+      .send(statusBody(s));
     expect(res.status).toBe(200);
   }
 }

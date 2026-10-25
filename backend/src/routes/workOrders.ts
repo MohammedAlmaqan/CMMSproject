@@ -1016,8 +1016,11 @@ function requireSupervisorForClose(req: Request, res: Response, next: NextFuncti
  *       Optional plannedStart/plannedFinish values are applied in the same
  *       update as the status, so scheduling a work order is one call. The
  *       pair that will be stored is validated as a whole: a finish earlier
- *       than the start is refused with 400. A work order may still be moved
- *       to Scheduled without dates.
+ *       than the start is refused with 400. A transition to Scheduled is
+ *       refused with 400 unless both dates are present after the update, so a
+ *       work order cannot be scheduled without a schedule; a work order
+ *       already in Scheduled without dates is not re-validated and can still
+ *       leave the state.
  *
  *       Transitioning to Completed additionally performs, in the same
  *       transaction as the status change so the work order can never be
@@ -1068,7 +1071,9 @@ function requireSupervisorForClose(req: Request, res: Response, next: NextFuncti
  *             schema:
  *               type: object
  *       '400':
- *         description: Invalid status transition, or a planned finish before its start
+ *         description: >
+ *           Invalid status transition, a planned finish before its start, or a
+ *           transition to Scheduled with a missing planned date
  *       '403':
  *         description: Insufficient permissions (closing requires Maintenance Supervisor or Administrator)
  *       '409':
@@ -1110,9 +1115,8 @@ router.put(
     // rather than a status change and a separate edit. Either date may be sent
     // on its own; the pair that will actually be stored is what gets checked,
     // so a finish earlier than the start already on the row is refused instead
-    // of saved. Option C - refusing Scheduled at all without dates - was
-    // considered and deliberately not adopted (owner decision 2026-10-25): a
-    // work order can still be scheduled before its dates are known.
+    // of saved. See the Option C guard below for why a transition INTO
+    // Scheduled must end with both dates present.
     const nextPlannedStart =
       plannedStart !== undefined
         ? plannedStart
@@ -1139,6 +1143,28 @@ router.put(
     if (!allowed || !allowed.includes(newStatus)) {
       return res.status(400).json({
         error: `Invalid transition from '${workOrder.status}' to '${newStatus}'`,
+      });
+    }
+
+    // F5 option C (owner decision 2026-10-25): a work order may not enter
+    // Scheduled without a schedule. The test is on the pair that would be
+    // stored, not on the request body, so a transition that restates no dates
+    // still succeeds when the row already carries both - which is what keeps a
+    // re-schedule working after a move out to Planned.
+    //
+    // Only the transition INTO the state is guarded. A record the deployment
+    // already holds in Scheduled without dates is not re-validated, and none of
+    // the transitions out of Scheduled (In Progress, Planned, Cancelled) is
+    // refused by this rule, so an existing row cannot be trapped by it. No
+    // backfill is needed for the same reason, which is why this could be closed
+    // without a data migration.
+    if (newStatus === 'Scheduled' && (!nextPlannedStart || !nextPlannedFinish)) {
+      const missing = [
+        nextPlannedStart ? null : 'plannedStart',
+        nextPlannedFinish ? null : 'plannedFinish',
+      ].filter((field): field is string => field !== null);
+      return res.status(400).json({
+        error: `Scheduling a work order requires ${missing.join(' and ')}`,
       });
     }
 
