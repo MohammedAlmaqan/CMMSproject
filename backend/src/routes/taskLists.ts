@@ -4,7 +4,8 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
-import { taskListCreateSchema, taskListUpdateSchema, validate, taskListOperationItemSchema, taskListMaterialItemSchema } from '../utils/validation.js';
+import { taskListCreateSchema, taskListUpdateSchema, taskListImportRowSchema, validate, taskListOperationItemSchema, taskListMaterialItemSchema } from '../utils/validation.js';
+import { csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
 import { isPrismaError, prismaErrorTarget } from '../utils/prismaErrors.js';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
@@ -217,6 +218,192 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+
+const TASK_LIST_CSV_COLUMNS = [
+  'code',
+  'description',
+  'equipmentClass',
+  'equipmentCode',
+  'workCenterCode',
+] as const;
+
+/**
+ * @openapi
+ * /api/task-lists/export.csv:
+ *   get:
+ *     summary: Export task-list headers as CSV
+ *     description: >
+ *       Streams every non-deleted task list as text/csv in code order. Operations and
+ *       their required materials are not included: a flat file cannot carry a nested
+ *       step list without inventing a second row shape, so those stay on the task-list
+ *       screen. The work center and equipment are written by code.
+ *     tags: [Task Lists]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Task-list headers as text/csv
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'task lists',
+    filename: 'task-lists',
+    columns: TASK_LIST_CSV_COLUMNS,
+    rows: async () => {
+      const rows = await prisma.taskList.findMany({
+        where: { isDeleted: false },
+        orderBy: { code: 'asc' },
+        include: {
+          workCenter: { select: { code: true } },
+          equipment: { select: { equipmentCode: true } },
+        },
+      });
+      return rows.map((row) => [
+        row.code,
+        row.description,
+        row.equipmentClass ?? '',
+        row.equipment?.equipmentCode ?? '',
+        row.workCenter.code,
+      ]);
+    },
+  })
+);
+
+/**
+ * @openapi
+ * /api/task-lists/import.csv:
+ *   post:
+ *     summary: Import task-list headers from CSV
+ *     description: >
+ *       Multipart upload with a single `file` part. Requires the Maintenance Planner role.
+ *       Rows are validated by `taskListImportRowSchema`; `workCenterCode` must name an
+ *       existing work center and `equipmentCode`, when given, an existing equipment. A row
+ *       whose `code` already exists is updated rather than duplicated. A blank optional cell
+ *       leaves the stored value alone, so an empty `equipmentCode` never clears a task
+ *       list's equipment. Operations and their required materials are not imported; they
+ *       stay on the task-list screen. The import is all-or-nothing: the first invalid row
+ *       rolls the whole file back and returns 400 naming that row. Add `?dryRun=1` to
+ *       report the outcome without writing anything.
+ *     tags: [Task Lists]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema: { type: boolean }
+ *         description: Run the import and roll it back, reporting what it would do
+ *     requestBody:
+ *       required: true
+ *       description: "Multipart form; each CSV row validated by zod `taskListImportRowSchema`"
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       '200':
+ *         description: Import completed; every row was accepted
+ *       '400':
+ *         description: Malformed CSV, a missing header column, or a row naming an unknown work center or equipment (the file is rolled back)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '500':
+ *         description: Internal server error
+ */
+router.post(
+  '/import.csv',
+  ...csvImportRoute({
+    noun: 'task lists',
+    columns: TASK_LIST_CSV_COLUMNS,
+    schema: taskListImportRowSchema,
+    mode: 'strict',
+    run: async (ctx, rows) => {
+      const [workCenters, equipment] = await Promise.all([
+        ctx.tx.workCenter.findMany({ where: { isDeleted: false }, select: { workCenterId: true, code: true } }),
+        ctx.tx.equipment.findMany({ where: { isDeleted: false }, select: { equipmentId: true, equipmentCode: true } }),
+      ]);
+      const workCenterByCode = new Map(workCenters.map((w) => [w.code, w.workCenterId]));
+      const equipmentByCode = new Map(equipment.map((e) => [e.equipmentCode, e.equipmentId]));
+
+      const outcome = { created: 0, updated: 0, rejected: [] as Array<{ row: number; reason: string }> };
+      for (const row of rows) {
+        const d = row.record;
+
+        const workCenterId = workCenterByCode.get(d.workCenterCode);
+        if (!workCenterId) {
+          outcome.rejected.push({ row: row.number, reason: `unknown workCenterCode '${d.workCenterCode}'` });
+          continue;
+        }
+
+        let equipmentId: string | undefined;
+        if (d.equipmentCode) {
+          equipmentId = equipmentByCode.get(d.equipmentCode);
+          if (!equipmentId) {
+            outcome.rejected.push({ row: row.number, reason: `unknown equipmentCode '${d.equipmentCode}'` });
+            continue;
+          }
+        }
+
+        const existing = await ctx.tx.taskList.findFirst({
+          where: { code: d.code, isDeleted: false },
+        });
+
+        if (existing) {
+          await ctx.tx.taskList.update({
+            where: { taskListId: existing.taskListId },
+            data: {
+              description: d.description,
+              equipmentClass: d.equipmentClass || existing.equipmentClass,
+              equipmentId: equipmentId ?? existing.equipmentId,
+              workCenterId,
+              modifiedBy: ctx.userId,
+            },
+          });
+          await logAuditAction({
+            table: 'TaskList',
+            recordId: existing.taskListId,
+            action: 'Update',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.updated += 1;
+        } else {
+          const created = await ctx.tx.taskList.create({
+            data: {
+              code: d.code,
+              description: d.description,
+              equipmentClass: d.equipmentClass || null,
+              equipmentId: equipmentId ?? null,
+              workCenterId,
+              createdBy: ctx.userId,
+              modifiedBy: ctx.userId,
+            },
+          });
+          await logAuditAction({
+            table: 'TaskList',
+            recordId: created.taskListId,
+            action: 'Create',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.created += 1;
+        }
+      }
+      return outcome;
+    },
+  })
+);
 
 /**
  * @openapi
