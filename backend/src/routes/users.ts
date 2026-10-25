@@ -452,7 +452,8 @@ router.delete('/:id', authorize('Administrator'), async (req: Request, res: Resp
  *     description: >
  *       A user may change their own password by supplying currentPassword, or an
  *       Administrator may set any user's password without it. newPassword must be at least
- *       8 characters. The new hash is generated with bcrypt at cost 10. This route is not
+ *       12 characters, matching the installer's first-Administrator floor. The new hash is
+ *       generated with bcrypt at cost 10. This route is not
  *       covered by userUpdateSchema, so its inputs are validated inline. Writes an
  *       AuditLogEntry with fieldName password.
  *     tags: [Users]
@@ -473,7 +474,7 @@ router.delete('/:id', authorize('Administrator'), async (req: Request, res: Resp
  *             type: object
  *             required: [newPassword]
  *             properties:
- *               newPassword: { type: string, minLength: 8 }
+ *               newPassword: { type: string, minLength: 12 }
  *               currentPassword: { type: string, description: "Required when changing your own password" }
  *     responses:
  *       '200':
@@ -502,8 +503,8 @@ router.put('/:id/password', async (req: Request, res: Response) => {
     if (!newPassword) {
       return res.status(400).json({ error: 'New password is required' });
     }
-    if (typeof newPassword !== 'string' || newPassword.length < 8) {
-      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    if (typeof newPassword !== 'string' || newPassword.length < 12) {
+      return res.status(400).json({ error: 'New password must be at least 12 characters' });
     }
 
     const isAdmin = req.user!.role === 'Administrator';

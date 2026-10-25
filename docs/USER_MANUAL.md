@@ -367,7 +367,7 @@ Select **Administration**. The screen has three tabs:
 
 1. Select **Administration**, then the **Users & Roles** tab.
 2. Select **Add User**.
-3. Enter a username, a password of at least 8 characters, the person's full name, an email address, and a role.
+3. Enter a username, a password of at least 12 characters, the person's full name, an email address, and a role.
 4. Select **Create User**.
 
 The new account is active immediately and can sign in. Optionally assign a work center for a Technician. The same operation is available as `POST /api/users` for Administrators. A duplicate active username is refused with **409**, and the action is written to the audit log. See the [Administrator Guide](ADMIN_GUIDE.md#61-create-a-user) for the field rules.

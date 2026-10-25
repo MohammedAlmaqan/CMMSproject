@@ -700,7 +700,7 @@ function UserForm({
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
-            minLength={8}
+            minLength={12}
             aria-label="New user password"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
             style={{ backgroundColor: '#27272A' }}

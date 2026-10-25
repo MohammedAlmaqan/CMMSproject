@@ -699,7 +699,11 @@ export const userUpdateSchema = z
 
 export const userCreateSchema = z.object({
   username: z.string().trim().min(1),
-  password: z.string().min(8),
+  // 12, not 8: the installer has always refused a first-Administrator password
+  // shorter than 12, and a reset that is weaker than the bootstrap credential is
+  // the same policy with two answers. Existing shorter passwords still sign in -
+  // only creation and change are gated.
+  password: z.string().min(12, 'Password must be at least 12 characters'),
   fullName: z.string().trim().min(1),
   email: z.string().email(),
   role: userRoleSchema,

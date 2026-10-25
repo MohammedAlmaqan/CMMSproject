@@ -209,6 +209,34 @@ describe('users routes', () => {
     ).toBe(before + 1);
   });
 
+  // A5: the installer has always refused a first-Administrator password shorter
+  // than 12, while the API accepted 8. These two cases would both have passed
+  // under the old floor, which is what makes them a regression test for the
+  // alignment rather than a restatement of the existing min-length guard.
+  it('rejects an 11-character password change that the old 8-character floor allowed', async () => {
+    const res = await api()
+      .put(`/api/users/${tempUserId}/password`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ newPassword: 'elevenchars' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('12 characters');
+  });
+
+  it('rejects an 11-character password at creation', async () => {
+    const res = await api()
+      .post('/api/users')
+      .set(authHeaders(ctx.adminToken))
+      .send({
+        username: `eleven-${Date.now()}`,
+        password: 'elevenchars',
+        fullName: 'Eleven Chars',
+        email: `eleven-${Date.now()}@example.com`,
+        role: 'Technician',
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('12 characters');
+  });
+
   // Row 60 - Administrator user lifecycle (create + deactivate).
 
   it('rejects user creation by a non-admin with 403', async () => {

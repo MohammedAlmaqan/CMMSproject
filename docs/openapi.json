@@ -2207,7 +2207,7 @@
     "/api/users/{id}/password": {
       "put": {
         "summary": "Change a password",
-        "description": "A user may change their own password by supplying currentPassword, or an Administrator may set any user's password without it. newPassword must be at least 8 characters. The new hash is generated with bcrypt at cost 10. This route is not covered by userUpdateSchema, so its inputs are validated inline. Writes an AuditLogEntry with fieldName password.\n",
+        "description": "A user may change their own password by supplying currentPassword, or an Administrator may set any user's password without it. newPassword must be at least 12 characters, matching the installer's first-Administrator floor. The new hash is generated with bcrypt at cost 10. This route is not covered by userUpdateSchema, so its inputs are validated inline. Writes an AuditLogEntry with fieldName password.\n",
         "tags": [
           "Users"
         ],
@@ -2240,7 +2240,7 @@
                 "properties": {
                   "newPassword": {
                     "type": "string",
-                    "minLength": 8
+                    "minLength": 12
                   },
                   "currentPassword": {
                     "type": "string",

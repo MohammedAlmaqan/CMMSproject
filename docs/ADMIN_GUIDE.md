@@ -272,7 +272,7 @@ All SQL below uses the quoted `"User"` table, which is case-sensitive. Substitut
 
 ```
 POST /api/users
-{ "username": "jsmith", "password": "<at least 8 characters>", "fullName": "Jane Smith",
+{ "username": "jsmith", "password": "<at least 12 characters>", "fullName": "Jane Smith",
   "email": "jsmith@example.com", "role": "Technician", "workCenterId": null }
 ```
 

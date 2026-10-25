@@ -59,8 +59,8 @@ export default function ChangePasswordDialog({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (newPassword.length < 8) {
-      setError('New password must be at least 8 characters');
+    if (newPassword.length < 12) {
+      setError('New password must be at least 12 characters');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -136,7 +136,7 @@ export default function ChangePasswordDialog({
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             required
-            minLength={8}
+            minLength={12}
             autoComplete="new-password"
             aria-label="New password"
             className={inputCls}
@@ -150,7 +150,7 @@ export default function ChangePasswordDialog({
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            minLength={8}
+            minLength={12}
             autoComplete="new-password"
             aria-label="Confirm new password"
             className={inputCls}

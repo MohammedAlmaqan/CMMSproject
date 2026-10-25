@@ -92,4 +92,20 @@ describe('ChangePasswordDialog', () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  // A5: the floor is 12, matching the installer's first-Administrator rule.
+  it('refuses a new password shorter than 12 characters before calling the API', async () => {
+    const user = userEvent.setup();
+    render(<ChangePasswordDialog userId="u-tech" open onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('Current password'), 'old-password');
+    await user.type(screen.getByLabelText('New password'), 'elevenchars');
+    await user.type(screen.getByLabelText('Confirm new password'), 'elevenchars');
+    await user.click(screen.getByRole('button', { name: 'Change Password' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'New password must be at least 12 characters'
+    );
+    expect(vi.mocked(userService.changePassword)).not.toHaveBeenCalled();
+  });
 });
