@@ -358,6 +358,169 @@ export const equipmentImportRowSchema = z.object({
   operationalStatus: z.enum(['Active', 'Inactive', 'Decommissioned']).optional(),
 });
 
+/**
+ * A blank CSV cell means "not supplied" for an optional boolean column, not
+ * false: on an update the stored value must survive a blank cell. The accepted
+ * spellings are the ones a spreadsheet user types; anything else is left for
+ * `z.boolean()` to reject with its own message rather than being coerced.
+ */
+const optionalCsvBoolean = z.preprocess((value) => {
+  if (value === '' || value === undefined || value === null) return undefined;
+  if (typeof value === 'boolean') return value;
+  const text = String(value).trim().toLowerCase();
+  if (['true', 'yes', '1'].includes(text)) return true;
+  if (['false', 'no', '0'].includes(text)) return false;
+  return value;
+}, z.boolean().optional());
+
+/**
+ * A date cell must be a date. The importers store what the module stores (a
+ * DateTime), and `new Date('next tuesday')` is an exception waiting to become a
+ * 500, so the row is refused at the boundary instead. `YYYY-MM-DD` is what the
+ * export writes; a full ISO timestamp is accepted too.
+ */
+const csvDateCell = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'must be a date, e.g. 2026-10-25' });
+
+const optionalCsvDateCell = z.preprocess(
+  (value) => (value === '' || value === undefined || value === null ? undefined : value),
+  csvDateCell.optional()
+);
+
+/** F7: work centres, imported and exported by their natural key `code`. */
+export const workCenterImportRowSchema = z.object({
+  code: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  dailyCapacityHours: z.coerce.number().nonnegative(),
+  costRatePerHour: z.coerce.number().nonnegative(),
+  isActive: optionalCsvBoolean,
+});
+
+/** F7: crafts, keyed by their work centre's code plus their own craft code. */
+export const craftImportRowSchema = z.object({
+  workCenterCode: z.string().trim().min(1),
+  craftCode: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  hourlyRate: z.coerce.number().nonnegative(),
+});
+
+/**
+ * F7: task lists are header-level in CSV. A step and its required material are
+ * nested records with their own foreign keys (craft, material), and a flat file
+ * cannot say which of a repeated set of rows belongs to which parent without a
+ * second key; those stay on the task-list screen.
+ */
+export const taskListImportRowSchema = z.object({
+  code: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  equipmentClass: z.string().trim().optional(),
+  equipmentCode: z.string().trim().optional(),
+  workCenterCode: z.string().trim().min(1),
+});
+
+/**
+ * F7: one row per checklist item. The template is named on every row and items
+ * are matched by `sequenceNumber` inside it, so re-importing an edited file
+ * updates in place. A template row with a blank sequenceNumber and no item
+ * description is legal: it carries a template that has no items yet, which is
+ * how such a template survives an export/import round trip.
+ */
+export const checklistImportRowSchema = z
+  .object({
+    templateName: z.string().trim().min(1),
+    templateDescription: z.string().trim().optional(),
+    isMandatory: optionalCsvBoolean,
+    sequenceNumber: z.preprocess(
+      (value) => (value === '' || value === undefined || value === null ? undefined : value),
+      z.coerce.number().int().positive().optional()
+    ),
+    itemDescription: z.string().trim().optional(),
+  })
+  .superRefine((row, ctx) => {
+    const hasSequence = row.sequenceNumber !== undefined;
+    const hasDescription = Boolean(row.itemDescription);
+    if (hasSequence !== hasDescription) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [hasSequence ? 'itemDescription' : 'sequenceNumber'],
+        message: 'an item needs both sequenceNumber and itemDescription, or neither',
+      });
+    }
+  });
+
+export const causeCodeImportRowSchema = z.object({
+  code: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+});
+
+/**
+ * F7: failure codes are a hierarchy, so a row may name its parent by code. The
+ * parent may appear later in the file than the child, which is why the import
+ * writes every code first and resolves the parents in a second pass.
+ */
+export const failureCodeImportRowSchema = z.object({
+  code: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  parentCode: z.string().trim().optional(),
+});
+
+/**
+ * F7: plan header fields only. `targets` and `planMeters` are nested lists that
+ * a flat file cannot express without inventing a second row shape, so they stay
+ * on the plan screen - and a Meter/Combined plan still needs them, which the
+ * route refuses at create time rather than storing a plan that can never come
+ * due.
+ */
+export const maintenancePlanImportRowSchema = z
+  .object({
+    planCode: z.string().trim().min(1),
+    description: z.string().trim().min(1),
+    workCenterCode: z.string().trim().min(1),
+    taskListCode: z.string().trim().min(1),
+    strategyType: z.enum(['Time', 'Meter', 'Combined']),
+    intervalValue: z.coerce.number().int().positive(),
+    intervalUnit: z.enum(['Days', 'Weeks', 'Months']),
+    callHorizonValue: optionalCsvNumber,
+    callHorizonUnit: z.enum(['Days', 'Units']).optional(),
+    startDate: csvDateCell,
+    endDate: optionalCsvDateCell,
+    priority: prioritySchema.optional(),
+    generatedWorkOrderStatus: z.enum(['Draft', 'Planned']).optional(),
+    equipmentCode: z.string().trim().optional(),
+    functionalLocationCode: z.string().trim().optional(),
+    notificationNumber: z.string().trim().optional(),
+    activeFlag: optionalCsvBoolean,
+  })
+  .superRefine((row, ctx) => {
+    // The API's own rule (planTargetSchema) is exactly one target; a plan
+    // covering several assets is expressed with the target list, which this
+    // file does not carry. Two codes would be ambiguous about which column the
+    // plan actually targets.
+    const codes = [row.equipmentCode, row.functionalLocationCode].filter(Boolean);
+    if (codes.length !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['equipmentCode'],
+        message: 'exactly one of equipmentCode or functionalLocationCode is required',
+      });
+    }
+    if (row.endDate) {
+      const start = Date.parse(row.startDate);
+      const end = Date.parse(row.endDate);
+      if (end < start) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['endDate'],
+          message: 'endDate cannot be before startDate',
+        });
+      }
+    }
+  });
+
+
 export const notificationTypeSchema = z.enum(['M1', 'M2', 'M3']);
 
 export const notificationStatusSchema = z.enum(['Open', 'In Process', 'Completed', 'Converted']);
