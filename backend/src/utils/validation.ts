@@ -325,12 +325,23 @@ export const checklistItemUpdateSchema = z.object({
   comment: z.string().nullable().optional(),
 });
 
+/**
+ * A blank CSV cell means "not supplied" for an optional numeric column, not
+ * zero: the import updates an existing row, and a blank standardCost must leave
+ * the stored cost alone. `z.coerce.number()` on its own turns '' into 0, so the
+ * blank is removed before coercion.
+ */
+const optionalCsvNumber = z.preprocess(
+  (value) => (value === '' || value === undefined || value === null ? undefined : value),
+  z.coerce.number().nonnegative().optional()
+);
+
 export const materialImportRowSchema = z.object({
   materialCode: z.string().trim().min(1),
   description: z.string().trim().min(1),
   unitOfMeasure: z.string().trim().min(1),
-  standardCost: z.coerce.number().nonnegative().optional(),
-  currentStock: z.coerce.number().nonnegative().optional(),
+  standardCost: optionalCsvNumber,
+  currentStock: optionalCsvNumber,
 });
 
 export const equipmentImportRowSchema = z.object({

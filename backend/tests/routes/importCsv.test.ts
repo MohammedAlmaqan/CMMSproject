@@ -27,12 +27,26 @@ const WO_HEADER = [
   'createdBy',
   'createdDate',
 ];
+const EQUIPMENT_HEADER = [
+  'equipmentCode',
+  'name',
+  'description',
+  'functionalLocationCode',
+  'manufacturer',
+  'model',
+  'serialNumber',
+  'assetTag',
+  'equipmentClass',
+  'criticality',
+  'operationalStatus',
+];
+const MATERIAL_HEADER = ['materialCode', 'description', 'unitOfMeasure', 'standardCost', 'currentStock'];
 
 describe('CSV import routes', () => {
   afterAll(async () => {
     if (woId) await purgeWorkOrders([woId]);
     const locs = await prisma.functionalLocation.findMany({
-      where: { locationCode: { in: [parentCode, childCode, `${childCode}-X`] } },
+      where: { locationCode: { startsWith: parentCode } },
       select: { functionalLocationId: true },
     });
     const ids = locs.map((l) => l.functionalLocationId);
@@ -40,6 +54,18 @@ describe('CSV import routes', () => {
       await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: ids } } });
       await prisma.functionalLocation.deleteMany({ where: { functionalLocationId: { in: ids } } });
     }
+
+    const equipment = await prisma.equipment.findMany({
+      where: { equipmentCode: { startsWith: `IMP-EQ-${stamp}` } },
+      select: { equipmentId: true },
+    });
+    const equipmentIds = equipment.map((e) => e.equipmentId);
+    if (equipmentIds.length > 0) {
+      await prisma.auditLogEntry.deleteMany({ where: { recordId: { in: equipmentIds } } });
+      await prisma.equipment.deleteMany({ where: { equipmentId: { in: equipmentIds } } });
+    }
+
+    await prisma.material.deleteMany({ where: { materialCode: { startsWith: `IMP-MAT-${stamp}` } } });
   });
 
   describe('POST /api/functional-locations/import.csv', () => {
@@ -117,6 +143,25 @@ describe('CSV import routes', () => {
       expect(res.body.rejected).toHaveLength(1);
       expect(res.body.rejected[0].reason).toContain('parentLocationId=NO-SUCH-PARENT');
     });
+
+    it('keeps an accepted row when another row in the same file is rejected', async () => {
+      const kept = `${parentCode}-KEEP`;
+      const res = await api()
+        .post('/api/functional-locations/import.csv')
+        .set(authHeaders(ctx.plannerToken))
+        .attach(
+          'file',
+          csvBuffer(FL_HEADER, [
+            [kept, 'Kept Row', '', 'Area', 'Active'],
+            [`${childCode}-Y`, 'Orphan', 'NO-SUCH-PARENT', 'Area', 'Active'],
+          ]),
+          'locations.csv',
+        );
+      expect(res.status).toBe(200);
+      expect(res.body.created).toBe(1);
+      expect(res.body.rejected).toHaveLength(1);
+      expect(await prisma.functionalLocation.count({ where: { locationCode: kept, isDeleted: false } })).toBe(1);
+    });
   });
 
   describe('POST /api/work-orders/import.csv', () => {
@@ -168,6 +213,147 @@ describe('CSV import routes', () => {
       expect(res.body.created).toBe(0);
       expect(res.body.rejected).toHaveLength(1);
       expect(res.body.rejected[0].reason).toContain('functionalLocationId=NO-SUCH-LOC');
+    });
+
+    it('reports what it would do without writing on a dry run', async () => {
+      const dryNumber = `IMPWO-DRY-${stamp}`;
+      const res = await api()
+        .post('/api/work-orders/import.csv?dryRun=1')
+        .set(authHeaders(ctx.plannerToken))
+        .attach(
+          'file',
+          csvBuffer(WO_HEADER, [[dryNumber, 'CM', 'Medium', 'Draft', 'PL-01', '', 'Dry run WO', 'MECH', 'tech1', 'tech1', '2025-10-15']]),
+          'work-orders.csv',
+        );
+      expect(res.status).toBe(200);
+      expect(res.body.created).toBe(1);
+      expect(res.body.rejected).toEqual([]);
+      // The whole transaction was rolled back, so the row is not there.
+      expect(await prisma.workOrder.count({ where: { woNumber: dryNumber } })).toBe(0);
+    });
+  });
+
+  describe('POST /api/equipment/import.csv', () => {
+    const code = `IMP-EQ-${stamp}`;
+    const row = (equipmentCode: string, name: string, criticality: string) => [
+      equipmentCode,
+      name,
+      'imported by test',
+      'PL-01',
+      'Acme',
+      'M1',
+      `SN-${equipmentCode}`,
+      '',
+      'Pump',
+      criticality,
+      'Active',
+    ];
+
+    it('imports a row and updates it on re-import instead of duplicating it', async () => {
+      const first = await api()
+        .post('/api/equipment/import.csv')
+        .set(authHeaders(ctx.plannerToken))
+        .attach('file', csvBuffer(EQUIPMENT_HEADER, [row(code, 'Imported Pump', 'B')]), 'equipment.csv');
+      expect(first.status).toBe(200);
+      expect(first.body).toMatchObject({ created: 1, updated: 0, rejected: [] });
+
+      const second = await api()
+        .post('/api/equipment/import.csv')
+        .set(authHeaders(ctx.plannerToken))
+        .attach('file', csvBuffer(EQUIPMENT_HEADER, [row(code, 'Imported Pump v2', 'A')]), 'equipment.csv');
+      expect(second.status).toBe(200);
+      expect(second.body).toMatchObject({ created: 0, updated: 1, rejected: [] });
+
+      const stored = await prisma.equipment.findMany({ where: { equipmentCode: code, isDeleted: false } });
+      expect(stored).toHaveLength(1);
+      expect(stored[0].name).toBe('Imported Pump v2');
+      expect(stored[0].criticality).toBe('A');
+    });
+
+    it('matches columns by name rather than by position', async () => {
+      // The same data, with the header in the opposite order. A positional
+      // reader would put "Active" in equipmentCode and fail every row.
+      const reversedCode = `IMP-EQ-${stamp}-REV`;
+      const reversedHeader = [...EQUIPMENT_HEADER].reverse();
+      const values = ['Active', 'C', 'Pump', '', '', '', '', 'PL-01', 'imported by test', 'Reversed Pump', reversedCode];
+      const res = await api()
+        .post('/api/equipment/import.csv')
+        .set(authHeaders(ctx.plannerToken))
+        .attach('file', csvBuffer(reversedHeader, [values]), 'equipment.csv');
+      expect(res.status).toBe(200);
+      expect(res.body.created).toBe(1);
+
+      const stored = await prisma.equipment.findFirst({ where: { equipmentCode: reversedCode } });
+      expect(stored?.name).toBe('Reversed Pump');
+      expect(stored?.criticality).toBe('C');
+    });
+
+    it('rolls the whole file back when one row fails validation', async () => {
+      const good = `IMP-EQ-${stamp}-STRICT-OK`;
+      const bad = `IMP-EQ-${stamp}-STRICT-BAD`;
+      const res = await api()
+        .post('/api/equipment/import.csv')
+        .set(authHeaders(ctx.plannerToken))
+        .attach(
+          'file',
+          csvBuffer(EQUIPMENT_HEADER, [row(good, 'Good Row', 'B'), row(bad, 'Bad Row', 'not-a-criticality')]),
+          'equipment.csv',
+        );
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('criticality');
+      expect(
+        await prisma.equipment.count({ where: { equipmentCode: { in: [good, bad] } } })
+      ).toBe(0);
+    });
+
+    it('reports what it would do without writing on a dry run', async () => {
+      const dryCode = `IMP-EQ-${stamp}-DRY`;
+      const res = await api()
+        .post('/api/equipment/import.csv?dryRun=1')
+        .set(authHeaders(ctx.plannerToken))
+        .attach('file', csvBuffer(EQUIPMENT_HEADER, [row(dryCode, 'Dry Pump', 'C')]), 'equipment.csv');
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ created: 1, updated: 0, rejected: [] });
+      expect(await prisma.equipment.count({ where: { equipmentCode: dryCode } })).toBe(0);
+    });
+  });
+
+  describe('POST /api/materials/import.csv', () => {
+    const code = `IMP-MAT-${stamp}`;
+
+    it('keeps the stored cost and stock when a re-import leaves them blank', async () => {
+      const first = await api()
+        .post('/api/materials/import.csv')
+        .set(authHeaders(ctx.plannerToken))
+        .attach('file', csvBuffer(MATERIAL_HEADER, [[code, 'Imported material', 'EA', '12.50', '4']]), 'materials.csv');
+      expect(first.status).toBe(200);
+      expect(first.body).toMatchObject({ created: 1, updated: 0, rejected: [] });
+
+      const second = await api()
+        .post('/api/materials/import.csv')
+        .set(authHeaders(ctx.plannerToken))
+        .attach('file', csvBuffer(MATERIAL_HEADER, [[code, 'Imported material v2', 'EA', '', '']]), 'materials.csv');
+      expect(second.status).toBe(200);
+      expect(second.body).toMatchObject({ created: 0, updated: 1, rejected: [] });
+
+      const stored = await prisma.material.findFirstOrThrow({ where: { materialCode: code } });
+      expect(stored.description).toBe('Imported material v2');
+      // A blank cell means "not supplied", not zero.
+      expect(Number(stored.standardCost)).toBe(12.5);
+      expect(stored.currentStock).toBe(4);
+    });
+  });
+
+  describe('GET export.csv', () => {
+    it('writes the declared header, in the declared order', async () => {
+      const equipment = await api().get('/api/equipment/export.csv').set(authHeaders(ctx.plannerToken));
+      expect(equipment.status).toBe(200);
+      expect(equipment.headers['content-type']).toContain('text/csv');
+      expect(equipment.text.split(/\r?\n/)[0]).toBe(EQUIPMENT_HEADER.join(','));
+
+      const materials = await api().get('/api/materials/export.csv').set(authHeaders(ctx.plannerToken));
+      expect(materials.status).toBe(200);
+      expect(materials.text.split(/\r?\n/)[0]).toBe(MATERIAL_HEADER.join(','));
     });
   });
 });

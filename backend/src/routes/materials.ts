@@ -1,29 +1,17 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
-import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
 import { materialImportRowSchema, materialCreateSchema, materialUpdateSchema, validate } from '../utils/validation.js';
-import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
+import { csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
 import { isPrismaError } from '../utils/prismaErrors.js';
 import { getMaterialAvailability } from '../services/materialAvailability.js';
 import { logger } from '../utils/logger.js';
 import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 
 const router = Router();
-
-const csvUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype !== 'text/csv') {
-      return cb(new Error('Unsupported file type: only text/csv is allowed'));
-    }
-    cb(null, true);
-  },
-});
 
 router.use(authenticate);
 
@@ -43,16 +31,12 @@ const MATERIAL_CSV_COLUMNS = [
  *     summary: Export the material master as CSV
  *     description: >
  *       Streams the full non-deleted material master as text/csv with a Content-Disposition
- *       filename, suitable for Excel. Honours the same optional search filter as the JSON
- *       list endpoint. No role restriction beyond authentication.
+ *       filename, suitable for Excel. No role restriction beyond authentication. The
+ *       `search` parameter on the JSON list endpoint is not applied: this is a whole-master
+ *       export, deliberately, so a filtered export can never be mistaken for the register.
  *     tags: [Materials]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: search
- *         schema: { type: string }
- *         description: Case-insensitive match on materialCode or description
  *     responses:
  *       '200':
  *         description: CSV file
@@ -64,33 +48,28 @@ const MATERIAL_CSV_COLUMNS = [
  *       '500':
  *         description: Internal server error
  */
-router.get('/export.csv', async (req: Request, res: Response) => {
-  try {
-    const materials = await prisma.material.findMany({
-      where: { isDeleted: false },
-      orderBy: { materialCode: 'asc' },
-    });
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'materials',
+    filename: 'materials',
+    columns: MATERIAL_CSV_COLUMNS,
+    rows: async () => {
+      const materials = await prisma.material.findMany({
+        where: { isDeleted: false },
+        orderBy: { materialCode: 'asc' },
+      });
 
-    const rows: (string | number)[][] = [
-      [...MATERIAL_CSV_COLUMNS],
-      ...materials.map((m) => [
+      return materials.map((m) => [
         m.materialCode,
         m.description,
         m.unitOfMeasure,
         Number(m.standardCost),
         m.currentStock,
-      ]),
-    ];
-
-    const date = new Date().toISOString().split('T')[0];
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="materials-${date}.csv"`);
-    res.send(toCsv(rows));
-  } catch (error) {
-    logger.error({ err: error }, 'Error exporting materials');
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+      ]);
+    },
+  })
+);
 
 
 /**
@@ -102,12 +81,19 @@ router.get('/export.csv', async (req: Request, res: Response) => {
  *       Multipart upload with a single `file` part. Requires the Maintenance Planner role.
  *       Each row is validated by the zod schema `materialImportRowSchema` (see
  *       utils/validation.ts), which coerces standardCost and currentStock to non-negative
- *       numbers. Valid rows are inserted and invalid rows are reported back per line so a
- *       partial import is still usable. A duplicate materialCode returns HTTP 409 rather
- *       than failing the whole file.
+ *       numbers and treats a blank cell as "leave the stored value alone". The import is
+ *       all-or-nothing: the first invalid row rolls the whole file back and returns 400
+ *       naming that row. A row whose `materialCode` already exists is updated rather than
+ *       duplicated; there is no 409. Add `?dryRun=1` to validate the file and report the
+ *       outcome without writing anything.
  *     tags: [Materials]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema: { type: boolean }
+ *         description: Run the import and roll it back, reporting what it would do
  *     requestBody:
  *       required: true
  *       description: "Multipart form; each CSV row validated by zod `materialImportRowSchema`"
@@ -120,110 +106,64 @@ router.get('/export.csv', async (req: Request, res: Response) => {
  *               file: { type: string, format: binary }
  *     responses:
  *       '200':
- *         description: Import completed; per-row outcome reported
+ *         description: Import completed; every row was accepted
  *       '400':
- *         description: Malformed CSV, or every row failed validation
+ *         description: Malformed CSV, a missing header column, or a row that failed validation (the file is rolled back)
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
  *         description: Caller role is below Maintenance Planner
- *       '409':
- *         description: One or more materialCode values already exist
  *       '500':
  *         description: Internal server error
  */
-router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.single('file'), async (req: Request, res: Response) => {
-  try {
-    if (!req.file || !req.file.buffer) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+router.post(
+  '/import.csv',
+  ...csvImportRoute({
+    noun: 'materials',
+    columns: MATERIAL_CSV_COLUMNS,
+    schema: materialImportRowSchema,
+    mode: 'strict',
+    run: async (ctx, rows) => {
+      const outcome = { created: 0, updated: 0, rejected: [] as Array<{ row: number; reason: string }> };
+      for (const row of rows) {
+        const d = row.record;
 
-    const text = req.file.buffer.toString('utf8');
-    let rows: string[][];
-    try {
-      rows = parseCsv(text);
-    } catch {
-      return res.status(400).json({ error: 'Malformed CSV' });
-    }
-    if (rows.length === 0) {
-      return res.status(400).json({ error: 'CSV is empty' });
-    }
-
-    const [header, ...dataRows] = rows;
-    const headerOk = MATERIAL_CSV_COLUMNS.every(
-      (col, i) => (header[i] || '').trim().toLowerCase() === col.toLowerCase()
-    );
-    if (!headerOk) {
-      return res.status(400).json({ error: `CSV header must be: ${MATERIAL_CSV_COLUMNS.join(', ')}` });
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-      let created = 0;
-      let updated = 0;
-      for (let i = 0; i < dataRows.length; i++) {
-        const row = dataRows[i];
-        const lineNumber = i + 2; // 1-based, header occupies line 1
-        const record = {
-          materialCode: (row[0] || '').trim(),
-          description: (row[1] || '').trim(),
-          unitOfMeasure: (row[2] || '').trim(),
-          standardCost: row[3] === '' ? undefined : row[3],
-          currentStock: row[4] === '' ? undefined : row[4],
-        };
-
-        const parsed = materialImportRowSchema.safeParse(record);
-        if (!parsed.success) {
-          const reason = parsed.error.issues
-            .map((iss) => `${iss.path.join('.')}: ${iss.message}`)
-            .join('; ');
-          throw new CsvRowError(lineNumber, reason);
-        }
-        const d = parsed.data;
-
-        const existing = await tx.material.findFirst({
+        const existing = await ctx.tx.material.findFirst({
           where: { materialCode: d.materialCode, isDeleted: false },
         });
         if (existing) {
-          await tx.material.update({
+          await ctx.tx.material.update({
             where: { materialId: existing.materialId },
             data: {
               description: d.description,
               unitOfMeasure: d.unitOfMeasure,
               standardCost: d.standardCost ?? existing.standardCost,
               currentStock: d.currentStock ?? existing.currentStock,
-              modifiedBy: req.user!.userId,
+              modifiedBy: ctx.userId,
             },
           });
-          await logAuditAction({ table: 'Material', recordId: existing.materialId, action: 'Update', userId: req.user!.userId, ipAddress: req.ip, db: tx });
-          updated++;
+          await logAuditAction({ table: 'Material', recordId: existing.materialId, action: 'Update', userId: ctx.userId, ipAddress: ctx.ipAddress, db: ctx.tx });
+          outcome.updated += 1;
         } else {
-          const createdRow = await tx.material.create({
+          const createdRow = await ctx.tx.material.create({
             data: {
               materialCode: d.materialCode,
               description: d.description,
               unitOfMeasure: d.unitOfMeasure,
               standardCost: d.standardCost ?? 0,
               currentStock: d.currentStock ?? 0,
-              createdBy: req.user!.userId,
-              modifiedBy: req.user!.userId,
+              createdBy: ctx.userId,
+              modifiedBy: ctx.userId,
             },
           });
-          await logAuditAction({ table: 'Material', recordId: createdRow.materialId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip, db: tx });
-          created++;
+          await logAuditAction({ table: 'Material', recordId: createdRow.materialId, action: 'Create', userId: ctx.userId, ipAddress: ctx.ipAddress, db: ctx.tx });
+          outcome.created += 1;
         }
       }
-      return { created, updated, failed: [] };
-    });
-
-    res.json(result);
-  } catch (error) {
-    if (error instanceof CsvRowError) {
-      return res.status(400).json({ error: `Row ${error.row}: ${error.reason}` });
-    }
-    logger.error({ err: error }, 'Error importing materials');
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+      return outcome;
+    },
+  })
+);
 
 
 /**

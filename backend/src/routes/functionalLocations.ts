@@ -1,11 +1,9 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import type { FunctionalLocation, Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
-import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { functionalLocationImporter } from '../migration-trial/importers/functionalLocation.js';
-import { parseCsv as parseTrialCsv } from '../migration-trial/importers/csv.js';
 import { persistDataset } from '../migration-trial/liveImport.js';
 import { validate, functionalLocationCreateSchema, functionalLocationUpdateSchema } from '../utils/validation.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
@@ -19,21 +17,11 @@ import {
 } from '../utils/locationCounts.js';
 import { logger } from '../utils/logger.js';
 import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
+import { csvImportRoute } from '../utils/csvRoutes.js';
 
 const router = Router();
 
 router.use(authenticate);
-
-const csvUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype !== 'text/csv') {
-      return cb(new Error('Unsupported file type: only text/csv is allowed'));
-    }
-    cb(null, true);
-  },
-});
 
 const FUNCTIONAL_LOCATION_IMPORT_REQUIRED = ['locationCode', 'description', 'locationType'] as const;
 
@@ -49,9 +37,18 @@ const FUNCTIONAL_LOCATION_IMPORT_REQUIRED = ['locationCode', 'description', 'loc
  *       whose `parentLocationId` names a location that is neither live nor created
  *       earlier in the same file is rejected with a reason; parents must appear before
  *       their children. Extra columns are ignored and `modifiedBy` is set to the caller.
+ *
+ *       The import is partial by design: an accepted row is kept even when another
+ *       row is rejected, and the response reports both. Add `?dryRun=1` to validate
+ *       the file and report the outcome without writing anything.
  *     tags: [Functional Locations]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema: { type: boolean }
+ *         description: Run the import and roll it back, reporting what it would do
  *     requestBody:
  *       required: true
  *       content:
@@ -63,9 +60,9 @@ const FUNCTIONAL_LOCATION_IMPORT_REQUIRED = ['locationCode', 'description', 'loc
  *               file: { type: string, format: binary }
  *     responses:
  *       '200':
- *         description: Import completed; per-row outcome reported
+ *         description: Import completed; created, updated and rejected counts are returned
  *       '400':
- *         description: Malformed CSV, missing header columns, or no importable rows
+ *         description: Malformed CSV, or a missing required header column
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
@@ -73,46 +70,30 @@ const FUNCTIONAL_LOCATION_IMPORT_REQUIRED = ['locationCode', 'description', 'loc
  *       '500':
  *         description: Internal server error
  */
-router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.single('file'), async (req: Request, res: Response) => {
-  try {
-    if (!req.file || !req.file.buffer) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const text = req.file.buffer.toString('utf8');
-    let parsed;
-    try {
-      parsed = parseTrialCsv(text);
-    } catch {
-      return res.status(400).json({ error: 'Malformed CSV' });
-    }
-    if (parsed.rows.length === 0) {
-      return res.status(400).json({ error: 'CSV is empty' });
-    }
-
-    const header = parsed.headers.map((h) => h.trim().toLowerCase());
-    const missing = FUNCTIONAL_LOCATION_IMPORT_REQUIRED.filter((c) => !header.includes(c.toLowerCase()));
-    if (missing.length > 0) {
-      return res.status(400).json({ error: `CSV header is missing: ${missing.join(', ')}` });
-    }
-
-    const mapped = functionalLocationImporter.parse(parsed.rows);
-    if (mapped.rows.length === 0) {
-      return res.status(400).json({
-        error: `No importable rows: ${mapped.rejected.map((r) => `row ${r.row}: ${r.reason}`).join('; ') || 'CSV has no data rows'}`,
+router.post(
+  '/import.csv',
+  ...csvImportRoute({
+    noun: 'functional locations',
+    required: FUNCTIONAL_LOCATION_IMPORT_REQUIRED,
+    mode: 'partial',
+    run: async (ctx, rows) => {
+      // Same importer as the accuracy trial, so a live import and the trial
+      // cannot disagree about a cell. It rejects a row it cannot map;
+      // persistDataset resolves parent codes against live data and rows created
+      // earlier in this file, and keeps the rest.
+      const mapped = functionalLocationImporter.parse(rows.map((row) => ({ number: row.number, cells: row.cells })));
+      const result = await persistDataset(ctx.tx, functionalLocationImporter, mapped, {
+        userId: ctx.userId,
+        ipAddress: ctx.ipAddress,
       });
-    }
-
-    const result = await prisma.$transaction((tx) =>
-      persistDataset(tx, functionalLocationImporter, mapped, { userId: req.user!.userId, ipAddress: req.ip })
-    );
-
-    res.json({ created: result.created, updated: result.updated, rejected: result.rejected });
-  } catch (error) {
-    logger.error({ err: error }, 'Error importing functional locations');
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+      return {
+        created: result.created,
+        updated: result.updated,
+        rejected: result.rejected.map(({ row, reason }) => ({ row, reason })),
+      };
+    },
+  })
+);
 
 
 /**

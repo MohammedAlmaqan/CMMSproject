@@ -1,29 +1,17 @@
 import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import type { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
-import multer from 'multer';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { validate, equipmentCreateSchema, equipmentUpdateSchema, equipmentImportRowSchema, equipmentBomCreateSchema, equipmentBomUpdateSchema } from '../utils/validation.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
-import { parseCsv, toCsv, CsvRowError } from '../utils/csv.js';
+import { csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
 import { isPrismaError } from '../utils/prismaErrors.js';
 import { checkEquipmentPlacement } from '../utils/locationRules.js';
 import { logger } from '../utils/logger.js';
 import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 
 const router = Router();
-
-const csvUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype !== 'text/csv') {
-      return cb(new Error('Unsupported file type: only text/csv is allowed'));
-    }
-    cb(null, true);
-  },
-});
 
 router.use(authenticate);
 
@@ -51,24 +39,13 @@ const EQUIPMENT_CSV_COLUMNS = [
  *       Streams the full non-deleted equipment register as text/csv with a Content-Disposition
  *       filename, suitable for Excel. Honours the same search, functionalLocationId,
  *       criticality and equipmentClass filters as the JSON list endpoint. No role
- *       restriction beyond authentication.
+ *       restriction beyond authentication. The list endpoint's search,
+ *       functionalLocationId, criticality and equipmentClass filters are not applied:
+ *       this is a whole-register export, deliberately, so a filtered export can never be
+ *       mistaken for the register.
  *     tags: [Equipment]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: search
- *         schema: { type: string }
- *         description: Case-insensitive match on equipmentCode, name, description, manufacturer, model or serialNumber
- *       - in: query
- *         name: functionalLocationId
- *         schema: { type: string }
- *       - in: query
- *         name: criticality
- *         schema: { type: string, enum: [S, A, B, C] }
- *       - in: query
- *         name: equipmentClass
- *         schema: { type: string }
  *     responses:
  *       '200':
  *         description: CSV file
@@ -80,17 +57,20 @@ const EQUIPMENT_CSV_COLUMNS = [
  *       '500':
  *         description: Internal server error
  */
-router.get('/export.csv', async (req: Request, res: Response) => {
-  try {
-    const equipment = await prisma.equipment.findMany({
-      where: { isDeleted: false },
-      orderBy: { equipmentCode: 'asc' },
-      include: { functionalLocation: true },
-    });
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'equipment',
+    filename: 'equipment',
+    columns: EQUIPMENT_CSV_COLUMNS,
+    rows: async () => {
+      const equipment = await prisma.equipment.findMany({
+        where: { isDeleted: false },
+        orderBy: { equipmentCode: 'asc' },
+        include: { functionalLocation: true },
+      });
 
-    const rows: (string | number)[][] = [
-      [...EQUIPMENT_CSV_COLUMNS],
-      ...equipment.map((e) => [
+      return equipment.map((e) => [
         e.equipmentCode,
         e.name,
         e.description,
@@ -102,18 +82,10 @@ router.get('/export.csv', async (req: Request, res: Response) => {
         e.equipmentClass,
         e.criticality,
         e.operationalStatus,
-      ]),
-    ];
-
-    const date = new Date().toISOString().split('T')[0];
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="equipment-${date}.csv"`);
-    res.send(toCsv(rows));
-  } catch (error) {
-    logger.error({ err: error }, 'Error exporting equipment');
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+      ]);
+    },
+  })
+);
 
 
 /**
@@ -124,12 +96,19 @@ router.get('/export.csv', async (req: Request, res: Response) => {
  *     description: >
  *       Multipart upload with a single `file` part. Requires the Maintenance Planner role.
  *       Each row is validated by the zod schema `equipmentImportRowSchema` (see
- *       utils/validation.ts). Valid rows are inserted and invalid rows are reported back per
- *       line so a partial import is still usable. A duplicate equipmentCode returns HTTP 409
- *       rather than failing the whole file.
+ *       utils/validation.ts). The import is all-or-nothing: the first invalid row rolls
+ *       the whole file back and returns 400 naming that row, so a caller can never
+ *       mistake a partly-applied file for a complete one. A row whose `equipmentCode`
+ *       already exists is updated rather than duplicated; there is no 409. Add
+ *       `?dryRun=1` to validate the file and report the outcome without writing anything.
  *     tags: [Equipment]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema: { type: boolean }
+ *         description: Run the import and roll it back, reporting what it would do
  *     requestBody:
  *       required: true
  *       description: "Multipart form; each CSV row validated by zod `equipmentImportRowSchema`"
@@ -142,88 +121,47 @@ router.get('/export.csv', async (req: Request, res: Response) => {
  *               file: { type: string, format: binary }
  *     responses:
  *       '200':
- *         description: Import completed; per-row outcome reported
+ *         description: Import completed; every row was accepted
  *       '400':
- *         description: Malformed CSV, or every row failed validation
+ *         description: Malformed CSV, a missing header column, or a row that failed validation (the file is rolled back)
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
  *         description: Caller role is below Maintenance Planner
- *       '409':
- *         description: One or more equipmentCode values already exist
  *       '500':
  *         description: Internal server error
  */
-router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.single('file'), async (req: Request, res: Response) => {
-  try {
-    if (!req.file || !req.file.buffer) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+router.post(
+  '/import.csv',
+  ...csvImportRoute({
+    noun: 'equipment',
+    columns: EQUIPMENT_CSV_COLUMNS,
+    schema: equipmentImportRowSchema,
+    mode: 'strict',
+    run: async (ctx, rows) => {
+      const locations = await ctx.tx.functionalLocation.findMany({
+        where: { isDeleted: false },
+        select: { functionalLocationId: true, locationCode: true },
+      });
+      const locationByCode = new Map(locations.map((l) => [l.locationCode, l.functionalLocationId]));
 
-    const text = req.file.buffer.toString('utf8');
-    let rows: string[][];
-    try {
-      rows = parseCsv(text);
-    } catch {
-      return res.status(400).json({ error: 'Malformed CSV' });
-    }
-    if (rows.length === 0) {
-      return res.status(400).json({ error: 'CSV is empty' });
-    }
-
-    const [header, ...dataRows] = rows;
-    const headerOk = EQUIPMENT_CSV_COLUMNS.every(
-      (col, i) => (header[i] || '').trim().toLowerCase() === col.toLowerCase()
-    );
-    if (!headerOk) {
-      return res.status(400).json({ error: `CSV header must be: ${EQUIPMENT_CSV_COLUMNS.join(', ')}` });
-    }
-
-    const locations = await prisma.functionalLocation.findMany({
-      where: { isDeleted: false },
-      select: { functionalLocationId: true, locationCode: true },
-    });
-    const locationByCode = new Map(locations.map((l) => [l.locationCode, l.functionalLocationId]));
-
-    const result = await prisma.$transaction(async (tx) => {
-      let created = 0;
-      let updated = 0;
-      for (let i = 0; i < dataRows.length; i++) {
-        const row = dataRows[i];
-        const lineNumber = i + 2; // 1-based, header occupies line 1
-        const record = {
-          equipmentCode: (row[0] || '').trim(),
-          name: (row[1] || '').trim(),
-          description: (row[2] || '').trim(),
-          functionalLocationCode: (row[3] || '').trim(),
-          manufacturer: (row[4] || '').trim(),
-          model: (row[5] || '').trim(),
-          serialNumber: (row[6] || '').trim(),
-          assetTag: (row[7] || '').trim(),
-          equipmentClass: (row[8] || '').trim(),
-          criticality: (row[9] || '').trim(),
-          operationalStatus: (row[10] || '').trim(),
-        };
-
-        const parsed = equipmentImportRowSchema.safeParse(record);
-        if (!parsed.success) {
-          const reason = parsed.error.issues
-            .map((iss) => `${iss.path.join('.')}: ${iss.message}`)
-            .join('; ');
-          throw new CsvRowError(lineNumber, reason);
-        }
-        const d = parsed.data;
+      const outcome = { created: 0, updated: 0, rejected: [] as Array<{ row: number; reason: string }> };
+      for (const row of rows) {
+        const d = row.record;
 
         const functionalLocationId = locationByCode.get(d.functionalLocationCode);
         if (!functionalLocationId) {
-          throw new CsvRowError(lineNumber, `unknown functionalLocationCode '${d.functionalLocationCode}'`);
+          // Strict mode turns this into a rollback and a 400; the reason is
+          // still reported through the shared shape.
+          outcome.rejected.push({ row: row.number, reason: `unknown functionalLocationCode '${d.functionalLocationCode}'` });
+          continue;
         }
 
-        const existing = await tx.equipment.findFirst({
+        const existing = await ctx.tx.equipment.findFirst({
           where: { equipmentCode: d.equipmentCode, isDeleted: false },
         });
         if (existing) {
-          await tx.equipment.update({
+          await ctx.tx.equipment.update({
             where: { equipmentId: existing.equipmentId },
             data: {
               name: d.name,
@@ -236,13 +174,13 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
               equipmentClass: d.equipmentClass ?? existing.equipmentClass,
               criticality: d.criticality,
               operationalStatus: d.operationalStatus ?? existing.operationalStatus,
-              modifiedBy: req.user!.userId,
+              modifiedBy: ctx.userId,
             },
           });
-          await logAuditAction({ table: 'Equipment', recordId: existing.equipmentId, action: 'Update', userId: req.user!.userId, ipAddress: req.ip, db: tx });
-          updated++;
+          await logAuditAction({ table: 'Equipment', recordId: existing.equipmentId, action: 'Update', userId: ctx.userId, ipAddress: ctx.ipAddress, db: ctx.tx });
+          outcome.updated += 1;
         } else {
-          const createdRow = await tx.equipment.create({
+          const createdRow = await ctx.tx.equipment.create({
             data: {
               equipmentCode: d.equipmentCode,
               name: d.name,
@@ -255,26 +193,18 @@ router.post('/import.csv', authorizeMinRole('Maintenance Planner'), csvUpload.si
               equipmentClass: d.equipmentClass ?? 'General',
               criticality: d.criticality,
               operationalStatus: d.operationalStatus || 'Active',
-              createdBy: req.user!.userId,
-              modifiedBy: req.user!.userId,
+              createdBy: ctx.userId,
+              modifiedBy: ctx.userId,
             },
           });
-          await logAuditAction({ table: 'Equipment', recordId: createdRow.equipmentId, action: 'Create', userId: req.user!.userId, ipAddress: req.ip, db: tx });
-          created++;
+          await logAuditAction({ table: 'Equipment', recordId: createdRow.equipmentId, action: 'Create', userId: ctx.userId, ipAddress: ctx.ipAddress, db: ctx.tx });
+          outcome.created += 1;
         }
       }
-      return { created, updated, failed: [] };
-    });
-
-    res.json(result);
-  } catch (error) {
-    if (error instanceof CsvRowError) {
-      return res.status(400).json({ error: `Row ${error.row}: ${error.reason}` });
-    }
-    logger.error({ err: error }, 'Error importing equipment');
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+      return outcome;
+    },
+  })
+);
 
 
 /**

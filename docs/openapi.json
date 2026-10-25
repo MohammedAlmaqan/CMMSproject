@@ -28,13 +28,23 @@
     "/api/work-orders/import.csv": {
       "post": {
         "summary": "Bulk import work orders from CSV",
-        "description": "Multipart upload with a single `file` part, mapped by the same rules as the migration trial importers. Requires the Maintenance Planner role. Foreign keys are given as natural keys - `functionalLocationId` is a location code, `equipmentId` an equipment code, `workCenterId` a work-centre code, `reportedByUserId` a username - and are resolved against live master data. A row is created, or updated when `woNumber` already exists among live rows. A row naming a natural key that does not exist live, or whose supervisor cannot be resolved, is rejected with a reason. A blank `supervisorUserId` is backfilled to the reporter, mirroring notification conversion.\n",
+        "description": "Multipart upload with a single `file` part, mapped by the same rules as the migration trial importers. Requires the Maintenance Planner role. Foreign keys are given as natural keys - `functionalLocationId` is a location code, `equipmentId` an equipment code, `workCenterId` a work-centre code, `reportedByUserId` a username - and are resolved against live master data. A row is created, or updated when `woNumber` already exists among live rows. A row naming a natural key that does not exist live, or whose supervisor cannot be resolved, is rejected with a reason. A blank `supervisorUserId` is backfilled to the reporter, mirroring notification conversion.\nThe import is partial by design: an accepted row is kept even when another row is rejected, and the response reports both. Add `?dryRun=1` to validate the file and report the outcome without writing anything.\n",
         "tags": [
           "Work Orders"
         ],
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
           }
         ],
         "requestBody": {
@@ -58,10 +68,10 @@
         },
         "responses": {
           "200": {
-            "description": "Import completed; per-row outcome reported"
+            "description": "Import completed; created, updated and rejected counts are returned"
           },
           "400": {
-            "description": "Malformed CSV, missing header columns, or no importable rows"
+            "description": "Malformed CSV, or a missing required header column"
           },
           "401": {
             "description": "Missing or invalid bearer token"
@@ -5577,23 +5587,13 @@
     "/api/materials/export.csv": {
       "get": {
         "summary": "Export the material master as CSV",
-        "description": "Streams the full non-deleted material master as text/csv with a Content-Disposition filename, suitable for Excel. Honours the same optional search filter as the JSON list endpoint. No role restriction beyond authentication.\n",
+        "description": "Streams the full non-deleted material master as text/csv with a Content-Disposition filename, suitable for Excel. No role restriction beyond authentication. The `search` parameter on the JSON list endpoint is not applied: this is a whole-master export, deliberately, so a filtered export can never be mistaken for the register.\n",
         "tags": [
           "Materials"
         ],
         "security": [
           {
             "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "query",
-            "name": "search",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Case-insensitive match on materialCode or description"
           }
         ],
         "responses": {
@@ -5619,13 +5619,23 @@
     "/api/materials/import.csv": {
       "post": {
         "summary": "Bulk import materials from CSV",
-        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Each row is validated by the zod schema `materialImportRowSchema` (see utils/validation.ts), which coerces standardCost and currentStock to non-negative numbers. Valid rows are inserted and invalid rows are reported back per line so a partial import is still usable. A duplicate materialCode returns HTTP 409 rather than failing the whole file.\n",
+        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Each row is validated by the zod schema `materialImportRowSchema` (see utils/validation.ts), which coerces standardCost and currentStock to non-negative numbers and treats a blank cell as \"leave the stored value alone\". The import is all-or-nothing: the first invalid row rolls the whole file back and returns 400 naming that row. A row whose `materialCode` already exists is updated rather than duplicated; there is no 409. Add `?dryRun=1` to validate the file and report the outcome without writing anything.\n",
         "tags": [
           "Materials"
         ],
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
           }
         ],
         "requestBody": {
@@ -5650,19 +5660,16 @@
         },
         "responses": {
           "200": {
-            "description": "Import completed; per-row outcome reported"
+            "description": "Import completed; every row was accepted"
           },
           "400": {
-            "description": "Malformed CSV, or every row failed validation"
+            "description": "Malformed CSV, a missing header column, or a row that failed validation (the file is rolled back)"
           },
           "401": {
             "description": "Missing or invalid bearer token"
           },
           "403": {
             "description": "Caller role is below Maintenance Planner"
-          },
-          "409": {
-            "description": "One or more materialCode values already exist"
           },
           "500": {
             "description": "Internal server error"
@@ -7028,13 +7035,23 @@
     "/api/functional-locations/import.csv": {
       "post": {
         "summary": "Bulk import functional locations from CSV",
-        "description": "Multipart upload with a single `file` part, mapped by the same rules as the migration trial importers. Requires the Maintenance Planner role. A row is created, or updated when `locationCode` already exists among live rows. A row whose `parentLocationId` names a location that is neither live nor created earlier in the same file is rejected with a reason; parents must appear before their children. Extra columns are ignored and `modifiedBy` is set to the caller.\n",
+        "description": "Multipart upload with a single `file` part, mapped by the same rules as the migration trial importers. Requires the Maintenance Planner role. A row is created, or updated when `locationCode` already exists among live rows. A row whose `parentLocationId` names a location that is neither live nor created earlier in the same file is rejected with a reason; parents must appear before their children. Extra columns are ignored and `modifiedBy` is set to the caller.\nThe import is partial by design: an accepted row is kept even when another row is rejected, and the response reports both. Add `?dryRun=1` to validate the file and report the outcome without writing anything.\n",
         "tags": [
           "Functional Locations"
         ],
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
           }
         ],
         "requestBody": {
@@ -7058,10 +7075,10 @@
         },
         "responses": {
           "200": {
-            "description": "Import completed; per-row outcome reported"
+            "description": "Import completed; created, updated and rejected counts are returned"
           },
           "400": {
-            "description": "Malformed CSV, missing header columns, or no importable rows"
+            "description": "Malformed CSV, or a missing required header column"
           },
           "401": {
             "description": "Missing or invalid bearer token"
@@ -8858,50 +8875,13 @@
     "/api/equipment/export.csv": {
       "get": {
         "summary": "Export the equipment register as CSV",
-        "description": "Streams the full non-deleted equipment register as text/csv with a Content-Disposition filename, suitable for Excel. Honours the same search, functionalLocationId, criticality and equipmentClass filters as the JSON list endpoint. No role restriction beyond authentication.\n",
+        "description": "Streams the full non-deleted equipment register as text/csv with a Content-Disposition filename, suitable for Excel. Honours the same search, functionalLocationId, criticality and equipmentClass filters as the JSON list endpoint. No role restriction beyond authentication. The list endpoint's search, functionalLocationId, criticality and equipmentClass filters are not applied: this is a whole-register export, deliberately, so a filtered export can never be mistaken for the register.\n",
         "tags": [
           "Equipment"
         ],
         "security": [
           {
             "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "query",
-            "name": "search",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Case-insensitive match on equipmentCode, name, description, manufacturer, model or serialNumber"
-          },
-          {
-            "in": "query",
-            "name": "functionalLocationId",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "criticality",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "S",
-                "A",
-                "B",
-                "C"
-              ]
-            }
-          },
-          {
-            "in": "query",
-            "name": "equipmentClass",
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {
@@ -8927,13 +8907,23 @@
     "/api/equipment/import.csv": {
       "post": {
         "summary": "Bulk import equipment from CSV",
-        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Each row is validated by the zod schema `equipmentImportRowSchema` (see utils/validation.ts). Valid rows are inserted and invalid rows are reported back per line so a partial import is still usable. A duplicate equipmentCode returns HTTP 409 rather than failing the whole file.\n",
+        "description": "Multipart upload with a single `file` part. Requires the Maintenance Planner role. Each row is validated by the zod schema `equipmentImportRowSchema` (see utils/validation.ts). The import is all-or-nothing: the first invalid row rolls the whole file back and returns 400 naming that row, so a caller can never mistake a partly-applied file for a complete one. A row whose `equipmentCode` already exists is updated rather than duplicated; there is no 409. Add `?dryRun=1` to validate the file and report the outcome without writing anything.\n",
         "tags": [
           "Equipment"
         ],
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Run the import and roll it back, reporting what it would do"
           }
         ],
         "requestBody": {
@@ -8958,19 +8948,16 @@
         },
         "responses": {
           "200": {
-            "description": "Import completed; per-row outcome reported"
+            "description": "Import completed; every row was accepted"
           },
           "400": {
-            "description": "Malformed CSV, or every row failed validation"
+            "description": "Malformed CSV, a missing header column, or a row that failed validation (the file is rolled back)"
           },
           "401": {
             "description": "Missing or invalid bearer token"
           },
           "403": {
             "description": "Caller role is below Maintenance Planner"
-          },
-          "409": {
-            "description": "One or more equipmentCode values already exist"
           },
           "500": {
             "description": "Internal server error"
