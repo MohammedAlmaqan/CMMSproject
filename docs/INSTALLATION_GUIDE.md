@@ -302,7 +302,11 @@ applied and before the API starts. Sign in at the web UI with those details.
 The installer enforces a 12-character minimum and refuses the username itself
 and common defaults. The password is not written to the install log and is not
 recoverable from it; if it is lost, an existing Administrator has to reset the
-account, because the app has no self-service password reset.
+account. In the app that is **Administration -> Users & Roles**, the per-row
+**Password** action, which sets a new password without knowing the old one. The
+same 12-character minimum applies, and there is no self-service "forgot
+password" flow: recovery always needs a working Administrator account, so keep
+the credentials for at least one of them somewhere recoverable.
 
 If the database was prepared some other way, for example `npx prisma db seed`
 during development, remember that the seed creates the demo account
