@@ -45,6 +45,8 @@ and the table is wrong.
 | I-22 | The PostgreSQL credential was exposed on disk and must be rotated | Closed | Owner | Closed 2026-10-22 — reset to the owner-supplied value. Temporary `pg_hba` trust entries, `ALTER ROLE` OK, original 5,649-byte `pg_hba.conf` restored with an identical SHA-256, scram login verified (`postgres super=true`); `backend\.env` and the Machine `PGPASSWORD` updated; PM2 restarted (new PIDs); `backup.bat` OK, 9,325,169 bytes. |
 | I-23 | The compiled wizard could not complete an install: `OnInitializeWizard` is never called, the `TEdit` casts are invalid, and `GetDateTimeString` is called with string separators | Closed | Installer | Fixed in 9de8853; driven end to end 2026-10-22 — engine log `install-20261022-213838.log` records database `cmms_wizard_test`, API `http://127.0.0.1:4111` and a scratch install root, health check 200, then the throwaway PM2 apps, database and directories were removed |
 | I-24 | A release bundle must carry the verified setup artifact and a manifest that covers it | Closed | Owner | Closed 2026-10-22 with tag `v1.6.3`: `CommandPulse-CMMS-v1.6.3` in `C:\Users\Injaz\Documents\Default Project` carries `Setup_CommandPulse.exe` at its root and a regenerated `SHA256SUMS.txt`; the previous bundle is preserved unchanged beside it |
+| I-25 | `v1.6.4` was tagged with no release-notes entry. Its last commit, `f245123` "docs: add v1.6.4 release notes", changes three lines of `RELEASE_NOTES.md` and all three replace an em dash with mojibake | Closed | Installer | Closed 2026-10-25 in the release-notes commit immediately after this one: `RELEASE_NOTES.md` gains a `v1.6.4` section derived from the six commits of `v1.6.3..v1.6.4`. The tag is immutable and still carries no entry, which is why the section is dated by its work and not by the tag. The mojibake itself was repaired in `693bbb1` |
+| I-26 | `da42aea` "docs: close I-25/I-26 and document first-sign-in" names two rows that did not exist (the table ended at I-24) and a first-Administrator closure the commit does not contain - it changes documentation only | Closed | Installer | Closed 2026-10-25 by I-25 above and this row. The implementation the message described is `db33058` (`installer/admin/create-admin.cjs`), `75ab60d` (wizard page and transport) and `7238b6a` (coverage); `da42aea` names none of the three |
 
 ## Closed history
 
@@ -64,3 +66,11 @@ what a closure actually changed, in order, once the closing commit exists.
   `RELEASE_MANIFEST.md`, the added `Setup_CommandPulse.exe`, and `SHA256SUMS.txt`, which
   is regenerated over every file including the executable and re-verified entry by entry
   before handover.
+- **I-25 and I-26, 2026-10-25.** `RELEASE_NOTES.md` gains a `v1.6.4` section, written
+  from the six commits the tag contains (`db33058`, `75ab60d`, `d5741a1`, `7238b6a`,
+  `da42aea`, `f245123`) because there was no entry to correct. It describes what the
+  installer now does - it creates the first Administrator, the wizard collects the
+  account, and the tests cover creation and login - and says in the section itself that
+  its own commit added no notes. The two rows above are the errata; the v1.6.4 commit
+  messages are left exactly as committed, on the same rule as elsewhere in this
+  repository: history is recorded, not rewritten.
