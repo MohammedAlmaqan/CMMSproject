@@ -4,7 +4,8 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate, authorizeMinRole } from '../middleware/auth.js';
 import { logAuditAction, logFieldChanges } from '../middleware/audit.js';
-import { workCenterCreateSchema, workCenterUpdateSchema, capacityQuerySchema, validate } from '../utils/validation.js';
+import { workCenterCreateSchema, workCenterUpdateSchema, capacityQuerySchema, workCenterImportRowSchema, validate } from '../utils/validation.js';
+import { csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
 import { buildCapacityBoard, CAPACITY_CONSUMING_STATUSES } from '../utils/capacity.js';
 import { isPrismaError } from '../utils/prismaErrors.js';
 import { logger } from '../utils/logger.js';
@@ -276,6 +277,162 @@ router.get('/capacity', async (req: Request, res: Response) => {
   }
 });
 
+
+const WORK_CENTER_CSV_COLUMNS = [
+  'code',
+  'name',
+  'dailyCapacityHours',
+  'costRatePerHour',
+  'isActive',
+] as const;
+
+/**
+ * @openapi
+ * /api/work-centers/export.csv:
+ *   get:
+ *     summary: Export the work-center register as CSV
+ *     description: >
+ *       Streams every non-deleted work center in code order as text/csv with a
+ *       Content-Disposition filename. No role restriction beyond authentication.
+ *       `isActive` is written as `true`/`false`, the same two spellings the import
+ *       accepts, so an exported file can be edited and uploaded back unchanged.
+ *     tags: [Work Centers]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: The register as text/csv
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'work centers',
+    filename: 'work-centers',
+    columns: WORK_CENTER_CSV_COLUMNS,
+    rows: async () => {
+      const rows = await prisma.workCenter.findMany({
+        where: { isDeleted: false },
+        orderBy: { code: 'asc' },
+      });
+      return rows.map((row) => [
+        row.code,
+        row.name,
+        row.dailyCapacityHours,
+        row.costRatePerHour.toString(),
+        row.isActive ? 'true' : 'false',
+      ]);
+    },
+  })
+);
+
+/**
+ * @openapi
+ * /api/work-centers/import.csv:
+ *   post:
+ *     summary: Import work centers from CSV
+ *     description: >
+ *       Multipart upload with a single `file` part. Requires the Maintenance Planner role.
+ *       Rows are validated by the zod schema `workCenterImportRowSchema`. The import is
+ *       all-or-nothing: the first invalid row rolls the whole file back and returns 400
+ *       naming that row. A row whose `code` already exists is updated rather than
+ *       duplicated; there is no 409. Add `?dryRun=1` to validate the file and report the
+ *       outcome without writing anything.
+ *     tags: [Work Centers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dryRun
+ *         schema: { type: boolean }
+ *         description: Run the import and roll it back, reporting what it would do
+ *     requestBody:
+ *       required: true
+ *       description: "Multipart form; each CSV row validated by zod `workCenterImportRowSchema`"
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       '200':
+ *         description: Import completed; every row was accepted
+ *       '400':
+ *         description: Malformed CSV, a missing header column, or a row that failed validation (the file is rolled back)
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '403':
+ *         description: Caller role is below Maintenance Planner
+ *       '500':
+ *         description: Internal server error
+ */
+router.post(
+  '/import.csv',
+  ...csvImportRoute({
+    noun: 'work centers',
+    columns: WORK_CENTER_CSV_COLUMNS,
+    schema: workCenterImportRowSchema,
+    mode: 'strict',
+    run: async (ctx, rows) => {
+      const outcome = { created: 0, updated: 0, rejected: [] as Array<{ row: number; reason: string }> };
+      for (const row of rows) {
+        const d = row.record;
+        const existing = await ctx.tx.workCenter.findFirst({
+          where: { code: d.code, isDeleted: false },
+        });
+
+        if (existing) {
+          await ctx.tx.workCenter.update({
+            where: { workCenterId: existing.workCenterId },
+            data: {
+              name: d.name,
+              dailyCapacityHours: d.dailyCapacityHours,
+              costRatePerHour: d.costRatePerHour,
+              isActive: d.isActive ?? existing.isActive,
+              modifiedBy: ctx.userId,
+            },
+          });
+          await logAuditAction({
+            table: 'WorkCenter',
+            recordId: existing.workCenterId,
+            action: 'Update',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.updated += 1;
+        } else {
+          const created = await ctx.tx.workCenter.create({
+            data: {
+              code: d.code,
+              name: d.name,
+              dailyCapacityHours: d.dailyCapacityHours,
+              costRatePerHour: d.costRatePerHour,
+              isActive: d.isActive ?? true,
+              createdBy: ctx.userId,
+              modifiedBy: ctx.userId,
+            },
+          });
+          await logAuditAction({
+            table: 'WorkCenter',
+            recordId: created.workCenterId,
+            action: 'Create',
+            userId: ctx.userId,
+            ipAddress: ctx.ipAddress,
+            db: ctx.tx,
+          });
+          outcome.created += 1;
+        }
+      }
+      return outcome;
+    },
+  })
+);
 
 /**
  * @openapi
