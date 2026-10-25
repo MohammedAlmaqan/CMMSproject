@@ -161,30 +161,38 @@ const renderDetail = () =>
     </MemoryRouter>
   );
 
+// Every service the detail page reads in one Promise.all. Named rather than
+// inlined in the first describe's beforeEach so a second describe cannot forget
+// one - forgetting failureCodeService.getAll leaves it returning undefined and
+// the page reports "Failed to load work order", which reads like a page bug.
+function setupDetailMocks() {
+  useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
+  vi.clearAllMocks();
+  vi.mocked(workOrderService.getById).mockResolvedValue(baseWo);
+  vi.mocked(workOrderService.getHistory).mockResolvedValue({ data: [], total: 0 });
+  vi.mocked(laborService.getByWorkOrder).mockResolvedValue([]);
+  vi.mocked(auditLogService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 100 });
+  vi.mocked(userService.getAll).mockResolvedValue([]);
+  vi.mocked(userService.getOptions).mockResolvedValue([]);
+  vi.mocked(craftService.getAll).mockResolvedValue([]);
+  vi.mocked(materialService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 0 });
+  vi.mocked(materialService.getAllPages).mockResolvedValue([]);
+  vi.mocked(safetyChecklistService.getTemplates).mockResolvedValue([]);
+  vi.mocked(attachmentService.getByEntity).mockResolvedValue([]);
+  vi.mocked(failureCodeService.getAll).mockResolvedValue([]);
+  vi.mocked(costSplitService.getAllocation).mockResolvedValue(allocationFixture);
+  vi.mocked(costSplitService.replace).mockResolvedValue({
+    workOrderId: 'wo-1',
+    splits: [],
+    replacedCount: 2,
+    totalPercentage: 100,
+  });
+  vi.mocked(workOrderService.transitionStatus).mockResolvedValue(baseWo);
+}
+
 describe('WorkOrderDetailPage', () => {
   beforeEach(() => {
-    useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
-    vi.clearAllMocks();
-    vi.mocked(workOrderService.getById).mockResolvedValue(baseWo);
-    vi.mocked(workOrderService.getHistory).mockResolvedValue({ data: [], total: 0 });
-    vi.mocked(laborService.getByWorkOrder).mockResolvedValue([]);
-    vi.mocked(auditLogService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 100 });
-    vi.mocked(userService.getAll).mockResolvedValue([]);
-    vi.mocked(userService.getOptions).mockResolvedValue([]);
-    vi.mocked(craftService.getAll).mockResolvedValue([]);
-    vi.mocked(materialService.getAll).mockResolvedValue({data:[],total:0,skip:0,take:0});
-    vi.mocked(materialService.getAllPages).mockResolvedValue([]);
-    vi.mocked(safetyChecklistService.getTemplates).mockResolvedValue([]);
-    vi.mocked(attachmentService.getByEntity).mockResolvedValue([]);
-    vi.mocked(failureCodeService.getAll).mockResolvedValue([]);
-    vi.mocked(costSplitService.getAllocation).mockResolvedValue(allocationFixture);
-    vi.mocked(costSplitService.replace).mockResolvedValue({
-      workOrderId: 'wo-1',
-      splits: [],
-      replacedCount: 2,
-      totalPercentage: 100,
-    });
-    vi.mocked(workOrderService.transitionStatus).mockResolvedValue(baseWo);
+    setupDetailMocks();
   });
 
   it('renders the loading state while the detail fetch is pending', () => {
@@ -602,3 +610,157 @@ describe('WorkOrderDetailPage', () => {
     );
   });
 });
+
+// F4: the header fields had no edit affordance anywhere in the app. The only way
+// to reassign a supervisor or move a planned date was a raw PUT /api/work-orders.
+describe('WorkOrderDetailPage header edit (F4)', () => {
+  const plannerUser: User = {
+    ...technicianUser,
+    userId: 'u-plan',
+    username: 'planner',
+    fullName: 'PlanUser',
+    email: 'planner@example.com',
+    role: 'Maintenance Planner',
+  };
+
+  const supervisorUser: User = {
+    ...technicianUser,
+    userId: 'u-sup',
+    username: 'sup',
+    fullName: 'SupUser',
+    email: 'sup@example.com',
+    role: 'Maintenance Supervisor',
+  };
+
+  const headerWo: WorkOrder = {
+    ...baseWo,
+    supervisorUserId: 'u-sup',
+    plannedStart: '2026-10-26T06:00:00.000Z',
+    plannedFinish: '2026-10-26T14:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    setupDetailMocks();
+    vi.mocked(workOrderService.getById).mockResolvedValue(headerWo);
+    vi.mocked(userService.getOptions).mockResolvedValue([
+      { userId: 'u-sup', username: 'sup', fullName: 'SupUser', role: 'Maintenance Supervisor' },
+      { userId: 'u-tech', username: 'tech', fullName: 'TechUser', role: 'Technician' },
+    ]);
+  });
+
+  it('offers the edit to a Maintenance Planner', async () => {
+    useAuthStore.setState({ user: plannerUser, isAuthenticated: true, loading: false, error: null });
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    expect(screen.getByRole('button', { name: 'Edit details' })).toBeInTheDocument();
+  });
+
+  it('does not offer the edit to a Technician', async () => {
+    // A technician owns the work, not the schedule (owner decision 2026-10-25).
+    useAuthStore.setState({ user: technicianUser, isAuthenticated: true, loading: false, error: null });
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    expect(screen.queryByRole('button', { name: 'Edit details' })).not.toBeInTheDocument();
+  });
+
+  it('opens with the current supervisor and planned dates', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: 'Edit details' }));
+
+    expect(screen.getByLabelText('Supervisor')).toHaveValue('u-sup');
+    // Rendered in local time, not sliced from the UTC ISO string.
+    expect(screen.getByLabelText('Planned start')).toHaveValue(
+      toDateTimeLocal(headerWo.plannedStart)
+    );
+    expect(screen.getByLabelText('Planned finish')).toHaveValue(
+      toDateTimeLocal(headerWo.plannedFinish)
+    );
+  });
+
+  it('saves the supervisor and both dates through PUT /work-orders/:id', async () => {
+    vi.mocked(workOrderService.update).mockResolvedValue({
+      ...headerWo,
+      supervisorUserId: 'u-tech',
+      plannedStart: '2026-10-27T06:00:00.000Z',
+      plannedFinish: '2026-10-27T14:00:00.000Z',
+    });
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: 'Edit details' }));
+    await user.selectOptions(screen.getByLabelText('Supervisor'), 'u-tech');
+    await user.clear(screen.getByLabelText('Planned start'));
+    await user.type(screen.getByLabelText('Planned start'), '2026-10-27T09:00');
+    await user.clear(screen.getByLabelText('Planned finish'));
+    await user.type(screen.getByLabelText('Planned finish'), '2026-10-27T17:00');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(vi.mocked(workOrderService.update)).toHaveBeenCalledWith(
+        'wo-1',
+        expect.objectContaining({
+          supervisorUserId: 'u-tech',
+          plannedStart: new Date('2026-10-27T09:00').toISOString(),
+          plannedFinish: new Date('2026-10-27T17:00').toISOString(),
+        })
+      )
+    );
+    await waitFor(() => expect(screen.queryByLabelText('Supervisor')).not.toBeInTheDocument());
+  });
+
+  it('refuses a finish before the start without calling the API', async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: 'Edit details' }));
+    await user.clear(screen.getByLabelText('Planned start'));
+    await user.type(screen.getByLabelText('Planned start'), '2026-10-27T17:00');
+    await user.clear(screen.getByLabelText('Planned finish'));
+    await user.type(screen.getByLabelText('Planned finish'), '2026-10-27T09:00');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Planned finish must be on or after planned start'
+    );
+    expect(vi.mocked(workOrderService.update)).not.toHaveBeenCalled();
+  });
+
+  it('clears a planned date to null when the field is emptied', async () => {
+    vi.mocked(workOrderService.update).mockResolvedValue({
+      ...headerWo,
+      plannedStart: null,
+      plannedFinish: '2026-10-26T14:00:00.000Z',
+    });
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText('WO-0099');
+    await user.click(screen.getByRole('button', { name: 'Edit details' }));
+    await user.clear(screen.getByLabelText('Planned start'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(vi.mocked(workOrderService.update)).toHaveBeenCalledWith(
+        'wo-1',
+        expect.objectContaining({ plannedStart: null })
+      )
+    );
+  });
+});
+
+// Mirrors the page's own helper: what a datetime-local input expects for an ISO
+// value, in local time. Duplicated deliberately so the test fails if the page
+// switches to slicing the UTC string.
+function toDateTimeLocal(value: string | null | undefined): string {
+  if (!value) return '';
+  const d = new Date(value);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

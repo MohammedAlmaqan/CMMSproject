@@ -263,6 +263,18 @@ export default function WorkOrderDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
+  // F4: the header fields had no edit affordance anywhere in the app - the only
+  // way to reassign a supervisor or move a planned date was a raw PUT. Owner
+  // decision 2026-10-25: Maintenance Supervisor, Maintenance Planner and
+  // Administrator may edit the header. Technician is deliberately excluded: a
+  // technician owns the work, not the schedule.
+  const [headerEditing, setHeaderEditing] = useState(false);
+  const [headerError, setHeaderError] = useState<string | null>(null);
+  const [headerForm, setHeaderForm] = useState<{
+    supervisorUserId: string;
+    plannedStart: string;
+    plannedFinish: string;
+  }>({ supervisorUserId: '', plannedStart: '', plannedFinish: '' });
   const [notesForm, setNotesForm] = useState<{
     safetyNotes: string;
     completionRemarks: string;
@@ -336,6 +348,12 @@ export default function WorkOrderDetailPage() {
   // that does not total 100) that the per-line endpoint guards against, and
   // "these percentages total 100" is only ever true of the set.
   const canReplaceAllocation = hasPermission(['Maintenance Planner', 'Administrator']);
+
+  const canEditHeader = hasPermission([
+    'Maintenance Supervisor',
+    'Maintenance Planner',
+    'Administrator',
+  ]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -653,6 +671,78 @@ export default function WorkOrderDetailPage() {
       setBusy(null);
     }
   }, [wo, calForm]);
+
+  // ---- Header edit (F4) ----
+  const startEditHeader = useCallback(() => {
+    if (!wo) return;
+    setHeaderError(null);
+    setHeaderForm({
+      supervisorUserId: wo.supervisorUserId || '',
+      plannedStart: toDateTimeLocal(wo.plannedStart),
+      plannedFinish: toDateTimeLocal(wo.plannedFinish),
+    });
+    setHeaderEditing(true);
+  }, [wo]);
+
+  const handleSaveHeader = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!wo) return;
+      setHeaderError(null);
+      if (!headerForm.supervisorUserId) {
+        setHeaderError('Select a supervisor');
+        return;
+      }
+      // Ordered-pair check. The API accepts either date alone and does not
+      // compare them, so a finish before its start would be stored happily and
+      // only look wrong much later; refuse it where the two inputs are visible.
+      if (
+        headerForm.plannedStart &&
+        headerForm.plannedFinish &&
+        new Date(headerForm.plannedFinish).getTime() < new Date(headerForm.plannedStart).getTime()
+      ) {
+        setHeaderError('Planned finish must be on or after planned start');
+        return;
+      }
+      setBusy('header:save');
+      try {
+        const updated = await workOrderService.update(wo.workOrderId, {
+          supervisorUserId: headerForm.supervisorUserId,
+          plannedStart: headerForm.plannedStart ? new Date(headerForm.plannedStart).toISOString() : null,
+          plannedFinish: headerForm.plannedFinish ? new Date(headerForm.plannedFinish).toISOString() : null,
+        });
+        // PUT returns the bare row, without the joined supervisor, so resolve
+        // the name from the options list the page already holds rather than
+        // re-reading the whole work order for one label.
+        const supervisor = users.find((u) => u.userId === updated.supervisorUserId);
+        setWo((prev) =>
+          prev
+            ? {
+                ...prev,
+                supervisorUserId: updated.supervisorUserId,
+                supervisor: supervisor
+                  ? {
+                      userId: supervisor.userId,
+                      fullName: supervisor.fullName,
+                      username: supervisor.username,
+                    }
+                  : null,
+                plannedStart: updated.plannedStart,
+                plannedFinish: updated.plannedFinish,
+              }
+            : prev
+        );
+        setHeaderEditing(false);
+      } catch (err) {
+        setHeaderError(
+          err instanceof ApiError ? err.message : 'Failed to save the work order details'
+        );
+      } finally {
+        setBusy(null);
+      }
+    },
+    [wo, headerForm, users]
+  );
 
   // ---- Operations CRUD ----
   const startAddOperation = useCallback(() => {
@@ -1145,25 +1235,115 @@ export default function WorkOrderDetailPage() {
       </div>
 
       {/* WO Info Cards */}
-      <div className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-subtle">
-        <InfoCard label="Type" value={wo.type} color={wo.type === 'EM' ? '#F87171' : wo.type === 'PM' ? '#2563EB' : '#A1A1AA'} />
-        <InfoCard label="Priority" value={wo.priority} color={wo.priority === 'High' ? '#F87171' : wo.priority === 'Medium' ? '#D97706' : '#92929B'} />
-        <InfoCard label="Location" value={wo.functionalLocation?.locationCode || '-'} />
-        <InfoCard label="Equipment" value={wo.equipment?.equipmentCode || '-'} />
-        <InfoCard label="Work Center" value={wo.workCenter?.code || '-'} />
-        <InfoCard label="Supervisor" value={wo.supervisor?.fullName || '-'} />
-        <InfoCard label="Planned Cost" value={`$${wo.plannedCost.toLocaleString()}`} color="#D97706" />
-        <InfoCard label="Actual Cost" value={`$${wo.actualCost.toLocaleString()}`} color={wo.actualCost > wo.plannedCost ? '#F87171' : '#059669'} />
-        <InfoCard
-          label="Planned Start"
-          value={wo.plannedStart ? new Date(wo.plannedStart).toLocaleDateString() : '-'}
-        />
-        <InfoCard
-          label="Planned Finish"
-          value={wo.plannedFinish ? new Date(wo.plannedFinish).toLocaleDateString() : '-'}
-        />
-        <InfoCard label="Cost Center" value={wo.costCenterCode} />
-        <InfoCard label="Internal Order" value={wo.internalOrder || '-'} />
+      <div className="px-6 py-4 border-b border-subtle">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            Work order details
+          </span>
+          {canEditHeader && !headerEditing && (
+            <button
+              onClick={startEditHeader}
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-primary border border-subtle hover:border-amber hover:bg-surface-tertiary transition-all"
+            >
+              <Pencil className="w-3 h-3" /> Edit details
+            </button>
+          )}
+        </div>
+        {headerEditing ? (
+          <form onSubmit={handleSaveHeader} className="space-y-3">
+            {headerError && (
+              <p className="text-xs text-red-400" role="alert">
+                {headerError}
+              </p>
+            )}
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <FieldLabel>Supervisor</FieldLabel>
+                <select
+                  value={headerForm.supervisorUserId}
+                  onChange={(e) => setHeaderForm({ ...headerForm, supervisorUserId: e.target.value })}
+                  className={selectCls}
+                  style={{ backgroundColor: '#27272A' }}
+                  aria-label="Supervisor"
+                >
+                  <option value="">Select supervisor</option>
+                  {/* Every active user, matching the create screen's picker. The
+                      API does not require the role to be a supervisor, so
+                      filtering here would hide a value the record can hold. */}
+                  {users.map((u) => (
+                    <option key={u.userId} value={u.userId}>
+                      {u.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Planned Start</FieldLabel>
+                <input
+                  type="datetime-local"
+                  value={headerForm.plannedStart}
+                  onChange={(e) => setHeaderForm({ ...headerForm, plannedStart: e.target.value })}
+                  className={inputCls}
+                  style={{ backgroundColor: '#27272A' }}
+                  aria-label="Planned start"
+                />
+              </div>
+              <div>
+                <FieldLabel>Planned Finish</FieldLabel>
+                <input
+                  type="datetime-local"
+                  value={headerForm.plannedFinish}
+                  onChange={(e) => setHeaderForm({ ...headerForm, plannedFinish: e.target.value })}
+                  className={inputCls}
+                  style={{ backgroundColor: '#27272A' }}
+                  aria-label="Planned finish"
+                />
+              </div>
+              <div className="flex items-end gap-2">
+                <button
+                  type="submit"
+                  disabled={busy === 'header:save'}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all disabled:opacity-50"
+                >
+                  {busy === 'header:save' ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setHeaderEditing(false); setHeaderError(null); }}
+                  className="px-3 py-1.5 rounded text-xs font-medium text-secondary border border-subtle hover:text-primary hover:bg-surface-tertiary transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </form>
+        ) : (
+          <div className="grid grid-cols-4 gap-4">
+            <InfoCard label="Type" value={wo.type} color={wo.type === 'EM' ? '#F87171' : wo.type === 'PM' ? '#2563EB' : '#A1A1AA'} />
+            <InfoCard label="Priority" value={wo.priority} color={wo.priority === 'High' ? '#F87171' : wo.priority === 'Medium' ? '#D97706' : '#92929B'} />
+            <InfoCard label="Location" value={wo.functionalLocation?.locationCode || '-'} />
+            <InfoCard label="Equipment" value={wo.equipment?.equipmentCode || '-'} />
+            <InfoCard label="Work Center" value={wo.workCenter?.code || '-'} />
+            <InfoCard label="Supervisor" value={wo.supervisor?.fullName || '-'} />
+            <InfoCard label="Planned Cost" value={`$${wo.plannedCost.toLocaleString()}`} color="#D97706" />
+            <InfoCard label="Actual Cost" value={`$${wo.actualCost.toLocaleString()}`} color={wo.actualCost > wo.plannedCost ? '#F87171' : '#059669'} />
+            <InfoCard
+              label="Planned Start"
+              value={wo.plannedStart ? new Date(wo.plannedStart).toLocaleString() : '-'}
+            />
+            <InfoCard
+              label="Planned Finish"
+              value={wo.plannedFinish ? new Date(wo.plannedFinish).toLocaleString() : '-'}
+            />
+            <InfoCard label="Cost Center" value={wo.costCenterCode} />
+            <InfoCard label="Internal Order" value={wo.internalOrder || '-'} />
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -2579,4 +2759,18 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
+}
+
+/**
+ * ISO timestamp -> the value a `<input type="datetime-local">` expects, in the
+ * viewer's local time. Slicing the ISO string instead would show UTC and then
+ * save the shifted time back, so a supervisor in UTC+3 would see their 08:00
+ * plan as 05:00 and every edit would move it another three hours.
+ */
+function toDateTimeLocal(value: string | null | undefined): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
