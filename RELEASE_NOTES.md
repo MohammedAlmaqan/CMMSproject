@@ -4,6 +4,48 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.6.4
+
+The installer could produce an installation nobody could sign in to. A migrated
+database has no users, and the API only lets an existing Administrator create
+accounts, so a blank install had no way past the login screen. This release
+closes that gap. Application code (`backend/`, `app/`) is unchanged from v1.6.3.
+
+- **The installer creates the first Administrator.** A new helper,
+  `installer/admin/create-admin.cjs`, is copied into the installed backend and run
+  from there, so `@prisma/client` and `bcryptjs` resolve from the application's
+  own `node_modules` and the hash is the one the API would have written (bcrypt,
+  cost 10). It writes one Administrator and refuses to write a second: an
+  existing active Administrator is exit 10 and leaves the database untouched, a
+  taken username is exit 11, rejected details are exit 12. `db33058`.
+- **The credentials are not exposed on the way in.** The account travels as one
+  JSON object on stdin - never in `argv` and never in the environment, so it
+  cannot be read from the process list or a PM2 environment dump - and the
+  ACL-restricted temp file it arrives in is deleted after the copy. The install
+  log records that an Administrator was created, not the password. `db33058`,
+  `install.ps1`.
+- **The wizard asks for the account.** A new **Administrator Account** page
+  collects username, full name, email, password and a confirmation, and validates
+  them before the page turns: username 3-32 characters from letters, digits, dot,
+  underscore and hyphen; a well-formed email; a password of at least 12
+  characters, not the username itself and not one of the common defaults. The
+  password fields are masked and repeated. `75ab60d`.
+- **The installer harness covers it.** `installer/tests/run-tests.ps1` now tests
+  the contract end to end: the `User` row exists as an active Administrator, the
+  stored hash is bcrypt rather than plaintext, the temp file is gone, the account
+  signs in and comes back with the Administrator role, and a wrong password is
+  refused with 401. `7238b6a`.
+- **The guide tells operators to use it.** `docs/INSTALLATION_GUIDE.md` gains a
+  **First sign-in** section: sign in with the account the installer created, and
+  do not rely on the `admin` / `password` demo seed, which exists only for
+  development and must not survive on a real deployment. `da42aea`.
+- **Released as 1.6.4.** Wizard version bumped in `d5741a1`.
+
+Written 2026-10-25, after the tag: v1.6.4's last commit was titled "docs: add
+v1.6.4 release notes" and added none, so this section is derived from the six
+commits the tag contains rather than from any message about them. Recorded as
+tracker I-25 in `docs/INSTALLER_TRACKER.md`.
+
 ## v1.6.3
 
 The installer workstream, closed. The standalone installer under `installer/` is
