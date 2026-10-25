@@ -22,6 +22,7 @@ import {
   Tags,
   ListChecks,
   KeyRound,
+  LogOut,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { hasMinRole, routeFloor } from '@/lib/rbac';
@@ -53,6 +54,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const [collapsed, setCollapsed] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
 
@@ -131,9 +133,14 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
 
       {/* User Profile */}
       <div className="px-3 py-3 border-t border-subtle">
-        <button
-          onClick={() => navigate('/administration')}
-          className={`w-full flex items-center gap-2 px-2 py-2 rounded hover:bg-surface-tertiary transition-all ${
+        {/* Display only. This used to be a button that navigated to
+            /administration for every role; the route floor is Administrator, so
+            five of the six roles clicked their own name and were silently
+            redirected to /dashboard. The Administration page is already in the
+            navigation list above, filtered by the same floor, so identity here
+            needs no target at all. */}
+        <div
+          className={`w-full flex items-center gap-2 px-2 py-2 rounded ${
             collapsed ? 'justify-center' : ''
           }`}
         >
@@ -152,7 +159,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
               </div>
             </div>
           )}
-        </button>
+        </div>
 
         {/* Self-service credential rotation (G2). Available to every role;
             the API accepts a self-change with currentPassword for any caller. */}
@@ -166,6 +173,25 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
         >
           <KeyRound className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
           {!collapsed && <span>Change password</span>}
+        </button>
+
+        {/* Sign out lives in the global chrome, for every role. Before this it
+            existed only on AdministrationPage, which is Administrator-only, so
+            Technician, Requester, Supervisor and Planner had no in-app way to
+            end a session short of closing the browser. */}
+        <button
+          onClick={() => {
+            logout();
+            navigate('/login');
+          }}
+          className={`w-full flex items-center gap-2 px-2 py-1.5 mt-0.5 rounded text-xs text-secondary hover:text-primary hover:bg-surface-tertiary transition-all ${
+            collapsed ? 'justify-center' : ''
+          }`}
+          aria-label="Sign out"
+          title={collapsed ? 'Sign out' : undefined}
+        >
+          <LogOut className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.5} />
+          {!collapsed && <span>Sign out</span>}
         </button>
 
         {user && (
