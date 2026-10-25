@@ -429,10 +429,20 @@ function Copy-Bundle {
     Log "INFO" "  excluded dump file $($_.FullName)"
     Remove-Item -LiteralPath $_.FullName -Force
   }
-  # The published bundle ships backend\.env.deploy as a template. The install
-  # generates its own .env, so the template is not copied into the install root.
-  $deployTemplate = Join-Path $Root "backend\.env.deploy"
-  if (Test-Path -LiteralPath $deployTemplate) { Remove-Item -LiteralPath $deployTemplate -Force; Log "INFO" "  removed backend\.env.deploy (replaced by the generated .env)" }
+  # The published bundle ships env templates (backend\.env.deploy) and a sample
+  # (backend\.env.example). The install generates its own .env, so neither may
+  # reach the install root: left beside the real .env they look like it, carry
+  # placeholders such as your_password and <PGPASSWORD>, and invite an operator
+  # to "fix" a configuration that is already correct. Removing every backend
+  # env file except the generated .env is the only rule that cannot be forgotten
+  # when a new template is added to the bundle.
+  $backendRoot = Join-Path $Root "backend"
+  if (Test-Path -LiteralPath $backendRoot) {
+    Get-ChildItem -LiteralPath $backendRoot -Force -File -Filter ".env.*" -ErrorAction SilentlyContinue | ForEach-Object {
+      Remove-Item -LiteralPath $_.FullName -Force
+      Log "INFO" "  removed backend\$($_.Name) (the installer generates backend\.env)"
+    }
+  }
 }
 
 # Build the folder the web server points at: the compiled frontend files and
@@ -478,6 +488,19 @@ function New-BackendEnv {
     $backup = "$envPath.bak.$script:RunStamp"
     Copy-Item -LiteralPath $envPath -Destination $backup -Force
     Log "INFO" "Existing .env backed up to $backup"
+  }
+  # Guard: the substitution table above is hand-written, so a token added to the
+  # template without a matching .Replace() would ship an unsubstituted value and
+  # the install would start with a literal __DATABASE_URL__ as its connection
+  # string. Fail here, where the cause is obvious, rather than at first request.
+  $leftover = @([regex]::Matches($content, '__[A-Z0-9_]+__') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+  if ($leftover.Count -gt 0) {
+    throw "The generated .env still contains template tokens: $($leftover -join ', '). Add a .Replace() for each in New-BackendEnv."
+  }
+  foreach ($sample in @('your_password', '<PGPASSWORD>', 'change-this-to-a-random-secret-key')) {
+    if ($content.Contains($sample)) {
+      throw "The generated .env still contains the example value '$sample'."
+    }
   }
   [System.IO.File]::WriteAllText($envPath, $content)
   Log "OK" "Generated $envPath with a fresh random JWT secret"
