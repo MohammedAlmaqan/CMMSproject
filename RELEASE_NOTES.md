@@ -4,6 +4,130 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.6.5
+
+A manual end-to-end pass against v1.6.4 (`docs/E2E_V164_FINDINGS_PHASE1.md`)
+found fourteen defects. This release closes all of them, tracked row by row in
+`docs/E2E_V164_REMEDIATION_TRACKER.md`. Most were gaps between the API and the
+screen: the endpoint existed, the dialog existed, and nothing in the interface
+reached either. Two were not: a credential file travelled inside the handover
+bundle, and the bundle's documentation was stale in a way no check could catch.
+
+Application code is no longer frozen; the installer workstream's freeze ended
+with this pass.
+
+### What a user will notice
+
+- **Sign out is in the sidebar, for every role.** The only Sign Out control was
+  on `/administration`, which has an Administrator floor, so Technician,
+  Requester, Maintenance Supervisor and Maintenance Planner had no in-app way to
+  end a session. The profile block above it was a button that navigated to
+  `/administration` for everyone, which for five of six roles was a dead click
+  that redirected to `/dashboard` without explanation; it is now a display
+  block, and the role-filtered navigation list already carries the Administration
+  link. `d6518d8`.
+- **An Administrator can reset a user's password.** The users table offered Edit
+  and Deactivate only, so an account could be created and then never recovered.
+  A per-row Password action mounts the existing dialog in `adminMode`, which
+  posts `newPassword` alone and never asks for a current password the
+  Administrator does not know. The dialog's header comment claimed this wiring
+  already existed, which is why the gap survived review; the comment is
+  corrected. `f2dac8e`.
+- **The work-order header is editable.** Neither the supervisor nor the planned
+  dates had an edit affordance after creation, so reassigning a job or moving a
+  schedule was an API task. The details band gains **Edit details**, gated to
+  Maintenance Supervisor, Maintenance Planner and Administrator; Technician is
+  excluded deliberately. A finish before the start is refused, and the fields
+  round-trip in local time rather than through a UTC slice that would shift every
+  schedule by the viewer's offset. `a5c31c9`.
+- **Scheduling collects the plan.** Both places that offer Schedule - the detail
+  header and the list row - now open one dialog and send `plannedStart` and
+  `plannedFinish` as part of the same status transition, so a scheduled job has a
+  schedule. One request, one transaction, one audit entry. `9fac75f`, `d66dc84`.
+- **Import and Export on four registers.** Equipment, Materials, Work Orders and
+  Functional Locations share one toolbar and one contract: columns by name,
+  `?dryRun=1` for a dry run, and one result shape of `created`, `updated` and
+  `rejected[{row, reason}]`. Equipment and Materials reject the whole file when a
+  row is bad; Work Orders and Functional Locations keep the rows they accepted
+  and name the rest. `7b85685`, `d6eba45`, `258660e`. Documented in
+  `docs/USER_MANUAL.md` section 3.4 and `docs/API_REFERENCE.md`.
+- **One password floor, 12 characters.** The installer has always required 12;
+  the API accepted 8, and three inputs in the app were labelled accordingly. A
+  policy with two answers is not a policy, so the API and the UI were raised to
+  the installer's floor and the refusal now states it. Existing shorter passwords
+  still sign in - only creation and change are gated, so nobody is locked out
+  mid-session. `5e8c062`.
+
+### What an operator or reviewer will notice
+
+- **The install root no longer carries a look-alike `.env`.** `Copy-Bundle`
+  copied the whole `backend` folder and removed only `.env.deploy`, so
+  `backend\.env.example` landed beside the generated file, opening with "Copy this
+  file to .env" and carrying `your_password`. Every `backend\.env.*` is now
+  removed rather than named one at a time, and the generated file is asserted
+  complete before its ACL is applied: a surviving `__TOKEN__` or sample value
+  fails the install with the cause named. `9c14f53`. This is the most plausible
+  explanation for the v1.6.4 manual test's report of an installer `.env` full of
+  placeholders; the generator was not at fault.
+- **A credential file no longer ships.** The v1.6.4 bundle contained
+  `backend\.env.deploy` - a 64-character `JWT_SECRET` and a `DATABASE_URL`
+  naming database `cmms` - and `SHA256SUMS.txt` attested it by hash, so it was
+  delivered as part of the release. `.gitignore` listed `.env` and
+  `.env.local`, which does not cover `.env.deploy`. `.gitignore` now ignores
+  `.env.*` and re-includes `.env.example`, at every depth, and
+  `scripts/verify/verify_bundle.py --secrets` fails if an assembled bundle
+  contains any `.env*` other than the sample. `3d6126c`.
+- **The bundle's documentation is gated against its tag.** The v1.6.4 bundle
+  carried documents from three different tags: `INSTALLATION_GUIDE.md` and
+  `RELEASE_NOTES.md` were v1.6.3's, `GO_LIVE_CHECKLIST.md` matched neither and
+  still said go-live had not happened, and only `ADMIN_GUIDE.md` and
+  `USER_MANUAL.md` were v1.6.4's. The bundle is assembled by copying files out of
+  a working tree, so whatever a developer had open travelled with it and nothing
+  failed. `scripts/verify/verify_bundle.py` now compares all 11 shipped documents
+  and `docs/images/*` against `git show <tag>:<path>`, normalising only a UTF-8
+  BOM and CRLF; `--sync` repairs a drift from the tag rather than by hand.
+  Re-derived against the preserved v1.6.4 bundle it reports the real defect:
+  27 OK, 3 drift. `9450462`.
+- **Mojibake is gone from the handover documents.** 38 runs of UTF-8 text that
+  had been decoded as CP1252 were repaired in five files, including two that were
+  visible on screen: the material line and the attachment separators on the
+  equipment detail page. The installer tracker had been through the corruption
+  twice, so its dashes were eight characters wide rather than three. Repaired by
+  round-tripping each run back through CP1252, not by substitution. Leading
+  byte-order marks on seven files are valid UTF-8 and were left alone. `693bbb1`.
+- **v1.6.4 has release notes.** The tag shipped without an entry, and the commit
+  titled "docs: add v1.6.4 release notes" changed three lines, all three turning
+  an em dash into mojibake. The section is written from the six commits the tag
+  contains and says so. The two misleading v1.6.4 commit messages are recorded as
+  installer-tracker rows I-25 and I-26 rather than rewritten. `d630e12`,
+  `78528a5`.
+
+### Verification
+
+`scripts/verify/verify_a1.py` (214 clause rows), `verify_a1_dispositions.py`
+(77 of 77 rows dispositioned) and `verify_openapi.py` (150 operations across 95
+paths) pass. Backend suite: 88 files, 1205 tests. App suite: 29 files, 177 tests.
+The CI run at the tagged SHA is the evidence, not this paragraph.
+
+### Known open items
+
+Not fixed here, and not claimed as fixed:
+
+- A work order may still be moved to `Scheduled` through the API with no dates.
+  The dialog requires both, but the API does not (F5 option C was considered and
+  not adopted, as the plan is often agreed after the job is queued).
+- `PUT /api/work-orders/{id}` still has a Technician floor. Field-level
+  authorisation does not exist in that route, so tightening it would also stop a
+  technician editing a description; the Supervisor/Planner/Admin rule for the
+  header edit is enforced in the UI only.
+- CSV import/export remains absent for Work Centers, Crafts, Task Lists, Safety
+  Checklists, Code Lists and Maintenance Plans - both the UI and the backend
+  routes. The shared factory makes each one small; they were not approved for
+  this release.
+- Whether the `JWT_SECRET` and database password that travelled in the v1.6.4
+  bundle are treated as disclosed is an owner decision. Neither value matches the
+  current live configuration, but the file was delivered.
+
 ## v1.6.4
 
 The installer could produce an installation nobody could sign in to. A migrated
