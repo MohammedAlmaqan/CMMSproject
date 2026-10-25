@@ -22,7 +22,7 @@ import {
 } from '../utils/validation.js';
 import { workOrderImporter } from '../migration-trial/importers/workOrder.js';
 import { persistDataset } from '../migration-trial/liveImport.js';
-import { csvImportRoute } from '../utils/csvRoutes.js';
+import { csvDate, csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
 
 const router = Router();
 
@@ -40,6 +40,102 @@ const WORK_ORDER_IMPORT_REQUIRED = [
   'createdBy',
   'createdDate',
 ] as const;
+
+/**
+ * The export carries exactly the import contract (plus the optional columns the
+ * importer already understands), so the register can be exported, edited and
+ * imported back without a translation step. Foreign keys are written as the
+ * natural keys the import resolves: a location code, an equipment code, a
+ * work-centre code, a username.
+ */
+const WORK_ORDER_CSV_COLUMNS = [
+  'woNumber',
+  'type',
+  'priority',
+  'status',
+  'functionalLocationId',
+  'equipmentId',
+  'description',
+  'workCenterId',
+  'supervisorUserId',
+  'reportedByUserId',
+  'plannedStart',
+  'plannedFinish',
+  'createdBy',
+  'createdDate',
+] as const;
+
+/**
+ * @openapi
+ * /api/work-orders/export.csv:
+ *   get:
+ *     summary: Export the work-order register as CSV
+ *     description: >
+ *       Streams the full non-deleted work-order register as text/csv with a
+ *       Content-Disposition filename, suitable for Excel. No role restriction beyond
+ *       authentication. Foreign keys are written as natural keys - location code,
+ *       equipment code, work-centre code, username - so the file can be edited and
+ *       re-imported through POST /api/work-orders/import.csv. The list endpoint's
+ *       filters are not applied: this is a whole-register export.
+ *     tags: [Work Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: CSV file
+ *         content:
+ *           text/csv:
+ *             schema: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'work orders',
+    filename: 'work-orders',
+    columns: WORK_ORDER_CSV_COLUMNS,
+    rows: async () => {
+      const [orders, users] = await Promise.all([
+        prisma.workOrder.findMany({
+          where: { isDeleted: false },
+          orderBy: { woNumber: 'asc' },
+          include: {
+            functionalLocation: { select: { locationCode: true } },
+            equipment: { select: { equipmentCode: true } },
+            workCenter: { select: { code: true } },
+            supervisor: { select: { username: true } },
+            reportedBy: { select: { username: true } },
+          },
+        }),
+        // createdBy is an audit string, not a relation like supervisor/reportedBy;
+        // it usually holds a userId, so it is mapped back to a username and left
+        // alone when it holds something else (the 'system' default).
+        prisma.user.findMany({ select: { userId: true, username: true } }),
+      ]);
+      const usernameById = new Map(users.map((u) => [u.userId, u.username]));
+
+      return orders.map((wo) => [
+        wo.woNumber,
+        wo.type,
+        wo.priority,
+        wo.status,
+        wo.functionalLocation.locationCode,
+        wo.equipment?.equipmentCode,
+        wo.description,
+        wo.workCenter.code,
+        wo.supervisor.username,
+        wo.reportedBy.username,
+        csvDate(wo.plannedStart),
+        csvDate(wo.plannedFinish),
+        usernameById.get(wo.createdBy) ?? wo.createdBy,
+        csvDate(wo.createdDate),
+      ]);
+    },
+  })
+);
 
 /**
  * @openapi

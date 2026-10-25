@@ -7,8 +7,6 @@ const parentCode = `IMP-LOC-${stamp}`;
 const childCode = `IMP-LOC-${stamp}-01`;
 const woNumber = `IMPWO-${stamp}`;
 
-let woId = '';
-
 function csvBuffer(header: string[], rows: string[][]): Buffer {
   return Buffer.from([header.join(','), ...rows.map((r) => r.join(','))].join('\n') + '\n', 'utf8');
 }
@@ -41,10 +39,40 @@ const EQUIPMENT_HEADER = [
   'operationalStatus',
 ];
 const MATERIAL_HEADER = ['materialCode', 'description', 'unitOfMeasure', 'standardCost', 'currentStock'];
+const WO_EXPORT_HEADER = [
+  'woNumber',
+  'type',
+  'priority',
+  'status',
+  'functionalLocationId',
+  'equipmentId',
+  'description',
+  'workCenterId',
+  'supervisorUserId',
+  'reportedByUserId',
+  'plannedStart',
+  'plannedFinish',
+  'createdBy',
+  'createdDate',
+];
+const FL_EXPORT_HEADER = [
+  'locationCode',
+  'description',
+  'parentLocationId',
+  'locationType',
+  'operationalStatus',
+  'installationDate',
+  'gpsCoordinates',
+  'safetyCritical',
+];
 
 describe('CSV import routes', () => {
   afterAll(async () => {
-    if (woId) await purgeWorkOrders([woId]);
+    const orders = await prisma.workOrder.findMany({
+      where: { woNumber: { startsWith: `IMPWO-${stamp}` } },
+      select: { workOrderId: true },
+    });
+    if (orders.length > 0) await purgeWorkOrders(orders.map((o) => o.workOrderId));
     const locs = await prisma.functionalLocation.findMany({
       where: { locationCode: { startsWith: parentCode } },
       select: { functionalLocationId: true },
@@ -197,7 +225,6 @@ describe('CSV import routes', () => {
       expect(wo!.reportedBy.username).toBe('tech1');
       // Blank supervisor is backfilled to the reporter (app conversion convention).
       expect(wo!.supervisor.username).toBe('tech1');
-      woId = wo!.workOrderId;
     });
 
     it('rejects a work order naming an unknown functional location', async () => {
@@ -354,6 +381,65 @@ describe('CSV import routes', () => {
       const materials = await api().get('/api/materials/export.csv').set(authHeaders(ctx.plannerToken));
       expect(materials.status).toBe(200);
       expect(materials.text.split(/\r?\n/)[0]).toBe(MATERIAL_HEADER.join(','));
+
+      const workOrders = await api().get('/api/work-orders/export.csv').set(authHeaders(ctx.plannerToken));
+      expect(workOrders.status).toBe(200);
+      expect(workOrders.text.split(/\r?\n/)[0]).toBe(WO_EXPORT_HEADER.join(','));
+
+      const locations = await api().get('/api/functional-locations/export.csv').set(authHeaders(ctx.plannerToken));
+      expect(locations.status).toBe(200);
+      expect(locations.text.split(/\r?\n/)[0]).toBe(FL_EXPORT_HEADER.join(','));
+    });
+
+    it('writes work orders with the natural keys the import resolves', async () => {
+      const number = `${woNumber}-EXP`;
+      const imported = await api()
+        .post('/api/work-orders/import.csv')
+        .set(authHeaders(ctx.plannerToken))
+        .attach(
+          'file',
+          csvBuffer(WO_HEADER, [[number, 'CM', 'Medium', 'Draft', 'PL-01', '', 'Export probe', 'MECH', 'tech1', 'tech1', '2025-10-15']]),
+          'work-orders.csv',
+        );
+      expect(imported.status).toBe(200);
+
+      const res = await api().get('/api/work-orders/export.csv').set(authHeaders(ctx.plannerToken));
+      expect(res.status).toBe(200);
+      const row = res.text.split(/\r?\n/).find((line) => line.startsWith(`${number},`));
+      expect(row).toBeDefined();
+      const cells = row!.split(',');
+      // location code, work-centre code, supervisor username, reporter username
+      expect(cells[4]).toBe('PL-01');
+      expect(cells[7]).toBe('MECH');
+      expect(cells[8]).toBe('tech1');
+      expect(cells[9]).toBe('tech1');
+      // Dates are date-only, the only form the importer's dateCol accepts.
+      expect(cells[13]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('writes a location parent as its code, so the file can be imported back', async () => {
+      const parent = `${parentCode}-EXP`;
+      const child = `${parentCode}-EXP-01`;
+      const imported = await api()
+        .post('/api/functional-locations/import.csv')
+        .set(authHeaders(ctx.plannerToken))
+        .attach(
+          'file',
+          csvBuffer(FL_HEADER, [
+            [parent, 'Export parent', '', 'Plant', 'Active'],
+            [child, 'Export child', parent, 'Area', 'Active'],
+          ]),
+          'locations.csv',
+        );
+      expect(imported.status).toBe(200);
+
+      const res = await api().get('/api/functional-locations/export.csv').set(authHeaders(ctx.plannerToken));
+      expect(res.status).toBe(200);
+      const row = res.text.split(/\r?\n/).find((line) => line.startsWith(`${child},`));
+      expect(row).toBeDefined();
+      const cells = row!.split(',');
+      expect(cells[2]).toBe(parent);
+      expect(cells[3]).toBe('Area');
     });
   });
 });

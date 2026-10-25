@@ -25,6 +25,38 @@
     }
   ],
   "paths": {
+    "/api/work-orders/export.csv": {
+      "get": {
+        "summary": "Export the work-order register as CSV",
+        "description": "Streams the full non-deleted work-order register as text/csv with a Content-Disposition filename, suitable for Excel. No role restriction beyond authentication. Foreign keys are written as natural keys - location code, equipment code, work-centre code, username - so the file can be edited and re-imported through POST /api/work-orders/import.csv. The list endpoint's filters are not applied: this is a whole-register export.\n",
+        "tags": [
+          "Work Orders"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV file",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/work-orders/import.csv": {
       "post": {
         "summary": "Bulk import work orders from CSV",
@@ -7085,6 +7117,38 @@
           },
           "403": {
             "description": "Caller role is below Maintenance Planner"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/functional-locations/export.csv": {
+      "get": {
+        "summary": "Export the functional-location register as CSV",
+        "description": "Streams the full non-deleted location register as text/csv with a Content-Disposition filename, suitable for Excel. No role restriction beyond authentication. `parentLocationId` is written as the parent's location code, so the file can be edited and re-imported through POST /api/functional-locations/import.csv. The list endpoint's filters are not applied: this is a whole-register export.\n",
+        "tags": [
+          "Functional Locations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV file",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
           },
           "500": {
             "description": "Internal server error"

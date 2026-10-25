@@ -297,6 +297,15 @@ export function csvImportRoute<T>(spec: CsvImportSpec<T>): RequestHandler[] {
 }
 
 /**
+ * Date-only cell, the form the importers accept (`YYYY-MM-DD`). An absent date
+ * is an empty cell, not "null": the importer's dateCol reads `''` as "no date"
+ * and would reject the word.
+ */
+export function csvDate(value: Date | null | undefined): string {
+  return value ? value.toISOString().slice(0, 10) : '';
+}
+
+/**
  * Builds the GET handler for a module's `export.csv`. Authentication is the
  * caller's (the module router already applies it), matching the read floor of
  * the JSON list endpoint it mirrors.

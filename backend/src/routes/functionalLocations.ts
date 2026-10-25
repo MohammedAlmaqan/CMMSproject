@@ -17,13 +17,30 @@ import {
 } from '../utils/locationCounts.js';
 import { logger } from '../utils/logger.js';
 import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
-import { csvImportRoute } from '../utils/csvRoutes.js';
+import { csvDate, csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
 
 const router = Router();
 
 router.use(authenticate);
 
 const FUNCTIONAL_LOCATION_IMPORT_REQUIRED = ['locationCode', 'description', 'locationType'] as const;
+
+/**
+ * The export carries the import contract plus the optional columns the importer
+ * already understands, so a register can be exported, edited and imported back
+ * without a translation step. `parentLocationId` is the parent's location code,
+ * the form the import resolves.
+ */
+const FUNCTIONAL_LOCATION_CSV_COLUMNS = [
+  'locationCode',
+  'description',
+  'parentLocationId',
+  'locationType',
+  'operationalStatus',
+  'installationDate',
+  'gpsCoordinates',
+  'safetyCritical',
+] as const;
 
 /**
  * @openapi
@@ -91,6 +108,60 @@ router.post(
         updated: result.updated,
         rejected: result.rejected.map(({ row, reason }) => ({ row, reason })),
       };
+    },
+  })
+);
+
+
+/**
+ * @openapi
+ * /api/functional-locations/export.csv:
+ *   get:
+ *     summary: Export the functional-location register as CSV
+ *     description: >
+ *       Streams the full non-deleted location register as text/csv with a
+ *       Content-Disposition filename, suitable for Excel. No role restriction beyond
+ *       authentication. `parentLocationId` is written as the parent's location code,
+ *       so the file can be edited and re-imported through POST
+ *       /api/functional-locations/import.csv. The list endpoint's filters are not
+ *       applied: this is a whole-register export.
+ *     tags: [Functional Locations]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: CSV file
+ *         content:
+ *           text/csv:
+ *             schema: { type: string }
+ *       '401':
+ *         description: Missing or invalid bearer token
+ *       '500':
+ *         description: Internal server error
+ */
+router.get(
+  '/export.csv',
+  csvExportRoute({
+    noun: 'functional locations',
+    filename: 'functional-locations',
+    columns: FUNCTIONAL_LOCATION_CSV_COLUMNS,
+    rows: async () => {
+      const locations = await prisma.functionalLocation.findMany({
+        where: { isDeleted: false },
+        orderBy: { locationCode: 'asc' },
+        include: { parent: { select: { locationCode: true } } },
+      });
+
+      return locations.map((l) => [
+        l.locationCode,
+        l.description,
+        l.parent?.locationCode,
+        l.locationType,
+        l.operationalStatus,
+        csvDate(l.installationDate),
+        l.gpsCoordinates,
+        l.safetyCritical ? 'true' : 'false',
+      ]);
     },
   })
 );
