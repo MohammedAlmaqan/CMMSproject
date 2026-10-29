@@ -384,7 +384,7 @@ A Maintenance Planner can do everything in [section 8](#8-maintenance-planner), 
 
 Select **Administration**. The screen has three tabs:
 
-- **Users & Roles** - a list of every user with username, full name, email, role, active flag, and last sign-in. It carries an **Add User** form, a per-row **Edit** control ([9.3a](#93a-edit-a-user)) and a per-row **Deactivate** control ([9.2](#92-create-a-user), [9.3](#93-disable-a-user)).- **Audit Log** - every recorded change, filterable by table, action, and free text, and paginated. Only Administrators can read it; any other role selecting this tab receives an error.
+- **Users & Roles** - a list of every user with username, full name, email, role, active flag, and last sign-in. It carries an **Add User** form, a per-row **Edit** control ([9.3a](#93a-edit-a-user)) and a per-row **Deactivate** control ([9.2](#92-create-a-user), [9.3](#93-disable-a-user)).`n- **Audit Log** - every recorded change, filterable by table, action, and free text, and paginated. Only Administrators can read it; any other role selecting this tab receives an error. (*Superseded 2026-10-28: formatting corrected - bullets previously concatenated.*)
 - **Settings** - shows configuration. Three rows load from `GET /api/system-config` and are editable by an Administrator (saved via `PUT /api/system-config`): the two number-prefix rows (`wo_number_prefix`, `notif_number_prefix`) and the audit retention window (`audit_retention_years`); the remaining rows are a read-only display of static values.
 
 ### 9.2 Create a user
