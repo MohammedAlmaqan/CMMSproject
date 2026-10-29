@@ -112,9 +112,7 @@ external mapping (see §6).
 | `parentCodeId` | Failure-mode hierarchy | Covered (self-relation) |
 | (no referencing column) | Link from a maintenance / failure record | **Absent** |
 
-`FailureCode` exists as a hierarchical taxonomy but **no other model
-references it** — there is no `WorkOrder.failureCodeId` and no
-`Notification.failureCodeId`. The taxonomy can be maintained but not applied
+FailureCode exists as a hierarchical taxonomy. It is now **wired to WorkOrder.failureCodeId** (added 2026-10-05, schema.prisma) for root-cause/failure capture on work orders; Notification.failureCodeId is not present. The taxonomy is applied via WorkOrder. (*Superseded 2026-10-28: previously stated no other model referenced it / no WorkOrder.failureCodeId.*)
 to a real failure record. This is the open half of tracker v1.1-1 and is
 carried as **L35**; it is the single largest alignment gap in this document.
 
