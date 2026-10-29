@@ -28,7 +28,7 @@ importers expect, matching the reviewed sample under `docs/migration-templates/`
 1. `WorkCenter.filled.csv`
 2. `User.filled.csv`
 3. `FunctionalLocation.filled.csv`
-4. `Equipment.filled.csv`
+3. `Equipment.filled.csv` (*Superseded 2026-10-28: numbering corrected; previously numbered 4.*)
 4. `Material.filled.csv`
 5. `Notification.filled.csv`
 6. `WorkOrder.filled.csv`
