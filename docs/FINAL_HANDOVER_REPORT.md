@@ -763,3 +763,7 @@ Non-blocking observations recorded for the owner (none stop handover):
 
 **Authorisation exercised with this report:** push this report as
 `docs: final handover audit report`, then tag the pushed commit `v1.4.0` and push the tag.
+
+---
+
+> **Note (2026-10-28):** This report predates later RBAC/UI closures and some post-audit changes; see CMMS_FINALIZATION_TRACKER.md and HANDOFF.md for current authoritative state. Superseded details are preserved above.
