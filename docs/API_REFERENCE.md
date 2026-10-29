@@ -1,4 +1,4 @@
-# API Reference
+﻿# API Reference
 
 Reference documentation for the CMMS REST API, version 1.0.0.
 
@@ -443,7 +443,7 @@ Use `/api/users/options` for dropdown and assignee fields; it is available from 
 | GET | `/api/system-config` | List known system configuration values with their current or default values |
 | PUT | `/api/system-config` | Set one known system configuration value (Administrator only) |
 
-The writable key set is a fixed allowlist (`wo_number_prefix`, `notif_number_prefix`); anything else is rejected by validation.
+The writable key set is a fixed allowlist (`wo_number_prefix`, `notif_number_prefix`, `audit_retention_years`); anything else is rejected by validation. (*Superseded 2026-10-28: previously listed only two keys.*)
 
 ## Known v1.0.0 limitations
 
