@@ -649,6 +649,27 @@ The frontend now mirrors the server's role hierarchy in one place (`app/src/lib/
 
 Recorded here so that nobody plans an operation around a feature that does not exist. Each is a known gap, not a defect discovered at runtime.
 
+### 13.1 Business and operational limitations
+
+These are the limits an operations plan has to allow for. None is a defect awaiting a fix: each is out of scope, waived by a recorded decision, or owned by the Client as an operational obligation. The clause-by-clause position is the matrix in [SOW_COMPLIANCE.md](SOW_COMPLIANCE.md); the decision IDs below are rows in [DECISION_REGISTER.md](DECISION_REGISTER.md).
+
+| Limitation | What it means in practice | Recorded in |
+|---|---|---|
+| **Single-site plant only** | There is no multi-site tenancy and no per-cost-centre data separation: every list route returns rows from the whole plant to anyone whose role may read that module. Custom roles cannot be defined - the six built-in roles are fixed in code. | SOW §4.2, §2.2; decisions D-7, D-18; `backend/src/utils/roles.ts` |
+| **English only** | There is no internationalisation layer and no translated interface. | `CMMS_FINALIZATION_TRACKER.md` scope line |
+| **No mobile layout** | The pages declare a mobile viewport but there are no responsive breakpoints, so a phone or tablet renders the desktop layout. Attaching a photo directly from a mobile device is excluded from scope; the attachment API still accepts an upload from any client. | SOW §1.3 (partial), §3.2.2 (excluded) |
+| **No ERP, HR or payroll integration** | No inbound Equipment or Functional Location master sync, and no posting-oriented export of material consumption or labour hours. Reporting is exposed through the documented SQL view layer for the Client's own BI tool; no connector is delivered or configured. | SOW §3.10 (deferred), §5.2 and §3.7.3 (view layer met) |
+| **No notification e-mail** | Alerts appear on the Dashboard only. Nothing is sent to an inbox, so an alert is seen when somebody signs in. | [13.2](#132-technical-deferrals-and-unimplemented-items) |
+| **First-party sign-in only** | No OAuth2/OIDC or Active Directory integration, so accounts and passwords are managed here rather than in the Client's directory. Multi-factor authentication and forced password rotation or expiry are not implemented. | SOW §5.5 (waived, D-5); [12.2](#122-authentication-controls) |
+| **No read logging** | The audit log answers who changed a record, not who viewed one. | [13.2](#132-technical-deferrals-and-unimplemented-items) |
+| **Scale beyond the volume actually run** | The 500,000-work-order / 100,000-equipment volume has not been tested, so capacity at that size is unmeasured. 99.5% availability during business hours and pre-agreed maintenance windows are operational obligations, not product features; no uptime monitor is included. | SOW §4.1 (volume deferred), §4.6 (deferred, D-19) |
+| **Backups are full plus WAL, not differential** | Recovery is a nightly full dump plus WAL replay, bounding loss at 5 minutes. No differential backup mechanism exists; WAL recovery is the accepted mechanism by owner decision. | SOW §4.3; decision D-4 |
+| **No PDF report export** | Reports export to `.xlsx` and `.csv`. PDF export was waived. | SOW §3.7.1; decision D-9 |
+
+### 13.2 Technical deferrals and unimplemented items
+
+Screen-level, configuration and integration gaps that are not visible as a business limit above.
+
 | Item | Status |
 |---|---|
 | **200-concurrent-user capacity test** | **Deferred post-go-live.** Recorded P2028 decision. Do not quote the k6 smoke numbers as capacity evidence |

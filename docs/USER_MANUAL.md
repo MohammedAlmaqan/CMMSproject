@@ -42,6 +42,8 @@ Related documents:
 
 **Screenshots** point at images in the `screenshots/` folder of this repository. They are captured from development builds and may differ slightly in wording from your deployment, but the layout, tabs, and buttons are the same.
 
+**What the system does not do.** This manual describes what the product does today. Limits that affect how you plan work - a single-site plant only, English only, no e-mail alerts, no ERP or payroll integration, no PDF report export - are listed in the [Administrator Guide, section 13.1](ADMIN_GUIDE.md#131-business-and-operational-limitations). If a task is not described in this manual, do not assume the screen can do it.
+
 **Where permissions are enforced.** The menus are almost the same for every signed-in user: the Administration item is hidden unless your role is Administrator, and the new-work-order screen requires Requester or above; every other page opens for any role. A small number of buttons are hidden based on your role, but most permissions are enforced by the server, not by the screen. If you perform an action your role is not allowed to perform, the server rejects it and you see an error rather than a successful change. This is the normal, expected behaviour, not a fault. It also means a screen that looks editable may still refuse your action.
 
 ---
