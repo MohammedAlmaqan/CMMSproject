@@ -84,8 +84,9 @@ router.use(authenticate);
  *     description: >
  *       Buckets every non-deleted work order by the calendar month of its createdDate and
  *       sums plannedCost and actualCost. Months are returned in ascending order as
- *       "YYYY-MM". Values are rounded to two decimals; the underlying columns are
- *       Float-typed in v1.0.0, so small rounding drift is expected.
+ *       "YYYY-MM". Values are rounded to two decimals, and the underlying columns
+ *       are DECIMAL(12,2) since the Float-to-Decimal migration (E.13 / D-17), so
+ *       the column type introduces no floating-point drift of its own.
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []

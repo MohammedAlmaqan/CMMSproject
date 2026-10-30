@@ -123,8 +123,10 @@ router.get('/', async (req: Request, res: Response) => {
  *       Creates a craft under a work centre. The hourly rate is required, not
  *       defaulted, so a craft can never enter costing as a silent zero. Rejects
  *       an unknown or deleted work centre and a duplicate craft code within
- *       that work centre. Per decision D-16 the rate is stored per craft; the
- *       Float to Decimal migration is deferred to v1.1.
+ *       that work centre. Per decision D-16 the rate is stored per craft. The
+ *       column is DECIMAL(12,2) since the Float-to-Decimal migration
+ *       `20260928170000_float_to_decimal` (E.13 / D-17), so the rate and the
+ *       costing it feeds stay exact to the cent.
  *     tags: [Crafts]
  *     security:
  *       - bearerAuth: []
