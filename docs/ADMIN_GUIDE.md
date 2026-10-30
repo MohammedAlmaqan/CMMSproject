@@ -11,7 +11,7 @@ For the initial installation itself, see the [Installation & Deployment Guide](I
 Related documents:
 
 - [User Manual](USER_MANUAL.md) - the guide you give to plant users
-- [API Reference](API_REFERENCE.md) - all 150 endpoints across 27 route groups (supersedes the 146 across 27, the 141 across 27, and the 129 across 26 cited here earlier; the two extra endpoints are the `/api/health` and `/api/health/scheduler` routes defined inline in `index.ts`)
+- [API Reference](API_REFERENCE.md) - all 166 operations across 111 paths and 27 route groups, re-derived 2026-10-30; the sixteen added since the earlier reading of 150 are the F7 CSV routes. *Superseded wording, kept: "all 150 endpoints across 27 route groups (supersedes the 146 across 27, the 141 across 27, and the 129 across 26 cited here earlier; the two extra endpoints are the `/api/health` and `/api/health/scheduler` routes defined inline in `index.ts`)". That health-route note is still true - it accounted for 150 against 148, not for the CSV routes added since.*
 - [Architecture](ARCHITECTURE.md) - design decisions and measured performance
 - [Handoff](HANDOFF.md) - known open risks carried into production
 
