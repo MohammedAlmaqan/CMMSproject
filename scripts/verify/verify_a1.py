@@ -2,12 +2,12 @@
 # ═══════════════════════════════════════════════════════════════════════
 # A1  VERIFY — Phase A baseline freeze
 #
-# Parses docs/SOW_COMPLIANCE.md and asserts the frozen v1.0.0 clause
-# inventory. This is the authority for every downstream count: the SOW
-# matrix summary table is a hand-maintained claim, and Phase A's whole
-# purpose is to stop the scope argument resting on it.
+# Parses docs/SOW_COMPLIANCE.md and docs/DECISION_REGISTER.md and asserts the
+# frozen v1.0.0 clause inventory plus the register checks. This is the authority
+# for every downstream count: the SOW matrix summary table is a hand-maintained
+# claim, and Phase A's whole purpose is to stop the scope argument resting on it.
 #
-# Reads exactly one file (a markdown table). Touches no database, no API,
+# Reads exactly those two files (markdown tables). Touches no database, no API,
 # no .env, no credential.
 #
 # Usage: python scripts/verify/verify_a1.py
@@ -17,7 +17,10 @@ import os
 import re
 import sys
 
-ROOT = r"C:\Users\Injaz\Documents\Default Project\CMMSproject"
+# Derived from this file's location, the same way verify_bundle.py does it, so
+# the gate travels with the repository instead of depending on one checkout path.
+# scripts/verify/verify_a1.py -> three parents = repository root.
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MATRIX = os.path.join(ROOT, "docs", "SOW_COMPLIANCE.md")
 REGISTER = os.path.join(ROOT, "docs", "DECISION_REGISTER.md")
 SCREEN = os.path.join(ROOT, "screenshots")
