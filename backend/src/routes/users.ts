@@ -7,6 +7,7 @@ import { AUDITED_FIELDS } from '../middleware/auditFields.js';
 import { userCreateSchema, userUpdateSchema, validate } from '../utils/validation.js';
 import { csvExportRoute } from '../utils/csvRoutes.js';
 import { logger } from '../utils/logger.js';
+import { revokeUserSessions } from '../services/sessionRevocation.js';
 
 const router = Router();
 
@@ -355,8 +356,9 @@ router.get('/:id', async (req: Request, res: Response) => {
  *     description: >
  *       Administrator-only. Partial update of the profile, role, work centre and active
  *       flag. Validated by the zod schema `userUpdateSchema` (see utils/validation.ts),
- *       which requires at least one field. The username is immutable. Writes an
- *       AuditLogEntry.
+ *       which requires at least one field. The username is immutable. Setting `isActive`
+ *       to false revokes every live session for the account in the same transaction; a
+ *       role change does not revoke sessions. Writes an AuditLogEntry.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -409,21 +411,35 @@ router.put('/:id', authorize('Administrator'), validate(userUpdateSchema), async
 
     const { fullName, email, role, workCenterId, isActive } = req.body;
 
-    const user = await prisma.user.update({
-      where: { userId: id },
-      data: {
-        ...(fullName !== undefined && { fullName }),
-        ...(email !== undefined && { email }),
-        ...(role !== undefined && { role }),
-        ...(workCenterId !== undefined && { workCenterId: workCenterId || null }),
-        ...(isActive !== undefined && { isActive }),
-        modifiedBy: req.user!.userId,
-      },
-      select: {
-        userId: true, username: true, fullName: true, email: true,
-        role: true, workCenterId: true, isActive: true, lastLogin: true,
-        createdBy: true, createdDate: true, modifiedBy: true, modifiedDate: true,
-      },
+    // Deactivation is a lifecycle event, not a profile edit: the account's live
+    // sessions are revoked in the same transaction that clears the flag, so the
+    // token cannot outlive the decision by its remaining lifetime. A role change
+    // deliberately does not revoke anything (O-3): the token's role stays as it
+    // was until the next sign-in, which is the accepted trade-off for not
+    // signing an Administrator out mid-edit.
+    const deactivating = isActive === false && existing.isActive;
+
+    const user = await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { userId: id },
+        data: {
+          ...(fullName !== undefined && { fullName }),
+          ...(email !== undefined && { email }),
+          ...(role !== undefined && { role }),
+          ...(workCenterId !== undefined && { workCenterId: workCenterId || null }),
+          ...(isActive !== undefined && { isActive }),
+          modifiedBy: req.user!.userId,
+        },
+        select: {
+          userId: true, username: true, fullName: true, email: true,
+          role: true, workCenterId: true, isActive: true, lastLogin: true,
+          createdBy: true, createdDate: true, modifiedBy: true, modifiedDate: true,
+        },
+      });
+      if (deactivating) {
+        await revokeUserSessions(id, { db: tx });
+      }
+      return updated;
     });
 
     // A profile edit touches several columns at once. Recording one label with
@@ -459,6 +475,7 @@ router.put('/:id', authorize('Administrator'), validate(userUpdateSchema), async
  *       Administrator-only. Marks the user `isDeleted = true` and `isActive = false` rather
  *       than removing the row, so the account keeps its audit trail but can no longer sign
  *       in or appear in listings. An Administrator cannot deactivate their own account.
+ *       Every live session for the account is revoked in the same transaction.
  *       Writes an AuditLogEntry.
  *     tags: [Users]
  *     security:
@@ -502,9 +519,15 @@ router.delete('/:id', authorize('Administrator'), async (req: Request, res: Resp
       return res.status(404).json({ error: 'User not found' });
     }
 
-    await prisma.user.update({
-      where: { userId: id },
-      data: { isDeleted: true, isActive: false, modifiedBy: req.user!.userId },
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { userId: id },
+        data: { isDeleted: true, isActive: false, modifiedBy: req.user!.userId },
+      });
+      // Soft delete is deactivation plus disappearance from listings; the live
+      // sessions have to end with it, or the account stays usable until its
+      // access token happens to expire.
+      await revokeUserSessions(id, { db: tx });
     });
 
     await logAuditAction({ table: 'User', recordId: id, action: 'Delete', userId: req.user!.userId, ipAddress: req.ip });
@@ -526,7 +549,9 @@ router.delete('/:id', authorize('Administrator'), async (req: Request, res: Resp
  *       A user may change their own password by supplying currentPassword, or an
  *       Administrator may set any user's password without it. newPassword must be at least
  *       12 characters, matching the installer's first-Administrator floor. The new hash is
- *       generated with bcrypt at cost 10. This route is not
+ *       generated with bcrypt at cost 10. A successful change revokes every live session
+ *       for the account except the caller's own session when they are changing their own
+ *       password. This route is not
  *       covered by userUpdateSchema, so its inputs are validated inline. Writes an
  *       AuditLogEntry with fieldName password.
  *     tags: [Users]
@@ -606,12 +631,21 @@ router.put('/:id/password', async (req: Request, res: Response) => {
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
-    await prisma.user.update({
-      where: { userId: id },
-      data: {
-        passwordHash,
-        modifiedBy: req.user!.userId,
-      },
+    // A new password ends every session that used the old one. The exception is
+    // a user changing their own password: the request they are making comes from
+    // a session we keep, so they are not signed out of the device in their hand.
+    // When the caller has no session id (a pre-session or harness token), there
+    // is nothing to preserve and every session ends, which is the safe direction.
+    const keepSessionId = isSelf ? req.user!.sid : undefined;
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { userId: id },
+        data: {
+          passwordHash,
+          modifiedBy: req.user!.userId,
+        },
+      });
+      await revokeUserSessions(id, { db: tx, exceptSessionId: keepSessionId });
     });
 
     // Deliberately action-only. A password change must never put the old or new

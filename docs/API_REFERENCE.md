@@ -426,7 +426,7 @@ Upload takes a `multipart/form-data` body with a single `file` part. Files are c
 
 The user register is export-only and Administrator-only, like the JSON list. The file carries username, full name, e-mail, role, work-centre code, active flag and the two timestamps; it never carries `passwordHash` or any other credential column.
 
-Use `/api/users/options` for dropdown and assignee fields; it is available from the Requester role upwards. Password hashes are never returned. Creation (`POST`, validated by `userCreateSchema`) and deletion (`DELETE`, which sets `isDeleted` and `isActive` to `false` rather than removing the row) are Administrator-only. A user may change their own password by supplying `currentPassword`; an Administrator may set any user's password without it.
+Use `/api/users/options` for dropdown and assignee fields; it is available from the Requester role upwards. Password hashes are never returned. Creation (`POST`, validated by `userCreateSchema`) and deletion (`DELETE`, which sets `isDeleted` and `isActive` to `false` rather than removing the row) are Administrator-only. A user may change their own password by supplying `currentPassword`; an Administrator may set any user's password without it. A successful password change revokes the account's live sessions (a self change keeps the caller's own session), and deactivation through `DELETE` or `isActive: false` on `PUT` revokes them all.
 
 ### Dashboard
 

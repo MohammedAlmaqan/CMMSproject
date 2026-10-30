@@ -2228,7 +2228,7 @@
       },
       "put": {
         "summary": "Update a user",
-        "description": "Administrator-only. Partial update of the profile, role, work centre and active flag. Validated by the zod schema `userUpdateSchema` (see utils/validation.ts), which requires at least one field. The username is immutable. Writes an AuditLogEntry.\n",
+        "description": "Administrator-only. Partial update of the profile, role, work centre and active flag. Validated by the zod schema `userUpdateSchema` (see utils/validation.ts), which requires at least one field. The username is immutable. Setting `isActive` to false revokes every live session for the account in the same transaction; a role change does not revoke sessions. Writes an AuditLogEntry.\n",
         "tags": [
           "Users"
         ],
@@ -2318,7 +2318,7 @@
       },
       "delete": {
         "summary": "Deactivate a user (soft delete)",
-        "description": "Administrator-only. Marks the user `isDeleted = true` and `isActive = false` rather than removing the row, so the account keeps its audit trail but can no longer sign in or appear in listings. An Administrator cannot deactivate their own account. Writes an AuditLogEntry.\n",
+        "description": "Administrator-only. Marks the user `isDeleted = true` and `isActive = false` rather than removing the row, so the account keeps its audit trail but can no longer sign in or appear in listings. An Administrator cannot deactivate their own account. Every live session for the account is revoked in the same transaction. Writes an AuditLogEntry.\n",
         "tags": [
           "Users"
         ],
@@ -2375,7 +2375,7 @@
     "/api/users/{id}/password": {
       "put": {
         "summary": "Change a password",
-        "description": "A user may change their own password by supplying currentPassword, or an Administrator may set any user's password without it. newPassword must be at least 12 characters, matching the installer's first-Administrator floor. The new hash is generated with bcrypt at cost 10. This route is not covered by userUpdateSchema, so its inputs are validated inline. Writes an AuditLogEntry with fieldName password.\n",
+        "description": "A user may change their own password by supplying currentPassword, or an Administrator may set any user's password without it. newPassword must be at least 12 characters, matching the installer's first-Administrator floor. The new hash is generated with bcrypt at cost 10. A successful change revokes every live session for the account except the caller's own session when they are changing their own password. This route is not covered by userUpdateSchema, so its inputs are validated inline. Writes an AuditLogEntry with fieldName password.\n",
         "tags": [
           "Users"
         ],

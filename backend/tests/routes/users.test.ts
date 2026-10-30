@@ -11,6 +11,51 @@ const createdUserIds: string[] = [];
 // this file caused and leave the baseline's alone.
 const seedUserAuditBaseline = await auditIdsMatching({ tableName: 'User', action: 'Blocked' });
 
+interface RawResponse {
+  status: number;
+  headers: Record<string, unknown>;
+  body: { token?: string; error?: string; message?: string; userId?: string };
+}
+
+function refreshCookieFrom(res: RawResponse): string {
+  const setCookie = (res.headers['set-cookie'] as unknown as string[]) || [];
+  const header = setCookie.find((c) => c.startsWith('cmms_refresh='));
+  return header ? header.split(';')[0] : '';
+}
+
+async function loginAs(username: string, password: string) {
+  const res = (await api()
+    .post('/api/auth/login')
+    .send({ username, password })) as unknown as RawResponse;
+  return { res, token: res.body.token ?? '', cookie: refreshCookieFrom(res) };
+}
+
+/** A throwaway account this file owns, signed in through the real login route. */
+async function createSessionUser() {
+  const username = `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const password = 'SessionPass123';
+  const created = await api()
+    .post('/api/users')
+    .set(authHeaders(ctx.adminToken))
+    .send({
+      username,
+      password,
+      fullName: 'Session Test User',
+      email: `${username}@example.com`,
+      role: 'Technician',
+    });
+  expect(created.status).toBe(201);
+  createdUserIds.push(created.body.userId);
+  return { id: created.body.userId as string, username, password };
+}
+
+function meStatus(token: string) {
+  return api()
+    .get('/api/auth/me')
+    .set(authHeaders(token))
+    .then((res) => res.status);
+}
+
 describe('users routes', () => {
   beforeAll(async () => {
     const hash = await bcrypt.hash('TempPass123', 10);
@@ -338,5 +383,93 @@ describe('users routes', () => {
 
     const login = await api().post('/api/auth/login').send({ username, password: 'DeactivatePass123' });
     expect(login.status).toBe(401);
+  });
+
+  // Session revocation on the account lifecycle events. Before this, a password
+  // reset, deactivation or soft delete took effect only at the next sign-in, so
+  // an already-issued access token stayed valid until it expired.
+  it('revokes every live session when an Administrator resets a password', async () => {
+    const { id, username, password } = await createSessionUser();
+    const first = await loginAs(username, password);
+    const second = await loginAs(username, password);
+    expect(first.res.status).toBe(200);
+    expect(second.res.status).toBe(200);
+    expect(await meStatus(first.token)).toBe(200);
+    expect(await meStatus(second.token)).toBe(200);
+
+    const reset = await api()
+      .put(`/api/users/${id}/password`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ newPassword: 'ResetPass456789' });
+    expect(reset.status).toBe(200);
+
+    expect(await meStatus(first.token)).toBe(401);
+    expect(await meStatus(second.token)).toBe(401);
+    expect((await api().post('/api/auth/refresh').set('Cookie', first.cookie)).status).toBe(401);
+
+    const reLogin = await loginAs(username, 'ResetPass456789');
+    expect(reLogin.res.status).toBe(200);
+    expect(await meStatus(reLogin.token)).toBe(200);
+  });
+
+  it('keeps the current session and ends the others on a self password change', async () => {
+    const { id, username, password } = await createSessionUser();
+    const current = await loginAs(username, password);
+    const other = await loginAs(username, password);
+
+    const change = await api()
+      .put(`/api/users/${id}/password`)
+      .set(authHeaders(current.token))
+      .send({ currentPassword: password, newPassword: 'SelfPass456789' });
+    expect(change.status).toBe(200);
+
+    expect(await meStatus(current.token)).toBe(200);
+    expect(await meStatus(other.token)).toBe(401);
+    // The kept session is still rotatable, so the device that made the change
+    // does not have to sign in again.
+    expect((await api().post('/api/auth/refresh').set('Cookie', current.cookie)).status).toBe(200);
+  });
+
+  it('revokes live sessions when a user is soft-deleted', async () => {
+    const { id, username, password } = await createSessionUser();
+    const live = await loginAs(username, password);
+    expect(await meStatus(live.token)).toBe(200);
+
+    const res = await api().delete(`/api/users/${id}`).set(authHeaders(ctx.adminToken));
+    expect(res.status).toBe(200);
+
+    expect(await meStatus(live.token)).toBe(401);
+    expect((await loginAs(username, password)).res.status).toBe(401);
+  });
+
+  it('revokes live sessions when PUT sets isActive to false', async () => {
+    const { id, username, password } = await createSessionUser();
+    const live = await loginAs(username, password);
+    expect(await meStatus(live.token)).toBe(200);
+
+    const res = await api()
+      .put(`/api/users/${id}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ isActive: false });
+    expect(res.status).toBe(200);
+    expect(res.body.isActive).toBe(false);
+
+    expect(await meStatus(live.token)).toBe(401);
+  });
+
+  it('does not revoke sessions on a role change (O-3)', async () => {
+    const { id, username, password } = await createSessionUser();
+    const live = await loginAs(username, password);
+
+    const res = await api()
+      .put(`/api/users/${id}`)
+      .set(authHeaders(ctx.adminToken))
+      .send({ role: 'Requester' });
+    expect(res.status).toBe(200);
+    expect(res.body.role).toBe('Requester');
+
+    // The decision accepts that the token keeps its old role until the next
+    // sign-in; what must not happen is an unexpected sign-out mid-edit.
+    expect(await meStatus(live.token)).toBe(200);
   });
 });

@@ -330,7 +330,7 @@ To re-enable, send `"isActive": true`. Both directions are written to the audit 
 
 Two things to know:
 
-- Disabling takes effect at the user's **next** sign-in attempt. It does not by itself terminate a session already in progress: server-side revocation exists from C1 (logout and rotation-reuse), but disabling a user does not trigger it, so an in-progress session ends on the idle window or at its absolute cap. See [13](#13-deferred-and-not-implemented).
+- Disabling takes effect immediately. Every live session for the account is revoked in the same transaction that clears the active flag, so a token already issued stops working on its next request rather than lingering until the idle window or its absolute cap. See [13](#13-deferred-and-not-implemented).
 - A disabled account returns the same generic `Invalid credentials` as a wrong password. This is deliberate, to avoid confirming which usernames exist. When a user insists their password is right, check the active flag.
 
 SQL fallback for re-enabling, if the API is unreachable (bypasses the audit log):
@@ -363,7 +363,7 @@ PUT /api/users/{userId}/password
 { "newPassword": "<the new password>" }
 ```
 
-Administrator only. **It does not require the target user's current password** - that is the point of an administrative reset, but it means any Administrator can take over any account. The reset is written to the audit log. There is no separate "must change on next sign-in" flag, so treat the reset value as final and have the user set their own afterwards.
+Administrator only. **It does not require the target user's current password** - that is the point of an administrative reset, but it means any Administrator can take over any account. The reset is written to the audit log, and it revokes every live session for the account, so the user must sign in again with the new password. There is no separate "must change on next sign-in" flag, so treat the reset value as final and have the user set their own afterwards.
 
 ### 6.6 Review users and roles in the UI
 
@@ -619,10 +619,10 @@ Stated plainly, including the gaps. This is a defensible baseline for an interna
 | Access-token lifetime | `ACCESS_TOKEN_TTL`, default 15 minutes (`JWT_EXPIRES_IN` is still read as a legacy alias) |
 | Session lifetime | `REFRESH_TOKEN_TTL`, default 8 hours — the absolute cap across rotations |
 | Idle timeout | 30 minutes, enforced **server-side** (`SESSION_IDLE_MS`) as well as warned in the browser with a 60-second toast |
-| Session revocation | Logout revokes the presented refresh token; replaying a rotated token revokes every live session for that user |
+| Session revocation | Logout revokes the presented refresh token; replaying a rotated token revokes every live session for that user. A password reset, deactivation or soft delete revokes every live session for the account; a self password change keeps the caller's own session |
 | Generic failure message | A wrong password, and a disabled or deleted account, both return `Invalid credentials`, so the endpoint does not confirm which usernames exist |
 
-Not implemented, and material to a security review: multi-factor authentication, forced password rotation, and a "must change password" flag. (Server-side session revocation *is* implemented from C1: logout, rotation-reuse and the idle window all revoke the session server-side.) See [13](#13-deferred-and-not-implemented).
+Not implemented, and material to a security review: multi-factor authentication, forced password rotation, and a "must change password" flag. (Server-side session revocation *is* implemented: C1 covers logout, rotation-reuse and the idle window; a password reset, deactivation and soft delete are covered by `backend/src/services/sessionRevocation.ts`.) See [13](#13-deferred-and-not-implemented).
 
 ### 12.3 Proxy trust and recorded IP addresses
 
@@ -662,7 +662,7 @@ Recorded here so that nobody plans an operation around a feature that does not e
 | Manual scheduler trigger screen | **Implemented.** A **Run Scheduler** button on the Preventive Maintenance page (Administrators), backed by `POST /api/maintenance-plans/run-scheduler` |
 | System settings screen | Partly editable. `wo_number_prefix`, `notif_number_prefix` and `audit_retention_years` write via `PUT /api/system-config`; the other displayed values are environment-only |
 | Content-Security-Policy | Disabled. See [12.1](#121-network-exposure) |
-| Server-side session revocation | Implemented from C1 (logout, rotation-reuse, idle window). Disabling a user still takes effect at their next sign-in, not by revoking an in-progress session |
+| Server-side session revocation | **Implemented.** C1 revokes on logout, rotation-reuse and the idle window; a password reset, deactivation (including the soft delete) revokes every live session for the account, and a self password change keeps the caller's own session (`backend/src/services/sessionRevocation.ts`). *Superseded wording, kept: "Disabling a user still takes effect at their next sign-in, not by revoking an in-progress session".* |
 | Multi-factor authentication | Not implemented |
 | Forced password change / expiry | Not implemented. A reset password stays in force |
 | Read logging | Not implemented. The audit log cannot answer who viewed a record |

@@ -398,7 +398,7 @@ The new account is active immediately and can sign in. Optionally assign a work 
 
 ### 9.3 Disable a user
 
-1. Confirm the person should no longer sign in. Disabling takes effect at their next sign-in attempt; they are not signed out of an existing session.
+1. Confirm the person should no longer sign in. Disabling takes effect immediately: they are signed out of every live session and cannot sign in again.
 2. In **Administration → Users & Roles**, select **Deactivate** on that row and confirm.
 3. To re-enable, send `"isActive": true`:
 
@@ -419,7 +419,7 @@ The same call is `PUT /api/users/{userId}` (Administrator). A duplicate active u
 
 ### 9.3b Change a password
 
-**Self-service:** every signed-in user can change their **own** password from the **Change password** dialog in the sidebar. You supply your current password and the new one. This is the normal recovery path when you still know the current password.
+**Self-service:** every signed-in user can change their **own** password from the **Change password** dialog in the sidebar. You supply your current password and the new one. Changing it signs you out everywhere else, but keeps this device signed in.
 
 **Administrator reset of another user:** an Administrator can reset any user's password from the same dialog without supplying the target's current password - see [9.4](#94-reset-a-password).
 
@@ -444,7 +444,7 @@ PUT /api/users/{userId}/password
 { "newPassword": "<the new password>" }
 ```
 
-This requires an Administrator token and **does not require the target user's current password**. The reset is written to the audit log. Communicate the new password to the user through a channel other than email, and require a change on first use where your policy demands it. Note that the system has no separate "must change password" flag, so treat the reset as final.
+This requires an Administrator token and **does not require the target user's current password**. The reset is written to the audit log and signs the user out of every live session. Communicate the new password to the user through a channel other than email, and require a change on first use where your policy demands it. Note that the system has no separate "must change password" flag, so treat the reset as final.
 
 ### 9.5 Review the audit log
 
