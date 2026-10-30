@@ -59,7 +59,7 @@ visible in the process list. Supply it either as a `SecureString`
 | `-PgHost` / `-PgPort` / `-PgUser` | `localhost` / `5432` / `postgres` | PostgreSQL target |
 | `-PgPassword` | - | Password as a `SecureString` |
 | `-PgPasswordEnv` | - | Name of an environment variable holding the password |
-| `-DbName` | `cmms` | Database to create/use |
+| `-DbName` | `cmms` | Database to use. Classified by state before anything is copied: absent is created, empty is migrated, an existing CommandPulse database needs `-AllowExistingDatabase`, a foreign one is always refused |
 | `-ApiPort` | `4000` | Port the API listens on |
 | `-BindHost` | `127.0.0.1` | Address the API binds to |
 | `-SiteName` | `cmms.local` | Host name used for CORS and the optional IIS site |
@@ -67,12 +67,32 @@ visible in the process list. Supply it either as a `SecureString`
 | `-AppNamePrefix` | (none) | Prefix for the PM2 application names |
 | `-PrismaEnginesPath` | (none) | Folder holding prebuilt Prisma engine binaries |
 | `-AdminFile` | (none) | JSON file with the first Administrator: `{"username","fullName","email","password"}`. The wizard always supplies it; a headless install may omit it and the database is then left with no user. |
-| `-Mode` | `full` | `full`, `verify` or `uninstall` |
+| `-Mode` | `full` | `full`, `verify`, `uninstall` or `probe` |
+| `-ProbeOut` | (none) | With `-Mode probe`, write the classification as one JSON object to this path |
+| `-AllowExistingDatabase` | off | Permit the install to apply migrations to an existing CommandPulse database |
+
+## Database target policy
+The engine decides what to do from the state of the database on the server, not from
+its name. The check runs before any file is copied, so a refusal leaves the host and
+the database untouched.
+
+| State | How it is recognised | Without `-AllowExistingDatabase` | With it |
+|---|---|---|---|
+| `Absent` | no row in `pg_database` | create it, then migrate | create it, then migrate |
+| `Empty` | exists, 0 tables in `public` | migrate | migrate |
+| `CommandPulse` | `public._prisma_migrations` exists | **refuse, exit 4** | migrate (upgrade) |
+| `Foreign` | exists, tables, no migration history | **refuse, exit 4** | **refuse, exit 4** |
+
+`cmms` is not special-cased any more: it is refused when it exists as a CommandPulse
+database, which is exactly the state that matters, and it is created on a host that
+has never run CommandPulse. `-Mode probe` returns the same four-way classification
+without writing anything, which is how the wizard asks before it upgrades.
 
 ## Modes
-- `full` - preflight, verify bundle, copy files, generate .env (ACL-locked), npm ci, prisma generate, prisma migrate deploy, pm2 start+save, verify health. It refuses an API port that is already listening, so the health check cannot be answered by another service.
+- `full` - preflight, verify bundle, classify/create the database, copy files, generate .env (ACL-locked), npm ci, prisma generate, prisma migrate deploy, pm2 start+save, verify health. It refuses an API port that is already listening, so the health check cannot be answered by another service.
 - `verify` - run health checks against an existing install (no file copy, no migrations).
 - `uninstall` - remove engine-created artifacts only (does not drop the database).
+- `probe` - classify the target database and write `-ProbeOut` JSON; copies nothing and writes nothing.
 
 ## Prerequisites (detected, not auto-installed)
 - Node.js >= 24
@@ -143,7 +163,7 @@ names. Uninstall deletes only the names that install owns; it never runs
 ## Security
 - `.env` is generated with a fresh CSPRNG JWT_SECRET and ACL-locked to SYSTEM, BUILTIN\Administrators, and the dynamically resolved current user. No hardcoded usernames.
 - The resolved PostgreSQL password is redacted from the install log and from every captured command-output file. `pm2 jlist` is not used: PM2 returns the full environment block of every application, which is how an earlier revision wrote `PGPASSWORD` to disk.
-- The live database `cmms` is never targeted by tests; the harness creates and drops a throwaway database. The engine itself writes only to `-DbName`, which defaults to `cmms` - on the live host that is the production database, so a test or side-by-side install must pass a new name, and the engine warns when `cmms` is selected.
+- The live database `cmms` is never targeted by tests; the harness creates and drops a throwaway database. The engine classifies `-DbName` before it copies anything, so an existing CommandPulse database (including `cmms` on this host) is refused with exit 4 unless `-AllowExistingDatabase` is passed, and a database with tables but no CommandPulse migration history is refused with or without it.
 - No dumps, client data, or production secrets are copied. The `database\` folder is excluded and the Prisma migrations under `backend\prisma\migrations\` are kept, because they are the schema history the install applies.
 - The first-Administrator password is registered with the same redaction list as the PostgreSQL password, and it is passed to the helper on stdin only. The Administrator JSON temp file is ACL-restricted to the installing account, deleted by the engine and again by the wizard.
 
@@ -162,10 +182,14 @@ safe, so rotate the database credential after running it.
 
 ## Tests
 `tests\run-tests.ps1` runs the engine against a throwaway database and a
-scratch install root, then asserts the contract. It gives the install a unique
-PM2 application name prefix and deletes only those names afterwards; it never
-runs `pm2 kill`, and it asserts that the live `cmms-api` / `cmms-worker` are
-untouched and still serving.
+scratch install root, then asserts the contract. It does not pre-create the
+database: the first install proves the engine creates an absent target. It then
+checks the other three states - probe reports `CommandPulse`, `Empty` and
+`Foreign`; an existing CommandPulse database is refused with exit 4 without the
+switch and upgraded with it; a foreign database is refused even with the switch
+and its table survives. It gives the install a unique PM2 application name
+prefix and deletes only those names afterwards; it never runs `pm2 kill`, and it
+asserts that the live `cmms-api` / `cmms-worker` are untouched and still serving.
 
 The verdict is written to `%ProgramData%\CommandPulse\logs\installer-test-<timestamp>.log`
 next to the engine log. That file starts with the throwaway database name and the

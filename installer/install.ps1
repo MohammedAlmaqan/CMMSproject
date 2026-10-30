@@ -20,8 +20,13 @@
     * The engine writes only to the database named by -DbName. That parameter
       defaults to `cmms`, which is the live production database name on the
       existing host, so every side-by-side or test install must pass a new
-      name; the harness uses cmms_installer_test_<random>. On a host that
-      already runs CommandPulse the engine warns when -DbName is `cmms`.
+      name; the harness uses cmms_installer_test_<random>.
+    * The target is classified by STATE, not by name. A database that does not
+      exist is created; an empty one is migrated; a CommandPulse database is
+      migrated only with -AllowExistingDatabase; a database with tables but no
+      CommandPulse migration history is never touched. The decision is a fact
+      read from the server, so an upgrade and an accidental overwrite are
+      distinguishable.
 
 .PARAMETER SourceBundle
   Path to the extracted release bundle. Must contain backend/, frontend/, ops/,
@@ -50,7 +55,20 @@
 .PARAMETER DbName
   Database the application connects to. Default cmms. On a host that already
   runs CommandPulse, `cmms` is the live database: pass a new name for a test or
-  side-by-side install. The engine warns when this value is `cmms`.
+  side-by-side install. The engine classifies the target (absent, empty,
+  CommandPulse, foreign) before it copies any file and acts on that state.
+
+.PARAMETER AllowExistingDatabase
+  Permit the install to apply migrations to an existing CommandPulse database.
+  Without it the engine refuses such a target and exits 4, so a fresh install
+  cannot silently upgrade (or damage) a database that is already in use. It has
+  no effect on an absent, empty or foreign database: absent is created, empty is
+  migrated, foreign is always refused.
+
+.PARAMETER ProbeOut
+  With -Mode probe, write the database classification as one JSON object to this
+  path. The wizard uses it to ask the operator whether to upgrade. Probe performs
+  no copy, no migration and no write to the target.
 
 .PARAMETER ApiPort
   TCP port the API listens on. Default 4000. The value is written to .env AND
@@ -92,6 +110,7 @@
   full   - install from the bundle (default)
   verify - health-check an existing install only
   uninstall - remove engine-created artifacts only; never drops the database
+  probe  - report the database state as JSON; writes nothing
 
 .PARAMETER NonInteractive
   Never prompt. Fails instead of asking.
@@ -113,7 +132,9 @@ param(
   [string]$AppNamePrefix = "",
   [string]$PrismaEnginesPath = "",
   [string]$AdminFile = "",
-  [ValidateSet("full","verify","uninstall")][string]$Mode = "full",
+  [ValidateSet("full","verify","uninstall","probe")][string]$Mode = "full",
+  [string]$ProbeOut = "",
+  [switch]$AllowExistingDatabase,
   [int]$AccessTokenTTL = 900,
   [int]$RefreshTokenTTL = 28800,
   [int]$SessionIdleMs = 1800000,
@@ -310,6 +331,117 @@ function Resolve-PgPassword {
   $secure = Read-Host -AsSecureString "PostgreSQL password for role '$PgUser'"
   $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
   try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }
+}
+
+# ------------------------------------------------------- database target ----
+
+# The engine used to act on the database name alone: it warned when -DbName was
+# `cmms` and then ran `prisma migrate deploy` against whatever answered. That
+# made an upgrade and an accidental overwrite of a live database the same
+# operation. The target is now classified from the server before any file is
+# copied, and the action follows the state:
+
+#   Absent       no row in pg_database            -> create, then migrate
+#   Empty        exists, no tables in public      -> migrate
+#   CommandPulse exists, public._prisma_migrations -> migrate only with -AllowExistingDatabase
+#   Foreign      exists, tables, no migration log -> always refuse
+
+# psql runs with -w so it can never prompt: a missing credential fails instead of
+# hanging. The password is in PGPASSWORD for the duration of the call and is
+# registered for log redaction before it gets there. SQL is piped on stdin
+# because Windows PowerShell 5.1 strips embedded double quotes from native
+# command arguments, and the identifier `_prisma_migrations` needs them.
+function Invoke-PsqlScalar {
+  param([string]$Psql, [string]$Database, [string]$Sql)
+  if (-not $Psql) { throw "psql not found; cannot query database '$Database'." }
+  $previous = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $out = @($Sql | & $Psql -w -tA -v ON_ERROR_STOP=1 -U $PgUser -h $PgHost -p $PgPort -d $Database 2>&1)
+    $code = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previous
+  }
+  $text = (@($out) -join "`n").Trim()
+  return [pscustomobject]@{ ExitCode = $code; Value = $text }
+}
+
+function Get-DatabaseState {
+  param([string]$Psql, [string]$Database)
+  # The same value is interpolated into CREATE DATABASE and into the connection
+  # URL, where psql offers no parameter binding, so it is validated first.
+  if ($Database -notmatch '^[A-Za-z_][A-Za-z0-9_]{0,62}$') {
+    throw "Database name '$Database' is not a valid PostgreSQL identifier (letters, digits and underscore, starting with a letter or underscore, at most 63 characters)."
+  }
+  $exists = Invoke-PsqlScalar -Psql $Psql -Database "postgres" -Sql "SELECT 1 FROM pg_database WHERE datname = '$Database';"
+  if ($exists.ExitCode -ne 0) { throw "Could not query PostgreSQL for database '$Database': $($exists.Value)" }
+  if ($exists.Value -ne "1") {
+    return [pscustomobject]@{ Name = $Database; Exists = $false; Kind = "Absent"; TableCount = 0; LastMigration = "" }
+  }
+
+  $tables = Invoke-PsqlScalar -Psql $Psql -Database $Database -Sql "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';"
+  if ($tables.ExitCode -ne 0) { throw "Could not read the table list of database '$Database': $($tables.Value)" }
+  $tableCount = 0
+  [void][int]::TryParse($tables.Value, [ref]$tableCount)
+
+  $migrated = Invoke-PsqlScalar -Psql $Psql -Database $Database -Sql "SELECT to_regclass('public._prisma_migrations') IS NOT NULL;"
+  if ($migrated.ExitCode -ne 0) { throw "Could not read the migration history of database '$Database': $($migrated.Value)" }
+
+  $kind = if ($migrated.Value -eq "t") { "CommandPulse" } elseif ($tableCount -eq 0) { "Empty" } else { "Foreign" }
+  $last = ""
+  if ($kind -eq "CommandPulse") {
+    $lastOut = Invoke-PsqlScalar -Psql $Psql -Database $Database -Sql 'SELECT COALESCE((SELECT migration_name FROM public."_prisma_migrations" ORDER BY finished_at DESC NULLS LAST LIMIT 1), '''');'
+    if ($lastOut.ExitCode -eq 0) { $last = $lastOut.Value }
+  }
+  return [pscustomobject]@{ Name = $Database; Exists = $true; Kind = $kind; TableCount = $tableCount; LastMigration = $last }
+}
+
+function New-Database {
+  param([string]$Psql, [string]$Database)
+  Log "INFO" "Database '$Database' does not exist; creating it"
+  $created = Invoke-PsqlScalar -Psql $Psql -Database "postgres" -Sql "CREATE DATABASE ""$Database"";"
+  if ($created.ExitCode -ne 0) {
+    throw "Could not create database '$Database': $($created.Value). Grant CREATEDB to role '$PgUser' or pre-create the database."
+  }
+  Log "OK" "CREATED database $Database"
+}
+
+# Called before Copy-Bundle. A refusal therefore leaves the machine untouched:
+# no files copied, no .env written, no migration attempted.
+function Assert-DatabaseTarget {
+  param([string]$Psql, [string]$Database, [switch]$AllowExisting)
+  $state = Get-DatabaseState -Psql $Psql -Database $Database
+  switch ($state.Kind) {
+    "Absent" {
+      New-Database -Psql $Psql -Database $Database
+      $state = Get-DatabaseState -Psql $Psql -Database $Database
+      Log "OK" "REUSE $($state.Kind) database $Database"
+    }
+    "Empty" {
+      Log "INFO" "Database '$Database' exists and has no tables; migrations will be applied"
+      Log "OK" "REUSE EMPTY database $Database"
+    }
+    "CommandPulse" {
+      if (-not $AllowExisting) {
+        Log "ERR" "Database '$Database' already exists and is a CommandPulse CMMS database (last applied migration: $($state.LastMigration))."
+        Log "ERR" "Refusing to apply migrations to it without confirmation. Re-run with -AllowExistingDatabase to upgrade it, or pass a new -DbName."
+        Log "ERR" "Nothing was copied and no migration was attempted."
+        exit 4
+      }
+      Log "WARN" "Database '$Database' already exists (CommandPulse, last applied migration: $($state.LastMigration)); upgrading because -AllowExistingDatabase was passed"
+      Log "OK" "UPGRADE database $Database"
+    }
+    "Foreign" {
+      Log "ERR" "Database '$Database' already exists with $($state.TableCount) table(s) in schema public and no CommandPulse migration history."
+      Log "ERR" "Refusing to modify a database this installer does not own, with or without -AllowExistingDatabase. Pass a new -DbName."
+      Log "ERR" "Nothing was copied and no migration was attempted."
+      exit 4
+    }
+    default {
+      throw "Unexpected database state '$($state.Kind)' for '$Database'."
+    }
+  }
+  return $state
 }
 
 # ------------------------------------------------------------- preflight ----
@@ -852,11 +984,36 @@ try {
   Log "INFO" "Install root : $InstallRoot"
   Log "INFO" "Bundle       : $SourceBundle"
   Log "INFO" "Database     : $DbName on $PgHost`:$PgPort as $PgUser"
-  if ($DbName -eq "cmms") {
-    Log "WARN" "-DbName is 'cmms'. On a host that already runs CommandPulse this is the LIVE database; pass a new name for a test or side-by-side install."
-  }
   Log "INFO" "API endpoint : http://$BindHost`:$ApiPort"
   Log "INFO" "Identity     : $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"
+
+  # `probe` answers one question - what is this database? - and writes nothing.
+  # It does not need Node, PM2, IIS or a bundle, so it is handled before the
+  # full-mode preflight. The wizard calls it before it copies anything.
+  if ($Mode -eq "probe") {
+    $psql = Get-PsqlPath
+    if (-not $psql) { throw "psql not found. Install PostgreSQL 15+ and add its bin folder to PATH." }
+    $plainPassword = Resolve-PgPassword
+    Add-Secret $plainPassword
+    $previousPgPassword = $env:PGPASSWORD
+    $env:PGPASSWORD = $plainPassword
+    try { $state = Get-DatabaseState -Psql $psql -Database $DbName }
+    finally { $env:PGPASSWORD = $previousPgPassword }
+    $json = [pscustomobject]@{
+      database      = $state.Name
+      exists        = $state.Exists
+      kind          = $state.Kind
+      tableCount    = $state.TableCount
+      lastMigration = $state.LastMigration
+    } | ConvertTo-Json -Compress
+    Log "OK" "PROBE $json"
+    if ($ProbeOut) {
+      [System.IO.File]::WriteAllText($ProbeOut, $json)
+      Log "INFO" "Probe written to $ProbeOut"
+    }
+    Log "INFO" "Engine finished (probe)"
+    exit 0
+  }
 
   if ($Mode -eq "verify") {
     if (Test-Health -Port $ApiPort) { Log "INFO" "Engine finished (verify)"; exit 0 }
@@ -874,6 +1031,22 @@ try {
   }
   Log "OK" "API port $ApiPort is free"
   Test-BundleIntegrity -Bundle $SourceBundle
+
+  # The database decision comes before any file is copied. A refusal (exit 4)
+  # therefore leaves the install root, the target database and the host
+  # untouched. The credential is resolved here rather than after Copy-Bundle
+  # because the check needs it; Add-Secret registers it for log redaction first.
+  $plainPassword = Resolve-PgPassword
+  Add-Secret $plainPassword
+  $psql = Get-PsqlPath
+  $previousPgPassword = $env:PGPASSWORD
+  $env:PGPASSWORD = $plainPassword
+  try {
+    Assert-DatabaseTarget -Psql $psql -Database $DbName -AllowExisting:$AllowExistingDatabase | Out-Null
+  } finally {
+    $env:PGPASSWORD = $previousPgPassword
+  }
+
   Copy-Bundle -Bundle $SourceBundle -Root $InstallRoot
 
   $backendDir = Join-Path $InstallRoot "backend"
@@ -882,8 +1055,6 @@ try {
   New-Item -ItemType Directory -Force -Path (Join-Path $backendDir "logs") | Out-Null
   New-Item -ItemType Directory -Force -Path (Join-Path $backendDir "uploads") | Out-Null
 
-  $plainPassword = Resolve-PgPassword
-  Add-Secret $plainPassword
   New-BackendEnv -BackendDir $backendDir -PlainPassword $plainPassword | Out-Null
   $plainPassword = $null
 

@@ -49,6 +49,29 @@ function Get-PsqlPath {
   return $null
 }
 
+function Test-PortFree {
+  param([int]$Port)
+  $client = New-Object System.Net.Sockets.TcpClient
+  try {
+    $iar = $client.BeginConnect("127.0.0.1", $Port, $null, $null)
+    if (-not $iar.AsyncWaitHandle.WaitOne(1000)) { return $true }
+    $client.EndConnect($iar)
+    return $false
+  } catch {
+    return $true
+  } finally {
+    try { $client.Close() } catch { }
+  }
+}
+
+function Get-FreePort {
+  param([int]$Start)
+  for ($p = $Start; $p -lt ($Start + 100); $p++) {
+    if (Test-PortFree $p) { return $p }
+  }
+  throw "No free TCP port found from $Start"
+}
+
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $engine = Join-Path $repoRoot "installer\install.ps1"
 if (-not $SourceBundle) {
@@ -73,6 +96,13 @@ $scratch = Join-Path $env:TEMP ("cmms-installer-test-" + (Get-Date -Format "yyyy
 $installRoot = Join-Path $scratch "install"
 $pm2Home = Join-Path $scratch "pm2-home"
 $dbName = "cmms_installer_test_" + (Get-Random)
+# Database-policy cases (I-27). They are declared here, before the try block, so
+# the finally clause can always drop them even if an assertion throws.
+$foreignDb = "cmms_installer_foreign_" + (Get-Random)
+$emptyDb = "cmms_installer_empty_" + (Get-Random)
+$policyRoot = Join-Path $scratch "policy-install"
+$policyPrefix = "cmmspol" + (Get-Random -Minimum 100000 -Maximum 999999) + "-"
+$policyAppNames = @("$($policyPrefix)api", "$($policyPrefix)worker")
 
 # The first-Administrator contract. A random password keeps the "not in the log"
 # assertion meaningful; the fixed username and email make the database row and
@@ -130,8 +160,9 @@ $env:PM2_HOME = $pm2Home
 New-Item -ItemType Directory -Force -Path $pm2Home | Out-Null
 
 $env:PGPASSWORD = $PgPassword
-& $psql -U $PgUser -h $PgHost -p $PgPort -c "CREATE DATABASE $dbName;" | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Failed to create throwaway database $dbName" }
+# The throwaway database is deliberately NOT created here. The engine creates an
+# absent database itself (I-27), and the install below is the proof: if the
+# engine cannot create it, the first assertion fails.
 
 try {
   Write-Host "`n-- running engine (full) --" -ForegroundColor Cyan
@@ -304,6 +335,71 @@ try {
   # 11. Live database untouched
   $liveCount = (& $psql -U $PgUser -h $PgHost -p $PgPort -d cmms -At -c "select count(*) from pg_tables where schemaname='public';" 2>$null | Select-Object -First 1)
   Assert-True "live cmms schema count unchanged (39)" ([int]$liveCount -eq 39) "(got $liveCount)"
+
+  # 12. Database-state policy (I-27). The engine classifies the target before it
+  # copies any file, so a refusal is cheap: nothing is copied, nothing is
+  # migrated, and the exit code is 4. Every database used here is throwaway.
+  $policyPort = Get-FreePort 4151
+  $upgradePort = Get-FreePort ($policyPort + 1)
+  $probeEnv = "CMMS_INSTALLER_TEST_PGPASSWORD"
+
+  # 12a. The install above started with no database at all and exited 0, which is
+  # the proof that an absent target is created. Confirm the row exists.
+  $dbExists = (& $psql -U $PgUser -h $PgHost -p $PgPort -d postgres -At -c "SELECT count(*) FROM pg_database WHERE datname = '$dbName';" 2>$null | Select-Object -First 1)
+  Assert-True "engine created the absent throwaway database" ([int]$dbExists -eq 1) "(count=$dbExists)"
+
+  # 12b. Probe classifies a migrated database.
+  $probeOut = Join-Path $scratch "probe-cp.json"
+  & $engine -Mode probe -DbName $dbName -ProbeOut $probeOut -PgPasswordEnv $probeEnv
+  Assert-True "probe exits 0" ($LASTEXITCODE -eq 0) "(exit $LASTEXITCODE)"
+  $probeCp = if (Test-Path $probeOut) { Get-Content $probeOut -Raw | ConvertFrom-Json } else { $null }
+  Assert-True "probe reports a CommandPulse database" ($probeCp -and $probeCp.kind -eq "CommandPulse") "(kind=$(if ($probeCp) { $probeCp.kind } else { 'none' }))"
+
+  # 12c. An existing CommandPulse database is refused without the switch, and the
+  # refusal leaves the migration history and the install root untouched.
+  $migBefore = Invoke-ThrowawaySql 'select count(*) from "_prisma_migrations";'
+  & $engine -SourceBundle $SourceBundle -InstallRoot $policyRoot `
+    -PgHost $PgHost -PgPort $PgPort -PgUser $PgUser -PgPasswordEnv $probeEnv `
+    -DbName $dbName -ApiPort $policyPort -SiteName "cmms.policy.local" `
+    -AppNamePrefix $policyPrefix -PrismaEnginesPath $PrismaEnginesPath -Mode full
+  Assert-True "existing CommandPulse database refused without -AllowExistingDatabase" ($LASTEXITCODE -eq 4) "(exit $LASTEXITCODE)"
+  Assert-True "refusal copied no files" (-not (Test-Path -LiteralPath $policyRoot))
+  $migAfterRefusal = Invoke-ThrowawaySql 'select count(*) from "_prisma_migrations";'
+  Assert-True "refusal left the migration history unchanged" ("$migBefore" -eq "$migAfterRefusal") "(before=$migBefore after=$migAfterRefusal)"
+
+  # 12d. A foreign database is refused even with the switch, and its table survives.
+  & $psql -U $PgUser -h $PgHost -p $PgPort -d postgres -c "CREATE DATABASE $foreignDb;" | Out-Null
+  & $psql -U $PgUser -h $PgHost -p $PgPort -d $foreignDb -c "CREATE TABLE keepme (id int);" | Out-Null
+  $probeForeignOut = Join-Path $scratch "probe-foreign.json"
+  & $engine -Mode probe -DbName $foreignDb -ProbeOut $probeForeignOut -PgPasswordEnv $probeEnv
+  $probeForeign = if (Test-Path $probeForeignOut) { Get-Content $probeForeignOut -Raw | ConvertFrom-Json } else { $null }
+  Assert-True "probe reports a foreign database" ($probeForeign -and $probeForeign.kind -eq "Foreign") "(kind=$(if ($probeForeign) { $probeForeign.kind } else { 'none' }))"
+  & $engine -SourceBundle $SourceBundle -InstallRoot $policyRoot `
+    -PgHost $PgHost -PgPort $PgPort -PgUser $PgUser -PgPasswordEnv $probeEnv `
+    -DbName $foreignDb -ApiPort $policyPort -SiteName "cmms.policy.local" `
+    -AppNamePrefix $policyPrefix -PrismaEnginesPath $PrismaEnginesPath -Mode full -AllowExistingDatabase
+  Assert-True "foreign database refused even with -AllowExistingDatabase" ($LASTEXITCODE -eq 4) "(exit $LASTEXITCODE)"
+  $keep = (& $psql -U $PgUser -h $PgHost -p $PgPort -d $foreignDb -At -c "SELECT to_regclass('public.keepme') IS NOT NULL;" 2>$null | Select-Object -First 1)
+  Assert-True "foreign table untouched after refusal" ("$keep" -eq "t") "(got $keep)"
+
+  # 12e. An empty database is classified as Empty (migrated in place, no refusal).
+  & $psql -U $PgUser -h $PgHost -p $PgPort -d postgres -c "CREATE DATABASE $emptyDb;" | Out-Null
+  $probeEmptyOut = Join-Path $scratch "probe-empty.json"
+  & $engine -Mode probe -DbName $emptyDb -ProbeOut $probeEmptyOut -PgPasswordEnv $probeEnv
+  $probeEmpty = if (Test-Path $probeEmptyOut) { Get-Content $probeEmptyOut -Raw | ConvertFrom-Json } else { $null }
+  Assert-True "probe reports an empty database" ($probeEmpty -and $probeEmpty.kind -eq "Empty") "(kind=$(if ($probeEmpty) { $probeEmpty.kind } else { 'none' }))"
+
+  # 12f. With the switch, an existing CommandPulse database is upgraded and the
+  # migration history is idempotent. This is a second full install against a
+  # separate root, prefix and port, so the first install is not disturbed.
+  & $engine -SourceBundle $SourceBundle -InstallRoot $policyRoot `
+    -PgHost $PgHost -PgPort $PgPort -PgUser $PgUser -PgPasswordEnv $probeEnv `
+    -DbName $dbName -ApiPort $upgradePort -SiteName "cmms.policy.local" `
+    -AppNamePrefix $policyPrefix -PrismaEnginesPath $PrismaEnginesPath -Mode full -AllowExistingDatabase
+  Assert-True "existing CommandPulse database upgraded with -AllowExistingDatabase" ($LASTEXITCODE -eq 0) "(exit $LASTEXITCODE)"
+  $migAfterUpgrade = Invoke-ThrowawaySql 'select count(*) from "_prisma_migrations";'
+  Assert-True "upgrade left the migration history unchanged" ("$migBefore" -eq "$migAfterUpgrade") "(before=$migBefore after=$migAfterUpgrade)"
+  Assert-True "policy install created its own site folder" (Test-Path (Join-Path $policyRoot "site\index.html"))
 }
 catch {
   Write-Summary "ERROR: $($_.Exception.Message)"
@@ -323,10 +419,20 @@ finally {
     try { & pm2 save 2>&1 | Out-Null } catch {}
     Pop-Location
   }
+  # The policy install used a second set of names, so it is removed the same way.
+  $policyBackend = Join-Path $policyRoot "backend"
+  if (Test-Path -LiteralPath $policyBackend) {
+    Push-Location $policyBackend
+    try { & pm2 delete @policyAppNames 2>&1 | Out-Null } catch {}
+    try { & pm2 save 2>&1 | Out-Null } catch {}
+    Pop-Location
+  }
   $env:PM2_HOME = $null
   $env:CMMS_INSTALLER_TEST_PGPASSWORD = $null
   $env:PGPASSWORD = $PgPassword
-  & $psql -U $PgUser -h $PgHost -p $PgPort -c "DROP DATABASE IF EXISTS $dbName;" 2>&1 | Out-Null
+  foreach ($throwaway in @($dbName, $foreignDb, $emptyDb)) {
+    & $psql -U $PgUser -h $PgHost -p $PgPort -c "DROP DATABASE IF EXISTS $throwaway;" 2>&1 | Out-Null
+  }
   if (-not $KeepArtifacts) { Remove-Item $scratch -Recurse -Force -ErrorAction SilentlyContinue }
   else { Write-Host "artifacts kept: $scratch" }
 }
