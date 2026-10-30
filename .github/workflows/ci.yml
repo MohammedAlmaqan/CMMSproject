@@ -54,7 +54,7 @@ jobs:
       - name: Typecheck
         working-directory: backend
         run: npx tsc --noEmit
-      - name: Lint baseline
+      - name: Lint
         working-directory: backend
         shell: bash
         run: |
@@ -64,7 +64,7 @@ jobs:
           cat /tmp/cmms-eslint.json
           errors=$(node -e "const fs=require('fs');const report=JSON.parse(fs.readFileSync('/tmp/cmms-eslint.json','utf8'));process.stdout.write(String(report.reduce((sum,file)=>sum+file.errorCount,0)))")
           echo "ESLINT_ERRORS=$errors"
-          if [ "$errors" -gt 50 ]; then
+          if [ "$errors" -gt 0 ]; then
             exit 1
           fi
       - name: Apply migrations
@@ -98,6 +98,9 @@ jobs:
       - name: Typecheck
         working-directory: app
         run: npx tsc -b
+      - name: Lint
+        working-directory: app
+        run: npx eslint .
       - name: Build
         working-directory: app
         run: npm run build
