@@ -5,6 +5,11 @@
 .DESCRIPTION
   Called by Inno Setup wizard to invoke the tested install.ps1 engine
   with parameters collected from the UI. Reads password from temp file.
+
+  With -ProbeOnly it runs the engine's read-only `-Mode probe` instead, so the
+  wizard can ask about an existing database before it copies anything. The
+  engine is always called with -NonInteractive: the wizard has no console to
+  answer a prompt in, so a missing value must fail instead of hanging.
 #>
 [CmdletBinding()]
 param(
@@ -21,7 +26,10 @@ param(
   [string]$CorsOrigins = "",
   [string]$AppNamePrefix = "",
   [string]$PrismaEnginesPath = "",
-  [string]$AdminFile = ""
+  [string]$AdminFile = "",
+  [switch]$ProbeOnly,
+  [string]$ProbeOut = "",
+  [string]$EnginePath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,29 +42,46 @@ if ($PgPassFile -and (Test-Path $PgPassFile)) {
 
 $env:CMMS_PGPASSWORD = $pgPass
 
-$engine = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) "install.ps1"
+$engine = $EnginePath
+if (-not $engine) {
+  $engine = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) "install.ps1"
+}
 if (-not (Test-Path $engine)) {
   $engine = "C:\Program Files\CommandPulse\CMMS\installer\install.ps1"
 }
 
-$args = @(
-  "-SourceBundle", $BundlePath,
-  "-InstallRoot", $InstallRoot,
-  "-PgHost", $PgHost,
-  "-PgPort", $PgPort,
-  "-PgUser", $PgUser,
-  "-PgPasswordEnv", "CMMS_PGPASSWORD",
-  "-DbName", $DbName,
-  "-ApiPort", $ApiPort,
-  "-BindHost", $BindHost,
-  "-SiteName", $SiteName,
-  "-Mode", "full"
-)
+if ($ProbeOnly) {
+  $args = @(
+    "-Mode", "probe",
+    "-DbName", $DbName,
+    "-PgHost", $PgHost,
+    "-PgPort", $PgPort,
+    "-PgUser", $PgUser,
+    "-PgPasswordEnv", "CMMS_PGPASSWORD",
+    "-NonInteractive"
+  )
+  if ($ProbeOut) { $args += @("-ProbeOut", $ProbeOut) }
+} else {
+  $args = @(
+    "-SourceBundle", $BundlePath,
+    "-InstallRoot", $InstallRoot,
+    "-PgHost", $PgHost,
+    "-PgPort", $PgPort,
+    "-PgUser", $PgUser,
+    "-PgPasswordEnv", "CMMS_PGPASSWORD",
+    "-DbName", $DbName,
+    "-ApiPort", $ApiPort,
+    "-BindHost", $BindHost,
+    "-SiteName", $SiteName,
+    "-Mode", "full",
+    "-NonInteractive"
+  )
 
-if ($CorsOrigins) { $args += @("-CorsOrigins", $CorsOrigins) }
-if ($AppNamePrefix) { $args += @("-AppNamePrefix", $AppNamePrefix) }
-if ($PrismaEnginesPath) { $args += @("-PrismaEnginesPath", $PrismaEnginesPath) }
-if ($AdminFile) { $args += @("-AdminFile", $AdminFile) }
+  if ($CorsOrigins) { $args += @("-CorsOrigins", $CorsOrigins) }
+  if ($AppNamePrefix) { $args += @("-AppNamePrefix", $AppNamePrefix) }
+  if ($PrismaEnginesPath) { $args += @("-PrismaEnginesPath", $PrismaEnginesPath) }
+  if ($AdminFile) { $args += @("-AdminFile", $AdminFile) }
+}
 
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $engine @args
 $exitCode = $LASTEXITCODE

@@ -12,10 +12,14 @@ This directory contains the installer for a blank CMMS instance, in three layers
 The wizard is optional: the engine is parameterised end to end, so the same script
 runs from the wizard, from an IT runbook, or from a CI job.
 
-The wizard refuses the database name `cmms` and a database page whose name is empty,
-validates the API port range, and stops with a non-zero engine exit code instead of
-reporting a successful install. The engine itself also refuses an API port that is
-already listening, so the health check cannot be answered by another service.
+The wizard probes the database when the database page is answered: a name that
+does not exist is created, an existing CommandPulse database needs an explicit
+Yes before it is upgraded, and a database this installer does not own is refused.
+It also refuses a database page whose name is empty, validates the API port
+range, and stops with a non-zero engine exit code instead of reporting a
+successful install. The engine itself repeats the classification and refuses an
+API port that is already listening, so the health check cannot be answered by
+another service.
 
 ## Build the wizard
 

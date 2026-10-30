@@ -39,6 +39,10 @@ Source: "..\templates\*"; DestDir: "{app}\installer\templates"; Flags: ignorever
 Source: "..\admin\create-admin.cjs"; DestDir: "{app}\installer\admin"; Flags: ignoreversion
 ; Wizard orchestration script
 Source: "scripts\Invoke-InstallerWizard.ps1"; DestDir: "{app}\installer\wizard\scripts"; Flags: ignoreversion
+; Copies for the pre-install database probe. The database page is answered
+; before [Files] is extracted, so the probe cannot use {app}\installer yet.
+Source: "..\install.ps1"; DestDir: "{tmp}"; Flags: dontcopy
+Source: "scripts\Invoke-InstallerWizard.ps1"; DestDir: "{tmp}"; Flags: dontcopy
 ; Bundle placeholder (IT will provide or use existing)
 Source: ".gitkeep"; DestDir: "{app}\bundle"; Flags: ignoreversion
 Source: ".gitkeep"; DestDir: "{app}\installer\wizard"; Flags: ignoreversion
@@ -50,6 +54,7 @@ Name: "{app}\bundle"
 var
   PwFileToDelete: String;
   AdminFileToDelete: String;
+  UpgradeExisting: Boolean;
   PageBundle: TInputQueryWizardPage;
   PageDB: TInputQueryWizardPage;
   PageApp: TInputQueryWizardPage;
@@ -73,7 +78,7 @@ begin
   // Database page
   PageDB := CreateInputQueryPage(PageBundle.ID,
     'PostgreSQL Configuration', 'Configure the database connection',
-    'Use a new database name. This wizard refuses the live database name cmms.');
+    'A new database is created if the name does not exist. An existing CommandPulse database can be upgraded after a confirmation; a database this installer does not own is refused.');
   PageDB.Add('&Host:', False);
   PageDB.Add('&Port:', False);
   PageDB.Add('&User:', False);
@@ -172,12 +177,72 @@ begin
   end;
 end;
 
+// The probe writes one JSON object. Inno has no JSON parser, and the engine's
+// key order and string shape are fixed, so the one value the wizard needs is
+// read by name. A missing key yields '' and takes the "could not inspect" path.
+function JsonStringField(Json, Key: String): String;
+var
+  p, q: Integer;
+begin
+  Result := '';
+  p := Pos('"' + Key + '":"', Json);
+  if p = 0 then
+    exit;
+  p := p + Length(Key) + 4;
+  q := Pos('"', Copy(Json, p, Length(Json)));
+  if q = 0 then
+    exit;
+  Result := Copy(Json, p, q - 1);
+end;
+
+function ProbeDatabase(Host, Port, User, Password, DbName: String): String;
+var
+  PwFile, JsonFile, WizardScript, EngineScript, Cmd: String;
+  Code: Integer;
+  Json: AnsiString;
+begin
+  Result := '';
+  PwFile := ExpandConstant('{tmp}\cmms_probe_pw_' + GetDateTimeString('hhmmss', #0, #0) + '.tmp');
+  JsonFile := ExpandConstant('{tmp}\cmms_probe_db_' + GetDateTimeString('hhmmss', #0, #0) + '.json');
+  DeleteFile(JsonFile);
+  SaveStringToFile(PwFile, Password, False);
+  Exec(ExpandConstant('{sys}\icacls.exe'),
+       '"' + PwFile + '" /inheritance:r /grant:r "' + GetUserNameString() + ':R"',
+       '', SW_HIDE, ewWaitUntilTerminated, Code);
+  try
+    // The wizard answers the database page before [Files] is extracted, so the
+    // probe uses temporary copies rather than the installed engine.
+    ExtractTemporaryFile('install.ps1');
+    ExtractTemporaryFile('Invoke-InstallerWizard.ps1');
+    EngineScript := ExpandConstant('{tmp}\install.ps1');
+    WizardScript := ExpandConstant('{tmp}\Invoke-InstallerWizard.ps1');
+    Cmd := '/c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + WizardScript + '"' +
+           ' -ProbeOnly -ProbeOut "' + JsonFile + '"' +
+           ' -DbName "' + DbName + '"' +
+           ' -PgHost "' + Host + '" -PgPort "' + Port + '" -PgUser "' + User + '"' +
+           ' -PgPassFile "' + PwFile + '"' +
+           ' -EnginePath "' + EngineScript + '"';
+    if Exec(ExpandConstant('{sys}\cmd.exe'), Cmd, '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0) then
+    begin
+      if LoadStringFromFile(JsonFile, Json) then
+        Result := JsonStringField(Json, 'kind');
+    end;
+  finally
+    DeleteFile(PwFile);
+    DeleteFile(JsonFile);
+  end;
+end;
+
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  Kind: String;
+  LiveNote: String;
 begin
   Result := True;
   // Basic validation
   if CurPageID = PageDB.ID then
   begin
+    UpgradeExisting := False;
     if PageDB.Values[3] = '' then
     begin
       MsgBox('PostgreSQL password is required.', mbError, MB_OK);
@@ -188,10 +253,41 @@ begin
       MsgBox('Database name is required.', mbError, MB_OK);
       Result := False;
     end;
-    if CompareText(Trim(PageDB.Values[4]), 'cmms') = 0 then
+    // The target is a fact, not a name. A fresh install is unaffected; an
+    // existing CommandPulse database needs an explicit Yes before any file is
+    // copied; a foreign database is never touched. The engine repeats the
+    // classification and enforces it, so this is a courtesy, not the control.
+    if Result then
     begin
-      MsgBox('The database name "cmms" is the live production database on the existing host and is not a blank-install target. Choose a new name.', mbError, MB_OK);
-      Result := False;
+      Kind := ProbeDatabase(PageDB.Values[0], PageDB.Values[1], PageDB.Values[2],
+                            PageDB.Values[3], Trim(PageDB.Values[4]));
+      if Kind = 'CommandPulse' then
+      begin
+        LiveNote := '';
+        if CompareText(Trim(PageDB.Values[4]), 'cmms') = 0 then
+          LiveNote := #13#10#13#10 + 'WARNING: "cmms" is the live production database name on this host.';
+        if MsgBox('Database "' + Trim(PageDB.Values[4]) + '" already exists and is a CommandPulse CMMS database.' + #13#10#13#10 +
+                  'Upgrading applies schema migrations and cannot be undone without a backup.' + LiveNote + #13#10#13#10 +
+                  'Yes = upgrade this database.' + #13#10 +
+                  'No  = go back and choose a new Database Name.', mbConfirmation, MB_YESNO) = IDYES then
+          UpgradeExisting := True
+        else
+        begin
+          MsgBox('Change the Database Name field to a new name, or Cancel to stop the installation.', mbInformation, MB_OK);
+          Result := False;
+        end;
+      end
+      else if Kind = 'Foreign' then
+      begin
+        MsgBox('Database "' + Trim(PageDB.Values[4]) + '" already exists and contains tables, but it is not a CommandPulse CMMS database.' + #13#10 +
+               'This installer will not modify it. Choose a new Database Name.', mbError, MB_OK);
+        Result := False;
+      end
+      else if Kind = '' then
+      begin
+        MsgBox('The installer could not inspect database "' + Trim(PageDB.Values[4]) + '".' + #13#10#13#10 +
+               'The installation will continue, and the engine will refuse the target if it already exists.', mbInformation, MB_OK);
+      end;
     end;
   end;
   if CurPageID = PageApp.ID then
@@ -314,6 +410,11 @@ begin
            '-AppNamePrefix "' + PagePM2.Values[0] + '" ' +
            '-PrismaEnginesPath "' + PagePM2.Values[1] + '" ' +
            '-AdminFile "' + AdminFile + '"';
+
+    // An existing CommandPulse database is upgraded only after the operator
+    // answered Yes on the database page. The engine refuses it otherwise.
+    if UpgradeExisting then
+      Cmd := Cmd + ' -AllowExistingDatabase';
     
     Exec(ExpandConstant('{sys}\cmd.exe'), '/c ' + Cmd, '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
     
