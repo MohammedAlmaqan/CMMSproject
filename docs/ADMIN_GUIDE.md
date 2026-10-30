@@ -595,7 +595,7 @@ The k6 smoke test verifies the main authenticated read path stays healthy and re
 Two constraints that are not negotiable:
 
 - **`K6_MODE=1` must never be set on a live system.** It raises the sign-in rate limit from 20 to 200 per 15 minutes, removing brute-force protection. The application refuses the override when `NODE_ENV=production`; rely on that guard and do not work around it.
-- **The smoke test is not a capacity proof.** It is a 50-VU sanity check, not the 200-concurrent-user requirement, which remains deferred. Do not quote smoke-test numbers as evidence of capacity. See [13](#13-deferred-and-not-implemented).
+- **The smoke test is not a capacity proof.** It is a 50-VU sanity check. The 200-concurrent-user requirement was measured separately and passed on 2026-10-03 (SOW §4.1 `Met`: 200 VUs, `http_req_failed` 0.00%, p(95) 1.15 s against the 2 s budget, 0 P2028 / 0×429 / 0×500; the transactional-save limb added by C12 measured p(95) 89.4 ms at realistic cadence). Do not quote smoke-test numbers as evidence of capacity. See [13](#13-deferred-and-not-implemented). *Superseded wording, kept: "not the 200-concurrent-user requirement, which remains deferred."*
 
 ---
 
@@ -672,7 +672,7 @@ Screen-level, configuration and integration gaps that are not visible as a busin
 
 | Item | Status |
 |---|---|
-| **200-concurrent-user capacity test** | **Deferred post-go-live.** Recorded P2028 decision. Do not quote the k6 smoke numbers as capacity evidence |
+| **200-concurrent-user capacity test** | **Passed 2026-10-03; SOW §4.1 is `Met`.** 200 VUs, `http_req_failed` 0.00%, p(95) 1.15 s against the 2 s budget, 0 P2028 / 0×429 / 0×500; the transactional-save limb added by C12 measured p(95) 89.4 ms at realistic cadence. The 500,000-work-order volume test is still outstanding - see [13.1](#131-business-and-operational-limitations). Do not quote the 50-VU smoke-test numbers as capacity evidence. *Superseded wording, kept: "Deferred post-go-live. Recorded P2028 decision."* |
 | Prisma connection-pool exhaustion (`P2028`) | **Resolved 2026-09-29.** Never observed in the passing 100-VU run after the fix in [14.3](#143-prisma-p2028---connection-pool-exhaustion) |
 | IIS `curl` verification | Untested; the HTTPS path in the installation guide has not been verified end to end |
 | User create / delete API | **Implemented.** `POST /api/users` (Administrator) and the soft-delete `DELETE /api/users/{userId}` back the **Add User** form and per-row **Deactivate** control on Administration → Users & Roles. The SQL in [6.1](#61-create-a-user) and [6.7](#67-delete-or-decommission-a-user) is a bulk/scripted fallback only |
