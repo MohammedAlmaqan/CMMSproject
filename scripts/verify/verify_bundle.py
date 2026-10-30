@@ -19,6 +19,12 @@
 # list are the same list, which is the point: a gate with its own private idea of
 # what should be there is how the drift happened.
 #
+# A document that is genuinely bundle-only is declared in BUNDLE_ONLY with the
+# reason, and compared automatically once a tag contains it. Coverage runs the
+# other way too: every markdown document in the bundle must be declared, and
+# every DOCUMENTS path must exist in the tag, so an omission fails instead of
+# passing silently.
+#
 # Usage: python scripts/verify/verify_bundle.py --tag v1.6.5
 #        python scripts/verify/verify_bundle.py --tag v1.6.5 --sync
 #        python scripts/verify/verify_bundle.py --tag v1.6.5 --bundle <path>
@@ -49,9 +55,28 @@ DOCUMENTS = [
     ("RELEASE_NOTES.md", "RELEASE_NOTES.md", "text"),
 ]
 
-# Shipped by the bundle but written by hand into it: there is no repository copy
-# to compare against. Named so the report does not imply full coverage.
-NOT_IN_REPOSITORY = ["IT_DEPLOYMENT_GUIDE.md", "RELEASE_MANIFEST.md"]
+# Shipped by the bundle but not compared by DOCUMENTS. Each entry says why, and
+# - where the repository has a copy - it is compared automatically as soon as the
+# tag contains it, so "added after the tag" cannot quietly become "never checked".
+# (path inside the bundle, path in the repository or None, reason)
+BUNDLE_ONLY = [
+    (
+        "IT_DEPLOYMENT_GUIDE.md",
+        "docs/IT_DEPLOYMENT_GUIDE.md",
+        "written into the v1.6.6 bundle; added to the repository at f773294, after the tag",
+    ),
+    (
+        "RELEASE_MANIFEST.md",
+        None,
+        "generated per release; never committed",
+    ),
+]
+
+# Folders the bundle ships that this gate does not read, each with the verifier
+# that does own the subject. Naming them keeps the coverage claim honest.
+BUNDLE_ONLY_DIRS = [
+    ("migration-templates", "scripts/verify/verify_migration_templates.py"),
+]
 
 # Screenshots are shipped from docs/images/ and are not covered by the list above.
 IMAGE_DIR = "docs/images"
@@ -84,6 +109,12 @@ def git(*args):
     return proc.stdout
 
 
+def git_optional(*args):
+    """stdout on success, None when git exits non-zero. For existence questions."""
+    proc = subprocess.run(["git", *args], cwd=ROOT, capture_output=True)
+    return proc.stdout if proc.returncode == 0 else None
+
+
 def normalise(data):
     if data.startswith(b"\xef\xbb\xbf"):
         data = data[3:]
@@ -113,6 +144,23 @@ def preview(line):
 def image_paths(tag):
     listing = git("ls-tree", "-r", "--name-only", tag, "--", IMAGE_DIR).decode("utf-8").split()
     return [(path, path, "binary") for path in listing]
+
+
+def bundle_markdown(bundle_root):
+    """Every markdown document the bundle ships at its root or under docs/."""
+    found = []
+    for name in os.listdir(bundle_root):
+        if name.lower().endswith(".md") and os.path.isfile(os.path.join(bundle_root, name)):
+            found.append(name)
+    docs = os.path.join(bundle_root, "docs")
+    if os.path.isdir(docs):
+        for dirpath, _, filenames in os.walk(docs):
+            for name in filenames:
+                if not name.lower().endswith(".md"):
+                    continue
+                full = os.path.join(dirpath, name)
+                found.append(os.path.relpath(full, bundle_root).replace(os.sep, "/"))
+    return sorted(found)
 
 
 def check(tag, commit, bundle_root, sync, secrets):
@@ -190,12 +238,62 @@ def check(tag, commit, bundle_root, sync, secrets):
                 )
         print(f"  DRIFT   {bundle_rel:<40} {len(have):,} B vs {len(want):,} B{detail}")
 
+    # Reverse assertion: a DOCUMENTS row that names a path the tag does not have
+    # means the list and the tag have diverged. That is a failure, not silence.
+    for _, repo_rel, _ in DOCUMENTS:
+        if git_optional("cat-file", "-e", f"{tag}:{repo_rel}") is None:
+            print(f"  FAIL    {repo_rel:<40} declared in DOCUMENTS but absent from tag {tag}")
+            missing += 1
+            failures.append(repo_rel)
+
+    # Documents the bundle ships that DOCUMENTS does not compare. A repository
+    # copy is compared as soon as the tag has it; otherwise the report says the
+    # document is not in this tag, which is a different claim from "not in the
+    # repository".
     print()
-    print(
-        f"  {len(entries)} entries: {ok} OK, {drift} drift, {missing} missing"
-    )
-    if NOT_IN_REPOSITORY:
-        print(f"  not checked (written into the bundle, not in the repository): {', '.join(NOT_IN_REPOSITORY)}")
+    print("  bundle-only documents:")
+    for bundle_rel, repo_rel, reason in BUNDLE_ONLY:
+        bundle_path = os.path.join(bundle_root, *bundle_rel.split("/"))
+        if not os.path.exists(bundle_path):
+            print(f"  MISSING {bundle_rel:<40} not in the bundle ({reason})")
+            missing += 1
+            failures.append(bundle_rel)
+            continue
+        if repo_rel is None:
+            print(f"  NOT CHECKED {bundle_rel:<34} {reason}")
+            continue
+        if git_optional("cat-file", "-e", f"{tag}:{repo_rel}") is None:
+            print(f"  NOT IN TAG  {bundle_rel:<34} absent from {tag}: {reason}")
+            continue
+        want = git("show", f"{tag}:{repo_rel}")
+        with open(bundle_path, "rb") as handle:
+            have = handle.read()
+        if normalise(have) == normalise(want):
+            print(f"  OK      {bundle_rel:<40} compared because {tag} has it")
+            ok += 1
+        else:
+            print(f"  DRIFT   {bundle_rel:<40} {len(have):,} B vs {len(want):,} B (from {tag})")
+            drift += 1
+            failures.append(bundle_rel)
+
+    # Coverage: every markdown document the bundle ships must be declared, so a
+    # new document cannot travel unchecked. An unlisted file is a failure.
+    print()
+    declared = {bundle for bundle, _, _ in DOCUMENTS} | {bundle for bundle, _, _ in BUNDLE_ONLY}
+    unlisted = [rel for rel in bundle_markdown(bundle_root) if rel not in declared]
+    if unlisted:
+        for rel in unlisted:
+            print(f"  FAIL    {rel:<40} shipped but not declared in DOCUMENTS or BUNDLE_ONLY")
+        missing += len(unlisted)
+        failures.extend(unlisted)
+    else:
+        print("  coverage: every markdown document in the bundle is declared")
+    for directory, verifier in BUNDLE_ONLY_DIRS:
+        if os.path.isdir(os.path.join(bundle_root, directory)):
+            print(f"  out of scope: {directory}/ is checked by {verifier}")
+
+    print()
+    print(f"  {len(entries)} compared entries: {ok} OK, {drift} drift, {missing} missing")
 
     leaked = []
     if secrets:
