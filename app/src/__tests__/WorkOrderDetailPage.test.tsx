@@ -623,15 +623,6 @@ describe('WorkOrderDetailPage header edit (F4)', () => {
     role: 'Maintenance Planner',
   };
 
-  const supervisorUser: User = {
-    ...technicianUser,
-    userId: 'u-sup',
-    username: 'sup',
-    fullName: 'SupUser',
-    email: 'sup@example.com',
-    role: 'Maintenance Supervisor',
-  };
-
   const headerWo: WorkOrder = {
     ...baseWo,
     supervisorUserId: 'u-sup',
