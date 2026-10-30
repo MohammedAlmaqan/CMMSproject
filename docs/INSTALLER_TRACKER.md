@@ -2,7 +2,11 @@
 
 **Opened:** 2026-10-22
 **Scope:** `installer/`, the CI gate that covers it, and the documentation that describes
-them. Application code (`backend/`, `app/`) is frozen at `v1.6.2` and is out of scope.
+them. Application code (`backend/`, `app/`) is out of this tracker's scope but is **not
+frozen**: it has moved past `v1.6.2` - the repository is tagged through `v1.6.6` and `main`
+carries later work. *(Superseded wording, kept: "Application code (`backend/`, `app/`) is
+frozen at `v1.6.2` and is out of scope"; corrected 2026-10-30, because a freeze statement
+that is not true is worse than no statement.)*
 **Source of truth:** the repository. Where this table and the code disagree, the code wins
 and the table is wrong.
 
