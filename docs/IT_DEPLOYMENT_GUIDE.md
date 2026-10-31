@@ -18,9 +18,9 @@ re-derive it rather than trust this prose.
 > | Scenario | When to use | Section |
 > |---|---|---|
 > | **1 — Standard Enterprise Deployment (recommended)** | A central Windows Server that installs Node.js, PostgreSQL, PM2 and IIS normally. Serves any number of client laptops over HTTPS. | §5 |
-> | **2 — Zero-Install Portable Server** | A host where IT will **not** allow Node.js or PostgreSQL to be installed globally. Requires a portable bundle that this v1.6.0 handover bundle does **not** contain (see §6). | §6 |
+> | **2 — Zero-Install Portable Server** | A host where IT will **not** allow Node.js or PostgreSQL to be installed globally. Requires a portable bundle that this handover bundle does **not** contain (see §6). | §6 |
 >
-> The v1.6.0 bundle does **not** include a portable `node/` or `postgres/` folder.
+> This bundle does **not** include a portable `node/` or `postgres/` folder.
 > Scenario 2 therefore requires a separate portable bundle to be produced by the
 > vendor; §6 states exactly what it must contain and documents the script that would
 > drive it. Do not attempt Scenario 2 from this bundle alone.
@@ -55,7 +55,7 @@ this guide says you may.
 | Frontend API base URL | `/api` (relative) | `app/src/lib/api.ts:1` (`VITE_API_URL \|\| '/api'`) |
 | Database name | `cmms` | `ops/backup.bat:9`, `ops/restore-drill.bat:9` |
 | PM2 app names | `cmms-api`, `cmms-worker` | `ecosystem.config.cjs:4,29` |
-| Migration count at v1.6.0 | 22 | `backend/prisma/migrations/` |
+| Migration count in this release | 22 | `backend/prisma/migrations/` |
 | Attachment root | `backend/uploads/<EntityType>/<entityId>/` | `ops/backup.bat:88` |
 
 > **The pre-built frontend calls `/api` relatively.** Because `web.config` proxies
@@ -275,7 +275,7 @@ Applying migration `20260924142537_init_baseline`
 All migrations have been successfully applied.
 ```
 
-> Note the **22 migrations**. A different count means you are not deploying v1.6.0.
+> Note the **22 migrations**. A different count means you are not deploying the release this guide describes.
 
 ### 5.5 Load the data (restore the dump) — only if migrating from the operating site
 
@@ -460,7 +460,7 @@ database) is working.**
 
 ## 6. Scenario 2 — Zero-Install Portable Server
 
-> **This v1.6.0 bundle does not contain a portable runtime.** There is no `node/` and
+> **This bundle does not contain a portable runtime.** There is no `node/` and
 > no `postgres/` folder inside it, and no `Start-Server.bat`. Scenario 2 can only be
 > run from a **separate portable bundle** that the vendor must build. The draft this
 > guide was expanded from described this scenario as if it were ready; it is not.
@@ -749,7 +749,7 @@ vendor runs the import. This bundle does not ship the importer source.
 | Login "Too many requests" | 20 attempts / 15 min per IP reached | Wait 15 minutes. Do **not** set `K6_MODE` in production |
 | Attachments return "not found" after restore | `-uploads` folder was not copied | Copy `database\cmms-...-uploads\` into `backend\uploads\` |
 | Port 4000 already in use | Another process holds it | `netstat -ano \| findstr :4000`, then `taskkill /PID <pid> /F`; or change `PORT` in `.env` |
-| `npx prisma migrate deploy` says "already applied" | DB already at v1.6.0 | Normal on re-run; no action |
+| `npx prisma migrate deploy` says "already applied" | DB already at this release's schema | Normal on re-run; no action |
 | Backup says `PGPASSWORD must be set` | Machine variable not visible to the process | Re-open the shell after `setx PGPASSWORD ... /M` |
 
 ---
@@ -768,5 +768,4 @@ These do not block deployment; each is recorded so it is not lost.
 
 ---
 
-*End of guide. This file ships only inside the handover bundle and is not committed to
-the application source repository.*
+*End of guide.* This file is maintained at `docs/IT_DEPLOYMENT_GUIDE.md` in the repository and ships in every handover bundle. *Superseded wording, kept: "This file ships only inside the handover bundle and is not committed to the application source repository" — true until it was added to the repository at `f773294` (2026-10-29).*
