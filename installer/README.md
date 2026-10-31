@@ -42,7 +42,7 @@ extracted bundle and when it sits inside it.
 ```powershell
 # From an elevated PowerShell window
 & "C:\path\to\installer\install.ps1" `
-  -SourceBundle "C:\path\to\CommandPulse-CMMS-v1.6.6" `
+  -SourceBundle "C:\path\to\CommandPulse-CMMS-v1.6.7" `
   -InstallRoot "C:\CMMS" `
   -PgHost "localhost" -PgPort 5432 -PgUser "postgres" -DbName "cmms" `
   -PgPasswordEnv "CMMS_PGPASSWORD" `
