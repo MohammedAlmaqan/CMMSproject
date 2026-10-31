@@ -4,6 +4,118 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.6.7
+
+A hardening release rather than a feature release: three code changes close a
+session-lifetime gap, an installer hazard and a blind spot in CI, and the rest of
+the release is a documentation sweep that removes the stale claims `v1.6.6` had
+accumulated. The API contract is unchanged - 166 operations across 111 paths -
+and so is the schema: 22 migrations, no new ones. An upgrade from `v1.6.6` is a
+deployment, not a data migration.
+
+### What a user or operator will notice
+
+- **A password reset or a deactivation now ends live sessions.** Session
+  revocation already covered logout, refresh-token reuse and the idle window
+  (C1), but an account whose password an Administrator reset, or which was
+  deactivated or soft-deleted, stayed usable on any device already signed in
+  until its access token expired. `PUT /users/{id}/password`, `DELETE
+  /users/{id}` and `PUT /users/{id}` when `isActive` moves true to false now
+  revoke every unrevoked refresh token for the account, in the same transaction
+  as the user row. A user changing their *own* password keeps the session they
+  are using; a role change revokes nothing, per O-3. `5266b8d`. Documented in
+  `docs/ADMIN_GUIDE.md` 6.3, 6.5 and 12.2.
+- **The installer refuses to touch an existing database by default.** The engine
+  used to warn when the database name was `cmms` and then migrate whatever
+  answered, so an upgrade and an accidental overwrite were the same operation -
+  and it never created a database, so every install needed a manual `CREATE
+  DATABASE` first. The target is now classified before any file is copied:
+  absent is created and migrated, empty is migrated, an existing CommandPulse
+  database exits 4 unless `-AllowExistingDatabase` is passed, and a database
+  with tables but no CommandPulse migration history is refused with or without
+  the switch. `-Mode probe` reports the classification as JSON and writes
+  nothing. `2fd85dc`. Installer tracker I-27.
+- **The wizard offers the upgrade path instead of refusing the name.** The
+  database page asks the engine for the state before anything is extracted; an
+  existing CommandPulse database gets a Yes/No confirmation that names the
+  database and its last applied migration, with an extra warning when the name
+  is `cmms`, and a foreign database is refused. Yes sets `UpgradeExisting`,
+  which appends `-AllowExistingDatabase` to the engine call. The probe runs
+  from temporary copies and through `-ProbeOnly`, so the password still travels
+  in the ACL-restricted file rather than on a command line. `cc7130b`. Installer
+  tracker I-28.
+- **CI fails on any ESLint error in either package.** The backend lint step was
+  a baseline that failed only above 50 errors, so a regression from 0 to 40 was
+  invisible, and the frontend had no lint step at all. Backend now fails above
+  0 and the frontend runs `npx eslint .` after its type check. `846ac8a`; the
+  one frontend error that stood in the way was an unused test fixture, removed
+  in `e41c0d9`.
+
+### Documentation corrections
+
+- **§4.1 is no longer described as deferred anywhere.** The 200-VU test passed
+  on 2026-10-03 (200 VUs, `http_req_failed` 0.00%, p(95) 1.15 s against the 2 s
+  budget, 0 P2028 / 0x429 / 0x500; the transactional-save limb measured by C12
+  on 2026-10-10 at p(95) 89.4 ms). `ADMIN_GUIDE.md` 11 and 13.2, `ARCHITECTURE.md`
+  7.2, `DECISION_REGISTER.md` and the finalization tracker all now say so, each
+  keeping its superseded wording. `70ed58c`, `1907cd7`, `2139c6f`. The
+  500,000-work-order volume limb remains outstanding and is stated as such.
+- **`ARCHITECTURE.md` no longer says meter and combined PM strategies are
+  unimplemented.** They have generated work orders since `60f016b` (2026-09-27);
+  the section now records the three strategies, the one-work-order rule for
+  Combined and the `M:<meterId>:<reading>` provenance key. `e164161`.
+- **The endpoint count is 166, not 120.** `d97be74`.
+- **Money columns are `Decimal`, not `Float`, in the API reference comments.**
+  `526ae72`.
+- **The installer tracker no longer claims the application code is frozen at
+  `v1.6.2`.** `09db028`.
+- **`IT_DEPLOYMENT_GUIDE.md` is in the repository and no longer claims
+  otherwise.** Added at `f773294`; the body no longer calls itself the `v1.6.0`
+  bundle in four places, and its closing line no longer says the file is not
+  committed. Version numbers were removed from the body rather than re-stamped,
+  so the next bundle does not have to edit them again. `f7d2647`.
+- **The business and operational limits are stated where an operator will meet
+  them.** `ADMIN_GUIDE.md` section 13 opens with 13.1, a table of the limits with
+  their clause and decision anchors; the technical table becomes 13.2.
+  `USER_MANUAL.md` and `ARCHITECTURE.md` point at it. `ee23c9a`.
+- Smaller corrections in the same sweep: the data dictionary's CHECK-constraint
+  count (`212585e`), `audit_retention_years` in the `SystemConfig` allowlist
+  (`2f51938`), the ISO 14224 mapping's `failureCodeId` status (`75f8a67`), the
+  migration runbook's encoding and duplicate numbering (`604c2a5`), the user
+  manual's section 9.1 bullet formatting (`be3fe75`), and a footer note on
+  `FINAL_HANDOVER_REPORT.md` covering later closures (`a572620`).
+
+### Release engineering
+
+- `installer/wizard/CommandPulse.iss` now declares `1.6.7`, so the setup program
+  and its Add/Remove Programs entry identify this release.
+- `scripts/verify/verify_bundle.py` now derives its own coverage in both
+  directions: every markdown document the bundle ships must be declared, and
+  every declared document must exist in the tag, so a repository copy cannot be
+  permanently exempted (`9c31764`). `scripts/verify/verify_a1.py` derives its
+  repository root from the script location rather than one developer's path
+  (`bf9d694`).
+
+### Verification
+
+`scripts/verify/verify_a1.py` (214 clause rows) and
+`verify_a1_dispositions.py` (77 of 77 rows dispositioned) pass, and
+`verify_openapi.py` reports 166 operations across 111 paths matching
+`docs/openapi.json`. Backend suite: 89 files, 1252 tests. App suite: 29 files,
+178 tests. The CI run at the tagged SHA is the evidence, not this paragraph.
+
+### Known open items
+
+- The 500,000-work-order / 100,000-equipment volume limb of §4.1 has not been
+  measured. The 200-VU concurrency limb has (above).
+- Field-level authorisation on `PUT /api/work-orders/{id}` does not exist; the
+  header gate is UI-only (F4, carried forward from `v1.6.6`).
+- The wizard's GUI click-through was not performed: it needs an interactive
+  desktop. The installer's database cases are proved locally against throwaway
+  databases, not in CI, whose runner has no PostgreSQL.
+- The `JWT_SECRET` and database password in the `v1.6.4` bundle are treated as
+  disclosed, not rotated (carried forward from `v1.6.6`).
+
 ## v1.6.6
 
 `v1.6.5` closed the fourteen findings from the manual end-to-end pass, but it
