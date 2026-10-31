@@ -983,7 +983,7 @@ Started 2026-09-29. Phase G has **no §3 build rows**. Its only §3 clause (OAut
 
 1. **100-VU performance run** (§6.4.3) — `k6.exe` is held at `scripts\k6\k6.exe`, so this rehearses the §6.4.3 acceptance criterion.
 2. **Backup/restore rehearsal under D-4** — live PostgreSQL + `PGPASSWORD` are held on this host, so the full `backup.bat` → `restore-drill.bat` drill can run. The **second backup target is not a Phase G blocker**: the daily `pg_dump` mechanism already works. **Superseded 2026-10-05:** the WAL/RPO proof that used to await a second target has since been rehearsed against one (see G.3), so it is no longer a pending verification.
-3. **200-VU §4.1 test** — remains **deferred by recorded decision** (P2028 pool exhaustion), not attempted in Phase G.
+3. **200-VU §4.1 test** — **executed and passed as G.5 on 2026-10-03** (p(95) 1.15 s, `http_req_failed` 0.00%, 0 P2028 / 0×429 / 0×500). *Superseded wording, kept: "remains **deferred by recorded decision** (P2028 pool exhaustion), not attempted in Phase G" — true when this list was written on 2026-09-29, when the P2028 blocker from G.1 was still open.*
 4. **§4.2 TLS rehearsal** — **rehearsed on the host 2026-10-02** (G.4): IIS + ARR + URL Rewrite serve `cmms.local` over HTTPS with both limbs green. The site physical path was moved to `C:\inetpub\cmms-site` to escape the user-profile traverse chain (see G.4).
 
 | # | Task | Status | Findings |

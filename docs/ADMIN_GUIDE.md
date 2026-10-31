@@ -746,7 +746,7 @@ and restart PostgreSQL and the API. The login route's `$transaction` also passes
 
 Applied to this host on 2026-09-29: the bcrypt-out-of-transaction change, the pool sizing (`backend/.env`/`.env.example`), and the raised transaction ceilings are all in place, and the 100-VU acceptance run passed cleanly - 0 P2028, 0 HTTP 500, 0 login limiters tripped (see the tracker G.6). The acceptance script itself was also reshaped to a single 100-VU scenario so it signs in ~100 times per run rather than ~300 (see `scripts/k6/acceptance.js`); the K6_MODE login limiter in `backend/src/index.ts` stays at 200 per 15 minutes and must not be raised to make a load test pass.
 
-The 200-user test (SOW §4.1) remains a separate deferred capacity exercise; see the decision register.
+The 200-user test (SOW §4.1) was executed on 2026-10-03 and passed; the transactional-save limb was measured separately by C12 on 2026-10-10. See [13.2](#132-technical-deferrals-and-unimplemented-items) and the §4.1 row in `docs/SOW_COMPLIANCE.md`. *Superseded wording, kept: "remains a separate deferred capacity exercise; see the decision register."*
 
 ### 14.4 A user cannot sign in
 
