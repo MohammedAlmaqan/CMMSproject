@@ -28,6 +28,7 @@ param(
   [string]$PrismaEnginesPath = "",
   [string]$AdminFile = "",
   [switch]$ProbeOnly,
+  [switch]$AllowExistingDatabase,
   [string]$ProbeOut = "",
   [string]$EnginePath = ""
 )
@@ -81,6 +82,11 @@ if ($ProbeOnly) {
   if ($AppNamePrefix) { $args += @("-AppNamePrefix", $AppNamePrefix) }
   if ($PrismaEnginesPath) { $args += @("-PrismaEnginesPath", $PrismaEnginesPath) }
   if ($AdminFile) { $args += @("-AdminFile", $AdminFile) }
+  # The wizard appends this switch when the operator answered Yes on the
+  # database page. Without forwarding it the wrapper rejects the argument with
+  # "A parameter cannot be found", the engine never starts, and the wizard
+  # reports exit code 1 - the upgrade branch could never run.
+  if ($AllowExistingDatabase) { $args += @("-AllowExistingDatabase") }
 }
 
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $engine @args
