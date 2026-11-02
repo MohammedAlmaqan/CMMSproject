@@ -464,6 +464,38 @@ function Test-PortInUse {
   }
 }
 
+# Which process is listening on the port. Needed so an upgrade can tell "the
+# port is held by the application this install is about to replace" (expected,
+# and restarted in place) from "the port is held by something else" (a real
+# conflict that the health check would mask).
+function Get-PortOwnerPid {
+  param([int]$Port)
+  if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
+    $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($conn) { return [int]$conn.OwningProcess }
+    return $null
+  }
+  $line = (& netstat -ano 2>$null | Select-String -Pattern (":$Port\s+\S+\s+LISTENING\s+(\d+)\s*$") | Select-Object -First 1)
+  if ($line -and "$line" -match 'LISTENING\s+(\d+)\s*$') { return [int]$Matches[1] }
+  return $null
+}
+
+# The PM2 applications this install would own, if one of them holds the port.
+function Get-OwnAppPids {
+  param([int]$Port)
+  $owner = Get-PortOwnerPid -Port $Port
+  if (-not $owner) { return @() }
+  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
+  if (-not $pm2) { return @() }
+  $found = @()
+  foreach ($name in (Get-AppNames -Prefix $AppNamePrefix)) {
+    $out = Invoke-External -FilePath $pm2 -ArgumentList @("pid", $name) -WorkingDirectory $script:LogDir -TimeoutSeconds 30 -LogTag "PM2PID" -Quiet
+    $text = (($out.Lines -join "`n")).Trim()
+    if ($out.ExitCode -eq 0 -and $text -match '^\d+$' -and [int]$text -eq $owner) { $found += [int]$text }
+  }
+  return $found
+}
+
 function Get-PsqlPath {
   $c = Get-Command psql -ErrorAction SilentlyContinue
   if ($c) { return $c.Source }
@@ -590,6 +622,24 @@ function New-SiteFolder {
   if (Test-Path -LiteralPath $srcWebConfig) { Copy-Item -LiteralPath $srcWebConfig -Destination $site -Force }
   Log "OK" "Site folder prepared at $site"
   return $site
+}
+
+# A staged dependency install leaves the previous tree behind as rollback
+# material. It is only removed once the new application has answered its health
+# check.
+function Remove-InstallStaging {
+  param([string]$BackendDir)
+  $stale = @(Get-ChildItem -LiteralPath $BackendDir -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq ".install-stage" -or $_.Name -like "node_modules.previous-*" })
+  foreach ($d in $stale) {
+    $mb = ((Get-ChildItem -LiteralPath $d.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum) / 1MB
+    Remove-Item -LiteralPath $d.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $d.FullName) {
+      Log "WARN" "Could not remove $($d.Name); remove it by hand to reclaim the space"
+    } else {
+      Log "INFO" ("Removed {0} ({1:N0} MB)" -f $d.Name, $mb)
+    }
+  }
 }
 
 # ------------------------------------------------------------------ .env ----
@@ -752,26 +802,156 @@ function Install-PrismaEngines {
   return $false
 }
 
+# `npm ci` deletes node_modules before it installs anything, so running it in a
+# live backend takes the application's dependencies away and puts them back only
+# if the install succeeds. On Windows it usually cannot succeed at all: the
+# running process has the Prisma engine DLL mapped and the delete fails with
+# EPERM (proved 2026-11-01 on a scratch instance, npm exit -4048, and the tree
+# was left without express). Dependencies for an upgrade are therefore installed
+# into a staging folder while the application keeps serving, and swapped in with
+# two directory renames at the very end.
+#
+# A rename of a directory holding a mapped DLL fails until the holder is gone, so
+# the swap retries for several seconds. That is the difference between an upgrade
+# that needs a retry and one that needs a reboot.
+function Move-DirectoryWithRetry {
+  param([string]$From, [string]$To, [int]$Attempts = 20)
+  $last = $null
+  for ($i = 1; $i -le $Attempts; $i++) {
+    try {
+      Move-Item -LiteralPath $From -Destination $To -ErrorAction Stop
+      return
+    } catch {
+      $last = $_
+      Start-Sleep -Milliseconds 500
+    }
+  }
+  throw "Could not move '$From' to '$To' after $($Attempts * 0.5) seconds (a process may still hold a file open): $($last.Exception.Message)"
+}
+
 function Install-Backend {
-  param([string]$BackendDir)
+  param([string]$BackendDir, [switch]$AppsRunning)
   Log "INFO" "=== Backend setup ==="
   $npm = Get-CmdPath @("npm.cmd", "npm")
   $npx = Get-CmdPath @("npx.cmd", "npx")
   if (-not $npm) { throw "npm not found" }
-  $code = Invoke-External -FilePath $npm -ArgumentList @("ci", "--foreground-scripts") -WorkingDirectory $BackendDir -TimeoutSeconds 1800 -LogTag "NPMCI"
-  if ($code -ne 0) { throw "npm ci failed with exit code $code" }
-  Log "OK" "Dependencies installed"
-  $enginesOk = Install-PrismaEngines -BackendDir $BackendDir
   if (-not $npx) { throw "npx not found" }
-  $code = Invoke-External -FilePath $npx -ArgumentList @("prisma", "generate") -WorkingDirectory $BackendDir -TimeoutSeconds 900 -LogTag "PRISMA"
-  if ($code -ne 0) {
-    if ($enginesOk) { throw "prisma generate failed with exit code $code" }
-    throw "prisma generate failed with exit code $code. The Prisma engine binaries could not be downloaded from binaries.prisma.sh. Re-run with -PrismaEnginesPath pointing at a folder holding the prebuilt engines, on a host with access to binaries.prisma.sh, or copy node_modules\.prisma from a prepared install."
+
+  if (-not $AppsRunning) {
+    $code = Invoke-External -FilePath $npm -ArgumentList @("ci", "--foreground-scripts") -WorkingDirectory $BackendDir -TimeoutSeconds 1800 -LogTag "NPMCI"
+    if ($code -ne 0) { throw "npm ci failed with exit code $code" }
+    Log "OK" "Dependencies installed"
+    $enginesOk = Install-PrismaEngines -BackendDir $BackendDir
+    $code = Invoke-External -FilePath $npx -ArgumentList @("prisma", "generate") -WorkingDirectory $BackendDir -TimeoutSeconds 900 -LogTag "PRISMA"
+    if ($code -ne 0) {
+      if ($enginesOk) { throw "prisma generate failed with exit code $code" }
+      throw "prisma generate failed with exit code $code. The Prisma engine binaries could not be downloaded from binaries.prisma.sh. Re-run with -PrismaEnginesPath pointing at a folder holding the prebuilt engines, on a host with access to binaries.prisma.sh, or copy node_modules\.prisma from a prepared install."
+    }
+    Log "OK" "Prisma client generated"
+    $code = Invoke-External -FilePath $npx -ArgumentList @("prisma", "migrate", "deploy") -WorkingDirectory $BackendDir -TimeoutSeconds 900 -LogTag "MIGRATE"
+    if ($code -ne 0) { throw "prisma migrate deploy failed with exit code $code" }
+    Log "OK" "Database schema applied"
+    return
   }
-  Log "OK" "Prisma client generated"
-  $code = Invoke-External -FilePath $npx -ArgumentList @("prisma", "migrate", "deploy") -WorkingDirectory $BackendDir -TimeoutSeconds 900 -LogTag "MIGRATE"
-  if ($code -ne 0) { throw "prisma migrate deploy failed with exit code $code" }
+
+  # --- upgrade with the application online -------------------------------
+  # Everything that takes minutes happens while the old application serves: the
+  # dependency install and the client generation are done in the stage, and the
+  # migration runs against the database. Only the swap needs the applications
+  # stopped, and it is two renames plus a start.
+  $stage = Join-Path $BackendDir ".install-stage"
+  if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
+  New-Item -ItemType Directory -Force -Path $stage | Out-Null
+  foreach ($f in @("package.json", "package-lock.json")) {
+    $src = Join-Path $BackendDir $f
+    if (-not (Test-Path -LiteralPath $src)) { throw "The install has no $f; a staged upgrade needs the bundle's lock file." }
+    Copy-Item -LiteralPath $src -Destination $stage -Force
+  }
+  # prisma\ travels with the stage so that `prisma generate` resolves the client
+  # into the staged tree instead of the live one.
+  $schemaDir = Join-Path $BackendDir "prisma"
+  if (-not (Test-Path -LiteralPath $schemaDir)) { throw "The install has no prisma\ folder; a staged upgrade needs the schema." }
+  Copy-Item -LiteralPath $schemaDir -Destination $stage -Recurse -Force
+
+  Log "INFO" "Staging dependencies in $stage (the application keeps serving)"
+  $code = Invoke-External -FilePath $npm -ArgumentList @("ci", "--foreground-scripts") -WorkingDirectory $stage -TimeoutSeconds 1800 -LogTag "NPMCI-STAGE"
+  if ($code -ne 0) {
+    Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+    throw "npm ci failed with exit code $code. The installed application was not touched and is still running."
+  }
+  Log "OK" "Dependencies staged"
+
+  $enginesOk = Install-PrismaEngines -BackendDir $stage
+  $code = Invoke-External -FilePath $npx -ArgumentList @("prisma", "generate") -WorkingDirectory $stage -TimeoutSeconds 900 -LogTag "PRISMA-STAGE"
+  if ($code -ne 0) {
+    Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+    if ($enginesOk) { throw "prisma generate failed with exit code $code. The installed application was not touched and is still running." }
+    throw "prisma generate failed with exit code $code. The engine binaries could not be downloaded and -PrismaEnginesPath was not usable. The installed application was not touched and is still running."
+  }
+  Log "OK" "Prisma client staged"
+
+  # The migration uses the staged CLI and the install's own .env, so it runs
+  # before the application is stopped. A migration that fails leaves the old
+  # application serving its old code against the old schema.
+  $stagedPrisma = Join-Path $stage "node_modules\.bin\prisma.cmd"
+  if (-not (Test-Path -LiteralPath $stagedPrisma)) { throw "The staged install has no Prisma CLI at $stagedPrisma" }
+  $code = Invoke-External -FilePath $stagedPrisma -ArgumentList @("migrate", "deploy") -WorkingDirectory $BackendDir -TimeoutSeconds 900 -LogTag "MIGRATE"
+  if ($code -ne 0) {
+    Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+    throw "prisma migrate deploy failed with exit code $code. The installed application was not touched and is still running."
+  }
   Log "OK" "Database schema applied"
+
+  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
+  if (-not $pm2) { throw "PM2 not found, so the applications cannot be stopped for the dependency swap" }
+  $names = Get-AppNames -Prefix $AppNamePrefix
+  $nodeModules = Join-Path $BackendDir "node_modules"
+  $retired = Join-Path $BackendDir ("node_modules.previous-" + $script:RunStamp)
+
+  Log "INFO" "Stopping $($names -join ', ') for the dependency swap"
+  Invoke-External -FilePath $pm2 -ArgumentList (@("stop") + $names) -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2STOP" | Out-Null
+  # `pm2 stop` returns after the processes are signalled, not necessarily after
+  # their image has been unloaded. The running application has the Prisma engine
+  # DLL mapped, and Windows refuses to rename a directory while that handle is
+  # open (the same EPERM that makes an in-place `npm ci` fail). The rename is
+  # therefore retried for a few seconds instead of failing the upgrade.
+  Start-Sleep -Milliseconds 800
+
+  $swapped = $false
+  $failed = $null
+  try {
+    if (Test-Path -LiteralPath $retired) { Remove-Item -LiteralPath $retired -Recurse -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $nodeModules) { Move-DirectoryWithRetry -From $nodeModules -To $retired }
+    Move-DirectoryWithRetry -From (Join-Path $stage "node_modules") -To $nodeModules
+    $swapped = $true
+    # A ready-built Prisma client was staged, but generating again from the
+    # installed tree is the only way to prove the client matches this install
+    # root; it takes a few seconds and runs with nothing holding the tree.
+    $code = Invoke-External -FilePath $npx -ArgumentList @("prisma", "generate") -WorkingDirectory $BackendDir -TimeoutSeconds 900 -LogTag "PRISMA"
+    if ($code -ne 0) { throw "prisma generate failed with exit code $code" }
+    Log "OK" "Prisma client generated in the installed tree"
+  } catch {
+    $failed = $_
+  }
+
+  if ($failed) {
+    Log "ERR" "Swapping the dependencies in failed: $($failed.Exception.Message)"
+    if ($swapped -and (Test-Path -LiteralPath $nodeModules)) {
+      Remove-Item -LiteralPath $nodeModules -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if (-not (Test-Path -LiteralPath $nodeModules) -and (Test-Path -LiteralPath $retired)) {
+      Move-DirectoryWithRetry -From $retired -To $nodeModules
+      Log "WARN" "The previous dependencies are back in place"
+    }
+    Log "WARN" "Starting the previous applications"
+    Invoke-External -FilePath $pm2 -ArgumentList (@("start") + $names) -WorkingDirectory $BackendDir -TimeoutSeconds 300 -LogTag "PM2ROLLBACK" | Out-Null
+    throw "The dependency swap failed; the previous dependencies and applications were restored. $($failed.Exception.Message)"
+  }
+
+  # The retired tree is the rollback material until the new application answers
+  # its health check, so it is left for the main flow to remove.
+  Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+  Log "OK" "Dependencies in place (previous tree kept at $retired until the health check passes)"
 }
 
 # ---------------------------------------------------------- administrator ---
@@ -1031,10 +1211,20 @@ try {
   }
 
   Test-Prerequisites
+  # An upgrade restarts this install's own PM2 application in place, so a port
+  # held BY THAT APPLICATION is expected. Any other holder is a real conflict:
+  # the health check could otherwise be answered by a different service.
+  $appsRunning = $false
   if (Test-PortInUse -Port $ApiPort) {
-    throw "TCP port $ApiPort is already in use on 127.0.0.1. This engine installs a blank instance; pass a free -ApiPort so the health check cannot be answered by a different service."
+    $ownPids = @(Get-OwnAppPids -Port $ApiPort)
+    if ($ownPids.Count -eq 0) {
+      throw "TCP port $ApiPort is already in use on 127.0.0.1 by a process this install does not own. Pass a free -ApiPort so the health check cannot be answered by a different service."
+    }
+    $appsRunning = $true
+    Log "OK" "API port $ApiPort is held by this install's own PM2 application (pid $($ownPids -join ', ')); the upgrade replaces it in place"
+  } else {
+    Log "OK" "API port $ApiPort is free"
   }
-  Log "OK" "API port $ApiPort is free"
   Test-BundleIntegrity -Bundle $SourceBundle
 
   # The database decision comes before any file is copied. A refusal (exit 4)
@@ -1063,7 +1253,7 @@ try {
   New-BackendEnv -BackendDir $backendDir -PlainPassword $plainPassword | Out-Null
   $plainPassword = $null
 
-  Install-Backend -BackendDir $backendDir
+  Install-Backend -BackendDir $backendDir -AppsRunning:$appsRunning
   New-Administrator -BackendDir $backendDir
   Start-Application -BackendDir $backendDir
 
@@ -1077,7 +1267,10 @@ try {
 
   Log "INFO" "Install log: $script:LogFile"
   if (-not $appsOnline) { Log "ERR" "The PM2 applications are not all online. See the log for the PM2 output."; exit 3 }
-  if ($healthy) { Log "INFO" "Engine finished (full)"; exit 0 }
+  if ($healthy) {
+    Remove-InstallStaging -BackendDir $backendDir
+    Log "INFO" "Engine finished (full)"; exit 0
+  }
   Log "ERR" "The installation completed but the API is not answering yet."; exit 3
 }
 catch {
