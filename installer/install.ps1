@@ -613,19 +613,31 @@ function Copy-Bundle {
     Log "INFO" "  excluded dump file $($_.FullName)"
     Remove-Item -LiteralPath $_.FullName -Force
   }
-  # The published bundle ships env templates (backend\.env.deploy) and a sample
-  # (backend\.env.example). The install generates its own .env, so neither may
+  # The published bundle ships env templates and a sample (backend\.env.deploy,
+  # backend\.env.example). The install generates its own .env, so neither may
   # reach the install root: left beside the real .env they look like it, carry
   # placeholders such as your_password and <PGPASSWORD>, and invite an operator
-  # to "fix" a configuration that is already correct. Removing every backend
-  # env file except the generated .env is the only rule that cannot be forgotten
-  # when a new template is added to the bundle.
+  # to "fix" a configuration that is already correct. Removing every backend env
+  # file except the generated .env is the only rule that cannot be forgotten when
+  # a new template is added to the bundle.
+  #
+  # Two names are deliberately kept:
+  #   backend\.env            - New-BackendEnv backs it up and then rewrites it;
+  #                             deleting it here is what destroyed the live
+  #                             secret on 2026-11-01, because the backup step
+  #                             runs after this sweep.
+  #   backend\.env.bak.<stamp> - the rollback copy of a previous upgrade.
+  # The filter is applied to the NAME: `Get-ChildItem -Filter '.env.*'` also
+  # matches '.env' itself on this host, which is the quirk that made the backup
+  # impossible in the first place.
   $backendRoot = Join-Path $Root "backend"
   if (Test-Path -LiteralPath $backendRoot) {
-    Get-ChildItem -LiteralPath $backendRoot -Force -File -Filter ".env.*" -ErrorAction SilentlyContinue | ForEach-Object {
-      Remove-Item -LiteralPath $_.FullName -Force
-      Log "INFO" "  removed backend\$($_.Name) (the installer generates backend\.env)"
-    }
+    Get-ChildItem -LiteralPath $backendRoot -Force -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -like ".env.*" -and $_.Name -ne ".env" -and $_.Name -notlike ".env.bak.*" } |
+      ForEach-Object {
+        Remove-Item -LiteralPath $_.FullName -Force
+        Log "INFO" "  removed backend\$($_.Name) (the installer generates backend\.env)"
+      }
   }
 }
 
@@ -687,9 +699,25 @@ function New-BackendEnv {
   $content = $content.Replace("__PM_SCHEDULER_CRON__", $PMSchedulerCron)
   $envPath = Join-Path $BackendDir ".env"
   if (Test-Path -LiteralPath $envPath) {
+    # The upgrade path rewrites .env, and the previous file holds the only copy
+    # of the JWT secret and database password. Copy-Bundle deliberately leaves it
+    # in place so this backup can happen; the copy is then given the same ACL as
+    # the original, because a fresh copy inherits the folder's permissions and
+    # would otherwise be readable by every local user.
     $backup = "$envPath.bak.$script:RunStamp"
     Copy-Item -LiteralPath $envPath -Destination $backup -Force
-    Log "INFO" "Existing .env backed up to $backup"
+    Protect-EnvFile -EnvFile $backup
+    Log "OK" "Existing .env backed up to $backup"
+    # Each upgrade leaves one more copy of the same secrets. Five is enough to
+    # undo the last few upgrades by hand and few enough to stay auditable.
+    $old = @(Get-ChildItem -LiteralPath $BackendDir -Force -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -like ".env.bak.*" } |
+      Sort-Object LastWriteTime -Descending |
+      Select-Object -Skip 5)
+    foreach ($f in $old) {
+      Remove-Item -LiteralPath $f.FullName -Force
+      Log "INFO" "Removed the superseded .env backup $($f.Name)"
+    }
   }
   # Guard: the substitution table above is hand-written, so a token added to the
   # template without a matching .Replace() would ship an unsubstituted value and
@@ -733,7 +761,13 @@ function Protect-EnvFile {
     $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($sid, $rights, $allow)))
   }
   try { $acl.SetOwner($currentSid) } catch { Log "WARN" "Could not set the file owner: $($_.Exception.Message)" }
-  Set-Acl -LiteralPath $EnvFile -AclObject $acl
+  # `Set-Acl` demands SeSecurityPrivilege when the file already carries an explicit
+  # DACL. Reproduced 2026-11-02 on an existing .env: it applied the ACL and then
+  # threw PrivilegeNotHeld, which aborted the upgrade after the .env had been
+  # rewritten. The .NET method writes the DACL and is idempotent, so the same call
+  # works on a fresh install and on every upgrade.
+  $item = Get-Item -LiteralPath $EnvFile -Force
+  $item.SetAccessControl($acl)
   $verify = Get-Acl -LiteralPath $EnvFile
   $trustees = @($verify.Access | ForEach-Object { $_.IdentityReference.Value })
   $expected = @("NT AUTHORITY\SYSTEM", "BUILTIN\Administrators", $currentName)
