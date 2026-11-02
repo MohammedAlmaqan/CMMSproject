@@ -222,6 +222,25 @@ function Redact-File {
 # Runs a native command with a hard timeout while streaming its output into the
 # install log. A hung child (a stalled npm download, for example) is killed
 # rather than leaving the wizard looking frozen.
+# Start-Process joins -ArgumentList with single spaces and quotes nothing. On
+# Windows every `*.cmd` shim (`pm2.cmd`, `npm.cmd`) is executed through cmd.exe,
+# which splits the resulting command line on spaces before the tool ever sees a
+# value. A path such as `C:\...\Default Project\...` therefore arrives as
+# `C:\...\Default`, and the tool reports a file it cannot find. The quoting lives
+# here, in the one place that builds a command line, so no caller has to
+# remember it.
+function Format-Argument {
+  param([string]$Value)
+  if ($null -eq $Value) { return '""' }
+  if ($Value -notmatch '[\s"&|<>^()]' -and -not $Value.EndsWith('\')) { return $Value }
+  # Windows command-line rules: a backslash is literal except when it precedes
+  # a quote, where the run of backslashes must be doubled; a trailing run is
+  # doubled so it cannot escape the closing quote.
+  $escaped = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
+  $escaped = [regex]::Replace($escaped, '(\\+)$', '$1$1')
+  return '"' + $escaped + '"'
+}
+
 function Invoke-External {
   param(
     [Parameter(Mandatory)][string]$FilePath,
@@ -234,16 +253,17 @@ function Invoke-External {
   $ts = (Get-Date).ToString("yyyyMMdd-HHmmss")
   $outFile = Join-Path $script:LogDir "$LogTag-out-$ts.txt"
   $errFile = Join-Path $script:LogDir "$LogTag-err-$ts.txt"
+  $quotedArguments = @($ArgumentList | ForEach-Object { Format-Argument $_ })
   $startParams = @{
     FilePath               = $FilePath
-    ArgumentList           = $ArgumentList
+    ArgumentList           = $quotedArguments
     NoNewWindow            = $true
     PassThru               = $true
     RedirectStandardOutput = $outFile
     RedirectStandardError  = $errFile
   }
   if ($WorkingDirectory) { $startParams["WorkingDirectory"] = $WorkingDirectory }
-  Log "INFO" "$LogTag : $FilePath $($ArgumentList -join ' ')"
+  Log "INFO" "$LogTag : $FilePath $($quotedArguments -join ' ')"
   $proc = Start-Process @startParams
   # Touching .Handle caches the process handle. Without it, PowerShell can
   # return a null ExitCode for a process that has already exited.
@@ -1037,6 +1057,66 @@ function New-Administrator {
 
 # ------------------------------------------------------------- PM2 / app ----
 
+# The generated ecosystem file is JavaScript, and PM2 takes everything it
+# starts from it - but `pm2 start` does not report a script path it cannot find:
+# it exits 0 and the application simply never comes up. The file is therefore
+# loaded and resolved with the same Node that will run it, before anything in the
+# PM2 table is touched. Returns a name -> absolute script path map, or $null when
+# the file is not startable.
+function Get-EcosystemApps {
+  param([string]$EcosystemFile, [string]$WorkingDir)
+  $node = Get-CmdPath @("node.exe", "node")
+  if (-not $node) { Log "WARN" "node was not found; the ecosystem file cannot be pre-validated"; return $null }
+  $validator = Join-Path $script:LogDir "ecosystem-check.cjs"
+  $js = @'
+// Written by installer/install.ps1 at run time, next to the install logs.
+// Prints one "app <name> -> <absolute script>" line per application and exits 0
+// only when every script resolves to a file that exists.
+const path = require('path');
+const fs = require('fs');
+const file = process.env.CMMS_ECOSYSTEM_FILE;
+let cfg;
+try { cfg = require(file); }
+catch (e) { console.error('cannot load ' + file + ': ' + e.message); process.exit(2); }
+const apps = (cfg && cfg.apps) || [];
+if (!apps.length) { console.error('the ecosystem file defines no apps'); process.exit(3); }
+let bad = 0;
+for (const app of apps) {
+  const base = app.cwd || path.dirname(file);
+  if (!app.name) { console.error('an app has no name'); bad++; continue; }
+  if (!app.script) { console.error('app ' + app.name + ' has no script'); bad++; continue; }
+  const abs = path.isAbsolute(app.script) ? app.script : path.resolve(base, app.script);
+  if (!fs.existsSync(abs)) { console.error('app ' + app.name + ' script is missing: ' + abs); bad++; continue; }
+  console.log('app ' + app.name + ' -> ' + abs);
+}
+process.exit(bad === 0 ? 0 : 4);
+'@
+  [System.IO.File]::WriteAllText($validator, ($js -replace "`r?`n", "`n"))
+  $previous = $env:CMMS_ECOSYSTEM_FILE
+  $env:CMMS_ECOSYSTEM_FILE = $EcosystemFile
+  try {
+    $result = Invoke-External -FilePath $node -ArgumentList @($validator) -WorkingDirectory $WorkingDir -TimeoutSeconds 120 -LogTag "ECOCHECK" -Quiet
+  } finally {
+    $env:CMMS_ECOSYSTEM_FILE = $previous
+  }
+  if ($result.ExitCode -ne 0) {
+    foreach ($line in $result.Lines) { if ($line.Trim()) { Log "ECOCHECK-ERR" $line.Trim() } }
+    return $null
+  }
+  $map = @{}
+  foreach ($line in $result.Lines) {
+    if ($line -match '^app\s+(\S+)\s+->\s+(.+?)\s*$') { $map[$Matches[1]] = $Matches[2] }
+  }
+  return $map
+}
+
+function Test-SamePath {
+  param([string]$A, [string]$B)
+  if (-not $A -or -not $B) { return $false }
+  try { return ([System.IO.Path]::GetFullPath($A).TrimEnd('\') -ieq [System.IO.Path]::GetFullPath($B).TrimEnd('\')) }
+  catch { return ($A -ieq $B) }
+}
+
 function Start-Application {
   param([string]$BackendDir)
   $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
@@ -1045,22 +1125,87 @@ function Start-Application {
   $names = Get-AppNames -Prefix $AppNamePrefix
   Log "INFO" "=== Starting the application with PM2 ==="
 
-  # An install owns its own application names. If a previous install (or an
-  # unrelated process) already holds one of them in this PM2 daemon, it is
-  # replaced rather than left running alongside and fighting over the port.
+  # Gate 1: the file must describe a startable application. Without this check
+  # the engine would delete a working application and only then discover that
+  # the replacement cannot start - which is how the 2026-11-01 live upgrade
+  # turned a path-quoting bug into a seven-minute outage.
+  $desired = Get-EcosystemApps -EcosystemFile $ecosystem -WorkingDir $BackendDir
+  if (-not $desired -or $desired.Count -eq 0) {
+    throw "The generated ecosystem file does not describe a startable application (see ECOCHECK-ERR above). PM2 was not touched; any application already running as $($names -join ' or ') is still running."
+  }
+
+  # Gate 2: capture what PM2 runs now, so a failed start can put it back.
+  $existing = @{}
   foreach ($name in $names) {
-    $clash = Get-Pm2AppState -Pm2Path $pm2 -WorkingDir $backendDir -Name $name
-    if ($clash) {
-      Log "WARN" "PM2 already has an application named '$name' (status $($clash.Status)); replacing it"
-      Invoke-External -FilePath $pm2 -ArgumentList @("delete", $name) -WorkingDirectory $backendDir -TimeoutSeconds 120 -LogTag "PM2DEL" | Out-Null
+    $state = Get-Pm2AppState -Pm2Path $pm2 -WorkingDir $BackendDir -Name $name
+    if ($state) { $existing[$name] = $state }
+  }
+
+  # PM2 restarts the script it has REGISTERED for a name; the `script` field of
+  # an ecosystem file is honoured only when the name is first created. Starting
+  # the file therefore replaces a same-path application in place - a restart of
+  # one or two seconds, with no window in which the service is absent - but
+  # silently keeps the OLD script when the path differs. Only that case is
+  # deleted first.
+  $toReplace = @()
+  foreach ($name in $names) {
+    if (-not $existing.ContainsKey($name)) { continue }
+    $old = $existing[$name]
+    $want = $desired[$name]
+    if ($want -and (Test-SamePath $old.ScriptPath $want)) {
+      Log "INFO" "PM2 application '$name' already runs this install's script; restarting it in place (no delete)"
+    } else {
+      Log "WARN" "PM2 application '$name' runs '$($old.ScriptPath)'; this install needs '$want', so it is replaced"
+      $toReplace += $name
+    }
+  }
+  foreach ($name in $toReplace) {
+    Invoke-External -FilePath $pm2 -ArgumentList @("delete", $name) -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2DEL" | Out-Null
+  }
+
+  # A relative file name plus -WorkingDirectory keeps the install path out of the
+  # command line entirely: the install root may contain spaces, and cmd.exe would
+  # split an unquoted path there.
+  $code = Invoke-External -FilePath $pm2 -ArgumentList @("start", "ecosystem.install.config.cjs") -WorkingDirectory $BackendDir -TimeoutSeconds 300 -LogTag "PM2START"
+  if ($code -ne 0) { Log "WARN" "pm2 start returned $code" }
+  Start-Sleep -Seconds 4
+
+  $allOnline = $true
+  foreach ($name in $names) {
+    $now = Get-Pm2AppState -Pm2Path $pm2 -WorkingDir $BackendDir -Name $name
+    if (-not $now) {
+      $allOnline = $false
+      Log "ERR" "PM2 has no application named '$name' after the start"
+    } elseif ($now.Status -ne "online") {
+      $allOnline = $false
+      Log "ERR" "PM2 application '$name' is '$($now.Status)' after the start"
     }
   }
 
-  $code = Invoke-External -FilePath $pm2 -ArgumentList @("start", $ecosystem) -WorkingDirectory $BackendDir -TimeoutSeconds 300 -LogTag "PM2START"
-  if ($code -ne 0) { Log "WARN" "pm2 start returned $code" }
-  $code = Invoke-External -FilePath $pm2 -ArgumentList @("save") -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2SAVE"
-  if ($code -ne 0) { Log "WARN" "pm2 save returned $code" }
-  Start-Sleep -Seconds 4
+  if ($allOnline) {
+    $code = Invoke-External -FilePath $pm2 -ArgumentList @("save") -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2SAVE"
+    if ($code -ne 0) { Log "WARN" "pm2 save returned $code" }
+  } else {
+    # Gate 3: put the previously running application back before reporting the
+    # failure, so a broken install cannot leave the host with no service at all.
+    Log "ERR" "The new applications did not all come online; restoring the previous ones"
+    foreach ($name in @($existing.Keys)) {
+      $old = $existing[$name]
+      if (-not $old.ScriptPath) { Log "WARN" "'$name' had no readable script path; it cannot be restored automatically"; continue }
+      $rollbackDir = if ($old.Cwd) { $old.Cwd } else { $BackendDir }
+      Invoke-External -FilePath $pm2 -ArgumentList @("delete", $name) -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2ROLLBACK-DEL" | Out-Null
+      Invoke-External -FilePath $pm2 -ArgumentList @("start", $old.ScriptPath, "--name", $name) -WorkingDirectory $rollbackDir -TimeoutSeconds 300 -LogTag "PM2ROLLBACK" | Out-Null
+    }
+    Start-Sleep -Seconds 4
+    if (Test-Pm2Apps -Pm2Path $pm2 -WorkingDir $BackendDir) {
+      Log "WARN" "The previous applications are online again; the new install did not start"
+      Invoke-External -FilePath $pm2 -ArgumentList @("save") -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2SAVE" | Out-Null
+    } else {
+      Log "ERR" "The previous applications could not be restored either; start them from the output above"
+    }
+    throw "PM2 did not bring the new applications online. The installer restored the previous applications."
+  }
+
   Invoke-External -FilePath $pm2 -ArgumentList @("list") -WorkingDirectory $BackendDir -TimeoutSeconds 60 -LogTag "PM2LIST" | Out-Null
 }
 
@@ -1092,11 +1237,26 @@ function Get-Pm2AppState {
   $text = Remove-Ansi (($desc.Lines -join "`n"))
   if ($desc.ExitCode -ne 0 -or $text -match "doesn't exist") { return $null }
   $status = Get-Pm2StatusFromText -Text $text
+  # `pm2 start <ecosystem>` restarts the script PM2 has registered for a name and
+  # ignores the file's `script` field, so the registered path decides whether a
+  # replacement can be a restart or has to be a delete-and-start. The table is
+  # drawn with U+2502; the plain `|` and a drive-letter fallback keep the parse
+  # working if the console encoding could not be set to UTF-8.
+  $scriptPath = ""
+  $scriptLine = ($text -split "`r?`n" | Where-Object { $_ -match 'script path' } | Select-Object -First 1)
+  if ($scriptLine -and $scriptLine -match 'script path\s*[\u2502|]\s*(.+?)\s*[\u2502|]?\s*$') {
+    $scriptPath = $Matches[1].Trim()
+  } elseif ($scriptLine -and $scriptLine -match '(?i)([A-Za-z]:\\.*?\.(?:js|cjs|mjs|exe))') {
+    $scriptPath = $Matches[1]
+  }
+  $execCwd = ""
+  $cwdLine = ($text -split "`r?`n" | Where-Object { $_ -match 'exec cwd' } | Select-Object -First 1)
+  if ($cwdLine -and $cwdLine -match 'exec cwd\s*[\u2502|]\s*(.+?)\s*[\u2502|]?\s*$') { $execCwd = $Matches[1].Trim() }
   $procId = 0
   $pidOut = Invoke-External -FilePath $Pm2Path -ArgumentList @("pid", $Name) -WorkingDirectory $WorkingDir -TimeoutSeconds 30 -LogTag "PM2PID" -Quiet
   $pidText = (($pidOut.Lines -join "`n")).Trim()
   if ($pidText -match '^\d+$') { $procId = [int]$pidText }
-  return [pscustomobject]@{ Name = $Name; Status = $status; Pid = $procId }
+  return [pscustomobject]@{ Name = $Name; Status = $status; Pid = $procId; ScriptPath = $scriptPath; Cwd = $execCwd }
 }
 
 function Test-Pm2Apps {
