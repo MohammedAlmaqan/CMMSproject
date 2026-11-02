@@ -601,17 +601,30 @@ function Copy-Bundle {
     $src = Join-Path $Bundle $f
     if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination $Root -Force; Log "INFO" "  copied $f" }
   }
-  # A blank instance must never receive a database dump or any client data.
-  # The `database\` folder is where a published bundle keeps a full dump; it is
-  # removed wholesale. Stray .sql files elsewhere are removed too, EXCEPT the
-  # Prisma migrations under backend\prisma\migrations\, which are the schema
-  # history the install needs in order to apply the database.
-  $dumpDir = Join-Path $Root "database"
-  if (Test-Path -LiteralPath $dumpDir) { Remove-Item -LiteralPath $dumpDir -Recurse -Force; Log "INFO" "  removed database\ (excluded: a blank instance carries no data)" }
-  Get-ChildItem -LiteralPath $Root -Recurse -File -Filter "*.sql" -ErrorAction SilentlyContinue | ForEach-Object {
-    if ($_.FullName -match '[\\/]prisma[\\/]migrations[\\/]') { return }
-    Log "INFO" "  excluded dump file $($_.FullName)"
-    Remove-Item -LiteralPath $_.FullName -Force
+  # A blank instance must never receive a database dump, but only files the
+  # BUNDLE itself delivered are removed. A *.sql that was already in the install
+  # root belongs to the operator - a backups folder, a hand-made dump - and
+  # deleting it is data loss, not hygiene. On 2026-11-01 this sweep deleted the
+  # production dumps in <root>\backups because the install root was also the
+  # repository checkout. The list is taken from the bundle, so what is removed is
+  # exactly what the bundle carried (the Prisma migrations are the schema
+  # history, not a data dump, and are kept).
+  $bundleRoot = (Resolve-Path -LiteralPath $Bundle).Path
+  $bundledDumps = @(Get-ChildItem -LiteralPath $bundleRoot -Recurse -File -Filter "*.sql" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '[\\/]prisma[\\/]migrations[\\/]' } |
+    ForEach-Object { $_.FullName.Substring($bundleRoot.Length).TrimStart('\') })
+  if (Test-Path -LiteralPath (Join-Path $bundleRoot "database")) {
+    Log "WARN" "  the bundle carries database\; it is not copied (a blank instance carries no data)"
+  }
+  if (Test-Path -LiteralPath (Join-Path $Root "database")) {
+    Log "WARN" "  $Root\database exists and is left untouched (it did not come from this bundle)"
+  }
+  foreach ($rel in $bundledDumps) {
+    $copied = Join-Path $Root $rel
+    if (Test-Path -LiteralPath $copied) {
+      Remove-Item -LiteralPath $copied -Force
+      Log "INFO" "  excluded bundled dump file $rel"
+    }
   }
   # The published bundle ships env templates and a sample (backend\.env.deploy,
   # backend\.env.example). The install generates its own .env, so neither may
