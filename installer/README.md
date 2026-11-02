@@ -67,6 +67,7 @@ visible in the process list. Supply it either as a `SecureString`
 | `-ApiPort` | `4000` | Port the API listens on |
 | `-BindHost` | `127.0.0.1` | Address the API binds to |
 | `-SiteName` | `cmms.local` | Host name used for CORS and the optional IIS site |
+| `-SitePath` | resolved from `-SiteName` | Folder the web server serves. The engine asks IIS for the site's physical path and replaces its `assets\`, keeping the host's own `web.config`; pass this where the browser's host name is not the IIS site name |
 | `-CorsOrigins` | derived from `-SiteName` | Explicit CORS origin list |
 | `-AppNamePrefix` | (none) | Prefix for the PM2 application names |
 | `-PrismaEnginesPath` | (none) | Folder holding prebuilt Prisma engine binaries |
@@ -93,10 +94,35 @@ has never run CommandPulse. `-Mode probe` returns the same four-way classificati
 without writing anything, which is how the wizard asks before it upgrades.
 
 ## Modes
-- `full` - preflight, verify bundle, classify/create the database, copy files, generate .env (ACL-locked), npm ci, prisma generate, prisma migrate deploy, pm2 start+save, verify health. It refuses an API port that is already listening, so the health check cannot be answered by another service.
+- `full` - preflight, verify bundle, classify/create the database, copy files, generate .env (ACL-locked), install dependencies, prisma generate, prisma migrate deploy, pm2 start+save, verify health, deploy the compiled frontend to the web server. An upgrade stages the dependencies while the running application keeps serving, and accepts an API port held by this install's own PM2 application because it replaces that application in place. Any other listener on the port is refused, so the health check cannot be answered by a different service.
 - `verify` - run health checks against an existing install (no file copy, no migrations).
 - `uninstall` - remove engine-created artifacts only (does not drop the database).
 - `probe` - classify the target database and write `-ProbeOut` JSON; copies nothing and writes nothing.
+
+## Upgrades
+The engine treats an existing CommandPulse database with `-AllowExistingDatabase` as an
+upgrade, and the steps that can take minutes run while the old application keeps
+serving:
+
+1. `backend\.env` is copied to `backend\.env.bak.<RunStamp>` and the copy is given the
+   same ACL as the original before `.env` is rewritten. The five most recent backups are
+   kept; older ones are removed.
+2. `npm ci`, `prisma generate` and `prisma migrate deploy` run against a staged copy in
+   `backend\.install-stage`, with the install's own `.env`. A failure there leaves the
+   installed application and its `node_modules` untouched and still running.
+3. The generated ecosystem file is loaded with Node and every script path is resolved
+   before PM2 is touched. `pm2 start` exits 0 when a script is missing, so this gate is
+   what keeps a bad path from becoming an outage.
+4. The applications are stopped only for the dependency swap, which is two directory
+   renames (retried for several seconds, because the running process holds the Prisma
+   engine DLL). If the script path PM2 has registered already matches the new one, the
+   application is restarted in place instead of deleted. A start that does not come
+   online restores the previously registered applications before the engine reports
+   failure.
+5. The compiled frontend is deployed to the folder the web server actually serves,
+   after the new API answers its health check, so the browser never gets a new build
+   pointed at an old backend. A failure there exits 5 while leaving the application
+   running.
 
 ## Prerequisites (detected, not auto-installed)
 - Node.js >= 24
@@ -123,6 +149,13 @@ different port needs its own ecosystem file. The shipped file is never
 modified. The generated file must keep the `.config.cjs` naming: PM2 only
 treats a file with that pattern as an ecosystem definition, and starts a
 plain `.cjs` file as an application script.
+
+`site\` is the install's own copy of the compiled frontend. On a host where IIS
+already serves the site, the engine also updates that site's physical folder
+(`-SitePath`, or the path recorded for `-SiteName`), replacing `assets\` and
+verifying every copied file by SHA-256; the site's `web.config` is kept because
+it carries the host's proxy binding. If no site can be resolved the engine logs
+a warning and leaves the web server alone rather than guessing a path.
 
 ## First Administrator
 A migrated database has no users, and the application only lets an existing
@@ -168,7 +201,8 @@ names. Uninstall deletes only the names that install owns; it never runs
 - `.env` is generated with a fresh CSPRNG JWT_SECRET and ACL-locked to SYSTEM, BUILTIN\Administrators, and the dynamically resolved current user. No hardcoded usernames.
 - The resolved PostgreSQL password is redacted from the install log and from every captured command-output file. `pm2 jlist` is not used: PM2 returns the full environment block of every application, which is how an earlier revision wrote `PGPASSWORD` to disk.
 - The live database `cmms` is never targeted by tests; the harness creates and drops a throwaway database. The engine classifies `-DbName` before it copies anything, so an existing CommandPulse database (including `cmms` on this host) is refused with exit 4 unless `-AllowExistingDatabase` is passed, and a database with tables but no CommandPulse migration history is refused with or without it.
-- No dumps, client data, or production secrets are copied. The `database\` folder is excluded and the Prisma migrations under `backend\prisma\migrations\` are kept, because they are the schema history the install applies.
+- No dumps, client data, or production secrets are copied. Only files the bundle itself carries are removed, so a `database\` folder or `*.sql` dump that was already in the install root belongs to the operator and is left in place; the Prisma migrations under `backend\prisma\migrations\` are kept, because they are the schema history the install applies.
+- An upgrade backs up `backend\.env` to `.env.bak.<RunStamp>` before rewriting it, gives the copy the same ACL, and keeps the five most recent backups. `Copy-Bundle` never deletes either name.
 - The first-Administrator password is registered with the same redaction list as the PostgreSQL password, and it is passed to the helper on stdin only. The Administrator JSON temp file is ACL-restricted to the installing account, deleted by the engine and again by the wizard.
 
 ## Timeouts
@@ -204,3 +238,12 @@ The harness also supplies a random Administrator password and asserts that the
 account exists with a bcrypt hash, that `POST /api/auth/login` returns a token
 for it, that a wrong password is rejected with 401, and that the password does
 not appear anywhere in the install log.
+
+A final section upgrades the same install in place with the engine's `full` mode
+and asserts the properties the 2026-11-01 live upgrade did not have: the PM2
+application pid changes without the service disappearing (a 250 ms health poller
+records the gap), the registered script path is the new tree, `.env.bak.<stamp>`
+holds the previous JWT secret while the live `.env` holds a different one, the
+operator's `.sql` dumps and `database\` folder survive, the staging folder is
+removed, and the folder the web server serves matches the new build while keeping
+its planted `web.config`.
