@@ -83,6 +83,14 @@
 .PARAMETER SiteName
   Host name used for CORS and for the optional IIS site. Default cmms.local.
 
+.PARAMETER SitePath
+  Folder the web server serves for -SiteName. When unset the engine asks IIS for
+  the physical path of the site named by -SiteName, so the compiled frontend is
+  deployed to the live site on an upgrade instead of being left behind in the
+  install root. Pass it explicitly on a host where the site name is not the one
+  the browser uses. When neither resolves, the frontend is left in the install
+  root and the log says so.
+
 .PARAMETER AppNamePrefix
   Prefix for the names this install registers with PM2. The shipped names are
   "cmms-api" and "cmms-worker"; with a prefix they become "<prefix>api" and
@@ -128,6 +136,7 @@ param(
   [int]$ApiPort = 4000,
   [string]$BindHost = "127.0.0.1",
   [string]$SiteName = "cmms.local",
+  [string]$SitePath = "",
   [string]$CorsOrigins = "",
   [string]$AppNamePrefix = "",
   [string]$PrismaEnginesPath = "",
@@ -667,6 +676,99 @@ function New-SiteFolder {
   if (Test-Path -LiteralPath $srcWebConfig) { Copy-Item -LiteralPath $srcWebConfig -Destination $site -Force }
   Log "OK" "Site folder prepared at $site"
   return $site
+}
+
+# The folder IIS actually serves is NOT the install root's site\ folder. An
+# upgrade that replaced the backend but left that folder alone would serve a
+# frontend from an older release - the drift found on 2026-11-01, where the API
+# ran the 2026-10-31 build while the IIS site still held whatever had been copied
+# by hand. The target is resolved from the site NAME with appcmd, so no path is
+# hardcoded, and an existing web.config is preserved because it carries the
+# host's own proxy binding.
+function Get-WebSitePath {
+  param([string]$Name)
+  if (-not $Name) { return $null }
+  $appcmd = Join-Path $env:SystemRoot "System32\inetsrv\appcmd.exe"
+  if (-not (Test-Path -LiteralPath $appcmd)) { return $null }
+  $out = & $appcmd list vdir "$Name/" 2>$null
+  if (-not $out) { return $null }
+  if ("$out" -match 'physicalPath:([^,)]+)') { return $Matches[1].Trim() }
+  return $null
+}
+
+function Deploy-Site {
+  param([string]$Root, [string]$Target)
+  $source = Join-Path $Root "site"
+  if (-not (Test-Path -LiteralPath (Join-Path $source "index.html"))) {
+    Log "WARN" "No compiled frontend under $source; the web server was not updated"
+    return "skipped"
+  }
+  if (-not $Target) { $Target = Get-WebSitePath -Name $SiteName }
+  if (-not $Target) {
+    Log "WARN" "No IIS site named '$SiteName' on this host, so the compiled frontend was not deployed. Pass -SitePath to name the folder the web server serves."
+    return "skipped"
+  }
+  if (-not (Test-Path -LiteralPath $Target)) {
+    Log "WARN" "Site folder '$Target' does not exist; nothing was deployed"
+    return "skipped"
+  }
+  $fullTarget = (Resolve-Path -LiteralPath $Target).Path.TrimEnd('\')
+  $fullSource = (Resolve-Path -LiteralPath $source).Path.TrimEnd('\')
+  if ($fullTarget -ieq $fullSource) {
+    Log "INFO" "$fullTarget is the install's own site folder; nothing to deploy"
+    return "skipped"
+  }
+  # A mistyped -SitePath must not be able to empty a drive root or the Windows
+  # folder: this step removes <target>\assets before it copies.
+  if ($fullTarget -match '^[A-Za-z]:$' -or $fullTarget -ieq $env:SystemRoot) {
+    throw "Refusing to deploy the frontend into $fullTarget"
+  }
+
+  Log "INFO" "=== Frontend deployment ==="
+  # Hashed asset names change every release, so the old set is removed rather
+  # than left to accumulate beside the new one.
+  $assets = Join-Path $fullTarget "assets"
+  if (Test-Path -LiteralPath $assets) { Remove-Item -LiteralPath $assets -Recurse -Force }
+
+  # web.config is handled on its own below: the host's copy is the reverse proxy
+  # binding, and a bundle copy built for another host would repoint it.
+  $copied = 0
+  foreach ($f in Get-ChildItem -LiteralPath $source -Recurse -File) {
+    $rel = $f.FullName.Substring($source.Length).TrimStart('\')
+    if ($rel -ieq "web.config") { continue }
+    $dst = Join-Path $fullTarget $rel
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+    Copy-Item -LiteralPath $f.FullName -Destination $dst -Force
+    $copied++
+  }
+
+  $liveWebConfig = Join-Path $fullTarget "web.config"
+  $bundleWebConfig = Join-Path $source "web.config"
+  if (Test-Path -LiteralPath $liveWebConfig) {
+    if ((Test-Path -LiteralPath $bundleWebConfig) -and
+        ((Get-FileHash -LiteralPath $liveWebConfig -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $bundleWebConfig -Algorithm SHA256).Hash)) {
+      Log "WARN" "The site's web.config differs from the bundle's; the site's own copy was kept because it carries this host's proxy binding"
+    }
+  } elseif (Test-Path -LiteralPath $bundleWebConfig) {
+    Copy-Item -LiteralPath $bundleWebConfig -Destination $liveWebConfig -Force
+    Log "INFO" "  the site had no web.config; the bundle's copy was installed"
+  }
+
+  # Evidence, not assumption: every file the release ships must now be the file
+  # the web server serves.
+  $checked = 0
+  $mismatch = @()
+  foreach ($f in Get-ChildItem -LiteralPath $source -Recurse -File) {
+    $rel = $f.FullName.Substring($source.Length).TrimStart('\')
+    if ($rel -ieq "web.config") { continue }
+    $dst = Join-Path $fullTarget $rel
+    $checked++
+    if (-not (Test-Path -LiteralPath $dst)) { $mismatch += $rel; continue }
+    if ((Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash) { $mismatch += $rel }
+  }
+  if ($mismatch.Count -gt 0) { throw "The deployed frontend does not match the bundle: $($mismatch -join ', ')" }
+  Log "OK" "Frontend deployed to $fullTarget ($copied files copied, $checked verified)"
+  return "updated"
 }
 
 # A staged dependency install leaves the previous tree behind as rollback
@@ -1472,10 +1574,25 @@ try {
 
   $healthy = Test-Health -Port $ApiPort
 
+  # The site folder inside the install root is not what the browser loads: the web
+  # server serves its own physical path. That folder is updated only once the new
+  # API is answering, so the browser never gets a new build pointed at an old
+  # backend. A failure here does not abort an install whose application is fine;
+  # it changes the exit code at the end.
+  $siteStatus = "skipped"
+  if ($healthy) {
+    try { $siteStatus = Deploy-Site -Root $InstallRoot -Target $SitePath }
+    catch { Log "ERR" "The compiled frontend could not be deployed to the web server: $($_.Exception.Message)"; $siteStatus = "failed" }
+  }
+
   Log "INFO" "Install log: $script:LogFile"
   if (-not $appsOnline) { Log "ERR" "The PM2 applications are not all online. See the log for the PM2 output."; exit 3 }
   if ($healthy) {
     Remove-InstallStaging -BackendDir $backendDir
+    if ($siteStatus -eq "failed") {
+      Log "ERR" "The application is running, but the compiled frontend was not deployed to the web server (see above); the site still serves its previous build."
+      exit 5
+    }
     Log "INFO" "Engine finished (full)"; exit 0
   }
   Log "ERR" "The installation completed but the API is not answering yet."; exit 3
