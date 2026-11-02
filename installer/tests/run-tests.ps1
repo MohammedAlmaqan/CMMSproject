@@ -93,7 +93,11 @@ if (-not $PrismaEnginesPath) {
   if (Test-Path -LiteralPath $candidate) { $PrismaEnginesPath = $candidate }
 }
 $scratch = Join-Path $env:TEMP ("cmms-installer-test-" + (Get-Date -Format "yyyyMMddHHmmss"))
-$installRoot = Join-Path $scratch "install"
+# The install root contains a space on purpose. The live root is
+# "…\Default Project\CMMSproject", and a path that splits on the space is exactly
+# what made the 2026-11-01 upgrade delete a healthy application and fail to
+# start its replacement (D2). Every harness run now covers that shape.
+$installRoot = Join-Path $scratch "install root"
 $pm2Home = Join-Path $scratch "pm2-home"
 $dbName = "cmms_installer_test_" + (Get-Random)
 # Database-policy cases (I-27). They are declared here, before the try block, so
@@ -103,6 +107,16 @@ $emptyDb = "cmms_installer_empty_" + (Get-Random)
 $policyRoot = Join-Path $scratch "policy-install"
 $policyPrefix = "cmmspol" + (Get-Random -Minimum 100000 -Maximum 999999) + "-"
 $policyAppNames = @("$($policyPrefix)api", "$($policyPrefix)worker")
+
+# The folder a web server would serve. It is deliberately NOT the install root's
+# site\ folder, and it starts with a web.config of its own: the deploy step has to
+# replace the compiled files and leave the host's proxy binding alone (D6). No IIS
+# site is involved, so the harness works on any host - it passes -SitePath.
+$siteTarget = Join-Path $scratch "iis site"
+New-Item -ItemType Directory -Force -Path $siteTarget | Out-Null
+$siteWebConfig = Join-Path $siteTarget "web.config"
+$siteWebConfigBody = '<?xml version="1.0" encoding="utf-8"?>' + "`r`n" + '<configuration><!-- this host'+"'"+'s proxy binding --></configuration>' + "`r`n"
+[System.IO.File]::WriteAllText($siteWebConfig, $siteWebConfigBody)
 
 # The first-Administrator contract. A random password keeps the "not in the log"
 # assertion meaningful; the fixed username and email make the database row and
@@ -171,7 +185,7 @@ try {
   $env:CMMS_INSTALLER_TEST_PGPASSWORD = $PgPassword
   & $engine -SourceBundle $SourceBundle -InstallRoot $installRoot `
     -PgHost $PgHost -PgPort $PgPort -PgUser $PgUser -PgPasswordEnv "CMMS_INSTALLER_TEST_PGPASSWORD" `
-    -DbName $dbName -ApiPort $TestPort -SiteName "cmms.test.local" `
+    -DbName $dbName -ApiPort $TestPort -SiteName "cmms.test.local" -SitePath $siteTarget `
     -AppNamePrefix $appPrefix -PrismaEnginesPath $PrismaEnginesPath `
     -AdminFile $adminFile -Mode full
   $engineExit = $LASTEXITCODE
@@ -229,6 +243,20 @@ try {
   $site = Join-Path $installRoot "site"
   Assert-True "site\index.html present" (Test-Path (Join-Path $site "index.html"))
   Assert-True "site\web.config present" (Test-Path (Join-Path $site "web.config"))
+
+  # 6b. The folder the web server actually serves was updated (D6). Before this
+  # step an upgrade replaced the backend and left the live site on its old build.
+  Assert-True "frontend deployed to the web server target" (Test-Path (Join-Path $siteTarget "index.html"))
+  if (Test-Path (Join-Path $siteTarget "index.html")) {
+    Assert-True "deployed index.html matches the install's site\index.html" (
+      (Get-FileHash (Join-Path $siteTarget "index.html") -Algorithm SHA256).Hash -eq
+      (Get-FileHash (Join-Path $site "index.html") -Algorithm SHA256).Hash)
+    $deployedAssets = @(Get-ChildItem (Join-Path $siteTarget "assets") -File -ErrorAction SilentlyContinue)
+    $bundleAssets = @(Get-ChildItem (Join-Path $site "assets") -File -ErrorAction SilentlyContinue)
+    Assert-True "deployed assets match the bundle's ($($bundleAssets.Count))" ($deployedAssets.Count -eq $bundleAssets.Count) "(deployed $($deployedAssets.Count), bundle $($bundleAssets.Count))"
+  }
+  Assert-True "site deploy preserved the host's own web.config" (
+    (Test-Path $siteWebConfig) -and ([System.IO.File]::ReadAllText($siteWebConfig) -eq $siteWebConfigBody))
 
   # 7. Schema applied to the throwaway database
   $tableCount = (& $psql -U $PgUser -h $PgHost -p $PgPort -d $dbName -At -c "select count(*) from pg_tables where schemaname='public';" 2>$null | Select-Object -First 1)
@@ -317,6 +345,26 @@ try {
     if ($status) { Assert-True "pm2 $name is online" ($status -eq "online") "(status $status)" }
   }
 
+  function Get-Pm2Pid {
+    param([string]$Name)
+    if (-not $pm2) { return $null }
+    $text = (& $pm2.Source pid $Name 2>&1 | Out-String).Trim()
+    if ($text -match '^\d+$') { return [int]$text }
+    return $null
+  }
+
+  function Get-Pm2ScriptPath {
+    param([string]$Name)
+    if (-not $pm2) { return "" }
+    $d = (& $pm2.Source describe $Name 2>&1 | Out-String)
+    $d = [regex]::Replace($d, ([string][char]27 + '\[[0-9;?]*[ -/]*[@-~]'), "")
+    $line = ($d -split "`r?`n" | Where-Object { $_ -match 'script path' } | Select-Object -First 1)
+    if (-not $line) { return "" }
+    if ($line -match 'script path\s*[\u2502|]\s*(.+?)\s*[\u2502|]?\s*$') { return $Matches[1].Trim() }
+    if ($line -match '(?i)([A-Za-z]:\\.*?\.(?:js|cjs|mjs))') { return $Matches[1] }
+    return ""
+  }
+
   # 10. The live CMMS applications are untouched. The test install used its own
   # application names, so the live ones must still be online and still be
   # serving the live port.
@@ -400,6 +448,172 @@ try {
   $migAfterUpgrade = Invoke-ThrowawaySql 'select count(*) from "_prisma_migrations";'
   Assert-True "upgrade left the migration history unchanged" ("$migBefore" -eq "$migAfterUpgrade") "(before=$migBefore after=$migAfterUpgrade)"
   Assert-True "policy install created its own site folder" (Test-Path (Join-Path $policyRoot "site\index.html"))
+
+  # 13. In-place upgrade (D2/D3/D4/D5/D6). A second full pass against the SAME
+  # root, port and application names, with the applications ONLINE. That is the
+  # shape of a real upgrade and the only shape in which the 2026-11-01 defects
+  # appear: an unquoted PM2 path, a .env deleted before it could be backed up, a
+  # *.sql sweep that ate the operator's dumps, a dependency install that cannot
+  # run against a live tree, and a frontend left behind on the web server.
+  Write-Host "`n-- in-place upgrade pass --" -ForegroundColor Cyan
+  $envBefore = [System.IO.File]::ReadAllText($envFile)
+  $jwtBefore = if ($envBefore -match '(?m)^JWT_SECRET="([^"]+)"') { $Matches[1] } else { "" }
+  Assert-True "pre-upgrade .env has a 64-char JWT secret" ($jwtBefore.Length -eq 64) "(len $($jwtBefore.Length))"
+  $pidBefore = @{}
+  foreach ($n in $testAppNames) { $pidBefore[$n] = Get-Pm2Pid $n }
+
+  # D4 material: a dump and a database\ folder that did NOT come from the bundle.
+  # The old sweep deleted every *.sql under the install root and the whole
+  # database\ folder; on 2026-11-01 that removed the production backups.
+  $backupsDir = Join-Path $installRoot "backups"
+  New-Item -ItemType Directory -Force -Path $backupsDir | Out-Null
+  $keepDump = Join-Path $backupsDir "cmms-operator-dump.sql"
+  [System.IO.File]::WriteAllText($keepDump, "-- an operator dump; an install must not remove it`n")
+  $keepDatabaseDir = Join-Path $installRoot "database"
+  New-Item -ItemType Directory -Force -Path $keepDatabaseDir | Out-Null
+  $keepDatabaseFile = Join-Path $keepDatabaseDir "operator.txt"
+  [System.IO.File]::WriteAllText($keepDatabaseFile, "not from the bundle`n")
+
+  # Continuity is measured, not asserted: health is polled every 250 ms for the
+  # whole upgrade. The gap must be the directory swap (seconds), not the
+  # dependency install (minutes), which is what an in-place `npm ci` would cause.
+  $pollFile = Join-Path $scratch "health-poll.txt"
+  $stopFile = Join-Path $scratch "health-poll.stop"
+  Remove-Item -LiteralPath $pollFile, $stopFile -Force -ErrorAction SilentlyContinue
+  $pollJob = Start-Job -ArgumentList $TestPort, $pollFile, $stopFile -ScriptBlock {
+    param($Port, $Out, $Stop)
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    Add-Content -LiteralPath $Out -Value "started"
+    $last = $true
+    while (-not (Test-Path -LiteralPath $Stop)) {
+      $ok = $false
+      try {
+        $r = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/api/health" -UseBasicParsing -TimeoutSec 4
+        $ok = ($r.StatusCode -eq 200)
+      } catch { $ok = $false }
+      if ($ok -ne $last) {
+        $word = if ($ok) { "UP" } else { "DOWN" }
+        Add-Content -LiteralPath $Out -Value ("{0:0.00} {1}" -f $sw.Elapsed.TotalSeconds, $word)
+        $last = $ok
+      }
+      Start-Sleep -Milliseconds 250
+    }
+    Add-Content -LiteralPath $Out -Value ("{0:0.00} END" -f $sw.Elapsed.TotalSeconds)
+  }
+  $waitStart = Get-Date
+  while (-not (Test-Path -LiteralPath $pollFile) -and ((New-TimeSpan -Start $waitStart).TotalSeconds -lt 30)) { Start-Sleep -Milliseconds 200 }
+  Assert-True "health poller started before the upgrade" (Test-Path -LiteralPath $pollFile)
+
+  $upgradeExit = -1
+  try {
+    & $engine -SourceBundle $SourceBundle -InstallRoot $installRoot `
+      -PgHost $PgHost -PgPort $PgPort -PgUser $PgUser -PgPasswordEnv "CMMS_INSTALLER_TEST_PGPASSWORD" `
+      -DbName $dbName -ApiPort $TestPort -SiteName "cmms.test.local" -SitePath $siteTarget `
+      -AppNamePrefix $appPrefix -PrismaEnginesPath $PrismaEnginesPath `
+      -Mode full -AllowExistingDatabase
+    $upgradeExit = $LASTEXITCODE
+  } finally {
+    New-Item -ItemType File -Force -Path $stopFile | Out-Null
+    try { Wait-Job $pollJob -Timeout 60 | Out-Null } catch { }
+    try { Receive-Job $pollJob -ErrorAction SilentlyContinue | Out-Null; Remove-Job $pollJob -Force } catch { }
+  }
+  Assert-True "in-place upgrade exits 0" ($upgradeExit -eq 0) "(exit $upgradeExit)"
+
+  # 13a. The operator's data survived the upgrade (D4).
+  Assert-True "operator dump in backups\ survived the upgrade" (Test-Path -LiteralPath $keepDump)
+  Assert-True "operator dump content is unchanged" (
+    (Test-Path -LiteralPath $keepDump) -and
+    ([System.IO.File]::ReadAllText($keepDump) -eq "-- an operator dump; an install must not remove it`n"))
+  Assert-True "operator database\ folder survived the upgrade" (Test-Path -LiteralPath $keepDatabaseFile)
+
+  # 13b. The previous .env was backed up before it was rewritten (D3), the copy
+  # holds the OLD secret, and the new .env holds a different one.
+  $backendDir = Join-Path $installRoot "backend"
+  $envBackups = @(Get-ChildItem -LiteralPath $backendDir -Force -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like ".env.bak.*" })
+  Assert-True "upgrade left a .env.bak.<stamp> copy" ($envBackups.Count -ge 1) "(found $($envBackups.Count))"
+  $savedOldSecret = $false
+  foreach ($b in $envBackups) {
+    if ([System.IO.File]::ReadAllText($b.FullName).Contains($jwtBefore)) { $savedOldSecret = $true }
+  }
+  Assert-True "the .env backup holds the previous JWT secret" $savedOldSecret
+  $envAfter = [System.IO.File]::ReadAllText($envFile)
+  $jwtAfter = if ($envAfter -match '(?m)^JWT_SECRET="([^"]+)"') { $Matches[1] } else { "" }
+  Assert-True ".env was rewritten with a fresh JWT secret" ($jwtAfter.Length -eq 64 -and $jwtAfter -ne $jwtBefore)
+  if ($envBackups.Count -ge 1) {
+    $bakAcl = Get-Acl -LiteralPath $envBackups[0].FullName
+    $bakTrustees = @($bakAcl.Access | ForEach-Object { $_.IdentityReference.Value })
+    $me2 = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $bakExpected = @("NT AUTHORITY\SYSTEM", "BUILTIN\Administrators", $me2)
+    $bakExtra = @($bakTrustees | Where-Object { $bakExpected -notcontains $_ })
+    Assert-True ".env backup ACL is protected" $bakAcl.AreAccessRulesProtected
+    Assert-True ".env backup ACL has no extra trustees" ($bakExtra.Count -eq 0) "(extra: $($bakExtra -join ', '))"
+  }
+
+  # 13c. The dependency install was staged and the stage was cleaned up (D5).
+  Assert-True "no .install-stage left behind" (-not (Test-Path -LiteralPath (Join-Path $backendDir ".install-stage")))
+  $previousTrees = @(Get-ChildItem -LiteralPath $backendDir -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like "node_modules.previous-*" })
+  Assert-True "previous node_modules removed after a healthy start" ($previousTrees.Count -eq 0) "(found $($previousTrees.Count))"
+  Assert-True "express is installed in the upgraded tree" (Test-Path (Join-Path $backendDir "node_modules\express\package.json"))
+
+  # 13d. The application was restarted in place, not deleted first (D2), and PM2
+  # has it registered against THIS install's script.
+  $apiName = $testAppNames[0]
+  Assert-True "pm2 $apiName is online after the upgrade" ((Get-Pm2Status $apiName) -eq "online") "(status $(Get-Pm2Status $apiName))"
+  $pidAfter = Get-Pm2Pid $apiName
+  Assert-True "pm2 $apiName was restarted (new pid)" (
+    $pidAfter -and $pidBefore[$apiName] -and $pidAfter -ne $pidBefore[$apiName]) "(before $($pidBefore[$apiName]), after $pidAfter)"
+  $registered = Get-Pm2ScriptPath $apiName
+  $expectedScript = Join-Path $backendDir "dist\index.js"
+  Assert-True "pm2 $apiName runs this install's script" (
+    [System.IO.Path]::GetFullPath($registered).TrimEnd('\') -ieq [System.IO.Path]::GetFullPath($expectedScript).TrimEnd('\')) "(registered '$registered')"
+
+  $upgradeLog = @(Get-ChildItem (Join-Path $env:ProgramData "CommandPulse\logs") -Filter "install-*.log" -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime | Select-Object -Last 1)
+  if ($upgradeLog.Count -eq 1) {
+    $upgradeText = [System.IO.File]::ReadAllText($upgradeLog[0].FullName)
+    Assert-True "upgrade log shows an in-place restart (no delete)" ($upgradeText -match "restarting it in place \(no delete\)")
+    Assert-True "upgrade log shows a staged dependency install" ($upgradeText -match "Staging dependencies in")
+    Assert-True "upgrade log shows the frontend deployment" ($upgradeText -match "Frontend deployed to")
+    Assert-True "upgrade log shows the database upgrade" ($upgradeText -match "UPGRADE database")
+    Assert-True "upgrade log shows no PM2 script-not-found error" ($upgradeText -notmatch "Script not found")
+  }
+
+  # 13e. The web server's folder was brought to the new build, and its own
+  # web.config was left alone (D6).
+  Assert-True "upgrade redeployed the frontend" (
+    (Get-FileHash (Join-Path $siteTarget "index.html") -Algorithm SHA256).Hash -eq
+    (Get-FileHash (Join-Path $site "index.html") -Algorithm SHA256).Hash)
+  Assert-True "upgrade preserved the host's own web.config" (
+    (Test-Path $siteWebConfig) -and ([System.IO.File]::ReadAllText($siteWebConfig) -eq $siteWebConfigBody))
+
+  # 13f. Continuity: measure the longest window in which health did not answer.
+  $events = @(Get-Content -LiteralPath $pollFile -ErrorAction SilentlyContinue |
+    Where-Object { $_ -match '^([0-9.]+) (UP|DOWN|END)$' } |
+    ForEach-Object {
+      $null = $_ -match '^([0-9.]+) (UP|DOWN|END)$'
+      [pscustomobject]@{ At = [double]$Matches[1]; State = $Matches[2] }
+    })
+  Assert-True "health poller recorded the upgrade window" ($events.Count -ge 2) "(events $($events.Count))"
+  $maxGap = 0.0
+  $downAt = $null
+  foreach ($e in $events) {
+    if ($e.State -eq "DOWN") { $downAt = $e.At }
+    elseif ($null -ne $downAt) {
+      $gap = $e.At - $downAt
+      if ($gap -gt $maxGap) { $maxGap = $gap }
+      $downAt = $null
+    }
+  }
+  Assert-True "service gap stayed under 30 s (the swap, not the install)" ($maxGap -lt 30) ("(gap {0:0.0} s)" -f $maxGap)
+  try {
+    $afterResp = Invoke-WebRequest -Uri "http://127.0.0.1:$TestPort/api/health" -UseBasicParsing -TimeoutSec 15
+    Assert-True "API healthy after the upgrade" ($afterResp.StatusCode -eq 200) "(status $($afterResp.StatusCode))"
+  } catch {
+    Assert-True "API healthy after the upgrade" $false "($($_.Exception.Message))"
+  }
+  Write-Summary ("upgrade   : exit {0}, longest gap {1:0.0} s, .env backups {2}" -f $upgradeExit, $maxGap, $envBackups.Count)
 }
 catch {
   Write-Summary "ERROR: $($_.Exception.Message)"
