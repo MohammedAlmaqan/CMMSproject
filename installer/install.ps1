@@ -685,7 +685,12 @@ function Protect-EnvFile {
 # replaces whatever already holds them.
 function Get-AppNames {
   param([string]$Prefix)
-  if ($Prefix) { return @("$Prefix" + "api", "$Prefix" + "worker") }
+  # "${Prefix}api" and not "$Prefix" + "api": the comma operator binds tighter
+  # than `+` in PowerShell, so the concatenating form collapses into ONE string
+  # ("cmmstest1-api cmmstest1-worker") and every `pm2 describe`/`pid`/`delete`
+  # then addresses an application that does not exist. Found by the harness
+  # 2026-11-01; the live install was unaffected only because it uses no prefix.
+  if ($Prefix) { return @("${Prefix}api", "${Prefix}worker") }
   return @("cmms-api", "cmms-worker")
 }
 
