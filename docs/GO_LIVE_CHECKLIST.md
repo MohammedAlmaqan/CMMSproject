@@ -74,6 +74,17 @@ position is a deployment step recorded here, not a reopening of the row.
    this laptop's task queued and never running, so those power conditions were cleared
    and `StartWhenAvailable` set. *Superseded open check (kept): no CMMS/backup scheduled
    task exists on this host.*
+   *Amended 2026-11-03 — supersedes the interactive-user deviation above, which is kept:*
+   the task now runs as **`NT AUTHORITY\SYSTEM`** (`S-1-5-18`, `LogonType=ServiceAccount`,
+   `RunLevel=HighestAvailable`), so delivery no longer depends on a logged-on session; no
+   credential is stored in the task or anywhere else, and `PGPASSWORD` is still read from
+   the machine-scoped variable, which SYSTEM inherits. `WakeToRun` was added and
+   `StartWhenAvailable` retained because this laptop sleeps at 02:00 (`Kernel-Power` id 42
+   at 2026-11-03 02:00:05), which is why the 11-02 and 11-03 runs were missed. Proven by
+   an on-demand run as SYSTEM: `backups\cmms-2026-11-03-1405.sql`, 9,410,639 bytes, owner
+   `NT AUTHORITY\SYSTEM`, 39 `COPY` blocks, `PostgreSQL database dump complete`, 243-file
+   `-uploads` snapshot; that dump was then restored into a throwaway database where all 39
+   tables matched `cmms` row-for-row (41,442 rows), and the throwaway database was dropped.
 
 4. **PM2 autostart on boot.** `pm2 start` / `pm2 save` / `pm2 startup` are documented in
    `INSTALLATION_GUIDE.md`, but no saved PM2 process list exists on this host, so PM2
@@ -86,9 +97,9 @@ position is a deployment step recorded here, not a reopening of the row.
    it produces no copy-paste command. The Windows equivalent was registered instead: the
    Scheduled Task `CommandPulse CMMS PM2 Resurrect` runs `pm2 resurrect` at logon and is
    present (`State: Ready`). **Recorded deviation:** it is a *logon* task, not a boot task,
-   so PM2 starts only once `Injaz` logs on — the same "logged-on only" model already
-   accepted for the backup task — and a pre-logon boot task would need a stored password or
-   an S4U principal. *Superseded open check (kept): no `dump.pm2` on this host.*
+   so PM2 starts only once `Injaz` logs on — the same "logged-on only" model the backup
+   task used until 2026-11-03 (see item 3) — and a pre-logon boot task would need a stored
+   password or an S4U principal. *Superseded open check (kept): no `dump.pm2` on this host.*
 
 5. **Apply the pending migrations to the live `cmms` database.** *Closed 2026-10-22.* The
    live `cmms` database has **22 of 22** finished migrations; the three that were pending
