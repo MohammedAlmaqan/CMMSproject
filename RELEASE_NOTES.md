@@ -4,6 +4,99 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.6.8
+
+An installer release. The application code, the schema and the API contract are
+unchanged from `v1.6.7` - 166 operations across 111 paths, 22 migrations, no new
+ones - so an upgrade from `v1.6.7` replaces the installer and re-runs it; it is
+not a data migration.
+
+Every defect below was found by running the released `v1.6.7` installer against a
+live installation on 2026-11-01, not by reading the code. Each one is recorded in
+`docs/INSTALLER_TRACKER.md` as I-29 to I-34, and each is now covered by the
+installer harness.
+
+### What an operator will notice
+
+- **An upgrade restarts the application instead of deleting it.** `pm2 start`
+  with an ecosystem file restarts the *registered* script, ignores the file's
+  own `script` field, and exits 0 even when nothing starts; the old engine also
+  deleted both applications first. An upgrade therefore stopped a healthy system
+  and left it stopped. The engine now resolves the ecosystem file with the Node
+  that will run it, refuses to start a file it cannot resolve, and - when the
+  registered application already runs this install's script - restarts it in
+  place without a delete. A delete happens only for a genuinely different
+  application, and a failed start rolls back. Paths are quoted for `cmd.exe`,
+  which splits `...\Default Project\...` on the space. I-29, I-34.
+- **The previous `backend\.env` is kept.** The bundle sweep that removes env
+  templates also matched `.env` itself, so an upgrade destroyed the only copy of
+  the live secret. The engine now writes `.env.bak.<RunStamp>` before it
+  generates a new `.env`, and restricts that copy to SYSTEM, Administrators and
+  the installing user. I-30.
+- **The operator's database dumps are not deleted.** Every `*.sql` under the
+  install root except the Prisma migrations was removed, which reached an
+  operator's `backups\` folder and the `database\` folder a published bundle may
+  carry. The sweep now removes only files the bundle itself delivered. I-31.
+- **Dependencies are installed beside the running application, not into it.**
+  `npm ci` ran against the live tree, deleted `node_modules` and then failed on a
+  mapped Prisma DLL, leaving the installation with no dependencies at all. The
+  install now builds `backend\.install-stage`, swaps the directories, and keeps
+  `node_modules.previous-<RunStamp>` until the health check passes. I-32.
+- **The folder IIS serves is updated.** The compiled frontend was copied to the
+  install root's `site\` folder, which no web server reads, so an upgrade left
+  the browser on the previous build. The engine now asks IIS for the physical
+  path of the site named by `-SiteName` (or takes `-SitePath`), replaces its
+  `assets\` and `index.html`, keeps the host's own `web.config`, and exits 5 if
+  the deploy fails after the health check passes. I-33.
+- **The wizard's confirmation actually reaches the engine.** The released
+  `v1.6.7` wizard accepted the upgrade confirmation and then dropped
+  `-AllowExistingDatabase` on the way to the engine, so a confirmed upgrade
+  would have been refused. `4662ac5`.
+
+### Verification
+
+`installer/tests/run-tests.ps1` gained an in-place upgrade section: it installs,
+then upgrades the same root with a bundle copied over it, and asserts the
+restart without a delete, the `.env` backup, that a planted dump survives, that
+`node_modules` is swapped, and that an unrelated folder which already has its own
+`web.config` is updated rather than replaced. The install root contains a space
+on purpose. 87 assertions, 0 failures.
+
+The release was then run as a live upgrade of the Client's own `cmms` database on
+2026-11-02, starting from a `v1.6.7` installation: 4.2 minutes, row counts
+unchanged (the only delta was one scheduler run), the pre-upgrade `.env` secret
+preserved in `.env.bak.20261102-132125`, both PM2 applications restarted in place
+with new process ids, `C:\inetpub\cmms-site` replaced with this bundle's
+`frontend\dist`, and its `web.config` preserved.
+
+`verify_a1.py` (214 clause rows), `verify_a1_dispositions.py` (77 of 77 rows),
+`verify_openapi.py` (166 operations across 111 paths) and `verify_bundle.py`
+pass. Backend suite: 89 files, 1252 tests. App suite: 29 files, 178 tests. The CI
+run at the tagged SHA is the evidence, not this paragraph.
+
+### Release engineering
+
+- `installer/wizard/CommandPulse.iss` declares `1.6.8`, so the setup program and
+  its Add/Remove Programs entry identify this release.
+- `Setup_CommandPulse.exe` was compiled from this tag, and the bundle was
+  reassembled. `backend/`, `frontend/`, `ops/`, `docs/` and
+  `migration-templates/` are byte-identical to `v1.6.7` - no application or
+  document changed - so the only new content is the installer and these notes.
+  `SHA256SUMS.txt` covers every other file in the bundle, including the setup
+  program.
+
+### Known open items
+
+Carried forward from `v1.6.7`: the 500,000-work-order / 100,000-equipment volume
+limb of §4.1 is unmeasured, field-level authorisation on `PUT
+/api/work-orders/{id}` is UI-only (F4), and the credentials in the `v1.6.4`
+bundle are treated as disclosed rather than rotated.
+
+The live upgrade stops the API for the duration of the dependency swap - 27
+seconds on 2026-11-02, measured at 250 ms intervals. A single fork-mode process
+cannot keep serving while its `node_modules` is replaced, so this is a planned
+window, not an outage, and no zero-downtime claim is made.
+
 ## v1.6.7
 
 A hardening release rather than a feature release: three code changes close a
