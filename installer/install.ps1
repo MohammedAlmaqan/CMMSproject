@@ -1485,15 +1485,52 @@ function Invoke-Uninstall {
   param([string]$Root)
   Log "INFO" "=== Uninstall (engine-created artifacts only) ==="
   $backendDir = Join-Path $Root "backend"
+
+  # The services must go before the install root, or SCM would keep a service
+  # whose wrapper executable has just been deleted. The service script removes
+  # both services and the watchdog task; it is a no-op when they do not exist.
+  if (Test-Path -LiteralPath (Join-Path $PSScriptRoot "service\Install-CmmsServices.ps1")) {
+    Invoke-CmmsServiceScript -Mode remove -BackendDir $backendDir -Prefix $AppNamePrefix
+  } else {
+    Log "WARN" "The service installer is missing; any CommandPulse CMMS Windows service must be removed by hand."
+  }
+
+  # A 1.6.x install can still have a PM2 pair under the shipped names.
   if (Test-Path -LiteralPath $backendDir) {
     $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
     if ($pm2) {
-      # Only this install's own application names are deleted. `pm2 kill` is
-      # deliberately NOT used: on Windows it would stop every application in
-      # the daemon, including ones this install does not own.
-      $names = Get-AppNames -Prefix $AppNamePrefix
-      Invoke-External -FilePath $pm2 -ArgumentList (@("delete") + $names) -WorkingDirectory $backendDir -TimeoutSeconds 120 -LogTag "PM2DEL" | Out-Null
-      Invoke-External -FilePath $pm2 -ArgumentList @("save") -WorkingDirectory $backendDir -TimeoutSeconds 60 -LogTag "PM2SAVE" | Out-Null
+      # `pm2 describe` SPAWNS a daemon when none is running, rooted in the
+      # client's working directory - and this uninstall is about to delete that
+      # directory. Reproduced 2026-11-05: the spawned daemon kept the folder
+      # open and Remove-Item failed. Probe the daemon's named pipe instead.
+      # No daemon means no PM2 application is running, so there is nothing to
+      # stop, delete or save; a stale dump.pm2 entry cannot resurrect either,
+      # because the script it names is deleted with the root.
+      $daemonUp = @(Get-ChildItem -LiteralPath '\\.\pipe\' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -eq 'rpc.sock' }).Count -gt 0
+      if (-not $daemonUp) {
+        Log "INFO" "No PM2 daemon is running; there are no legacy PM2 applications to remove"
+      } else {
+        # Only this install's own application names are touched. `pm2 kill` is
+        # deliberately NOT used: on Windows it would stop every application in
+        # the daemon, including ones this install does not own.
+        $names = Get-AppNames -Prefix $AppNamePrefix
+        $existing = @()
+        foreach ($name in $names) {
+          if (Get-Pm2AppState -Pm2Path $pm2 -WorkingDir $env:TEMP -Name $name) { $existing += $name }
+        }
+        if ($existing.Count -gt 0) {
+          Invoke-External -FilePath $pm2 -ArgumentList (@("delete") + $existing) -WorkingDirectory $env:TEMP -TimeoutSeconds 120 -LogTag "PM2DEL" | Out-Null
+          # `pm2 save` rewrites the whole dump.pm2, not just these entries, so it
+          # runs only after a real deletion. A service install has no PM2 names at
+          # all; an unconditional save would still overwrite another PM2-managed
+          # installation's saved process list on this host.
+          Invoke-External -FilePath $pm2 -ArgumentList @("save") -WorkingDirectory $env:TEMP -TimeoutSeconds 60 -LogTag "PM2SAVE" | Out-Null
+          Log "OK" "Removed the legacy PM2 applications: $($existing -join ', ')"
+        } else {
+          Log "INFO" "No legacy PM2 applications for prefix '$AppNamePrefix'; the saved PM2 dump was left untouched"
+        }
+      }
     }
   }
   if (Test-Path -LiteralPath $Root) {
