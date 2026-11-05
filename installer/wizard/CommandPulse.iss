@@ -35,6 +35,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Source: "..\install.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}\installer"; Flags: ignoreversion
 Source: "..\templates\*"; DestDir: "{app}\installer\templates"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Windows service scripts, the health watchdog and the vendored WinSW wrapper
+Source: "..\service\*"; DestDir: "{app}\installer\service"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\tools\winsw\*"; DestDir: "{app}\installer\tools\winsw"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; First-Administrator helper (run from the installed backend by the engine)
 Source: "..\admin\create-admin.cjs"; DestDir: "{app}\installer\admin"; Flags: ignoreversion
 ; Wizard orchestration script
@@ -101,11 +104,11 @@ begin
   PageApp.Values[1] := '127.0.0.1';
   PageApp.Values[2] := 'cmms.local';
 
-  // PM2/Prisma page
+  // Service/Prisma page
   PagePM2 := CreateInputQueryPage(PageApp.ID,
-    'PM2 & Prisma Settings', 'Advanced options for multi-instance or offline installs',
-    'Use App Name Prefix if running alongside an existing CMMS instance on the same Windows user.');
-  PagePM2.Add('PM2 App &Name Prefix (optional):', False);
+    'Service & Prisma Settings', 'Advanced options for multi-instance or offline installs',
+    'Use an instance prefix when running alongside an existing CommandPulse CMMS install on this server. It names the Windows services CommandPulseCMMS<prefix>API and CommandPulseCMMS<prefix>Worker.');
+  PagePM2.Add('Instance &Prefix (optional):', False);
   PagePM2.Add('Prisma Engines &Path (optional):', False);
 
   // First Administrator page. A blank install has no users, and the

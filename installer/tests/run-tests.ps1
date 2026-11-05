@@ -6,11 +6,12 @@
   Runs installer/install.ps1 against a THROWAWAY database and a scratch install root,
   then asserts the installer's contract. Never touches the live `cmms` database.
 
-  On Windows PM2 keeps ONE daemon per user account: PM2_HOME relocates the logs
-  and dump.pm2 but does not create a second daemon. The harness therefore gives
-  the install a unique PM2 application name prefix, and it deletes only those
-  names afterwards. It never runs `pm2 kill`, which would stop every
-  application on the host, including the live CMMS.
+  The installer now registers Windows services, which requires an ELEVATED
+  PowerShell window; the harness refuses to run without one rather than failing
+  half-way through a full install. Each install uses its own instance prefix, so
+  its service names (CommandPulseCMMS<prefix>API/Worker) and watchdog task are
+  distinct from the live install's. The harness removes only those names
+  afterwards; it never touches the live services.
 #>
 [CmdletBinding()]
 param(
@@ -25,12 +26,37 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Registering a Windows service requires an elevated session. Refuse here rather
+# than copying the bundle and swapping node_modules only to have SCM reject the
+# registration at the very end.
+$principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+  Write-Host "This harness registers Windows services and must run from an elevated PowerShell window." -ForegroundColor Red
+  Write-Host "Right-click PowerShell, choose 'Run as administrator', and run the harness again." -ForegroundColor Red
+  exit 2
+}
 # Native command output is decoded with the console output encoding, which on
 # Windows PowerShell 5.1 defaults to the OEM code page and mangles the
-# box-drawing characters PM2 uses. The tools write UTF-8.
+# box-drawing characters command output uses. The tools write UTF-8.
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 $script:Failures = @()
 $script:Passes = 0
+
+# The service names an install derives from its instance prefix. This mirrors
+# Get-CmmsServiceNames in installer\service\Install-CmmsServices.ps1: non-alphanumeric
+# characters are stripped, and a prefixed install gets its own watchdog task.
+function Get-TestServiceNames {
+  param([string]$Prefix)
+  $clean = ""
+  if ($Prefix) { $clean = ($Prefix -replace '[^A-Za-z0-9]', '') }
+  $watchdog = "CommandPulse CMMS Health Watchdog"
+  if ($clean) { $watchdog = "$watchdog $clean" }
+  [pscustomobject]@{
+    Api      = "CommandPulseCMMS${clean}API"
+    Worker   = "CommandPulseCMMS${clean}Worker"
+    Watchdog = $watchdog
+  }
+}
 
 function Assert-True {
   param([string]$Name, [bool]$Condition, [string]$Detail = "")
@@ -72,8 +98,75 @@ function Get-FreePort {
   throw "No free TCP port found from $Start"
 }
 
+# Get-Service returns a ServiceController whose StartType property is not
+# available on every PowerShell 5.1 host, and it cannot report the account.
+# Win32_Service reports state, start mode, account and the wrapper pid in one
+# object, so all service assertions read from there.
+function Get-ServiceInfo {
+  param([string]$Name)
+  $wmi = Get-CimInstance Win32_Service -Filter ("Name='{0}'" -f $Name) -ErrorAction SilentlyContinue
+  if (-not $wmi) { return $null }
+  [pscustomobject]@{
+    Name      = $Name
+    State     = [string]$wmi.State
+    StartMode = [string]$wmi.StartMode
+    Account   = [string]$wmi.StartName
+    Pid       = [int]$wmi.ProcessId
+    PathName  = [string]$wmi.PathName
+  }
+}
+
+# The pid that actually owns the listening socket. With WinSW this is the
+# node.exe child, not the wrapper pid Win32_Service reports.
+function Get-ListenerPid {
+  param([int]$Port)
+  if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
+    $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($conn) { return [int]$conn.OwningProcess }
+  }
+  $line = (& netstat -ano 2>$null | Select-String -Pattern (":{0}\s" -f $Port) | Select-Object -First 1)
+  if ($line -and $line.Line -match 'LISTENING\s+(\d+)') { return [int]$Matches[1] }
+  return $null
+}
+
+# True when $ChildPid is $AncestorPid or a descendant of it. The wrapper starts
+# node.exe, so the listener's parent chain is the only ownership proof: the
+# wrapper pid and the listener pid are deliberately different.
+function Test-DescendantOf {
+  param([int]$ChildPid, [int]$AncestorPid, [int]$MaxDepth = 8)
+  $cursor = $ChildPid
+  for ($i = 0; $i -lt $MaxDepth -and $cursor -gt 0; $i++) {
+    if ($cursor -eq $AncestorPid) { return $true }
+    $proc = Get-CimInstance Win32_Process -Filter ("ProcessId={0}" -f $cursor) -ErrorAction SilentlyContinue
+    if (-not $proc) { return $false }
+    $cursor = [int]$proc.ParentProcessId
+  }
+  return $false
+}
+
+# Runs the service script as a child process, the same way the engine does.
+# Cleanup must never throw: it runs from finally, and one leftover service is
+# not a reason to skip dropping the throwaway databases.
+function Invoke-ServiceScript {
+  param([string]$Mode, [string]$Prefix = "", [int]$Port = 0)
+  $powershell = Join-Path $env:windir "System32\WindowsPowerShell\v1.0\powershell.exe"
+  $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $serviceScript, "-Mode", $Mode)
+  if ($Prefix) { $argList += @("-ServicePrefix", $Prefix) }
+  if ($Port -gt 0) { $argList += @("-ApiPort", [string]$Port) }
+  try {
+    & $powershell @argList 2>&1 | ForEach-Object { Write-Host "  [service $Mode] $_" }
+    if ($LASTEXITCODE -ne 0) { Write-Host "  [service $Mode] exited $LASTEXITCODE" -ForegroundColor Yellow }
+  } catch {
+    Write-Host "  [service $Mode] failed: $($_.Exception.Message)" -ForegroundColor Yellow
+  }
+}
+
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $engine = Join-Path $repoRoot "installer\install.ps1"
+$serviceScript = Join-Path $repoRoot "installer\service\Install-CmmsServices.ps1"
+if (-not (Test-Path -LiteralPath $serviceScript)) {
+  throw "The service script was not found at $serviceScript. The harness asserts the service contract, so it cannot run without it."
+}
 if (-not $SourceBundle) {
   # The published bundle is distributed beside the repository checkout, so the
   # default is the newest sibling bundle that is actually present, not a
@@ -106,7 +199,6 @@ $foreignDb = "cmms_installer_foreign_" + (Get-Random)
 $emptyDb = "cmms_installer_empty_" + (Get-Random)
 $policyRoot = Join-Path $scratch "policy-install"
 $policyPrefix = "cmmspol" + (Get-Random -Minimum 100000 -Maximum 999999) + "-"
-$policyAppNames = @("$($policyPrefix)api", "$($policyPrefix)worker")
 
 # The folder a web server would serve. It is deliberately NOT the install root's
 # site\ folder, and it starts with a web.config of its own: the deploy step has to
@@ -143,11 +235,12 @@ function Write-Summary {
   try { Add-Content -LiteralPath $script:SummaryFile -Value $Line -Encoding UTF8 } catch { }
 }
 
-# A unique PM2 application name prefix. PM2 on Windows has one daemon per
-# user, so the prefix is what keeps the test off the live CMMS application
-# names.
+# A unique instance prefix. It keeps this run's Windows services
+# (CommandPulseCMMS<prefix>API/Worker) and its watchdog task distinct from the
+# live install's. The harness removes only those names.
 $appPrefix = "cmmstest" + (Get-Random -Minimum 100000 -Maximum 999999) + "-"
-$testAppNames = @("$($appPrefix)api", "$($appPrefix)worker")
+$testServices = Get-TestServiceNames -Prefix $appPrefix
+$policyServices = Get-TestServiceNames -Prefix $policyPrefix
 
 Write-Host "=== CommandPulse CMMS installer engine tests ===" -ForegroundColor Cyan
 Write-Host "scratch : $scratch"
@@ -158,7 +251,7 @@ Write-Summary "=== CommandPulse CMMS installer engine tests ==="
 Write-Summary "started   : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 Write-Summary "scratch   : $scratch"
 Write-Summary "database  : $dbName (throwaway)"
-Write-Summary "pm2 prefix: $appPrefix"
+Write-Summary "instance  : $appPrefix"
 Write-Summary "bundle    : $SourceBundle"
 Write-Summary "port      : $TestPort"
 Write-Summary "admin     : $adminUsername (password not recorded)"
@@ -315,64 +408,37 @@ try {
     Assert-True "install log found" $false
   }
 
-  # 9. PM2 apps online, under the test's own prefixed names.
-  # `pm2 jlist` is not used: PM2 returns the full environment block of every
-  # application, which on Windows contains keys that differ only in case
-  # (`username` / `USERNAME`). Windows PowerShell 5.1 resolves dictionary keys
-  # case-insensitively and ConvertFrom-Json throws "duplicated keys". The text
-  # output of `pm2 describe` is used instead.
-  $pm2 = Get-Command pm2.cmd -ErrorAction SilentlyContinue
-  if (-not $pm2) { $pm2 = Get-Command pm2 -ErrorAction SilentlyContinue }
-  function Get-Pm2Status {
-    param([string]$Name)
-    if (-not $pm2) { return $null }
-    $d = (& $pm2.Source describe $Name 2>&1 | Out-String)
-    # The escape character is built from its code point: writing it as a
-    # literal would depend on how this file is read.
-    $d = [regex]::Replace($d, ([string][char]27 + '\[[0-9;?]*[ -/]*[@-~]'), "")
-    if ($d -match "doesn't exist") { return $null }
-    $line = ($d -split "`r?`n" | Where-Object { $_ -match '\bstatus\b' } | Select-Object -First 1)
-    if (-not $line) { return "unknown" }
-    if ($line -match 'status[^A-Za-z0-9]*([A-Za-z]+)') {
-      $word = $Matches[1]
-      if ($word -match '^(online|stopped|errored|launching|launched|created|deleting|zombie|unknown|waiting)$') { return $word }
+  # 9. Both Windows services exist, are Running and Automatic, and the API's
+  # listener is a descendant of the service wrapper. The wrapper pid reported by
+  # Win32_Service is NOT the listener: WinSW starts node.exe as a child, so
+  # ownership is proved by walking the listener's parent chain.
+  foreach ($id in @($testServices.Api, $testServices.Worker)) {
+    $info = Get-ServiceInfo $id
+    Assert-True "service $id exists" ($null -ne $info)
+    if ($info) {
+      Assert-True "service $id is Running" ($info.State -eq "Running") "(state $($info.State))"
+      Assert-True "service $id starts automatically" ($info.StartMode -eq "Auto") "(start mode $($info.StartMode))"
+      Assert-True "service $id runs as LocalSystem" ($info.Account -ieq "LocalSystem" -or $info.Account -ieq "NT AUTHORITY\SYSTEM") "(account $($info.Account))"
     }
-    return "unknown"
   }
-  foreach ($name in $testAppNames) {
-    $status = Get-Pm2Status $name
-    Assert-True "pm2 has $name" ($null -ne $status)
-    if ($status) { Assert-True "pm2 $name is online" ($status -eq "online") "(status $status)" }
+  $listenerPid = Get-ListenerPid -Port $TestPort
+  Assert-True "test port $TestPort is listening" ($null -ne $listenerPid)
+  $apiInfo = Get-ServiceInfo $testServices.Api
+  if ($apiInfo -and $listenerPid) {
+    Assert-True "the API service owns the listener on $TestPort" (Test-DescendantOf -ChildPid $listenerPid -AncestorPid $apiInfo.Pid) "(wrapper $($apiInfo.Pid), listener $listenerPid)"
+    $listener = Get-CimInstance Win32_Process -Filter ("ProcessId={0}" -f $listenerPid) -ErrorAction SilentlyContinue
+    Assert-True "the listener is node.exe" ($listener -and $listener.Name -eq "node.exe") "(name $(if ($listener) { $listener.Name } else { 'gone' }))"
   }
-
-  function Get-Pm2Pid {
-    param([string]$Name)
-    if (-not $pm2) { return $null }
-    $text = (& $pm2.Source pid $Name 2>&1 | Out-String).Trim()
-    if ($text -match '^\d+$') { return [int]$text }
-    return $null
-  }
-
-  function Get-Pm2ScriptPath {
-    param([string]$Name)
-    if (-not $pm2) { return "" }
-    $d = (& $pm2.Source describe $Name 2>&1 | Out-String)
-    $d = [regex]::Replace($d, ([string][char]27 + '\[[0-9;?]*[ -/]*[@-~]'), "")
-    $line = ($d -split "`r?`n" | Where-Object { $_ -match 'script path' } | Select-Object -First 1)
-    if (-not $line) { return "" }
-    if ($line -match 'script path\s*[\u2502|]\s*(.+?)\s*[\u2502|]?\s*$') { return $Matches[1].Trim() }
-    if ($line -match '(?i)([A-Za-z]:\\.*?\.(?:js|cjs|mjs))') { return $Matches[1] }
-    return ""
+  $watchdog = Get-ScheduledTask -TaskName $testServices.Watchdog -ErrorAction SilentlyContinue
+  Assert-True "watchdog task '$($testServices.Watchdog)' is registered" ($null -ne $watchdog)
+  if ($watchdog) {
+    Assert-True "watchdog task is not disabled" ($watchdog.State -ne "Disabled") "(state $($watchdog.State))"
   }
 
-  # 10. The live CMMS applications are untouched. The test install used its own
-  # application names, so the live ones must still be online and still be
-  # serving the live port.
-  foreach ($name in @("cmms-api", "cmms-worker")) {
-    $status = Get-Pm2Status $name
-    Assert-True "live pm2 $name still present" ($null -ne $status)
-    if ($status) { Assert-True "live pm2 $name still online" ($status -eq "online") "(status $status)" }
-  }
+  # 10. The live CMMS is untouched. The test used its own service names, so the
+  # only facts to assert are the ones a shared resource could break: the live
+  # API still answers on 4000 and the live database still has its 39 tables
+  # (asserted in section 11).
   try {
     $liveResp = Invoke-WebRequest -Uri "http://127.0.0.1:4000/api/health" -UseBasicParsing -TimeoutSec 15
     Assert-True "live API still healthy on 4000" ($liveResp.StatusCode -eq 200) "(status $($liveResp.StatusCode))"
@@ -450,17 +516,20 @@ try {
   Assert-True "policy install created its own site folder" (Test-Path (Join-Path $policyRoot "site\index.html"))
 
   # 13. In-place upgrade (D2/D3/D4/D5/D6). A second full pass against the SAME
-  # root, port and application names, with the applications ONLINE. That is the
-  # shape of a real upgrade and the only shape in which the 2026-11-01 defects
-  # appear: an unquoted PM2 path, a .env deleted before it could be backed up, a
-  # *.sql sweep that ate the operator's dumps, a dependency install that cannot
-  # run against a live tree, and a frontend left behind on the web server.
+  # root, port and instance prefix, with the services RUNNING. That is the shape
+  # of a real upgrade and the only shape in which the 2026-11-01 defects appear:
+  # an unquoted path, a .env deleted before it could be backed up, a *.sql sweep
+  # that ate the operator's dumps, a dependency install that cannot run against a
+  # live tree, and a frontend left behind on the web server.
   Write-Host "`n-- in-place upgrade pass --" -ForegroundColor Cyan
   $envBefore = [System.IO.File]::ReadAllText($envFile)
   $jwtBefore = if ($envBefore -match '(?m)^JWT_SECRET="([^"]+)"') { $Matches[1] } else { "" }
   Assert-True "pre-upgrade .env has a 64-char JWT secret" ($jwtBefore.Length -eq 64) "(len $($jwtBefore.Length))"
   $pidBefore = @{}
-  foreach ($n in $testAppNames) { $pidBefore[$n] = Get-Pm2Pid $n }
+  foreach ($id in @($testServices.Api, $testServices.Worker)) {
+    $info = Get-ServiceInfo $id
+    $pidBefore[$id] = if ($info) { $info.Pid } else { $null }
+  }
 
   # D4 material: a dump and a database\ folder that did NOT come from the bundle.
   # The old sweep deleted every *.sql under the install root and the whole
@@ -557,27 +626,27 @@ try {
   Assert-True "previous node_modules removed after a healthy start" ($previousTrees.Count -eq 0) "(found $($previousTrees.Count))"
   Assert-True "express is installed in the upgraded tree" (Test-Path (Join-Path $backendDir "node_modules\express\package.json"))
 
-  # 13d. The application was restarted in place, not deleted first (D2), and PM2
-  # has it registered against THIS install's script.
-  $apiName = $testAppNames[0]
-  Assert-True "pm2 $apiName is online after the upgrade" ((Get-Pm2Status $apiName) -eq "online") "(status $(Get-Pm2Status $apiName))"
-  $pidAfter = Get-Pm2Pid $apiName
-  Assert-True "pm2 $apiName was restarted (new pid)" (
+  # 13d. The service was restarted in place, not unregistered and registered
+  # again (D2), and its wrapper still lives in THIS install's backend\service.
+  $apiName = $testServices.Api
+  $apiInfo = Get-ServiceInfo $apiName
+  Assert-True "service $apiName is Running after the upgrade" ($apiInfo -and $apiInfo.State -eq "Running") "(state $(if ($apiInfo) { $apiInfo.State } else { 'missing' }))"
+  $pidAfter = if ($apiInfo) { $apiInfo.Pid } else { $null }
+  Assert-True "service $apiName was restarted (new wrapper pid)" (
     $pidAfter -and $pidBefore[$apiName] -and $pidAfter -ne $pidBefore[$apiName]) "(before $($pidBefore[$apiName]), after $pidAfter)"
-  $registered = Get-Pm2ScriptPath $apiName
-  $expectedScript = Join-Path $backendDir "dist\index.js"
-  Assert-True "pm2 $apiName runs this install's script" (
-    [System.IO.Path]::GetFullPath($registered).TrimEnd('\') -ieq [System.IO.Path]::GetFullPath($expectedScript).TrimEnd('\')) "(registered '$registered')"
+  $expectedWrapper = Join-Path $backendDir ("service\{0}.exe" -f $apiName)
+  $qc = (& sc.exe qc $apiName 2>&1 | Out-String)
+  Assert-True "service $apiName runs this install's wrapper" (
+    (Test-Path -LiteralPath $expectedWrapper) -and $qc -match [regex]::Escape($expectedWrapper)) "(expected '$expectedWrapper')"
 
   $upgradeLog = @(Get-ChildItem (Join-Path $env:ProgramData "CommandPulse\logs") -Filter "install-*.log" -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime | Select-Object -Last 1)
   if ($upgradeLog.Count -eq 1) {
     $upgradeText = [System.IO.File]::ReadAllText($upgradeLog[0].FullName)
-    Assert-True "upgrade log shows an in-place restart (no delete)" ($upgradeText -match "restarting it in place \(no delete\)")
     Assert-True "upgrade log shows a staged dependency install" ($upgradeText -match "Staging dependencies in")
     Assert-True "upgrade log shows the frontend deployment" ($upgradeText -match "Frontend deployed to")
     Assert-True "upgrade log shows the database upgrade" ($upgradeText -match "UPGRADE database")
-    Assert-True "upgrade log shows no PM2 script-not-found error" ($upgradeText -notmatch "Script not found")
+    Assert-True "upgrade log shows the Windows service registration" ($upgradeText -match "Registering the Windows services")
   }
 
   # 13e. The web server's folder was brought to the new build, and its own
@@ -623,24 +692,26 @@ catch {
 finally {
   Write-Host "`n-- cleanup --" -ForegroundColor Cyan
   $env:PM2_HOME = $pm2Home
-  $backendDir = Join-Path $installRoot "backend"
-  if (Test-Path -LiteralPath $backendDir) {
-    Push-Location $backendDir
-    # Only the test's own application names are deleted. `pm2 kill` is never
-    # used: it would stop every application in the daemon, including the live
-    # CMMS.
-    try { & pm2 delete @testAppNames 2>&1 | Out-Null } catch {}
-    try { & pm2 save 2>&1 | Out-Null } catch {}
-    Pop-Location
-  }
-  # The policy install used a second set of names, so it is removed the same way.
-  $policyBackend = Join-Path $policyRoot "backend"
-  if (Test-Path -LiteralPath $policyBackend) {
-    Push-Location $policyBackend
-    try { & pm2 delete @policyAppNames 2>&1 | Out-Null } catch {}
-    try { & pm2 save 2>&1 | Out-Null } catch {}
-    Pop-Location
-  }
+
+  # Remove the Windows services this run registered. The service script is run as
+  # a child process (never dot-sourced) and -Mode remove also deletes the
+  # per-instance watchdog task. Only this run's prefixes are named, so the live
+  # services are never touched.
+  Invoke-ServiceScript -Mode remove -Prefix $appPrefix -Port $TestPort
+  Invoke-ServiceScript -Mode remove -Prefix $policyPrefix
+
+  # A 1.6.x install may still have PM2 entries for these names. Only the test's
+  # own names would be deleted; `pm2 kill` is never used because it would stop
+  # every application in the daemon, including the live CMMS.
+  #
+  # Nothing to delete here in practice: the engine registers Windows services,
+  # never PM2 applications, and the prefixes are unique to this run, so no other
+  # install can own them. A blind `pm2 delete` of a name that does not exist
+  # prints "[PM2][ERROR] Process or Namespace ... not found" on stderr, which
+  # Windows PowerShell turns into a TerminatingError under `Stop`; the earlier
+  # version of this block therefore filled the transcript with failures that were
+  # not failures. The engine's own legacy handling (below, in the upgrade test)
+  # covers a real 1.6.x pair that shares this install's prefix.
   $env:PM2_HOME = $null
   $env:CMMS_INSTALLER_TEST_PGPASSWORD = $null
   $env:PGPASSWORD = $PgPassword

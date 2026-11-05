@@ -7,13 +7,13 @@
   Installs a BLANK CommandPulse CMMS instance from a compiled release bundle.
   It reproduces, unattended, the procedure documented in IT_DEPLOYMENT_GUIDE.md
   section 5: preflight, integrity verification, file copy, .env generation,
-  dependency install, Prisma client generation, schema migration, PM2 start and
-  a first-run health check.
+  dependency install, Prisma client generation, schema migration, Windows service
+  registration and a first-run health check.
 
   Design rules:
     * Detect-and-report for prerequisites. The engine never downloads or installs
-      Node.js, PostgreSQL, PM2 or IIS. Missing hard prerequisites abort with the
-      fix; missing optional ones are warnings.
+      Node.js, PostgreSQL, IIS or the .NET Framework. Missing hard prerequisites
+      abort with the fix; missing optional ones are warnings.
     * No developer-machine paths anywhere. Every input is a parameter or comes
       from the supplied bundle, so the engine runs unchanged on a client server.
     * Secrets are never written to the log and never echoed to the console.
@@ -72,10 +72,10 @@
 
 .PARAMETER ApiPort
   TCP port the API listens on. Default 4000. The value is written to .env AND
-  applied to the generated install-local PM2 ecosystem file, because the shipped
-  ecosystem.config.cjs pins PORT and PM2's ecosystem env wins over the process
-  environment. In `full` mode the engine refuses a port that is already
-  listening: otherwise the health check could be answered by another service.
+  into the Windows service definition as the PORT environment variable. In
+  `full` mode the engine refuses a port that is already listening unless the
+  holder is this install's own application: otherwise the health check could be
+  answered by another service.
 
 .PARAMETER BindHost
   Address the API binds to. Default 127.0.0.1 (loopback, reverse-proxy only).
@@ -92,12 +92,28 @@
   root and the log says so.
 
 .PARAMETER AppNamePrefix
-  Prefix for the names this install registers with PM2. The shipped names are
-  "cmms-api" and "cmms-worker"; with a prefix they become "<prefix>api" and
-  "<prefix>worker". Set this when the host already runs a CommandPulse CMMS
-  under PM2, or when more than one instance is installed side by side. On
-  Windows PM2 keeps a single daemon per user account, so the name is the only
-  thing that keeps two installs apart.
+  Prefix for the Windows service names this install registers. The shipped names
+  are CommandPulseCMMSAPI and CommandPulseCMMSWorker; with a prefix "cmmstest1"
+  they become CommandPulseCMMScmmstest1API and CommandPulseCMMScmmstest1Worker.
+  Set this when the host already runs a CommandPulse CMMS, or when more than one
+  instance is installed side by side. The same prefix is used to find and remove
+  a legacy PM2 application pair from an older installation.
+
+.PARAMETER ServiceAccount
+  Account the two services run as. Default LocalSystem, which needs no password
+  and starts at boot with nobody logged on. LocalService, NetworkService or a
+  DOMAIN\user account can be supplied instead; a non-built-in account needs
+  -ServiceAccountPassword.
+
+.PARAMETER ServiceAccountPassword
+  Password for -ServiceAccount when it is not LocalSystem, LocalService or
+  NetworkService. Held as a SecureString and never written to the log.
+
+.PARAMETER DependOnPostgres
+  Add an SCM dependency from the CMMS services to the local PostgreSQL service.
+  Off by default: the API does not need the database to boot, and a PostgreSQL
+  that spends minutes in crash recovery would otherwise block the API from
+  starting at all. Enable it only where the PostgreSQL service starts reliably.
 
 .PARAMETER PrismaEnginesPath
   Optional folder containing prebuilt Prisma engine binaries
@@ -139,6 +155,9 @@ param(
   [string]$SitePath = "",
   [string]$CorsOrigins = "",
   [string]$AppNamePrefix = "",
+  [string]$ServiceAccount = "LocalSystem",
+  [SecureString]$ServiceAccountPassword,
+  [switch]$DependOnPostgres,
   [string]$PrismaEnginesPath = "",
   [string]$AdminFile = "",
   [ValidateSet("full","verify","uninstall","probe")][string]$Mode = "full",
@@ -215,15 +234,60 @@ function Redact-Secrets {
   return $Text
 }
 
+# Start-Process redirects a child's standard streams to the capture files, and a
+# child that hands those handles to something longer-lived keeps the file open
+# after the launcher has exited. A Windows service wrapper does exactly that:
+# the launcher reports its exit code while the service it registered still holds
+# the inherited handle. File.ReadAllText opens with FileShare.Read, so that
+# lingering handle turned a successful `-Mode install` into "The process cannot
+# access the file ... because it is being used by another process" at the moment
+# the engine read its own captured output (installer harness, 2026-11-04).
+# Read and write through a handle that tolerates concurrent access instead, and
+# retry briefly because the capture file can still be flushing.
+function Read-CapturedText {
+  param([string]$Path)
+  if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return "" }
+  $deadline = (Get-Date).AddSeconds(15)
+  while ($true) {
+    try {
+      $stream = [System.IO.File]::Open(
+        $Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+      try {
+        $reader = New-Object System.IO.StreamReader($stream)
+        try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
+      } finally { $stream.Dispose() }
+    } catch {
+      if ((Get-Date) -gt $deadline) { throw }
+      Start-Sleep -Milliseconds 250
+    }
+  }
+}
+
+function Write-CapturedText {
+  param([string]$Path, [string]$Text)
+  $stream = [System.IO.File]::Open(
+    $Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::ReadWrite)
+  try {
+    $stream.SetLength(0)
+    $writer = New-Object System.IO.StreamWriter($stream, (New-Object System.Text.UTF8Encoding($false)))
+    try { $writer.Write($Text) } finally { $writer.Dispose() }
+  } finally { $stream.Dispose() }
+}
+
 function Redact-File {
   param([string]$File)
   if (-not $File -or $script:Secrets.Count -eq 0) { return }
   if (-not (Test-Path -LiteralPath $File)) { return }
   try {
-    $raw = [System.IO.File]::ReadAllText($File)
+    $raw = Read-CapturedText $File
     $clean = Redact-Secrets $raw
-    if ($clean -ne $raw) { [System.IO.File]::WriteAllText($File, $clean) }
-  } catch { }
+    if ($clean -ne $raw) { Write-CapturedText -Path $File -Text $clean }
+  } catch {
+    # The output was already redacted on its way into the install log; this copy
+    # is the tool's raw capture. Say so rather than failing silently if it cannot
+    # be opened, so an operator can delete it.
+    Log "WARN" "Could not redact the captured file '$File': $($_.Exception.Message)"
+  }
 }
 
 # ------------------------------------------------------- external commands ---
@@ -286,7 +350,7 @@ function Invoke-External {
       $f = $pair[0]; $posRef = $pair[1]; $tag = $pair[2]
       if (-not (Test-Path $f)) { continue }
       try {
-        $content = [System.IO.File]::ReadAllText($f)
+        $content = Read-CapturedText $f
         if ($content.Length -gt $posRef.Value) {
           $new = $content.Substring($posRef.Value)
           $posRef.Value = $content.Length
@@ -305,11 +369,16 @@ function Invoke-External {
   }
   $proc.WaitForExit()
   $proc.Refresh()
+  $code = $proc.ExitCode
+  # Release PowerShell's own copy of the redirected handles before the capture
+  # files are read. A child that outlived the launcher can keep them open, which
+  # is why Read-CapturedText shares access; disposing here closes the other half.
+  try { $proc.Dispose() } catch { }
   foreach ($pair in @(@($outFile, [ref]$outPos, $LogTag), @($errFile, [ref]$errPos, "$LogTag-ERR"))) {
     $f = $pair[0]; $posRef = $pair[1]; $tag = $pair[2]
     if (-not (Test-Path $f)) { continue }
     try {
-      $content = [System.IO.File]::ReadAllText($f)
+      $content = Read-CapturedText $f
       if ($content.Length -gt $posRef.Value) {
         $new = $content.Substring($posRef.Value)
         $posRef.Value = $content.Length
@@ -319,7 +388,6 @@ function Invoke-External {
       }
     } catch { }
   }
-  $code = $proc.ExitCode
   Log "INFO" "$LogTag exit code $code"
   # The streamed lines were redacted on the way into the log; the captured
   # files are scrubbed here so a tool that dumped its environment leaves no
@@ -328,8 +396,8 @@ function Invoke-External {
   Redact-File $errFile
   if ($Quiet) {
     $lines = @()
-    if (Test-Path $outFile) { $lines += [System.IO.File]::ReadAllLines($outFile) }
-    if (Test-Path $errFile) { $lines += [System.IO.File]::ReadAllLines($errFile) }
+    if (Test-Path $outFile) { $lines += Read-CapturedText $outFile }
+    if (Test-Path $errFile) { $lines += Read-CapturedText $errFile }
     return [pscustomobject]@{ ExitCode = $code; Lines = $lines }
   }
   return $code
@@ -509,11 +577,23 @@ function Get-PortOwnerPid {
   return $null
 }
 
-# The PM2 applications this install would own, if one of them holds the port.
+# The processes this install would own, if one of them holds the port. Two
+# shapes exist: a 1.6.8 install runs as a Windows service, so the listener is a
+# descendant of a CommandPulseCMMS*.exe wrapper; a 1.6.x install runs under PM2,
+# so the listener is the process `pm2 pid <name>` reports.
 function Get-OwnAppPids {
   param([int]$Port)
   $owner = Get-PortOwnerPid -Port $Port
   if (-not $owner) { return @() }
+
+  $cursor = [int]$owner
+  for ($depth = 0; $depth -lt 6 -and $cursor -gt 0; $depth++) {
+    $proc = Get-CimInstance Win32_Process -Filter ("ProcessId={0}" -f $cursor) -ErrorAction SilentlyContinue
+    if (-not $proc) { break }
+    if ($proc.Name -match '^CommandPulseCMMS.*\.exe$') { return @([int]$owner) }
+    $cursor = [int]$proc.ParentProcessId
+  }
+
   $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
   if (-not $pm2) { return @() }
   $found = @()
@@ -541,6 +621,11 @@ function Get-PsqlPath {
 function Test-Prerequisites {
   Log "INFO" "=== Preflight (detect and report; nothing is installed) ==="
   $hard = $false
+  $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+  if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Log "ERR" "Registering the CommandPulse CMMS Windows services requires an elevated PowerShell window. Right-click PowerShell, choose 'Run as administrator', and re-run."
+    $hard = $true
+  } else { Log "OK" "Running elevated" }
   $node = Get-CmdPath @("node.exe", "node")
   if (-not $node) { Log "ERR" "Node.js not found. Install Node.js 24 LTS from https://nodejs.org/ and re-run."; $hard = $true }
   else {
@@ -550,8 +635,23 @@ function Test-Prerequisites {
   }
   $npm = Get-CmdPath @("npm.cmd", "npm")
   if (-not $npm) { Log "ERR" "npm not found. It ships with Node.js."; $hard = $true } else { Log "OK" "npm $(& $npm --version 2>&1 | Select-Object -First 1)" }
-  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
-  if (-not $pm2) { Log "WARN" "PM2 not found. Install it with: npm install -g pm2" } else { Log "OK" "PM2 at $pm2" }
+  # The service wrapper is shipped in the bundle; it needs .NET Framework 4.6.1
+  # or newer (release 394254). Windows 10 and Server 2016+ include it.
+  $winsw = Join-Path $PSScriptRoot "tools\winsw\WinSW.NET461.exe"
+  if (-not (Test-Path -LiteralPath $winsw)) {
+    Log "ERR" "The Windows service wrapper is missing from the bundle: $winsw"
+    $hard = $true
+  } else {
+    $release = $null
+    try { $release = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full' -ErrorAction Stop).Release } catch { }
+    if (-not $release) {
+      Log "ERR" ".NET Framework 4.6.1 or newer is required to run the CommandPulse CMMS Windows services. Install it from https://dotnet.microsoft.com/download/dotnet-framework and re-run."
+      $hard = $true
+    } elseif ([int]$release -lt 394254) {
+      Log "ERR" ".NET Framework 4.6.1 or newer is required; this host reports release $release. Install it and re-run."
+      $hard = $true
+    } else { Log "OK" ".NET Framework release $release (WinSW wrapper present)" }
+  }
   $psql = Get-PsqlPath
   if (-not $psql) { Log "ERR" "psql not found. Install PostgreSQL 15+ and add its bin folder to PATH."; $hard = $true }
   else { Log "OK" "psql $psql ($(& $psql --version 2>&1 | Select-Object -First 1))" }
@@ -893,15 +993,11 @@ function Protect-EnvFile {
   Log "OK" "Access restricted to: $($trustees -join ', ')"
 }
 
-# ---------------------------------------------------------- PM2 ecosystem ---
+# --------------------------------------------------- application services ---
 
-# The names this install registers with PM2.
-#
-# On Windows PM2 keeps a SINGLE daemon per user account. PM2_HOME relocates the
-# logs and dump.pm2 but it does NOT give a second daemon, so two installs on one
-# host share one process table. The application name is therefore the only
-# thing that keeps them apart: an install that reuses the shipped names
-# replaces whatever already holds them.
+# The PM2 application names an OLD (1.6.x) install may still use. Kept so an
+# upgrade can stop those before it swaps node_modules, and so the port check can
+# recognise a legacy process it owns.
 function Get-AppNames {
   param([string]$Prefix)
   # "${Prefix}api" and not "$Prefix" + "api": the comma operator binds tighter
@@ -913,36 +1009,121 @@ function Get-AppNames {
   return @("cmms-api", "cmms-worker")
 }
 
-# The shipped ecosystem.config.cjs pins PORT and BIND_HOST, and PM2 applies the
-# ecosystem env over the process environment. An install that needs a different
-# port therefore needs an install-local ecosystem file. The shipped file is left
-# untouched; this generated one imports it and overrides the API entry.
-#
-# The generated file MUST keep the ".config.cjs" naming. PM2 only treats a file
-# whose name follows that pattern as an ecosystem definition; a plain ".cjs"
-# file is started as an application script, which would start an app named after
-# the file, exit immediately, and look like a silent install failure.
-function New-InstallEcosystem {
+# The Windows service names this install owns. This mirrors Get-CmmsServiceNames
+# in installer\service\Install-CmmsServices.ps1, which is the authority; the
+# prefix is stripped to alphanumerics there, so it must be stripped here too.
+function Get-ServiceNames {
+  param([string]$Prefix)
+  $clean = ""
+  if ($Prefix) { $clean = ($Prefix -replace '[^A-Za-z0-9]', '') }
+  return [pscustomobject]@{
+    Api    = "CommandPulseCMMS${clean}API"
+    Worker = "CommandPulseCMMS${clean}Worker"
+  }
+}
+
+# Runs installer\service\Install-CmmsServices.ps1 as a CHILD process. It is not
+# dot-sourced: that script declares its own param() block, and dot-sourcing would
+# overwrite this installer's variables (-Mode, -ApiPort, -PgHost, ...).
+function Invoke-CmmsServiceScript {
+  param(
+    [Parameter(Mandatory)][ValidateSet("install", "remove", "status", "stop", "start")][string]$Mode,
+    [string]$BackendDir = "",
+    [int]$Port = 4000,
+    [string]$Bind = "127.0.0.1",
+    [string]$PgHost = "localhost",
+    [int]$PgPort = 5432,
+    [string]$Prefix = "",
+    [string]$Account = "LocalSystem",
+    [SecureString]$AccountPassword,
+    [switch]$SkipHealth,
+    [switch]$SkipWatchdog,
+    [switch]$DependOnPostgres
+  )
+  $serviceScript = Join-Path $PSScriptRoot "service\Install-CmmsServices.ps1"
+  if (-not (Test-Path -LiteralPath $serviceScript)) {
+    throw "The service installer is missing from the bundle: $serviceScript"
+  }
+  $powershell = Join-Path $env:windir "System32\WindowsPowerShell\v1.0\powershell.exe"
+  $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $serviceScript, "-Mode", $Mode)
+  if ($BackendDir) { $argList += @("-BackendDir", $BackendDir) }
+  if ($Mode -in @("install", "start")) {
+    $argList += @("-ApiPort", [string]$Port, "-PgPort", [string]$PgPort)
+  }
+  if ($Mode -eq "install") {
+    $argList += @("-BindHost", $Bind, "-PgHost", $PgHost, "-ServiceAccount", $Account)
+    if ($Prefix) { $argList += @("-ServicePrefix", $Prefix) }
+  }
+  if ($Prefix -and $Mode -in @("remove", "stop", "status")) { $argList += @("-ServicePrefix", $Prefix) }
+  if ($SkipHealth) { $argList += @("-SkipHealthCheck") }
+  if ($SkipWatchdog) { $argList += @("-SkipWatchdog") }
+  if ($DependOnPostgres) { $argList += @("-DependOnPostgres") }
+
+  # The account password travels in the environment, not on the command line,
+  # because command lines are visible to other processes on the host.
+  $hadPasswordEnv = Test-Path Env:\CMMS_SERVICE_ACCOUNT_PASSWORD
+  $previousPasswordEnv = $env:CMMS_SERVICE_ACCOUNT_PASSWORD
+  if ($AccountPassword) {
+    $env:CMMS_SERVICE_ACCOUNT_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+      [Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccountPassword))
+  }
+  try {
+    $result = Invoke-External -FilePath $powershell -ArgumentList $argList -WorkingDirectory $PSScriptRoot -TimeoutSeconds 1800 -LogTag ("SERVICE-" + $Mode.ToUpperInvariant()) -Quiet
+  } finally {
+    if ($hadPasswordEnv) { $env:CMMS_SERVICE_ACCOUNT_PASSWORD = $previousPasswordEnv }
+    else { Remove-Item Env:\CMMS_SERVICE_ACCOUNT_PASSWORD -ErrorAction SilentlyContinue }
+  }
+  foreach ($line in $result.Lines) { if ($line.Trim()) { Log "SERVICE" (Redact-Secrets $line.Trim()) } }
+  if ($result.ExitCode -ne 0) {
+    throw "The service script failed in mode '$Mode' with exit code $($result.ExitCode). See the SERVICE output above."
+  }
+  return $result
+}
+
+# Stops whatever this install currently runs, so node_modules can be swapped.
+# A 1.6.x install runs under PM2 and a 1.6.8 install runs as Windows services;
+# during the upgrade from one to the other either - or both - can be present.
+function Stop-OwnApplications {
   param([string]$BackendDir)
-  $target = Join-Path $BackendDir "ecosystem.install.config.cjs"
-  $prefix = $AppNamePrefix
-  $js = @"
-module.exports = {
-  apps: require('./ecosystem.config.cjs').apps.map(function (app) {
-    var renamed = app.name;
-    if ('$prefix') {
-      var bare = app.name.indexOf('cmms-') === 0 ? app.name.substring(5) : app.name;
-      renamed = '$prefix' + bare;
+  Invoke-CmmsServiceScript -Mode stop -BackendDir $BackendDir -Prefix $AppNamePrefix
+  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
+  if (-not $pm2) { return }
+  foreach ($name in (Get-AppNames -Prefix $AppNamePrefix)) {
+    $state = Get-Pm2AppState -Pm2Path $pm2 -WorkingDir $BackendDir -Name $name
+    if ($state -and $state.Status -eq "online") {
+      Log "INFO" "Stopping the legacy PM2 application '$name' (no save)"
+      Invoke-External -FilePath $pm2 -ArgumentList @("stop", $name) -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2STOP" | Out-Null
     }
-    var env = Object.assign({}, app.env);
-    if (app.name === 'cmms-api') { env.PORT = $ApiPort; env.BIND_HOST = '$BindHost'; }
-    return Object.assign({}, app, { name: renamed, env: env });
-  }),
-};
-"@
-  [System.IO.File]::WriteAllText($target, ($js -replace "`r?`n", "`n"))
-  Log "INFO" "Generated $target (PORT=$ApiPort, BIND_HOST=$BindHost, names: $((Get-AppNames -Prefix $prefix) -join ', '))"
-  return $target
+  }
+}
+
+# Puts back whatever was running if an upgrade step fails after the swap.
+function Start-OwnApplications {
+  param([string]$BackendDir)
+  $names = Get-ServiceNames -Prefix $AppNamePrefix
+  if (Get-Service -Name $names.Api -ErrorAction SilentlyContinue) {
+    Invoke-CmmsServiceScript -Mode start -BackendDir $BackendDir -Port $ApiPort -Prefix $AppNamePrefix -SkipHealth
+    return
+  }
+  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
+  if ($pm2) {
+    Invoke-External -FilePath $pm2 -ArgumentList (@("start") + (Get-AppNames -Prefix $AppNamePrefix)) -WorkingDirectory $BackendDir -TimeoutSeconds 300 -LogTag "PM2ROLLBACK" | Out-Null
+  }
+}
+
+function Test-ServiceApps {
+  param([int]$Port)
+  $names = Get-ServiceNames -Prefix $AppNamePrefix
+  $allRunning = $true
+  foreach ($id in @($names.Api, $names.Worker)) {
+    $svc = Get-Service -Name $id -ErrorAction SilentlyContinue
+    if (-not $svc) { Log "ERR" "Windows service '$id' does not exist"; $allRunning = $false; continue }
+    if ($svc.Status -ne "Running") { Log "ERR" "Windows service '$id' is '$($svc.Status)', not 'Running'"; $allRunning = $false; continue }
+    $wmi = Get-CimInstance Win32_Service -Filter ("Name='{0}'" -f $id) -ErrorAction SilentlyContinue
+    Log "OK" "Windows service '$id' is Running (pid $($wmi.ProcessId), start $($svc.StartType), account $($wmi.StartName))"
+    if ($svc.StartType -ne "Automatic") { Log "WARN" "Windows service '$id' is not Automatic; it will not start at boot" }
+  }
+  return $allRunning
 }
 
 # -------------------------------------------------------- backend setup -----
@@ -1071,19 +1252,15 @@ function Install-Backend {
   }
   Log "OK" "Database schema applied"
 
-  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
-  if (-not $pm2) { throw "PM2 not found, so the applications cannot be stopped for the dependency swap" }
-  $names = Get-AppNames -Prefix $AppNamePrefix
   $nodeModules = Join-Path $BackendDir "node_modules"
   $retired = Join-Path $BackendDir ("node_modules.previous-" + $script:RunStamp)
 
-  Log "INFO" "Stopping $($names -join ', ') for the dependency swap"
-  Invoke-External -FilePath $pm2 -ArgumentList (@("stop") + $names) -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2STOP" | Out-Null
-  # `pm2 stop` returns after the processes are signalled, not necessarily after
-  # their image has been unloaded. The running application has the Prisma engine
-  # DLL mapped, and Windows refuses to rename a directory while that handle is
-  # open (the same EPERM that makes an in-place `npm ci` fail). The rename is
-  # therefore retried for a few seconds instead of failing the upgrade.
+  Log "INFO" "Stopping the application for the dependency swap"
+  Stop-OwnApplications -BackendDir $BackendDir
+  # `Stop-Service` returns when SCM reports Stopped, and `pm2 stop` returns when
+  # the process is signalled, but Windows can hold the mapped Prisma engine DLL
+  # for a moment longer. The rename is retried for a few seconds instead of
+  # failing the upgrade (the same EPERM that makes an in-place `npm ci` fail).
   Start-Sleep -Milliseconds 800
 
   $swapped = $false
@@ -1112,8 +1289,9 @@ function Install-Backend {
       Move-DirectoryWithRetry -From $retired -To $nodeModules
       Log "WARN" "The previous dependencies are back in place"
     }
-    Log "WARN" "Starting the previous applications"
-    Invoke-External -FilePath $pm2 -ArgumentList (@("start") + $names) -WorkingDirectory $BackendDir -TimeoutSeconds 300 -LogTag "PM2ROLLBACK" | Out-Null
+    Log "WARN" "Starting the previous application"
+    try { Start-OwnApplications -BackendDir $BackendDir }
+    catch { Log "ERR" "The previous application could not be restarted automatically: $($_.Exception.Message)" }
     throw "The dependency swap failed; the previous dependencies and applications were restored. $($failed.Exception.Message)"
   }
 
@@ -1204,158 +1382,30 @@ function New-Administrator {
   }
 }
 
-# ------------------------------------------------------------- PM2 / app ----
+# -------------------------------------------------- start the application ---
 
-# The generated ecosystem file is JavaScript, and PM2 takes everything it
-# starts from it - but `pm2 start` does not report a script path it cannot find:
-# it exits 0 and the application simply never comes up. The file is therefore
-# loaded and resolved with the same Node that will run it, before anything in the
-# PM2 table is touched. Returns a name -> absolute script path map, or $null when
-# the file is not startable.
-function Get-EcosystemApps {
-  param([string]$EcosystemFile, [string]$WorkingDir)
-  $node = Get-CmdPath @("node.exe", "node")
-  if (-not $node) { Log "WARN" "node was not found; the ecosystem file cannot be pre-validated"; return $null }
-  $validator = Join-Path $script:LogDir "ecosystem-check.cjs"
-  $js = @'
-// Written by installer/install.ps1 at run time, next to the install logs.
-// Prints one "app <name> -> <absolute script>" line per application and exits 0
-// only when every script resolves to a file that exists.
-const path = require('path');
-const fs = require('fs');
-const file = process.env.CMMS_ECOSYSTEM_FILE;
-let cfg;
-try { cfg = require(file); }
-catch (e) { console.error('cannot load ' + file + ': ' + e.message); process.exit(2); }
-const apps = (cfg && cfg.apps) || [];
-if (!apps.length) { console.error('the ecosystem file defines no apps'); process.exit(3); }
-let bad = 0;
-for (const app of apps) {
-  const base = app.cwd || path.dirname(file);
-  if (!app.name) { console.error('an app has no name'); bad++; continue; }
-  if (!app.script) { console.error('app ' + app.name + ' has no script'); bad++; continue; }
-  const abs = path.isAbsolute(app.script) ? app.script : path.resolve(base, app.script);
-  if (!fs.existsSync(abs)) { console.error('app ' + app.name + ' script is missing: ' + abs); bad++; continue; }
-  console.log('app ' + app.name + ' -> ' + abs);
-}
-process.exit(bad === 0 ? 0 : 4);
-'@
-  [System.IO.File]::WriteAllText($validator, ($js -replace "`r?`n", "`n"))
-  $previous = $env:CMMS_ECOSYSTEM_FILE
-  $env:CMMS_ECOSYSTEM_FILE = $EcosystemFile
-  try {
-    $result = Invoke-External -FilePath $node -ArgumentList @($validator) -WorkingDirectory $WorkingDir -TimeoutSeconds 120 -LogTag "ECOCHECK" -Quiet
-  } finally {
-    $env:CMMS_ECOSYSTEM_FILE = $previous
-  }
-  if ($result.ExitCode -ne 0) {
-    foreach ($line in $result.Lines) { if ($line.Trim()) { Log "ECOCHECK-ERR" $line.Trim() } }
-    return $null
-  }
-  $map = @{}
-  foreach ($line in $result.Lines) {
-    if ($line -match '^app\s+(\S+)\s+->\s+(.+?)\s*$') { $map[$Matches[1]] = $Matches[2] }
-  }
-  return $map
-}
-
-function Test-SamePath {
-  param([string]$A, [string]$B)
-  if (-not $A -or -not $B) { return $false }
-  try { return ([System.IO.Path]::GetFullPath($A).TrimEnd('\') -ieq [System.IO.Path]::GetFullPath($B).TrimEnd('\')) }
-  catch { return ($A -ieq $B) }
-}
-
+# Registers (or refreshes) the two Windows services and brings them up. The
+# service wrapper, the service XML and the watchdog are the service script's
+# responsibility; this function only decides that they are wanted and forwards
+# the install's parameters.
 function Start-Application {
   param([string]$BackendDir)
-  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
-  if (-not $pm2) { throw "PM2 not found. Install it with: npm install -g pm2" }
-  $ecosystem = New-InstallEcosystem -BackendDir $BackendDir
-  $names = Get-AppNames -Prefix $AppNamePrefix
-  Log "INFO" "=== Starting the application with PM2 ==="
+  $names = Get-ServiceNames -Prefix $AppNamePrefix
+  Log "INFO" "=== Registering the Windows services ==="
 
-  # Gate 1: the file must describe a startable application. Without this check
-  # the engine would delete a working application and only then discover that
-  # the replacement cannot start - which is how the 2026-11-01 live upgrade
-  # turned a path-quoting bug into a seven-minute outage.
-  $desired = Get-EcosystemApps -EcosystemFile $ecosystem -WorkingDir $BackendDir
-  if (-not $desired -or $desired.Count -eq 0) {
-    throw "The generated ecosystem file does not describe a startable application (see ECOCHECK-ERR above). PM2 was not touched; any application already running as $($names -join ' or ') is still running."
+  # A failed registration must not leave a host with no service at all. On an
+  # upgrade the previous application is still running at this point: the
+  # service script stops and removes a legacy PM2 pair only after the new
+  # service is installed, and WinSW refuses a second copy of the same service.
+  # Nothing is deleted here, so a throw leaves the existing service untouched.
+  Invoke-CmmsServiceScript -Mode install -BackendDir $BackendDir -Port $ApiPort -Bind $BindHost `
+    -PgHost $PgHost -PgPort $PgPort -Prefix $AppNamePrefix -Account $ServiceAccount `
+    -AccountPassword $ServiceAccountPassword -DependOnPostgres:$DependOnPostgres
+
+  $allRunning = Test-ServiceApps -Port $ApiPort
+  if (-not $allRunning) {
+    throw "The Windows services '$($names.Api)' and '$($names.Worker)' are not both running. See the SERVICE output above."
   }
-
-  # Gate 2: capture what PM2 runs now, so a failed start can put it back.
-  $existing = @{}
-  foreach ($name in $names) {
-    $state = Get-Pm2AppState -Pm2Path $pm2 -WorkingDir $BackendDir -Name $name
-    if ($state) { $existing[$name] = $state }
-  }
-
-  # PM2 restarts the script it has REGISTERED for a name; the `script` field of
-  # an ecosystem file is honoured only when the name is first created. Starting
-  # the file therefore replaces a same-path application in place - a restart of
-  # one or two seconds, with no window in which the service is absent - but
-  # silently keeps the OLD script when the path differs. Only that case is
-  # deleted first.
-  $toReplace = @()
-  foreach ($name in $names) {
-    if (-not $existing.ContainsKey($name)) { continue }
-    $old = $existing[$name]
-    $want = $desired[$name]
-    if ($want -and (Test-SamePath $old.ScriptPath $want)) {
-      Log "INFO" "PM2 application '$name' already runs this install's script; restarting it in place (no delete)"
-    } else {
-      Log "WARN" "PM2 application '$name' runs '$($old.ScriptPath)'; this install needs '$want', so it is replaced"
-      $toReplace += $name
-    }
-  }
-  foreach ($name in $toReplace) {
-    Invoke-External -FilePath $pm2 -ArgumentList @("delete", $name) -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2DEL" | Out-Null
-  }
-
-  # A relative file name plus -WorkingDirectory keeps the install path out of the
-  # command line entirely: the install root may contain spaces, and cmd.exe would
-  # split an unquoted path there.
-  $code = Invoke-External -FilePath $pm2 -ArgumentList @("start", "ecosystem.install.config.cjs") -WorkingDirectory $BackendDir -TimeoutSeconds 300 -LogTag "PM2START"
-  if ($code -ne 0) { Log "WARN" "pm2 start returned $code" }
-  Start-Sleep -Seconds 4
-
-  $allOnline = $true
-  foreach ($name in $names) {
-    $now = Get-Pm2AppState -Pm2Path $pm2 -WorkingDir $BackendDir -Name $name
-    if (-not $now) {
-      $allOnline = $false
-      Log "ERR" "PM2 has no application named '$name' after the start"
-    } elseif ($now.Status -ne "online") {
-      $allOnline = $false
-      Log "ERR" "PM2 application '$name' is '$($now.Status)' after the start"
-    }
-  }
-
-  if ($allOnline) {
-    $code = Invoke-External -FilePath $pm2 -ArgumentList @("save") -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2SAVE"
-    if ($code -ne 0) { Log "WARN" "pm2 save returned $code" }
-  } else {
-    # Gate 3: put the previously running application back before reporting the
-    # failure, so a broken install cannot leave the host with no service at all.
-    Log "ERR" "The new applications did not all come online; restoring the previous ones"
-    foreach ($name in @($existing.Keys)) {
-      $old = $existing[$name]
-      if (-not $old.ScriptPath) { Log "WARN" "'$name' had no readable script path; it cannot be restored automatically"; continue }
-      $rollbackDir = if ($old.Cwd) { $old.Cwd } else { $BackendDir }
-      Invoke-External -FilePath $pm2 -ArgumentList @("delete", $name) -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2ROLLBACK-DEL" | Out-Null
-      Invoke-External -FilePath $pm2 -ArgumentList @("start", $old.ScriptPath, "--name", $name) -WorkingDirectory $rollbackDir -TimeoutSeconds 300 -LogTag "PM2ROLLBACK" | Out-Null
-    }
-    Start-Sleep -Seconds 4
-    if (Test-Pm2Apps -Pm2Path $pm2 -WorkingDir $BackendDir) {
-      Log "WARN" "The previous applications are online again; the new install did not start"
-      Invoke-External -FilePath $pm2 -ArgumentList @("save") -WorkingDirectory $BackendDir -TimeoutSeconds 120 -LogTag "PM2SAVE" | Out-Null
-    } else {
-      Log "ERR" "The previous applications could not be restored either; start them from the output above"
-    }
-    throw "PM2 did not bring the new applications online. The installer restored the previous applications."
-  }
-
-  Invoke-External -FilePath $pm2 -ArgumentList @("list") -WorkingDirectory $BackendDir -TimeoutSeconds 60 -LogTag "PM2LIST" | Out-Null
 }
 
 # `pm2 jlist` cannot be used to read the process table here. PM2 returns the
@@ -1406,23 +1456,6 @@ function Get-Pm2AppState {
   $pidText = (($pidOut.Lines -join "`n")).Trim()
   if ($pidText -match '^\d+$') { $procId = [int]$pidText }
   return [pscustomobject]@{ Name = $Name; Status = $status; Pid = $procId; ScriptPath = $scriptPath; Cwd = $execCwd }
-}
-
-function Test-Pm2Apps {
-  param([string]$Pm2Path, [string]$WorkingDir)
-  $expected = Get-AppNames -Prefix $AppNamePrefix
-  $allOnline = $true
-  foreach ($name in $expected) {
-    $app = Get-Pm2AppState -Pm2Path $Pm2Path -WorkingDir $WorkingDir -Name $name
-    if (-not $app) { Log "ERR" "PM2 has no application named '$name'"; $allOnline = $false; continue }
-    if ($app.Status -ne "online") {
-      Log "ERR" "PM2 application '$name' is '$($app.Status)', not 'online'"
-      $allOnline = $false
-    } else {
-      Log "OK" "PM2 application '$name' is online (pid $($app.Pid))"
-    }
-  }
-  return $allOnline
 }
 
 function Test-Health {
@@ -1482,7 +1515,7 @@ try {
   Log "INFO" "Identity     : $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)"
 
   # `probe` answers one question - what is this database? - and writes nothing.
-  # It does not need Node, PM2, IIS or a bundle, so it is handled before the
+  # It does not need Node, IIS or a bundle, so it is handled before the
   # full-mode preflight. The wizard calls it before it copies anything.
   if ($Mode -eq "probe") {
     $psql = Get-PsqlPath
@@ -1520,9 +1553,10 @@ try {
   }
 
   Test-Prerequisites
-  # An upgrade restarts this install's own PM2 application in place, so a port
-  # held BY THAT APPLICATION is expected. Any other holder is a real conflict:
-  # the health check could otherwise be answered by a different service.
+  # An upgrade restarts this install's own application in place, so a port held
+  # BY THAT APPLICATION is expected - whether it is the Windows service or a
+  # legacy PM2 process. Any other holder is a real conflict: the health check
+  # could otherwise be answered by a different service.
   $appsRunning = $false
   if (Test-PortInUse -Port $ApiPort) {
     $ownPids = @(Get-OwnAppPids -Port $ApiPort)
@@ -1530,7 +1564,7 @@ try {
       throw "TCP port $ApiPort is already in use on 127.0.0.1 by a process this install does not own. Pass a free -ApiPort so the health check cannot be answered by a different service."
     }
     $appsRunning = $true
-    Log "OK" "API port $ApiPort is held by this install's own PM2 application (pid $($ownPids -join ', ')); the upgrade replaces it in place"
+    Log "OK" "API port $ApiPort is held by this install's own application (pid $($ownPids -join ', ')); the upgrade replaces it in place"
   } else {
     Log "OK" "API port $ApiPort is free"
   }
@@ -1566,11 +1600,11 @@ try {
   New-Administrator -BackendDir $backendDir
   Start-Application -BackendDir $backendDir
 
-  # `pm2 start` exits 0 even when an application crashes on its first tick, so
-  # the process table is checked before the health check. A stopped application
-  # is reported as a failed install rather than being left to time out.
-  $pm2 = Get-CmdPath @("pm2.cmd", "pm2")
-  $appsOnline = Test-Pm2Apps -Pm2Path $pm2 -WorkingDir $backendDir
+  # A service can be registered and Running while its child crashes on the
+  # first tick, so the service state is checked before the health check. A
+  # stopped service is reported as a failed install rather than being left to
+  # time out.
+  $appsOnline = Test-ServiceApps -Port $ApiPort
 
   $healthy = Test-Health -Port $ApiPort
 
@@ -1586,7 +1620,7 @@ try {
   }
 
   Log "INFO" "Install log: $script:LogFile"
-  if (-not $appsOnline) { Log "ERR" "The PM2 applications are not all online. See the log for the PM2 output."; exit 3 }
+  if (-not $appsOnline) { Log "ERR" "The CommandPulse CMMS Windows services are not both running. See the log for the service output."; exit 3 }
   if ($healthy) {
     Remove-InstallStaging -BackendDir $backendDir
     if ($siteStatus -eq "failed") {
