@@ -4,7 +4,7 @@ This directory contains the installer for a blank CMMS instance, in three layers
 
 | Layer | Path | What it is |
 |---|---|---|
-| Engine | `install.ps1` | One self-contained PowerShell script: detect-and-report preflight, bundle integrity, copy, `.env`, npm/Prisma/migrate, PM2, health. |
+| Engine | `install.ps1` | One self-contained PowerShell script: detect-and-report preflight, bundle integrity, copy, `.env`, npm/Prisma/migrate, Windows service registration, health. |
 | Harness | `tests\run-tests.ps1` | Runs the engine against a throwaway database and asserts the contract. Never part of a production install. |
 | Admin helper | `admin\create-admin.cjs` | Creates the first Administrator in a blank database, using the installed backend's own Prisma client and bcrypt. |
 | Wizard | `wizard\CommandPulse.iss` | Inno Setup 6 wrapper that collects the parameters and calls the engine. |
@@ -69,7 +69,10 @@ visible in the process list. Supply it either as a `SecureString`
 | `-SiteName` | `cmms.local` | Host name used for CORS and the optional IIS site |
 | `-SitePath` | resolved from `-SiteName` | Folder the web server serves. The engine asks IIS for the site's physical path and replaces its `assets\`, keeping the host's own `web.config`; pass this where the browser's host name is not the IIS site name |
 | `-CorsOrigins` | derived from `-SiteName` | Explicit CORS origin list |
-| `-AppNamePrefix` | (none) | Prefix for the PM2 application names |
+| `-AppNamePrefix` | (none) | Prefix for the Windows service names; also used to find a legacy PM2 pair from a 1.6.x install |
+| `-ServiceAccount` | `LocalSystem` | Account the two services run as. `LocalSystem` starts at boot with no password |
+| `-ServiceAccountPassword` | (none) | Password for a non-built-in `-ServiceAccount`, as a `SecureString` |
+| `-DependOnPostgres` | off | Add an SCM dependency from the CMMS services to the local PostgreSQL service. Off by default; see [Windows services](#windows-services) |
 | `-PrismaEnginesPath` | (none) | Folder holding prebuilt Prisma engine binaries |
 | `-AdminFile` | (none) | JSON file with the first Administrator: `{"username","fullName","email","password"}`. The wizard always supplies it; a headless install may omit it and the database is then left with no user. |
 | `-Mode` | `full` | `full`, `verify`, `uninstall` or `probe` |
@@ -94,7 +97,7 @@ has never run CommandPulse. `-Mode probe` returns the same four-way classificati
 without writing anything, which is how the wizard asks before it upgrades.
 
 ## Modes
-- `full` - preflight, verify bundle, classify/create the database, copy files, generate .env (ACL-locked), install dependencies, prisma generate, prisma migrate deploy, pm2 start+save, verify health, deploy the compiled frontend to the web server. An upgrade stages the dependencies while the running application keeps serving, and accepts an API port held by this install's own PM2 application because it replaces that application in place. Any other listener on the port is refused, so the health check cannot be answered by a different service.
+- `full` - preflight, verify bundle, classify/create the database, copy files, generate .env (ACL-locked), install dependencies, prisma generate, prisma migrate deploy, register and start the Windows services, verify health, deploy the compiled frontend to the web server. An upgrade stages the dependencies while the running services keep serving, and accepts an API port held by this install's own application (a `CommandPulseCMMS*.exe` wrapper's node child, or a legacy PM2 process) because it replaces that application in place. Any other listener on the port is refused, so the health check cannot be answered by a different service.
 - `verify` - run health checks against an existing install (no file copy, no migrations).
 - `uninstall` - remove engine-created artifacts only (does not drop the database).
 - `probe` - classify the target database and write `-ProbeOut` JSON; copies nothing and writes nothing.
@@ -110,24 +113,46 @@ serving:
 2. `npm ci`, `prisma generate` and `prisma migrate deploy` run against a staged copy in
    `backend\.install-stage`, with the install's own `.env`. A failure there leaves the
    installed application and its `node_modules` untouched and still running.
-3. The generated ecosystem file is loaded with Node and every script path is resolved
-   before PM2 is touched. `pm2 start` exits 0 when a script is missing, so this gate is
-   what keeps a bad path from becoming an outage.
-4. The applications are stopped only for the dependency swap, which is two directory
-   renames (retried for several seconds, because the running process holds the Prisma
-   engine DLL). If the script path PM2 has registered already matches the new one, the
-   application is restarted in place instead of deleted. A start that does not come
-   online restores the previously registered applications before the engine reports
-   failure.
+3. The replacement service is rendered from a template (`installer\service\Install-CmmsServices.ps1`) and validated before anything is stopped. A registration failure leaves the existing service untouched: the new wrapper is not installed until the XML is complete.
+4. The applications are stopped only for the dependency swap, which is two directory renames (retried for several seconds, because the running process holds the Prisma engine DLL). Both services are then started again; if the start does not reach `Running` and answer its health check, the engine restores the previously installed dependencies and reports failure.
 5. The compiled frontend is deployed to the folder the web server actually serves,
    after the new API answers its health check, so the browser never gets a new build
    pointed at an old backend. A failure there exits 5 while leaving the application
    running.
 
+## Windows services
+The installer registers two services from a vendored WinSW wrapper
+(`tools\winsw\WinSW.NET461.exe`, MIT, .NET Framework 4.6.1+, no network access
+needed):
+
+| Service | Script | Start | Account |
+|---|---|---|---|
+| `CommandPulseCMMSAPI` | `backend\dist\index.js` | Automatic | `LocalSystem` |
+| `CommandPulseCMMSWorker` | `backend\dist\worker.js` | Automatic | `LocalSystem` |
+
+Both start at boot with nobody logged on. Each `*.xml` beside the wrapper under
+`backend\service\` fixes the working directory to `backend` (Prisma reads
+`.env` relative to it), sets `NODE_ENV=production`, and gives only the API
+`PORT`/`BIND_HOST`. WinSW restarts a crashed child with a 10/30/60 s backoff and
+then keeps retrying; `stoptimeout` is 20 s. Logs roll by size in `backend\logs\`
+(10 MB, eight files).
+
+**Default: no PostgreSQL dependency.** The API does not query the database at
+boot (Prisma connects lazily and `/api/health` is database-free), and the worker
+is retried indefinitely until PostgreSQL appears. A hard dependency would let a
+slow PostgreSQL crash recovery block the API entirely - which happened on
+2026-11-03. `-DependOnPostgres` opts into SCM ordering when the site's
+PostgreSQL service starts reliably.
+
+A `SYSTEM` Scheduled Task `CommandPulse CMMS Health Watchdog` polls
+`/api/health` every five minutes and restarts the API after three consecutive
+failures; see `service\health-watchdog.ps1`.
+
 ## Prerequisites (detected, not auto-installed)
 - Node.js >= 24
 - npm >= 9
-- PM2 (global)
+- .NET Framework >= 4.6.1 (WinSW wrapper), included on Windows 10 / Server 2016+
+- An elevated PowerShell window (registering a service needs it)
 - PostgreSQL >= 15 client tools on PATH or known install location
 - IIS (optional; warned only)
 - IIS URL Rewrite (optional; warned only)
@@ -136,19 +161,16 @@ serving:
 ## What the engine creates
 ```
 <InstallRoot>\
-  backend\      application, node_modules, .env, logs\, uploads\
+  backend\      application, node_modules, .env, logs\, uploads\, service\ (generated)
   frontend\     the published frontend sources
   site\         the built frontend (index.html, assets\, web.config) ready for IIS
   docs\, ops\, migration-templates\
 ```
 
-`backend\ecosystem.install.config.cjs` is generated next to the shipped
-`ecosystem.config.cjs`. The shipped file pins `PORT` and `BIND_HOST`, and PM2
-applies the ecosystem `env` over the process environment, so an install on a
-different port needs its own ecosystem file. The shipped file is never
-modified. The generated file must keep the `.config.cjs` naming: PM2 only
-treats a file with that pattern as an ecosystem definition, and starts a
-plain `.cjs` file as an application script.
+`backend\service\` is generated by the installer and is gitignored: it holds the
+WinSW wrapper copies and their XML. Do not edit it by hand; re-run the installer.
+The service XML is the authority for port, bind address, environment and
+dependency.
 
 `site\` is the install's own copy of the compiled frontend. On a host where IIS
 already serves the site, the engine also updates that site's physical folder
@@ -160,7 +182,7 @@ a warning and leaves the web server alone rather than guessing a path.
 ## First Administrator
 A migrated database has no users, and the application only lets an existing
 Administrator create accounts, so a blank install would be unreachable. After
-`prisma migrate deploy` and before PM2 starts the API, the engine runs
+`prisma migrate deploy` and before the services start, the engine runs
 `admin\create-admin.cjs` from the installed `backend` directory:
 
 - the helper resolves `@prisma/client` and `bcryptjs` from the installed
@@ -184,22 +206,23 @@ The wizard's page enforces the same rules the helper re-checks: username
 of at least 12 characters that differs from the username and is not a common
 default. The application's own login policy still applies after that.
 
-## PM2 application names
-On Windows PM2 keeps a single daemon per user account. `PM2_HOME` relocates
-PM2's logs and `dump.pm2` but it does not create a second daemon, so two
-installs on one host share one process table. The application name is the only
-thing that keeps them apart:
+## Service names
+Two installs on one host are told apart by their service names, not by a shared
+process manager:
 
-- without `-AppNamePrefix` the names are `cmms-api` and `cmms-worker`
-- with `-AppNamePrefix "cmms2-"` they become `cmms2-api` and `cmms2-worker`
+- without `-AppNamePrefix` the services are `CommandPulseCMMSAPI` and
+  `CommandPulseCMMSWorker`
+- with `-AppNamePrefix "cmms2-"` they become `CommandPulseCMMScmms2API` and
+  `CommandPulseCMMScmms2Worker` (the prefix is stripped to alphanumerics)
 
-An install replaces any existing application that already holds one of its
-names. Uninstall deletes only the names that install owns; it never runs
-`pm2 kill`, which would stop every application in the daemon.
+The same prefix is used to find and stop a legacy PM2 pair (`cmms2-api`,
+`cmms2-worker`) from a 1.6.x installation. Uninstall removes only the services,
+watchdog task and PM2 names that install owns; it never runs `pm2 kill`, which
+would stop every application in the daemon.
 
 ## Security
 - `.env` is generated with a fresh CSPRNG JWT_SECRET and ACL-locked to SYSTEM, BUILTIN\Administrators, and the dynamically resolved current user. No hardcoded usernames.
-- The resolved PostgreSQL password is redacted from the install log and from every captured command-output file. `pm2 jlist` is not used: PM2 returns the full environment block of every application, which is how an earlier revision wrote `PGPASSWORD` to disk.
+- The resolved PostgreSQL password is redacted from the install log and from every captured command-output file. `pm2 jlist` is not used: PM2 returns the full environment block of every application, which is how an earlier revision wrote `PGPASSWORD` to disk. The service account password is passed to the service script in the environment, never on a command line.
 - The live database `cmms` is never targeted by tests; the harness creates and drops a throwaway database. The engine classifies `-DbName` before it copies anything, so an existing CommandPulse database (including `cmms` on this host) is refused with exit 4 unless `-AllowExistingDatabase` is passed, and a database with tables but no CommandPulse migration history is refused with or without it.
 - No dumps, client data, or production secrets are copied. Only files the bundle itself carries are removed, so a `database\` folder or `*.sql` dump that was already in the install root belongs to the operator and is left in place; the Prisma migrations under `backend\prisma\migrations\` are kept, because they are the schema history the install applies.
 - An upgrade backs up `backend\.env` to `.env.bak.<RunStamp>` before rewriting it, gives the copy the same ACL, and keeps the five most recent backups. `Copy-Bundle` never deletes either name.
@@ -208,7 +231,7 @@ names. Uninstall deletes only the names that install owns; it never runs
 ## Timeouts
 Every external command runs under a hard timeout and is killed if it exceeds
 it, so a stalled download cannot leave the installer hanging: `npm ci` 1800s,
-`prisma generate` and `prisma migrate deploy` 900s, `pm2` 300s.
+`prisma generate` and `prisma migrate deploy` 900s, the service script 1800s.
 
 ## Logs
 Logs are written to `%ProgramData%\CommandPulse\logs\install-<timestamp>.log`.
@@ -225,13 +248,14 @@ database: the first install proves the engine creates an absent target. It then
 checks the other three states - probe reports `CommandPulse`, `Empty` and
 `Foreign`; an existing CommandPulse database is refused with exit 4 without the
 switch and upgraded with it; a foreign database is refused even with the switch
-and its table survives. It gives the install a unique PM2 application name
-prefix and deletes only those names afterwards; it never runs `pm2 kill`, and it
-asserts that the live `cmms-api` / `cmms-worker` are untouched and still serving.
+and its table survives. It gives the install a unique Windows service name
+prefix and removes only those services and that watchdog task afterwards; it
+never runs `pm2 kill`, and it asserts that the live install's own services are
+untouched and still serving.
 
 The verdict is written to `%ProgramData%\CommandPulse\logs\installer-test-<timestamp>.log`
 next to the engine log. That file starts with the throwaway database name and the
-PM2 prefix, then records every assertion and the final `RESULT:` line, so a run
+service prefix, then records every assertion and the final `RESULT:` line, so a run
 is auditable after the console closes.
 
 The harness also supplies a random Administrator password and asserts that the
@@ -240,9 +264,9 @@ for it, that a wrong password is rejected with 401, and that the password does
 not appear anywhere in the install log.
 
 A final section upgrades the same install in place with the engine's `full` mode
-and asserts the properties the 2026-11-01 live upgrade did not have: the PM2
-application pid changes without the service disappearing (a 250 ms health poller
-records the gap), the registered script path is the new tree, `.env.bak.<stamp>`
+and asserts the properties the 2026-11-01 live upgrade did not have: the API
+service's wrapper pid changes without the service disappearing (a 250 ms health
+poller records the gap), the service still runs this install's wrapper, `.env.bak.<stamp>`
 holds the previous JWT secret while the live `.env` holds a different one, the
 operator's `.sql` dumps and `database\` folder survive, the staging folder is
 removed, and the folder the web server serves matches the new build while keeping

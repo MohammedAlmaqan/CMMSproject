@@ -20,7 +20,15 @@
 | npm | 9+ | Package management |
 | PostgreSQL | 15+ | Database |
 | IIS (optional) | 10+ | Reverse proxy for production |
-| PM2 (recommended) | Latest | Process management |
+| Windows services | - | Process management. The installer registers `CommandPulseCMMSAPI` and `CommandPulseCMMSWorker` via the vendored WinSW wrapper (see [ADMIN_GUIDE §2.2](ADMIN_GUIDE.md#22-windows-services)) |
+
+> **Superseded 2026-11-03:** PM2 is no longer the process manager. Release 1.6.8
+> installs two Automatic Windows services that start at boot with nobody logged
+> on, plus a `SYSTEM` health watchdog. The PM2 steps in section 2 and the PM2
+> operation and log-rotation material in section 6 are kept below for historical
+> context and for a host that has not yet upgraded; `docs/ADMIN_GUIDE.md` §2.2 and §15 are the
+> current authority. Do not follow the PM2-on-boot instructions on a 1.6.8
+> install.
 
 ---
 
@@ -47,6 +55,11 @@ psql -U postgres -c "CREATE DATABASE cmms;"
 ```
 
 ### Step 3: Install PM2 (Recommended)
+
+> **Superseded 2026-11-03.** From release 1.6.8 this step is not required: the
+> installer registers native Windows services and ships the WinSW wrapper. Skip
+> to Step 4 if you are using `installer\install.ps1`. The command below is kept
+> only for a pre-1.6.8 install.
 
 ```cmd
 npm install -g pm2
@@ -98,6 +111,12 @@ runs the daily overdue sweep and purges old audit rows. Run exactly **one** work
 
 **Option A: Using PM2 (Recommended)**
 
+> **Superseded 2026-11-03.** On a 1.6.8 install the installer has already
+> registered `CommandPulseCMMSAPI` and `CommandPulseCMMSWorker`. Do not start
+> PM2 applications alongside them; two copies of the API would fight for port
+> 4000 and the worker lock. Use `Get-Service` / `Restart-Service` per
+> `docs/ADMIN_GUIDE.md` §2.2.
+
 ```cmd
 cd CMMSproject\backend
 pm2 start ecosystem.config.cjs
@@ -107,11 +126,13 @@ pm2 save
 `ecosystem.config.cjs` defines both apps - `cmms-api` and `cmms-worker` - so this one
 command starts both.
 
-**Autostart after reboot (Windows):** `pm2 startup` is Unix-only and exits with
-"Error: Init system not found" on Windows - do not use it. The supported pattern is a
-Scheduled Task that runs `pm2 resurrect` at logon (the exact task shape used on the
-reference deployment is recorded in `docs/GO_LIVE_CHECKLIST.md`, item 4), or the NSSM
-services in Option B below, which need no task at all.
+**Autostart after reboot (Windows):** *Superseded 2026-11-03.* `pm2 startup` is
+Unix-only and exits with "Error: Init system not found" on Windows. The old
+pattern was a Scheduled Task that runs `pm2 resurrect` at logon, which starts the
+application only after someone signs in. Release 1.6.8 replaces that with two
+Automatic Windows services registered by `installer\install.ps1`; they start at
+boot with nobody logged on. See `docs/ADMIN_GUIDE.md` §2.2. The logon-task shape
+is kept in `docs/GO_LIVE_CHECKLIST.md` item 4 for history only.
 
 **Option B: Using Windows Services**
 

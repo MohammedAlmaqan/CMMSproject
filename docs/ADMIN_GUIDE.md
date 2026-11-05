@@ -4,7 +4,7 @@ Audience: IT staff, database administrators, and operations staff responsible fo
 
 Scope: day-two operations of an **already installed** system - configuration, database administration, user administration, the preventive maintenance scheduler, backup and recovery, audit, and troubleshooting.
 
-For the initial installation itself, see the [Installation & Deployment Guide](INSTALLATION_GUIDE.md). That document covers hardware sizing, Node.js and PostgreSQL installation, PM2 setup, the IIS reverse proxy, and HTTPS.
+For the initial installation itself, see the [Installation & Deployment Guide](INSTALLATION_GUIDE.md). That document covers hardware sizing, Node.js and PostgreSQL installation, the IIS reverse proxy, and HTTPS. **Its PM2 and PM2-Resurrect sections are superseded:** since release 1.6.8 the installer registers two Windows services and a health watchdog, and this guide is the authority for that runtime. See [2.2](#22-windows-services).
 
 **This guide documents what the system does today.** Features that are not implemented are listed in [section 13](#13-deferred-and-not-implemented), not described as if they were available.
 
@@ -33,6 +33,7 @@ Related documents:
 12. [Security posture](#12-security-posture)
 13. [Deferred and not implemented](#13-deferred-and-not-implemented)
 14. [Troubleshooting](#14-troubleshooting)
+15. [Service maintenance, upgrades and housekeeping](#15-service-maintenance-upgrades-and-housekeeping)
 
 ---
 
@@ -43,7 +44,7 @@ Related documents:
 | Node.js | The version pinned in `backend/package.json`; the installation guide uses the current LTS |
 | PostgreSQL | Local server, database `cmms`, role `postgres` - these names are **hardcoded** in the backup scripts, see [7.1](#71-connection-details-are-hardcoded) |
 | PostgreSQL client tools | `pg_dump.exe` and `psql.exe` on `PATH`, or at `C:\Program Files\PostgreSQL\18\bin\` |
-| Process manager | PM2 (recommended) or NSSM Windows services |
+| Process manager | Windows services `CommandPulseCMMSAPI` and `CommandPulseCMMSWorker`, registered by the installer and set to Automatic (see [2.2](#22-windows-services)). PM2 is no longer used |
 | Reverse proxy | IIS with the ARR module, for HTTPS termination |
 | Disk | Enough space for the `backups\` folder to hold 14 daily dumps plus 14 attachment snapshots, and for `backend\uploads\` |
 
@@ -53,11 +54,12 @@ Related documents:
 
 The deployment has three processes:
 
-| Process | Default port | Serves |
-|---|---|---|
-| Backend API (`backend/dist/index.js`) | `4000` | JSON API, interactive API docs at `/api-docs`, OpenAPI JSON at `/api-docs.json` |
-| Frontend (built `app/dist` served by IIS) | `443` via IIS | The web application |
-| PostgreSQL | `5432` | All data |
+| Process | Windows service | Default port | Serves |
+|---|---|---|---|
+| Backend API (`backend/dist/index.js`) | `CommandPulseCMMSAPI` | `4000` | JSON API, interactive API docs at `/api-docs`, OpenAPI JSON at `/api-docs.json` |
+| Scheduler worker (`backend/dist/worker.js`) | `CommandPulseCMMSWorker` | - | PM generation, overdue sweep and audit retention (see [2.1](#21-the-scheduler-runs-in-a-separate-worker-process)) |
+| Frontend (built `app/dist` served by IIS) | - | `443` via IIS | The web application |
+| PostgreSQL | `postgresql-x64-<version>` | `5432` | All data |
 
 **The frontend and the API are separate origins.** The browser calls the API on a different port, so the API's `CORS_ORIGINS` must include the exact frontend origin or every request fails in the browser while working fine from `curl`. This is the single most common cause of "the app loads but shows no data".
 
@@ -65,15 +67,34 @@ The deployment has three processes:
 
 ### 2.1 The scheduler runs in a separate worker process
 
-Since C11 the preventive maintenance, overdue and audit-retention jobs run in a dedicated worker process, `cmms-worker` (`backend/dist/worker.js`, started by `npm run worker` or PM2), not inside the API. At boot the worker takes a database-backed startup lock. If a live lock exists - a `SchedulerRun` row in `running` state with a heartbeat newer than 5 minutes, from a different host or process - the worker **refuses to start the jobs and exits 0**, leaving the API untouched.
+Since C11 the preventive maintenance, overdue and audit-retention jobs run in a dedicated worker process, `cmms-worker` (`backend/dist/worker.js`), not inside the API. The installer runs it as the Windows service `CommandPulseCMMSWorker`; for manual debugging it can still be started as `npm run worker`. At boot the worker takes a database-backed startup lock. If a live lock exists - a `SchedulerRun` row in `running` state with a heartbeat newer than 5 minutes, from a different host or process - the worker **refuses to start the jobs and exits 0**, leaving the API untouched.
 
 Consequences you must plan for:
 
-- The API (`cmms-api`) no longer holds the scheduler, so it may be restarted freely. This deployment still runs one API instance, but for the in-process login rate limiter (see [12.1](#121-network-exposure)), not the scheduler.
-- Run **exactly one** `cmms-worker`. A second worker finds the live lock and exits; it is harmless but generates no work orders.
+- The API (`CommandPulseCMMSAPI`) no longer holds the scheduler, so it may be restarted freely. This deployment still runs one API instance, but for the in-process login rate limiter (see [12.1](#121-network-exposure)), not the scheduler.
+- Run **exactly one** `CommandPulseCMMSWorker`. A second worker finds the live lock and exits; it is harmless but generates no work orders.
 - This is deliberate. It prevents duplicate work orders if a second worker is ever started.
 - If the worker is killed hard, the lock is considered stale after 5 minutes and a replacement may take over.
 - A rolling restart will briefly have the new worker refuse the lock while the old one's heartbeat is still fresh. That is expected; do not "fix" it by deleting `SchedulerRun` rows.
+
+### 2.2 Windows services
+
+Release 1.6.8 replaces PM2 with two native Windows services, each wrapping `node.exe` with WinSW:
+
+| Service | Runs | Start type | Account |
+|---|---|---|---|
+| `CommandPulseCMMSAPI` | `backend\dist\index.js` | Automatic | `LocalSystem` (default) |
+| `CommandPulseCMMSWorker` | `backend\dist\worker.js` | Automatic | `LocalSystem` (default) |
+
+Both start at boot without anyone logging on, which is the property the old PM2 logon task could not provide. `-ServiceAccount` / `-ServiceAccountPassword` replace the default account with a dedicated service account; use that on a site whose security policy forbids `LocalSystem`. The installer also registers one Scheduled Task, `CommandPulse CMMS Health Watchdog`, which runs as `SYSTEM` every five minutes, polls `http://127.0.0.1:4000/api/health`, and restarts `CommandPulseCMMSAPI` after three consecutive failures (see [10](#10-health-checks-and-monitoring)).
+
+Operational rules:
+
+- **Use the services, not PM2.** `pm2 start|stop|restart|save` no longer control the application. A stale `dump.pm2` may still exist from a 1.6.x install; the installer removes the `CommandPulse CMMS PM2 Resurrect` task when it migrates the default instance.
+- **Never pair `pm2 stop` with `pm2 save`.** If PM2 is still present from an older release, `pm2 save` writes the current process table as the boot list. Running it while the applications are stopped makes the next `pm2 resurrect` restore *nothing*, which looks exactly like a dead service. Stop PM2 applications without saving, or delete them and start the services instead.
+- **The services do not depend on PostgreSQL by default.** The API is database-free at boot (Prisma connects lazily and `/api/health` does not query the database), and WinSW restarts the worker until the database is available. This is deliberate: on 2026-11-03 PostgreSQL spent about three minutes in crash recovery after a stale postmaster, and a hard dependency prevented the API from starting at all. `-DependOnPostgres` opts into SCM ordering for a site whose PostgreSQL service starts reliably.
+- **Working directory matters.** Prisma reads `backend\.env` relative to the process working directory, so the service is configured with `workingdirectory` set to the `backend` folder. Do not change it to the install root.
+- The wrapper and its log files live under `backend\service\` and `backend\logs\`; the wrapper executable is a copy of `installer\tools\winsw\WinSW.NET461.exe`.
 
 ---
 
@@ -96,7 +117,7 @@ Configuration is mostly by environment variable. The backend reads `backend/.env
 | `CORS_ORIGINS` | Comma-separated list of browser origins permitted to call the API | `http://localhost:3000` | **Always**, when the frontend is served from anywhere other than `http://localhost:3000`. Use full origins including scheme, host, and port, with no trailing slash. A mismatch produces a blank screen with no data and a CORS error in the browser console |
 | `BIND_HOST` | Interface the API binds to | `127.0.0.1` | Set to `0.0.0.0` only for direct-access development with no reverse proxy. The loopback default is what keeps port 4000 off the network behind IIS. See [12.1](#121-network-exposure) |
 | `LOG_LEVEL` | Log verbosity. One of `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` | `info` | Raise to `debug` only while diagnosing. `silent` disables logging entirely. An unrecognised value is ignored and falls back to `info` rather than failing to start |
-| `PM_SCHEDULER_CRON` | Cron expression for the nightly PM generation run (read by `cmms-worker`) | `0 2 * * *` (02:00 daily, **server local time**) | When the plant's maintenance window differs from 02:00, or to run more or less often. Five-field `node-cron` syntax. **The scheduler evaluates due dates, not a rolling window, so changing this does not backfill missed runs** - see [5.4](#54-when-a-run-is-missed). Restart `cmms-worker` after the change |
+| `PM_SCHEDULER_CRON` | Cron expression for the nightly PM generation run (read by `cmms-worker`) | `0 2 * * *` (02:00 daily, **server local time**) | When the plant's maintenance window differs from 02:00, or to run more or less often. Five-field `node-cron` syntax. **The scheduler evaluates due dates, not a rolling window, so changing this does not backfill missed runs** - see [5.4](#54-when-a-run-is-missed). Restart `CommandPulseCMMSWorker` after the change |
 
 ### 3.2 Runtime-only variables
 
@@ -115,9 +136,10 @@ These are read from the process environment but are deliberately not in `.env.ex
 
 ### 3.4 After changing any variable
 
-```cmd
-cd CMMSproject\backend
-pm2 restart ecosystem.config.cjs
+```powershell
+# Elevated PowerShell
+Restart-Service CommandPulseCMMSAPI
+Restart-Service CommandPulseCMMSWorker
 ```
 
 Changes to `PM_SCHEDULER_CRON`, `BIND_HOST`, `PORT`, or any database setting require a restart. A frontend `VITE_API_URL` change additionally requires a rebuild and redeploy of `app\dist`.
@@ -193,7 +215,7 @@ The last query lists attachments the database believes in. Cross-check it agains
 
 ## 5. Scheduler operations
 
-The scheduler generates work orders from preventive maintenance plans whose due date has arrived. Since C11 it runs in the `cmms-worker` process, and it is the only part of the system that writes data on a timer.
+The scheduler generates work orders from preventive maintenance plans whose due date has arrived. Since C11 it runs in the `CommandPulseCMMSWorker` service, and it is the only part of the system that writes data on a timer.
 
 ### 5.1 Check the scheduler is actually running
 
@@ -235,8 +257,8 @@ Use a manual run to confirm a new plan produces a work order before waiting for 
 
 Work through these in order:
 
-1. **Is the worker running?** `pm2 status` should list `cmms-worker` as `online`. `curl -s http://localhost:4000/api/health` checks the API, which is a different process - a healthy API does not mean the scheduler is running.
-2. **Is the worker that owns the lock alive?** Check the worker log (`backend\logs\worker-out.log`) for `startup lock acquired` versus `lock held by`. If the worker reports a lock held by another process, a hard-killed worker may have left a lock that has not yet aged past 5 minutes. Wait and restart; do not delete `SchedulerRun` rows by hand.
+1. **Is the worker running?** `Get-Service CommandPulseCMMSWorker` should report `Running`, and `Get-ScheduledTask -TaskName 'CommandPulse CMMS Health Watchdog'` should report `Ready`. `curl -s http://localhost:4000/api/health` checks the API, which is a different service - a healthy API does not mean the scheduler is running.
+2. **Is the worker that owns the lock alive?** Check the worker log (`backend\logs\CommandPulseCMMSWorker.out.log`) for `startup lock acquired` versus `lock held by`. If the worker reports a lock held by another process, a hard-killed worker may have left a lock that has not yet aged past 5 minutes. Wait and restart; do not delete `SchedulerRun` rows by hand.
 3. **Has a run been attempted at all?** Query `SchedulerRun` as in [4.4](#44-useful-read-only-queries). No row at all means cron never fired, so check `PM_SCHEDULER_CRON` syntax and that the worker has been up across the trigger time. Note the expression is evaluated in **server local time** - a daylight-saving change or a server in another time zone will shift the run.
 4. **Did runs fail?** A `SchedulerRun` with `status = 'error'` has the reason in `errorMessage`.
 5. **Do the plans have everything they need?** A plan missing an equipment record, a work center, or a task list can fail per-plan without failing the run. The `errors` array in the manual run response names them.
@@ -250,7 +272,7 @@ The scheduler evaluates each plan's due date at the moment it runs. It does **no
 Recovery is either:
 
 - Trigger a manual run as in [5.2](#52-running-the-scheduler-manually) - the plans are due by their date, so they are generated then; or
-- Restart the worker close to the scheduled time on the following night (`pm2 restart cmms-worker`). The worker also runs one catch-up pass at start, so a plan still due when the worker comes back is generated immediately.
+- Restart the worker close to the scheduled time on the following night (`Restart-Service CommandPulseCMMSWorker`). The worker also runs one catch-up pass at start, so a plan still due when the worker comes back is generated immediately.
 
 This matters for a plant that takes the worker down overnight for maintenance: move the window with `PM_SCHEDULER_CRON`, or accept that a missed night requires a manual run.
 
@@ -487,7 +509,7 @@ The drill was re-measured on 2026-09-29 against the `cmms` database at 189 work 
 2. Restore the newest `backups\cmms-*.sql` into `cmms`.
 3. Copy the matching `cmms-*-uploads\` contents over `backend\uploads\`, preserving structure.
 4. Re-apply the schema with `npx prisma migrate deploy` if the code has moved on from the dump.
-5. Rebuild the backend (`scripts\build.bat`) and the frontend, and restart via PM2.
+5. Rebuild the backend (`scripts\build.bat`) and the frontend, then restart the services (`Restart-Service CommandPulseCMMSAPI, CommandPulseCMMSWorker`).
 6. Verify `curl -s http://localhost:4000/api/health`, then sign in and confirm attachments resolve.
 
 ### 7.8 WAL archiving configuration (D-4)
@@ -559,10 +581,11 @@ The log is purged automatically: a daily cron (the `audit_retention_years` setti
 
 The backend logs through Pino, at the level set by `LOG_LEVEL`.
 
-- **Under PM2**, the API logs go to `backend\logs\api-out.log` and `backend\logs\api-err.log`, and the scheduler worker logs go to `backend\logs\worker-out.log` and `backend\logs\worker-err.log` (per `ecosystem.config.cjs`).
+- **Under the Windows services**, the API writes `backend\logs\CommandPulseCMMSAPI.out.log` and `CommandPulseCMMSAPI.err.log`; the worker writes `backend\logs\CommandPulseCMMSWorker.out.log` and `CommandPulseCMMSWorker.err.log`. WinSW's own wrapper log is `backend\logs\CommandPulseCMMSAPI.wrapper.log` (and the worker equivalent) and records service start, stop and restart decisions.
 - Useful startup lines: `startup lock acquired (pid@host, run <id>)` and `[scheduler] started cron="<expression>"` (both in the **worker** log), and `listening on <host>:<port>` (in the **API** log).
-- `ecosystem.config.cjs` references `pm2-logrotate` only in a comment; rotation is **not** actually configured there. Confirm rotation is active on a long-running host; an unrotated log will eventually fill the disk, and the failure then looks like an application fault.
+- **Rotation is configured.** WinSW rolls each log by size at 10 MB and keeps eight files (`backend\service\CommandPulseCMMSAPI.xml`). The watchdog keeps its own `backend\logs\watchdog.log` at 1 MB. Confirm older files are being pruned on a long-running host; a log that never rotates will eventually fill the disk and the failure then looks like an application fault.
 - Stale-scheduler health conditions are logged with `[scheduler] stale health detected - SystemAlert created`.
+- The watchdog records every restart decision in `backend\logs\watchdog.log`; its failure counter is `backend\logs\watchdog-state.json`.
 
 Do not paste raw logs into a shared channel. Log lines can contain usernames, IP addresses, and record identifiers.
 
@@ -585,6 +608,23 @@ Suggested monitoring:
 - Poll `/api/health/scheduler` with a bearer token and alert on `503`. Note that a `503` is expected on a brand-new system until the first run, so suppress it for the first 25 hours after install.
 - Alert on the appearance of `Scheduler_Stale` SystemAlerts, which is the user-visible signal of the same condition.
 - Watch the age of the newest file in `backups\`. If it is older than about 26 hours, the daily backup has stopped - the most consequential thing to monitor, because a silently dead backup is discovered only at restore time.
+
+### 10.1 Local health watchdog
+
+The installer registers the Scheduled Task `CommandPulse CMMS Health Watchdog`. It runs as `SYSTEM` (so it works with nobody logged on) every five minutes and:
+
+1. Calls `http://127.0.0.1:4000/api/health` with a short timeout.
+2. Increments a consecutive-failure counter in `backend\logs\watchdog-state.json` on failure, and resets it on success.
+3. After **three** consecutive failures, restarts `CommandPulseCMMSAPI` and waits for health to return, logging the action to `backend\logs\watchdog.log`.
+4. Does nothing if the service is already `Running` and healthy.
+
+The watchdog is a local liveness safeguard, not a replacement for external monitoring. It cannot see a database outage (the health endpoint does not query the database), and it does not touch the worker. A monitor that alerts a human is still required.
+
+```powershell
+# Elevated PowerShell - inspect or run the watchdog by hand
+Get-ScheduledTask -TaskName 'CommandPulse CMMS Health Watchdog'
+Get-Content .\backend\logs\watchdog.log -Tail 20
+```
 
 ---
 
@@ -715,7 +755,7 @@ Almost always CORS. The API rejects the browser's request, so every call fails w
 
 ### 14.2 The API is not reachable from the network
 
-1. Confirm the process is running - `pm2 list`, or `pm2 logs` for a startup crash.
+1. Confirm the process is running - `Get-Service CommandPulseCMMSAPI`, then the wrapper log `backend\logs\CommandPulseCMMSAPI.wrapper.log` and the application log `CommandPulseCMMSAPI.err.log` for a startup crash.
 2. Confirm the port: `netstat -ano | findstr 4000`.
 3. Confirm the bind address. `BIND_HOST=127.0.0.1` intentionally makes the port unreachable from other machines. If you have set it and need direct access, that is a security regression - use the proxy instead.
 4. Check Windows Firewall for an inbound rule on the port.
@@ -766,7 +806,7 @@ If a user is signing in correctly and is still refused, check for a lockout **fi
 
 ### 14.6 No work orders are being generated from PM plans
 
-1. `curl -s -H "Authorization: Bearer <token>" http://localhost:4000/api/health/scheduler` - and confirm `cmms-worker` is `online` in `pm2 status`; see [5.3](#53-when-the-scheduler-reports-stale).
+1. `curl -s -H "Authorization: Bearer <token>" http://localhost:4000/api/health/scheduler` - and confirm `Get-Service CommandPulseCMMSWorker` reports `Running`; see [5.3](#53-when-the-scheduler-reports-stale).
 2. Is the plan's **Next Due** date actually reached? Generation is driven by the due date, not by the plan's age.
 3. Is the plan active?
 4. Does the plan have the equipment, work center, and task list it needs? A missing reference fails that plan and appears in the manual run's `errors` array.
@@ -792,10 +832,68 @@ See [12.3](#123-proxy-trust-and-recorded-ip-addresses). `trust proxy` is hardcod
 
 The Prisma client is probably stale relative to the schema:
 
-```cmd
+```powershell
 cd CMMSproject\backend
 npx prisma generate
-pm2 restart ecosystem.config.cjs
+Restart-Service CommandPulseCMMSAPI
 ```
 
 If the column is genuinely absent from the database, apply the schema with `npx prisma migrate deploy` - see [4.1](#41-applying-the-schema) for why `db push` is the wrong tool on a live database.
+
+---
+
+## 15. Service maintenance, upgrades and housekeeping
+
+### 15.1 Day-to-day service control
+
+All of these need an elevated PowerShell window:
+
+```powershell
+Get-Service CommandPulseCMMSAPI, CommandPulseCMMSWorker
+Restart-Service CommandPulseCMMSAPI
+Stop-Service CommandPulseCMMSAPI
+Start-Service CommandPulseCMMSWorker
+```
+
+The services are `Automatic` and run as `LocalSystem` by default (unless the install was given `-ServiceAccount`), so they start at boot with nobody logged on. To prove that after a change, reboot and check both services plus `curl -s http://127.0.0.1:4000/api/health` **before** signing in.
+
+### 15.2 In-place upgrade
+
+The installer (`install.ps1 -Mode full`) is the supported upgrade path. On an upgrade it:
+
+1. Stages dependencies while the running services keep serving.
+2. Runs `prisma migrate deploy` before stopping anything.
+3. Stops both services, swaps `node_modules`, regenerates the Prisma client and starts the services again.
+4. Stops the legacy PM2 applications before registering the services, and removes the `CommandPulse CMMS PM2 Resurrect` task once the services are running.
+
+Two things to know:
+
+- **An in-place upgrade overwrites tracked documentation.** Files the release bundle ships into the install root - including this guide and the installation guide - are replaced with the bundle's versions. Anything you annotated by hand in those files is lost; keep local runbooks outside the install root, or copy the file before upgrading.
+- **Do not use `pm2 save` during the window.** See [2.2](#22-windows-services).
+
+### 15.3 Housekeeping
+
+| Item | What to do |
+|---|---|
+| `backend\logs\` | WinSW keeps eight 10 MB files per stream; the watchdog keeps 1 MB. Delete `*.log` files older than the retention you need only while the services are stopped, so a file is not held open. |
+| `backend\node_modules.previous-*` | The staged-upgrade rollback trees. The installer removes them after a successful health check; delete any left behind by a failed run once the new install is confirmed healthy. |
+| `backend\service\` | Wrapper executables and XML. This folder is generated by the installer and is **not** source-controlled; do not edit it by hand, re-run the installer instead. |
+| `backend\uploads\` | Attachments. Covered by the paired `-uploads` backup snapshot; never delete without a matching dump. |
+| `backend\.install-stage` | Transient staging folder. Safe to delete when no install is running. |
+| A `.pm2\logs\*test*` or PM2 `dump.pm2` on a host that is now service-based | Legacy leftovers. Delete the logs; keep `dump.pm2` only if a rollback to PM2 is still planned. |
+| `C:\CMMS-v166-VisualTest` and similar scratch install roots | Only if no service, scheduled task or IIS site references them. Check `Get-Service`, `Get-ScheduledTask` and `appcmd list site` first. |
+
+### 15.4 Checking a service by hand
+
+```powershell
+# Wrapper, node child, account and log paths
+Get-CimInstance Win32_Service -Filter "Name LIKE 'CommandPulseCMMS%'" |
+  Select-Object Name, State, StartMode, StartName, ProcessId
+Get-Content .\backend\logs\CommandPulseCMMSAPI.wrapper.log -Tail 30
+Get-Content .\backend\logs\CommandPulseCMMSWorker.err.log -Tail 30
+
+# Which process actually owns the API port (the wrapper spawns node.exe)
+Get-NetTCPConnection -LocalPort 4000 -State Listen |
+  ForEach-Object { Get-CimInstance Win32_Process -Filter "ProcessId=$($_.OwningProcess)" } |
+  Select-Object ProcessId, Name, ParentProcessId
+```

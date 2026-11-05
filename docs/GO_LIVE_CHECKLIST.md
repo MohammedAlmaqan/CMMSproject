@@ -100,6 +100,22 @@ position is a deployment step recorded here, not a reopening of the row.
    so PM2 starts only once `Injaz` logs on — the same "logged-on only" model the backup
    task used until 2026-11-03 (see item 3) — and a pre-logon boot task would need a stored
    password or an S4U principal. *Superseded open check (kept): no `dump.pm2` on this host.*
+   *Superseded 2026-11-03 by the services migration — see item 4a.*
+
+4a. **Boot-time autostart with nobody logged on.** *Closed 2026-11-03.* The commercial
+   requirement is that the application starts at boot, not at logon. PM2 and the
+   `PM2 Resurrect` logon task were replaced by two native Windows services —
+   `CommandPulseCMMSAPI` and `CommandPulseCMMSWorker` — both `Automatic`, running as
+   `LocalSystem` with no stored password. PM2 entries are gone and the Resurrect task was
+   removed, so there is no longer a process manager that depends on an interactive logon.
+   A `SYSTEM` task `CommandPulse CMMS Health Watchdog` restarts the API after three
+   consecutive `/api/health` failures. `postgresql-x64-18` was moved under SCM at the same
+   time, because the previous postmaster had been started by hand and would not have come
+   back cleanly. Evidence: a simulated reboot stopped all three services, freed ports 4000
+   and 5432, then started the CMMS services in 0.9 s **before** PostgreSQL; `/api/health`
+   returned 200 without a database, both wrappers ran as `NT AUTHORITY\SYSTEM` in session 0,
+   and the worker recovered by itself when PostgreSQL arrived. Detail:
+   `docs/ADMIN_GUIDE.md` §2.2 and §15.
 
 5. **Apply the pending migrations to the live `cmms` database.** *Closed 2026-10-22.* The
    live `cmms` database has **22 of 22** finished migrations; the three that were pending

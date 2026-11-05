@@ -89,7 +89,8 @@ reviewer correction; see "Commit discipline" below.
   `archive_mode=on` with `archive_command` copying each WAL segment to `C:\cmms-wal\wal`
   (`archive_timeout=300`), verified 2026-10-17 (`pg_stat_archiver` `archived_count=1`,
   `failed_count=0`). Go-live detail: `docs/GO_LIVE_CHECKLIST.md` items 2-3.
-- **Live application posture (2026-10-17):** PM2 runs both apps from
+- **Live application posture (2026-10-17):** *Superseded 2026-11-03 by the entry
+  below; kept as written.* PM2 runs both apps from
   `backend/ecosystem.config.cjs` — `cmms-api` (fork, port 4000) and `cmms-worker` (fork)
   are `online` as user `Injaz`, and `pm2 save` wrote `dump.pm2`. IIS serves the frontend
   from `C:\inetpub\cmms-site` (its `web.config` reverse-proxies `/api` to
@@ -106,6 +107,24 @@ reviewer correction; see "Commit discipline" below.
   container script rather than `dist/worker.js` (see `backend/src/worker.ts`). No
   boot-order autostart and no service account: both apps run as the interactive user
   `Injaz`.
+- **Live application posture (2026-11-03):** the application now runs as two native
+  Windows services, not PM2. `CommandPulseCMMSAPI` and `CommandPulseCMMSWorker` are
+  `Running`, `StartType Automatic`, account `LocalSystem`, with **no** SCM dependency on
+  PostgreSQL, and start at boot with nobody logged on. PM2 entries are gone
+  (`dump.pm2` has 0 apps; `dump.pm2.before-services` is the rollback copy) and the
+  `CommandPulse CMMS PM2 Resurrect` logon task has been removed. A `SYSTEM` Scheduled
+  Task `CommandPulse CMMS Health Watchdog` runs every 5 minutes, polls
+  `http://127.0.0.1:4000/api/health` and restarts `CommandPulseCMMSAPI` after 3
+  consecutive failures (`backend\logs\watchdog.{log,json}`). `postgresql-x64-18` is
+  also under SCM (`Running`/`Automatic`/`NetworkService`); it previously ran as an
+  orphaned manual postmaster, so a reboot now brings it up properly. Verified
+  2026-11-03 by a simulated reboot: the CMMS services started in 0.9 s **without** the
+  database, `/api/health` returned 200, and the worker recovered by itself when
+  PostgreSQL arrived. IIS, the firewall rule and the loopback bind are unchanged.
+  The services load `backend/.env` because their working directory is `backend`;
+  WinSW retries a crashing process indefinitely (proved with a throwaway service:
+  9 restarts in 41 s on a single `onfailure restart`). Detail:
+  `docs/ADMIN_GUIDE.md` §2.2 and §15, `installer/service/Install-CmmsServices.ps1`.
 
 ## Documentation accuracy
 
