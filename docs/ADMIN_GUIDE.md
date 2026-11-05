@@ -257,7 +257,7 @@ Use a manual run to confirm a new plan produces a work order before waiting for 
 
 Work through these in order:
 
-1. **Is the worker running?** `Get-Service CommandPulseCMMSWorker` should report `Running`, and `Get-ScheduledTask -TaskName 'CommandPulse CMMS Health Watchdog'` should report `Ready`. `curl -s http://localhost:4000/api/health` checks the API, which is a different service - a healthy API does not mean the scheduler is running.
+1. **Is the worker running?** `Get-Service CommandPulseCMMSWorker` should report `Running`, and `Get-ScheduledTask -TaskName 'CommandPulse CMMS Health Watchdog'` should report `Ready` from an **elevated** session - the task's ACL does not let a standard user read it. `curl -s http://localhost:4000/api/health` checks the API, which is a different service - a healthy API does not mean the scheduler is running.
 2. **Is the worker that owns the lock alive?** Check the worker log (`backend\logs\CommandPulseCMMSWorker.out.log`) for `startup lock acquired` versus `lock held by`. If the worker reports a lock held by another process, a hard-killed worker may have left a lock that has not yet aged past 5 minutes. Wait and restart; do not delete `SchedulerRun` rows by hand.
 3. **Has a run been attempted at all?** Query `SchedulerRun` as in [4.4](#44-useful-read-only-queries). No row at all means cron never fired, so check `PM_SCHEDULER_CRON` syntax and that the worker has been up across the trigger time. Note the expression is evaluated in **server local time** - a daylight-saving change or a server in another time zone will shift the run.
 4. **Did runs fail?** A `SchedulerRun` with `status = 'error'` has the reason in `errorMessage`.
