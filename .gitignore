@@ -17,6 +17,7 @@ Thumbs.db
 *.user
 screenshots/
 backend/uploads/
+backend/service/
 backups/
 
 # Local k6 portable binary (67 MB) — fetch it with the documented download command
