@@ -16,6 +16,13 @@ Thumbs.db
 *.suo
 *.user
 screenshots/
+# The v1.6.9 installer evidence is tracked on purpose: RELEASE_NOTES.md points at
+# it. The bare rule above is for working screenshots at the root, and older UAT
+# captures under docs/ stay ignored.
+!docs/screenshots/
+docs/screenshots/*
+!docs/screenshots/install_v1.6.9/
+!docs/screenshots/install_v1.6.9/**
 backend/uploads/
 backend/service/
 backups/

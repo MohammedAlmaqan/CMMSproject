@@ -4,7 +4,7 @@ Audience: IT staff, database administrators, and operations staff responsible fo
 
 Scope: day-two operations of an **already installed** system - configuration, database administration, user administration, the preventive maintenance scheduler, backup and recovery, audit, and troubleshooting.
 
-For the initial installation itself, see the [Installation & Deployment Guide](INSTALLATION_GUIDE.md). That document covers hardware sizing, Node.js and PostgreSQL installation, the IIS reverse proxy, and HTTPS. **Its PM2 and PM2-Resurrect sections are superseded:** since release 1.6.8 the installer registers two Windows services and a health watchdog, and this guide is the authority for that runtime. See [2.2](#22-windows-services).
+For the initial installation itself, see the [Installation & Deployment Guide](INSTALLATION_GUIDE.md). That document covers hardware sizing, Node.js and PostgreSQL installation, the IIS reverse proxy, and HTTPS. **Its PM2 and PM2-Resurrect sections are superseded:** since release 1.6.9 the installer registers two Windows services and a health watchdog, and this guide is the authority for that runtime. See [2.2](#22-windows-services).
 
 **This guide documents what the system does today.** Features that are not implemented are listed in [section 13](#13-deferred-and-not-implemented), not described as if they were available.
 
@@ -79,7 +79,7 @@ Consequences you must plan for:
 
 ### 2.2 Windows services
 
-Release 1.6.8 replaces PM2 with two native Windows services, each wrapping `node.exe` with WinSW:
+Release 1.6.9 replaces PM2 with two native Windows services, each wrapping `node.exe` with WinSW:
 
 | Service | Runs | Start type | Account |
 |---|---|---|---|

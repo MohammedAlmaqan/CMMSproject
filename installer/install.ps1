@@ -578,7 +578,7 @@ function Get-PortOwnerPid {
 }
 
 # The processes this install would own, if one of them holds the port. Two
-# shapes exist: a 1.6.8 install runs as a Windows service, so the listener is a
+# shapes exist: a 1.6.9 install runs as a Windows service, so the listener is a
 # descendant of a CommandPulseCMMS*.exe wrapper; a 1.6.x install runs under PM2,
 # so the listener is the process `pm2 pid <name>` reports.
 function Get-OwnAppPids {
@@ -1081,7 +1081,7 @@ function Invoke-CmmsServiceScript {
 }
 
 # Stops whatever this install currently runs, so node_modules can be swapped.
-# A 1.6.x install runs under PM2 and a 1.6.8 install runs as Windows services;
+# A 1.6.x install runs under PM2 and a 1.6.9 install runs as Windows services;
 # during the upgrade from one to the other either - or both - can be present.
 function Stop-OwnApplications {
   param([string]$BackendDir)

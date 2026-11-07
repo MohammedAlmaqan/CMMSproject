@@ -4,6 +4,123 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.6.9
+
+An installer release. The application process manager moves from PM2 to two
+native Windows services, and the uninstall path is made safe. The application
+code, the schema and the API contract are unchanged from `v1.6.8` - 166
+operations across 111 paths, 22 migrations, no new ones - so an upgrade from
+`v1.6.8` replaces the installer and re-runs it; it is not a data migration.
+
+### What an operator will notice
+
+- **The application runs as two Windows services instead of PM2.**
+  `CommandPulseCMMSAPI` and `CommandPulseCMMSWorker` are registered by the
+  installer, each a vendored WinSW 2.12.0 wrapper around `node.exe`. Both are
+  `Automatic` and run as `LocalSystem`, with no SCM dependency on PostgreSQL, so
+  a reboot brings the application up with nobody logged on; it answers
+  `/api/health` as soon as the database is listening, and the worker retries its
+  own connection until then. `-ServiceAccount` opts into a dedicated account and
+  `-DependOnPostgres` into an explicit dependency. WinSW is vendored so a Client
+  server needs no network access to install. `1e87b41`, `1f645b4`.
+- **A health watchdog restarts a dead API.** The `SYSTEM` scheduled task
+  `CommandPulse CMMS Health Watchdog` runs every five minutes, polls
+  `http://127.0.0.1:4000/api/health`, and restarts `CommandPulseCMMSAPI` after
+  three consecutive failures, writing `backend\logs\watchdog.log` and
+  `watchdog.json`. It is registered by the installer and removed by the
+  uninstaller. `1e87b41`.
+- **An uninstall cannot take another installation's PM2 boot list with it, and
+  cannot fail on the folder it is deleting.** Uninstall removes the services
+  first (SCM would otherwise keep a service whose wrapper executable had just
+  been deleted) and no longer calls `pm2 delete`/`pm2 save` unconditionally:
+  `pm2 save` rewrites the whole `dump.pm2`, and `pm2 describe` spawns a daemon
+  rooted in the directory about to be deleted, which then keeps that directory
+  open. It now probes `\\.\pipe\rpc.sock` and only runs PM2 when the operator's
+  installation actually used it. `6ad590a`.
+- **PM2 is retired on this host.** `dump.pm2` holds no applications, the
+  `CommandPulse CMMS PM2 Resurrect` logon task is removed, and an upgrade from a
+  1.6.x install stops the legacy PM2 applications it owns before the swap, so
+  the port check does not mistake them for a foreign listener.
+- **The wizard's PM2 page is now the Service & Prisma page.** An instance prefix
+  names the services `CommandPulseCMMS<prefix>API` and
+  `CommandPulseCMMS<prefix>Worker`; an empty prefix gives the names above.
+
+### Verification
+
+`installer/tests/run-tests.ps1` asserts the services: registration, `Automatic`
+start type, wrapper path, restart rather than re-registration on an upgrade, the
+watchdog task, and a live installation staying healthy through the install. 91
+assertions, 0 failures.
+
+The services were then installed on this host on 2026-11-03 and proved by a
+simulated reboot with PostgreSQL stopped: both services were `Running` within
+0.9 s, `/api/health` returned 200, and the worker reconnected by itself when
+PostgreSQL arrived. `postgresql-x64-18` was moved under SCM in the same pass, so
+a reboot now brings the database up rather than leaving an orphaned manual
+postmaster. `docs/ADMIN_GUIDE.md` 2.2, 10.1 and 15 are the runtime authority.
+
+**The wizard was then driven end to end through its own pages, 2026-11-06.**
+`Setup_CommandPulse.exe` (the `764A6709...` build) ran from Welcome to Finish
+with no operator editing, Source Bundle pointed at this repository and the
+database at `cmms`; the one interactive decision was answering Yes to the
+existing-database upgrade prompt. Engine log:
+`C:\ProgramData\CommandPulse\logs\install-20261106-161651.log`. Post-install
+the engine reported 39 tables, 22 migrations (none pending), the existing
+dataset intact at 2,193 work orders, 6,127 equipment and 2,174 notifications,
+4 active users, both services `Running`/`Automatic`/`LocalSystem`, the
+watchdog task `Ready`, `/api/health` 200 and 4 frontend files copied and
+verified; it backed the previous environment up to `.env.bak.20261106-161651`.
+The eleven pages are captured in `docs/screenshots/install_v1.6.9/`
+(`01-welcome.png` to `11-finished.png`). Because the Source Bundle page pointed
+at this repository, the run also left the setup payload under
+`C:\Program Files (x86)\CommandPulse\CMMS`; that copy is inert and is explained
+in `installer/README.md`, "Where the wizard puts its files".
+
+**Nine Playwright scenarios passed against `https://cmms.local`, 2026-11-07.**
+They ran after that install, against the live services, with fixtures prefixed
+`UAT-v169-*`:
+
+| # | Scenario | Result |
+|---|---|---|
+| S1 | Login, logout and route guard | PASS |
+| S2 | Silent refresh recovers; a revoked session lands on `/login` | PASS |
+| S3 | Work order Draft -> Planned -> Scheduled -> In Progress -> Completed -> Closed | PASS |
+| S4 | Notification raised, converted to a work order, completed with it | PASS |
+| S5 | Craft, work center, material and cause code created | PASS |
+| S6 | Seven reports exported as real `.xlsx` (ZIP) payloads, 3-32 KB | PASS |
+| S7 | PM plan created and a work order generated from it | PASS |
+| S8 | Password reset revokes the target user's live session | PASS |
+| S9 | Dashboard, work order search/filter, CSV export and audit log | PASS |
+
+The run left 12 work orders (9 raised directly, 3 generated by the PM plans),
+6 notifications, 5 crafts, 5 work centers, 4 materials, 3 cause codes and 3 PM
+plans in place, all tagged `UAT-v169-*`/`UATC*`/`UATWC*`/`UATMAT*`/`UATPM*` so
+they can be found and removed. The two UAT users, `uat-v169-admin` and
+`uat-v169-tech`, were soft-deleted - rows those users created are referenced by
+`RESTRICT` foreign keys, so a hard delete would have destroyed the audit trail -
+and their refresh tokens were revoked, returning the active-user count to 4.
+
+### Release engineering
+
+- `installer/wizard/CommandPulse.iss` declares `1.6.9`, so the setup program and
+  its Add/Remove Programs entry identify this release.
+- `Setup_CommandPulse.exe` is compiled from this tag. The compilation is
+  reproducible: the same tree compiled twice produced the same SHA-256.
+- `v1.6.8` - tagged at `10da8df` - remains the last PM2-based release and is
+  preserved unchanged, with its own bundle beside this one. The `v1.6.8` bundle
+  predates the service installer and must not be shipped.
+
+### Known open items
+
+Carried forward from `v1.6.8`: the 500,000-work-order / 100,000-equipment volume
+limb of A4.1 is unmeasured, field-level authorisation on
+`PUT /api/work-orders/{id}` is UI-only (F4), and the credentials in the `v1.6.4`
+bundle are treated as disclosed rather than rotated.
+
+The live upgrade restarts the API rather than keeping it serving: a single
+fork-mode process cannot keep answering while its `node_modules` is replaced.
+This is a planned window, not an outage, and no zero-downtime claim is made.
+
 ## v1.6.8
 
 An installer release. The application code, the schema and the API contract are

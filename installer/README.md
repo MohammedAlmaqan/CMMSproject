@@ -21,6 +21,23 @@ successful install. The engine itself repeats the classification and refuses an
 API port that is already listening, so the health check cannot be answered by
 another service.
 
+## Where the wizard puts its files
+
+The wizard keeps Inno Setup's **Select Destination Location** page. That page
+chooses where the setup program's own payload goes - the engine, the service
+scripts, the vendored WinSW wrapper, the admin helper and this README - and
+defaults to `C:\Program Files (x86)\CommandPulse\CMMS` on a 64-bit host. It does
+**not** choose where the application is installed: that is the Source Bundle
+page, and the bundle's `backend\`, `frontend\` and documents are copied there.
+
+On a production server the two locations are different by design: the payload is
+a fixed copy of the installer, and the application sits in its own directory.
+When the Source Bundle page points at this repository - as it does on the
+development host - the run leaves a second tree under `Program Files (x86)`.
+That copy is inert and safe to leave; it is not the running application and it is
+not a second installation. Delete it only after checking the services' WinSW
+wrapper paths, which point at the install root, not at `{app}`.
+
 ## Build the wizard
 
 `build-wizard.ps1` locates `ISCC.exe` (on `PATH`, in `%LOCALAPPDATA%\Programs\Inno Setup 6`,
