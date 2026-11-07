@@ -26,6 +26,10 @@ SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
 SetupLogging=yes
+; Inno Setup 6 disabled this page by default. The wizard is the operator's first
+; contact with the product, and its next page asks for two paths with no
+; explanation of what is being installed, so the welcome page is kept.
+DisableWelcomePage=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
