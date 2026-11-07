@@ -104,8 +104,22 @@ and their refresh tokens were revoked, returning the active-user count to 4.
 
 - `installer/wizard/CommandPulse.iss` declares `1.6.9`, so the setup program and
   its Add/Remove Programs entry identify this release.
-- `Setup_CommandPulse.exe` is compiled from this tag. The compilation is
-  reproducible: the same tree compiled twice produced the same SHA-256.
+- `Setup_CommandPulse.exe` ships as the artifact that was installed and driven on
+  2026-11-06 - SHA-256 `764a6709...`, 2,326,882 bytes, ProductVersion `1.6.9` -
+  because that is the binary the evidence in this section covers.
+- That file is **not** rebuilt from this tag, and this release does not claim it
+  is. Compiling `installer/wizard/CommandPulse.iss` at the tag produces
+  `eb50749e...` (2,327,329 bytes), and the compile is deterministic: two builds
+  of the same tree are byte-identical. The result is still not the shipped file.
+  Every embedded payload file matches the shipped installer except
+  `installer/README.md`, which carries the pre-note version from `556469e`, but
+  no reconstruction tried closes the gap: the tag with that README reverted gives
+  `92537bab...`, `9907b6c`'s tree gives `7fd71c2b...`, and removing the explicit
+  welcome-page setting gives `904ee687...`. All are 2,327,006-2,327,012 bytes
+  against 2,326,882, so the 2026-11-05 build's exact source state is not
+  recoverable. The claim this release makes is the narrower, checkable one: the
+  installer that ships is the installer that was tested, and its hash is listed
+  here and in `RELEASE_MANIFEST.md`.
 - `v1.6.8` - tagged at `10da8df` - remains the last PM2-based release and is
   preserved unchanged, with its own bundle beside this one. The `v1.6.8` bundle
   predates the service installer and must not be shipped.
