@@ -1,0 +1,14 @@
+# The wizard compiles the files below byte for byte into Setup_CommandPulse.exe,
+# so their line endings are part of the released artifact - not an artefact of
+# the developer's machine. Without a rule here a checkout inherits
+# core.autocrlf, and the same commit compiles to a different executable:
+# rebuilding the v1.6.9 tag from an LF checkout and from a normal CRLF checkout
+# produced 2,327,289 and 2,327,521 bytes respectively (C4C4BEC7... and
+# 9419D04F...). That is why the shipped setup program could not be rebuilt from
+# its own tag. eol=lf overrides core.autocrlf, so every clone, worktree and CI
+# checkout feeds ISCC the same bytes.
+* text=auto eol=lf
+
+# Vendored binaries must never be normalised.
+*.exe binary
+*.dll binary
