@@ -55,6 +55,48 @@ verified artifact travels with the files it installs. The wizard looks for
 program's own folder, so it works both when the setup program sits beside the
 extracted bundle and when it sits inside it.
 
+### Reproducible builds
+
+The setup program must be a function of the commit that ships it: build the tag
+twice, on two machines or two checkouts, and the bytes must match. Two things
+made that untrue up to v1.6.9, and both are now pinned rather than left to the
+developer's machine.
+
+- **Line endings.** ISCC embeds the files named in `[Files]` byte for byte.
+  `installer\.gitattributes` sets `eol=lf` for this directory, so a clone, a
+  worktree and a CI checkout all hand it the same bytes. Without that rule a
+  checkout inherits `core.autocrlf`; rebuilding the v1.6.9 tag from an LF
+  checkout and from a normal CRLF checkout gave 2,327,289 and 2,327,521 bytes.
+- **Timestamps.** ISCC records each source file's last-write time in the setup
+  data, so identical bytes built from the working tree and from a fresh
+  extraction of the same commit differed by checkout time (2,327,324 against
+  2,327,289 bytes). The script now copies only the `[Files]` entries into
+  `installer\out\.stage` and stamps every one with a fixed date before
+  compiling, so the checkout's mtimes never reach the artifact and a stray file
+  in a glob cannot either.
+
+The script refuses to compile from a tree with uncommitted or untracked changes
+under `installer\` (pass `-AllowDirty` for a throwaway build you will not
+publish) and refuses a payload file that is not LF, naming the files to
+re-materialise. It prints the commit, the ISCC version parsed from the compiler
+banner, and a SHA-256 digest over the payload, then the hash of the compiled
+program:
+
+```text
+Commit  : <40-hex commit>
+Tree    : clean
+Payload : <64-hex digest> (13 entries, LF, mtime 2020-01-01 00:00:00)
+ISCC    : C:\Users\...\ISCC.exe
+Source  : ...\installer\out\.stage\installer\wizard\CommandPulse.iss
+Version : Inno Setup 6.7.3
+SHA256  : <64-hex hash of Setup_CommandPulse.exe>
+```
+
+A release build is: check out the tag, confirm `Tree : clean`, build twice into
+two output directories, and confirm the two `SHA256` lines are equal. That hash
+is what the bundle records. A different compiler version is a different
+artifact even from the same payload, so the version is recorded beside it.
+
 ## Quick start (blank install)
 ```powershell
 # From an elevated PowerShell window
