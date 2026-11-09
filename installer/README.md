@@ -86,7 +86,7 @@ program:
 Commit  : <40-hex commit>
 Tree    : clean
 Payload : <64-hex digest> (13 entries, LF, mtime 2020-01-01 00:00:00)
-ISCC    : C:\Users\...\ISCC.exe
+ISCC    : <resolved ISCC.exe path>
 Source  : ...\installer\out\.stage\installer\wizard\CommandPulse.iss
 Version : Inno Setup 6.7.3
 SHA256  : <64-hex hash of Setup_CommandPulse.exe>
