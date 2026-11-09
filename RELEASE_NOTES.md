@@ -4,7 +4,58 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.6.11
+
+The published form of the v1.6.10 traceability release. `v1.6.10` was tagged and
+its bundle assembled, but **it was never published**: its CI run failed on the
+installer job, so `v1.6.10` stays tagged as a superseded attempt and this tag
+carries the release. There is no application change in either; the backend,
+frontend, schema, API contract and documents are those of `v1.6.9`.
+
+### Why v1.6.10 was superseded
+
+`v1.6.10` is commit `323e4ce`, tagged `e396daf`. CI run `42603498019` passed
+Frontend and Backend and failed **Installer**. The failing step is the guard that
+rejects a developer path anywhere under `installer/`, and it matched one line of
+that release's own new documentation:
+
+```text
+ISCC    : C:\Users\...\ISCC.exe
+```
+
+`installer/README.md` is embedded in the setup program, so a local path there
+would also have shipped. The sample was replaced with a placeholder
+(`5075df1`) and the version declared `1.6.11`; the pushed `v1.6.10` tag was left
+where it is rather than moved, because a tag that has been pushed is a published
+name even when its bundle is not.
+
+### Verification
+
+**The tag builds to the same bytes twice.** Two independent checkouts of
+`v1.6.11` - a fresh `git archive` extraction and a worktree - each built with
+`installer/build-wizard.ps1` at the tag produced
+`F5530C9FC2C821854040EE45A2CD58A3B4CD721F7E53F90C0CB4B694A7FDC900`,
+2,327,997 bytes, ProductVersion `1.6.11`, from payload digest `c247e0af...`,
+with Inno Setup 6.7.3.
+
+**That build was installed through its own UI, 2026-11-09.**
+`installer/tests/gui-e2e-v169.ps1` ran Welcome to Finish without operator input;
+engine log `C:\ProgramData\CommandPulse\logs\install-20261109-135011.log`. It
+targeted a scratch install root under `%TEMP%`, a new database
+`cmms_installer_v1611`, port 4002, service prefix `UAT1611` and a site name that
+does not exist on this host, so IIS was skipped and the live installation was
+not involved. The engine created the database, applied 22 migrations, created
+the first Administrator, registered `CommandPulseCMMSUAT1611API` and
+`CommandPulseCMMSUAT1611Worker` as Automatic, Running and `LocalSystem` with
+their watchdog task, and `/api/health` returned 200. Nine pages are captured in
+`docs/screenshots/install_v1.6.11/`. The services, watchdog task, database and
+scratch root were then removed, and the live `cmms` services and `/api/health`
+confirmed unchanged.
+
 ## v1.6.10
+
+*Superseded by `v1.6.11` before publication: its CI run failed on the installer
+job, so no bundle was released from this tag. Kept as written.*
 
 An installer traceability release. There is no application change: the backend,
 frontend, schema, API contract and documents are those of `v1.6.9`. What changes
