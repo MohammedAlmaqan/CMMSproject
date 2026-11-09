@@ -3,6 +3,26 @@
 Standing rules for how work is done in this repository. Added 2026-10-04 after a
 reviewer correction; see "Commit discipline" below.
 
+## Working practice
+
+Recorded 2026-11-09. These are about how a pass is executed, not about what is
+correct in the result; the rules below still decide whether a change is right.
+
+- **Search before reading.** Prefer `grep` and symbol search to locate the code
+  that matters, then read only the line ranges a hit points at. A whole-file read
+  is for a file that is genuinely small or that the task is about end to end.
+- **Test narrowly first.** Run the single test, verifier or clause a change
+  touches, then the full suite at release and CI gates, or when the change
+  plausibly crosses a module boundary.
+- **Parallelise independent inspection.** Independent reads, searches and
+  checks run together; a sequential chain is for steps that consume each other's
+  output.
+- **Do not repeat work already on screen.** A command whose result is in the
+  transcript, or an unchanged file already read, is not re-run or re-read;
+  refer to the earlier result instead.
+- **Report at milestones.** Commentary states what changed and what was verified
+  once it is true, not a running narration of each attempt.
+
 ## Commit discipline
 
 - **Each distinct concern in a prompt is its own commit, even when small.** Do not
