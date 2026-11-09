@@ -4,6 +4,82 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.6.10
+
+An installer traceability release. There is no application change: the backend,
+frontend, schema, API contract and documents are those of `v1.6.9`. What changes
+is the setup program, which is now built from the commit that ships it and
+produces the same bytes when it is built again.
+
+`v1.6.9` stays tagged, with its bundle exactly as published. That release shipped
+a tested binary its tag could not rebuild and said so; this release removes the
+cause rather than restating the exception.
+
+### Why the v1.6.9 setup could not be rebuilt
+
+Two defects, each proved by rebuilding and comparing bytes.
+
+1. **The shipped program was compiled from a tree that was never committed.**
+   The build of 2026-11-06 16:06 came from a pre-release checkout whose payload
+   matches `26a9eb2`, with `1.6.9` defined for that compile. Three commits landed
+   afterwards, two of which changed files the wizard embeds - `9a6a3a4` (the
+   welcome page in `CommandPulse.iss`) and `32a7cb3` (`install.ps1`,
+   `README.md`) - so the tag's payload is not the shipped payload. Rebuilding
+   `26a9eb2` with the 1.6.9 define gives `9F7974A4...`, 2,326,841 bytes, against
+   the shipped `764A6709...`, 2,326,882.
+2. **The compile was not a function of the commit.** Rebuilding the v1.6.9 tag
+   (`badf1bc`) from an LF checkout and from an ordinary CRLF checkout produced
+   2,327,289 bytes (`C4C4BEC7...`) and 2,327,521 bytes (`9419D04F...`). Two
+   inputs were taken from the machine instead of from the commit: the payload's
+   line endings, which followed `core.autocrlf`, and each payload file's
+   last-write time, which ISCC records in the setup data. The same bytes
+   compiled in place and from a fresh extraction of the same commit differed by
+   35 bytes for that reason alone (2,327,324 against 2,327,289).
+
+### What changed
+
+- `installer/.gitattributes` pins every file under `installer/` to `eol=lf`, so
+  a clone, a worktree and a CI checkout hand ISCC the same bytes. Vendored
+  binaries are marked `binary` and are never normalised. `809387f`.
+- `installer/build-wizard.ps1` refuses to compile from a tree with uncommitted
+  or untracked changes under `installer/` (pass `-AllowDirty` for a throwaway
+  build), refuses a payload file that is not LF, stages exactly the `[Files]`
+  entries into `installer/out/.stage` with every file stamped
+  `2020-01-01 00:00:00`, and prints the commit, the ISCC version, a digest over
+  the payload and the hash of the result. `89f39b9`.
+- `installer/README.md` records the recipe and what the guards enforce.
+  `aaacab3`.
+- The wizard declares `1.6.10`.
+
+The only operator-visible effect of the timestamp pin is that the files the
+wizard installs under `{app}\installer` carry that fixed date rather than the
+build day. Nothing reads those dates.
+
+### Verification
+
+**The tag builds to the same bytes twice.** Two independent checkouts of
+`v1.6.10` - a fresh `git archive` extraction and a worktree - each built with
+`installer/build-wizard.ps1` at the tag produced
+`7CD48EE2F324FB01E6D7048F9BD1326469CCFFCD2CABC7D4E7FBB6FCC521AE71`,
+2,328,105 bytes, ProductVersion `1.6.10`, from payload digest `a85b6454...`,
+with Inno Setup 6.7.3.
+
+**The rebuilt program was installed through its own UI, 2026-11-09.**
+`installer/tests/gui-e2e-v169.ps1` - written for the previous release and
+driving whichever setup program it is given - ran Welcome to Finish without
+operator input; engine log
+`C:\ProgramData\CommandPulse\logs\install-20261109-132729.log`. It targeted a
+scratch install root under `%TEMP%`, a new database `cmms_installer_v1610`, port
+4001, service prefix `UAT1610` and a site name that does not exist on this host,
+so IIS was skipped and the live installation was not involved. The engine
+created the database, applied 22 migrations, created the first Administrator,
+registered `CommandPulseCMMSUAT1610API` and `CommandPulseCMMSUAT1610Worker` as
+Automatic, Running and `LocalSystem` with their watchdog task, and
+`/api/health` returned 200. Nine pages are captured in
+`docs/screenshots/install_v1.6.10/` (`01-welcome.png` to `09-finished.png`).
+The services, watchdog task, database and scratch root were then removed, and
+the live `cmms` services and `/api/health` confirmed unchanged.
+
 ## v1.6.9
 
 An installer release. The application process manager moves from PM2 to two
