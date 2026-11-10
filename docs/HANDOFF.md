@@ -10,6 +10,10 @@ and 22 of 22 migrations. The current code anchor is `v1.6.2` (`a8a4223`). The in
 workstream - engine, wizard, harness and CI - is tracked in `docs/INSTALLER_TRACKER.md`.
 The long **State** paragraph above is the Phase G/H-era snapshot and is kept as history.
 
+*Superseded 2026-11-09 — pointer, original kept: the sentence "The current code anchor is
+`v1.6.2` (`a8a4223`)" above was accurate at the time this record was written. The current
+code anchor is `v1.6.11` (`3423b89`).*
+
 **Read first when resuming:** CMMS_FINALIZATION_TRACKER.md, git log --oneline -40, this file
 
 **Standing rules:** never touch .env/.env.example; never print secrets; raw outputs not summaries; one commit per logical unit; no .catch(() => mock) anywhere; stop at each group boundary for review

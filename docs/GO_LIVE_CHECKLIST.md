@@ -7,6 +7,10 @@ Go-live **happened on 2026-10-17**. `v1.1.0` (`5e2c478`) is the acceptance snaps
 current code anchor. The steps below were executed on this host and each item carries its
 recorded evidence.
 
+*Superseded 2026-11-09 — pointer, original kept: the sentence "`v1.6.2` (`a8a4223`) is the
+current code anchor" above was accurate at the time this record was written. The current
+code anchor is `v1.6.11` (`3423b89`).*
+
 *Superseded 2026-10-22 - pointer, original kept: this paragraph read "Go-live has not
 happened yet: `v1.1.0` (`5e2c478`) is the acceptance snapshot and `v1.2.1` (`2313b02`, cut
 2026-10-17) is the current deployment anchor. The steps below are forward-looking and are

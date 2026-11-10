@@ -5,7 +5,7 @@
 **Evaluated commit:** `1721c1290edbf775cf853594d6f38d7d9177ae43` (`main`, equal to `origin/main` at the time of writing)
 **Evaluation date:** 2026-10-20 (host local time, UTC+3)
 **Report file:** `docs/ARCHITECTURAL_EVALUATION.md`
-**Status:** Revision 1.1, documentation only. No Cons, Recommendation or Appendix D gap has been implemented. The Build Now items are a proposal awaiting the owner's decision; no code was written for them.
+**Status:** Revision 1.1, documentation only. No Cons, Recommendation or Appendix D gap has been implemented. The Build Now items are a proposal awaiting the owner's decision; no code was written for them. *Superseded 2026-11-10, original kept: the Build Now set (G1-G10) was subsequently implemented and shipped in `v1.6.0`; D.3 below ("D.3 Verdict summary") is the authoritative record, with per-item commits in D.5. The Defer set (G11-G18) remains unimplemented as written.*
 
 **Safety declaration:** No application code, configuration, schema, test, seed, migration
 or script was changed or executed as part of this evaluation. No statement was run against
