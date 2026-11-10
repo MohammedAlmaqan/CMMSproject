@@ -95,6 +95,9 @@ correct in the result; the rules below still decide whether a change is right.
   with `$env:DATABASE_URL`; do not edit `.env` to repoint the project.
 - `backend/tests/load-env.ts` fills only variables that are **unset**, so an explicit
   `DATABASE_URL` in the environment wins over `.env`.
+- **`scripts/verify/verify_r7.py` is not read-only**; it inserts and deletes fixture rows.
+  It must only be run against a throwaway database (e.g. `cmms_r7_scratch`) with a local
+  API instance on port 4100.
 - **Live backup posture (2026-10-17, amended 2026-11-03):** both Step 2 go-live controls
   are now active on this host. The Windows task `CommandPulse CMMS Daily Backup` runs
   `scripts\backup.bat` daily at 02:00. *Superseded 2026-11-03, original kept: it ran "as
@@ -119,7 +122,10 @@ correct in the result; the rules below still decide whether a change is right.
   assets, `/dashboard` and `/api/health`). PM2 autostart is registered as the *logon*
   Scheduled Task `CommandPulse CMMS PM2 Resurrect` (`pm2 resurrect`), and the firewall
   rule `CMMS API 4000 block external` is active on all profiles — loopback stays reachable
-  (Windows Firewall does not filter loopback), so the IIS proxy keeps working. The API is
+  (Windows Firewall does not filter loopback), so the IIS proxy keeps working. *Superseded
+  2026-11-10, original kept: the rule was in fact absent when audited on 2026-11-09; it was
+  restored on 2026-11-10 and is active again — see the 2026-11-10 posture entry below.*
+  The API is
   pinned to loopback (`BIND_HOST: '127.0.0.1'` in `backend/ecosystem.config.cjs`), so port
   4000 is not externally reachable even without the firewall rule. The worker's PM,
   overdue and audit-retention crons run in `cmms-worker`; it only starts when PM2 counts
@@ -132,12 +138,17 @@ correct in the result; the rules below still decide whether a change is right.
   `Running`, `StartType Automatic`, account `LocalSystem`, with **no** SCM dependency on
   PostgreSQL, and start at boot with nobody logged on. PM2 entries are gone
   (`dump.pm2` has 0 apps; `dump.pm2.before-services` is the rollback copy) and the
-  `CommandPulse CMMS PM2 Resurrect` logon task has been removed. A `SYSTEM` Scheduled
+  `CommandPulse CMMS PM2 Resurrect` logon task has been removed. *Updated 2026-11-10: the
+  `dump.pm2` and `dump.pm2.bak` files were deleted that day, so no PM2 apps or daemons are
+  registered any more — see the 2026-11-10 posture entry below.* A `SYSTEM` Scheduled
   Task `CommandPulse CMMS Health Watchdog` runs every 5 minutes, polls
   `http://127.0.0.1:4000/api/health` and restarts `CommandPulseCMMSAPI` after 3
   consecutive failures (`backend\logs\watchdog.{log,json}`). `postgresql-x64-18` is
   also under SCM (`Running`/`Automatic`/`NetworkService`); it previously ran as an
-  orphaned manual postmaster, so a reboot now brings it up properly. Verified
+  orphaned manual postmaster, so a reboot now brings it up properly. *Superseded
+  2026-11-10, original kept: the start type was set to `Manual` (`DEMAND_START`) on
+  2026-11-05, so it was not `Automatic`; it was restored on 2026-11-10 — see the
+  2026-11-10 posture entry below.* Verified
   2026-11-03 by a simulated reboot: the CMMS services started in 0.9 s **without** the
   database, `/api/health` returned 200, and the worker recovered by itself when
   PostgreSQL arrived. IIS, the firewall rule and the loopback bind are unchanged.
@@ -145,6 +156,17 @@ correct in the result; the rules below still decide whether a change is right.
   WinSW retries a crashing process indefinitely (proved with a throwaway service:
   9 restarts in 41 s on a single `onfailure restart`). Detail:
   `docs/ADMIN_GUIDE.md` §2.2 and §15, `installer/service/Install-CmmsServices.ps1`.
+- **Live application posture (2026-11-10):** the four host divergences recorded by the
+  2026-11-09 reconciliation (`docs/PROJECT_STATE_RECONCILIATION.md`) were remediated on
+  2026-11-10. `postgresql-x64-18` is `Running` / `StartType Automatic` / account
+  `NT AUTHORITY\NetworkService` — restored to Automatic on 2026-11-10 after an audit found
+  it had been changed to Manual, which risked a startup failure after reboot. PM2 has no
+  registered apps and no daemons: `dump.pm2` and `dump.pm2.bak` were deleted on 2026-11-10
+  after `pm2 kill`. The inbound firewall rule `CMMS API 4000 block external` is active on
+  all profiles — restored on 2026-11-10 after an audit found the rule had been removed. The
+  loopback bind (`BIND_HOST`) remains the primary protection. The leftover IIS application
+  pool `cmms-v167-test` was deleted the same day, leaving the four stale `CMCS-*` pools,
+  the two scheduled tasks and every site untouched.
 
 ## Documentation accuracy
 
