@@ -153,6 +153,12 @@ correct in the result; the rules below still decide whether a change is right.
   written; cross-check against the commits that touched the behaviour it describes.
   This was the `v1.1-8` sweep, closed 2026-10-16 (see the `v1.1-8` row in
   `docs/CMMS_FINALIZATION_TRACKER.md`); the rule remains standing.
+- **Dated reconciliations are reference records, not live status pages.** The
+  2026-11-09 reconciliation at `v1.6.11` (`3423b89`) lives in
+  `docs/PROJECT_STATE_RECONCILIATION.md`: the v1.0 assessment is preserved verbatim and
+  later corrections are v1.1 entries under a revision-history table, so a superseded
+  finding is never edited away. Its register is as of that date; `SOW_COMPLIANCE.md`,
+  `CMMS_FINALIZATION_TRACKER.md` and `verify_a1.py` remain the live authority.
 - Preserve history rather than overwriting it. When a figure is superseded, keep the
   original and add a pointer; do not silently restate it.
 - Prefer symbolic references ("the `APPROVED_PROMOTIONS` list") over hardcoded line
