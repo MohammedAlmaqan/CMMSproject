@@ -92,7 +92,7 @@ overwritten.*
 - System alerts and account lockout after repeated failed logins.
 - Administration screens for users and audit log. The **Settings** tab edits runtime configuration through `GET`/`PUT /api/system-config`.
 - Rate limiting on the login route.
-- Structured JSON logging (pino) to `logs/api-out.log` / `logs/api-err.log` (API) and `logs/worker-out.log` / `logs/worker-err.log` (scheduler worker) under PM2.
+- Structured JSON logging (pino) to `logs/api-out.log` / `logs/api-err.log` (API) and `logs/worker-out.log` / `logs/worker-err.log` (scheduler worker) when launched under PM2; the production runtime is the `CommandPulseCMMSAPI` / `CommandPulseCMMSWorker` Windows services, which capture the same JSON streams in `backend\logs` (see `docs/ADMIN_GUIDE.md` §2.2).
 
 ## Not implemented
 
@@ -239,7 +239,7 @@ All routes are under `/api`. Full request/response schemas are in Swagger at `/a
 | Database | PostgreSQL 15+ |
 | Auth | JWT + bcrypt, six-role RBAC |
 | Logging | pino, pino-http |
-| Process manager | PM2 (optional; `backend\ecosystem.config.cjs`) |
+| Process layer | Windows services `CommandPulseCMMSAPI` / `CommandPulseCMMSWorker` (WinSW) with a `SYSTEM` health-watchdog task; the legacy PM2 definition (`backend\ecosystem.config.cjs`) is retained but is not the runtime |
 | Load testing | k6 (`scripts/k6/smoke.js`, `scripts/k6/acceptance.js`) |
 | API docs | Swagger / OpenAPI 3 |
 
@@ -248,7 +248,7 @@ All routes are under `/api`. Full request/response schemas are in Swagger at `/a
 | Script | Purpose |
 |--------|---------|
 | `scripts\build.bat` | Install, `prisma generate`, `migrate deploy`, build backend and frontend |
-| `scripts\start.bat` | Start the API (PM2 if present, else `node dist/index.js`) and the frontend dev server |
+| `scripts\start.bat` | Start the API (`node dist/index.js`, or via PM2 only if it is already installed) and the frontend dev server — a development aid, not the production runtime |
 | `scripts\backup.bat` | Database backup |
 | `scripts\restore-drill.bat` | Verify a backup actually restores |
 | `scripts\pitr-drill.ps1` | Prove WAL archiving + point-in-time recovery and measure the RPO (ADMIN_GUIDE 7.8) |
@@ -310,7 +310,7 @@ CMMSproject/
 │   └── tests/                  # 88 test files + 3 support = 91 tracked
 ├── scripts/                    # Windows batch scripts, k6, verify scripts
 ├── installer/                  # standalone installer: engine, wizard, harness
-│   ├── install.ps1             # the engine (build, migrate, install, PM2)
+│   ├── install.ps1             # the engine (build, migrate, install, Windows services)
 │   ├── wizard/                 # Inno Setup wrapper
 │   ├── tests/                  # engine harness + tracker check
 │   └── build-wizard.ps1        # reproducible ISCC compile
@@ -318,13 +318,13 @@ CMMSproject/
 │   ├── CMMS_FINALIZATION_TRACKER.md
 │   ├── INSTALLATION_GUIDE.md
 │   └── ...                      # SOW_COMPLIANCE, API_REFERENCE, ARCHITECTURE, USER_MANUAL, ADMIN_GUIDE, DECISION_REGISTER, DATA_DICTIONARY, ER_DIAGRAM, WCAG-AUDIT, HANDOFF
-├── backend\ecosystem.config.cjs  # PM2 process definition
+├── backend\ecosystem.config.cjs  # legacy PM2 definition (not the runtime; see ADMIN_GUIDE §2.2)
 └── .github/workflows/ci.yml
 ```
 
 ## Further reading
 
 - `RELEASE_NOTES.md` — what changed in each release, most recent first.
-- `docs/INSTALLATION_GUIDE.md` — full Windows/IIS deployment, PM2, backup/restore, and k6 instructions.
+- `docs/INSTALLATION_GUIDE.md` — full Windows/IIS deployment, Windows services, backup/restore, and k6 instructions. `docs/ADMIN_GUIDE.md` §2.2 is the authoritative description of the current runtime.
 - `docs/CMMS_FINALIZATION_TRACKER.md` — per-phase status, verification evidence, and deferred items.
 - `docs/INSTALLER_TRACKER.md` — installer workstream status and the evidence for each closed item.

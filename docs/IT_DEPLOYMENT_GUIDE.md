@@ -1,3 +1,10 @@
+> **SUPERSEDED — v1.6.6, marked 2026-11-10.** The rest of this document is kept
+> unedited for historical reference, but it teaches PM2 as the process manager and
+> that is no longer how the application runs. Since v1.6.9 it runs as two
+> Automatic Windows services, `CommandPulseCMMSAPI` and `CommandPulseCMMSWorker`,
+> plus a `SYSTEM` health watchdog. Do not follow the PM2-on-boot steps on an
+> upgraded host. `docs/ADMIN_GUIDE.md` §2.2 and §15 are the current authority.
+
 # CommandPulse CMMS — IT Deployment Guide (v1.6.6)
 
 Audience: the Client's IT team. This document is written for administrators who may

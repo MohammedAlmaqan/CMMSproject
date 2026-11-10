@@ -6,7 +6,7 @@ Every claim in this document is traceable to a file in this repository. Where a 
 
 This document describes how CommandPulse CMMS is assembled: its runtime components, how a request travels through the system, where trust boundaries sit, how the preventive-maintenance scheduler behaves, and how data is protected.
 
-**In scope:** the application tier (React SPA, Express API, PostgreSQL), the process layer (PM2, node-cron scheduler), the documented IIS reverse proxy, the security model, and the backup strategy.
+**In scope:** the application tier (React SPA, Express API, PostgreSQL), the process layer (the `CommandPulseCMMSAPI` / `CommandPulseCMMSWorker` Windows services, node-cron scheduler), the documented IIS reverse proxy, the security model, and the backup strategy.
 
 **Out of scope:** build and release procedure (`scripts\build.bat`), phase-by-phase project history (`CMMS_FINALIZATION_TRACKER.md`), step-by-step Windows/IIS installation (`INSTALLATION_GUIDE.md`), and endpoint-by-endpoint API reference (Swagger at `/api-docs`).
 
@@ -26,9 +26,11 @@ An ESM Node application (`"type": "module"` in `backend/package.json`) built wit
 
 The system of record, database name `cmms`. The schema is **migration-managed** — 38 Prisma models across 22 migrations (previously cited here as 19, before the 2026-10-14 and 2026-10-15 migrations; and as 15, before the 2026-10-02 to 2026-10-05 migrations), applied with `prisma migrate deploy`. `prisma db push` is retired and must not be used. Integrity relies on a mix of Prisma-level constraints and hand-written partial unique indexes, notably `WorkOrder(sourcePlanId, sourcePlanCycle) WHERE isDeleted = false`, which is what makes PM generation idempotent.
 
-### PM2 process manager (`backend/ecosystem.config.cjs`)
+### Process layer: Windows services (WinSW), formerly PM2
 
-Runs **two apps**: `cmms-api` (`dist/index.js`, the HTTP tier) and, since C11, `cmms-worker` (`dist/worker.js`, the background jobs). Both use **fork mode with `instances: 1`**. *Before C11 the single API instance was mandatory because the PM scheduler ran in-process, so cluster mode would have started one scheduler per worker and multiplied work-order generation.* The scheduler now lives in `cmms-worker`, so the API tier is stateless and free to scale — a second worker would simply fail to take the startup lock and exit cleanly. `cmms-api` is nonetheless still pinned to one instance in this deployment, because the login rate limiter is an in-process store (see [Security boundaries](#security-boundaries)), not because of the scheduler. The config also sets `max_memory_restart: 512M` and forces `NODE_ENV: 'production'`, which has a direct security consequence described under [K6_MODE](#k6_mode-production-guard). `merge_logs: true` keeps stdout and stderr in one stream for `pm2-logrotate`; `log_date_format` is deliberately omitted because plain-text prefixes would break JSON-lines parsing, since pino already stamps an ISO `time` on every record.
+**Current runtime (2026-11-03 onward).** Two native Windows services run the application: `CommandPulseCMMSAPI` (`dist/index.js`, the HTTP tier, bound to `127.0.0.1:4000`) and `CommandPulseCMMSWorker` (`dist/worker.js`, the background jobs). Both are `StartType Automatic`, account `LocalSystem`, start at boot with nobody logged on, and are installed as thin WinSW wrappers by `installer/service/Install-CmmsServices.ps1`. A `SYSTEM` Scheduled Task, `CommandPulse CMMS Health Watchdog`, probes `http://127.0.0.1:4000/api/health` every 5 minutes and restarts the API service after 3 consecutive failures (`installer/service/health-watchdog.ps1`; log and state in `backend\logs\watchdog.{log,json}`). Neither service has an SCM dependency on `postgresql-x64-18`: they start first and the worker recovers by itself when PostgreSQL arrives. Detail: `ADMIN_GUIDE.md` §2.2 and §15.
+
+*Superseded 2026-11-10, original kept: this section was headed "### PM2 process manager (`backend/ecosystem.config.cjs`)" and described PM2 as the runtime — true from 2026-10-17 until the 2026-11-03 migration to Windows services, and not the current state. `backend/ecosystem.config.cjs` still exists and still defines the two apps described below, but nothing launches it in production; it is retained for reference and for a deliberate PM2 launch.* It runs **two apps**: `cmms-api` (`dist/index.js`, the HTTP tier) and, since C11, `cmms-worker` (`dist/worker.js`, the background jobs). Both use **fork mode with `instances: 1`**. *Before C11 the single API instance was mandatory because the PM scheduler ran in-process, so cluster mode would have started one scheduler per worker and multiplied work-order generation.* The scheduler now lives in `cmms-worker`, so the API tier is stateless and free to scale — a second worker would simply fail to take the startup lock and exit cleanly. `cmms-api` is nonetheless still pinned to one instance in this deployment, because the login rate limiter is an in-process store (see [Security boundaries](#security-boundaries)), not because of the scheduler. The config also sets `max_memory_restart: 512M` and forces `NODE_ENV: 'production'`, which has a direct security consequence described under [K6_MODE](#k6_mode-production-guard). `merge_logs: true` keeps stdout and stderr in one stream for `pm2-logrotate`; `log_date_format` is deliberately omitted because plain-text prefixes would break JSON-lines parsing, since pino already stamps an ISO `time` on every record.
 
 ### IIS reverse proxy (documented only)
 
@@ -52,9 +54,9 @@ flowchart TB
 
     subgraph HOST["Windows host"]
         direction TB
-        PM2["PM2 'cmms-api'<br/>fork, instances=1<br/>NODE_ENV=production<br/>max_memory_restart=512M"]
-        API["Express API :4000<br/>(stateless HTTP tier)"]
-        WORKER["PM2 'cmms-worker'<br/>fork, instances=1<br/>dist/worker.js<br/>(PM + overdue + audit cron)"]
+        API["CommandPulseCMMSAPI<br/>Windows service (WinSW)<br/>Express API :4000, 127.0.0.1<br/>(stateless HTTP tier)"]
+        WORKER["CommandPulseCMMSWorker<br/>Windows service (WinSW)<br/>dist/worker.js<br/>(PM + overdue + audit cron)"]
+        WATCHDOG["CommandPulse CMMS Health Watchdog<br/>SYSTEM task, every 5 min"]
         LOGS["logs/api-*.log<br/>logs/worker-*.log<br/>(JSON lines)"]
         UPL["backend/uploads/<br/>attachment files on disk<br/>snapshotted alongside the SQL dump"]
         BK["backups/<br/>cmms-YYYY-MM-DD-HHmm.sql<br/>+ matching -uploads folder<br/>newest 14 of each kept"]
@@ -71,6 +73,7 @@ flowchart TB
     API --> LOGS
     WORKER -->|Prisma| DB
     WORKER --> LOGS
+    WATCHDOG -.->|/api/health, restart after 3 failures| API
     TASKSCHED -->|pg_dump| BK
     BK -.->|restore drill| DB
 ```
@@ -148,7 +151,7 @@ const isK6Mode = process.env.K6_MODE === '1' && process.env.NODE_ENV !== 'produc
 const LOGIN_LIMIT = isK6Mode ? 200 : 20;
 ```
 
-Both conditions are required. Since PM2 pins `NODE_ENV: 'production'`, **any process started by the documented production start path ignores `K6_MODE` entirely** — the override is reachable only in a development-mode process. This is intentional: the raised ceiling weakens the brute-force protection that account lockout depends on, so it must not be reachable in production. Verified behaviour across the configuration matrix:
+Both conditions are required. Since the production runtime pins `NODE_ENV: 'production'` (the WinSW service definition sets it; the legacy PM2 config did the same), **any process started by the documented production start path ignores `K6_MODE` entirely** — the override is reachable only in a development-mode process. This is intentional: the raised ceiling weakens the brute-force protection that account lockout depends on, so it must not be reachable in production. Verified behaviour across the configuration matrix:
 
 | `K6_MODE` | `NODE_ENV` | Effective limit |
 |---|---|---|
@@ -256,7 +259,7 @@ Names and purposes only. No values are reproduced here, and no `.env` file was r
 | `LOG_LEVEL` | `utils/logger.ts` | pino level; validated against the 7 pino levels | `info` |
 | `CORS_ORIGINS` | `index.ts` | Comma-separated browser origin allow-list | `http://localhost:3000` |
 | `K6_MODE` | `index.ts` | `1` raises the login limit to 200 — **only** when `NODE_ENV !== 'production'` | unset (limit 20) |
-| `NODE_ENV` | `index.ts`, PM2 | `production` disables the K6 override; PM2 always sets it | unset |
+| `NODE_ENV` | `index.ts`, service/PM2 env | `production` disables the K6 override; the documented production paths always set it | unset |
 | `PM_SCHEDULER_CRON` | `services/scheduler.ts` | node-cron expression for PM generation | `0 2 * * *` |
 | `SEED_DEMO` | `prisma/seed.ts` only | `1` permits the destructive demo wipe. Never read by the API | unset (seed exits 0) |
 
@@ -267,7 +270,7 @@ Two gaps in this table's own coverage:
 - `PM_SCHEDULER_CRON` is now present in `backend/.env.example`. Note that the unquoted value `0 2 * * *` is parsed correctly by the Prisma-bundled `.env` loader (dotenv), but any tooling that treats spaces as value separators will mangle it; quote it if you introduce such a tool.
 - `SEED_DEMO` is not an API variable. `seed.ts` refuses to run without it and a non-production `NODE_ENV`, and exits 0 with a skip message otherwise. The supported entry point is `scripts\seed-demo.bat`.
 
-`backend/.env` is loaded into the process environment by Prisma Client — importing `@prisma/client` (through `src/utils/prisma.ts`) reads `backend/.env` via its bundled dotenv loader before any application code reads a variable. No `dotenv` call exists in the application itself and no `--env-file` flag is passed at launch; the loader is Prisma's. Two consequences follow. (1) The file is resolved relative to the process working directory, so the API must be launched from `backend/` (PM2's `ecosystem.config.cjs` does this) or the variables are absent. (2) A variable omitted from `.env` falls back to its code default, except `JWT_SECRET`, which `src/utils/config.ts` requires and which fails fast rather than running insecurely.
+`backend/.env` is loaded into the process environment by Prisma Client — importing `@prisma/client` (through `src/utils/prisma.ts`) reads `backend/.env` via its bundled dotenv loader before any application code reads a variable. No `dotenv` call exists in the application itself and no `--env-file` flag is passed at launch; the loader is Prisma's. Two consequences follow. (1) The file is resolved relative to the process working directory, so the API must be launched from `backend/` (both the WinSW service definition and the legacy `ecosystem.config.cjs` use `backend` as the working directory) or the variables are absent. (2) A variable omitted from `.env` falls back to its code default, except `JWT_SECRET`, which `src/utils/config.ts` requires and which fails fast rather than running insecurely.
 
 The batch scripts use a separate set of PostgreSQL client variables — `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD`, which must be supplied by the scheduled-task environment.
 
@@ -286,7 +289,7 @@ This list covers the technical and design limitations of the delivered system. T
 
 ## Cross-references
 
-- `INSTALLATION_GUIDE.md` — Windows/IIS deployment, PM2, backup, restore drill, and k6 procedures.
+- `INSTALLATION_GUIDE.md` — Windows/IIS deployment, Windows services, backup, restore drill, and k6 procedures. Its PM2-era steps are superseded; `ADMIN_GUIDE.md` §2.2 is the authoritative current runtime description.
 - `CMMS_FINALIZATION_TRACKER.md` — per-phase status, verification evidence, and deferred items.
 - `README.md` — user-facing feature summary and known issues.
 - `http://localhost:4000/api-docs` — live OpenAPI schema.
