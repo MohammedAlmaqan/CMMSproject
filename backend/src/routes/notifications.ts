@@ -8,6 +8,7 @@ import { generateNotifNumber, generateWoNumber } from '../utils/sequence.js';
 import {
   canTransition,
   invalidTransitionMessage,
+  isCompletionConfirmation,
   transitionTargets,
 } from '../utils/transitions.js';
 import { resolveWorkOrderPriority, highestPriority } from '../utils/workOrderRules.js';
@@ -656,9 +657,10 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
  *       takes the highest priority of the set; if any notification is a breakdown the
  *       work order is an EM and therefore High (SOW 3.3.1). The batch is
  *       all-or-nothing: if any notification is missing, already converted, not in a
- *       convertible state, or does not share the others' functional location, nothing
- *       is written. This route is additive; POST /{id}/convert-to-wo is untouched and
- *       remains the UI's single-notification path. Validated by the zod schema
+ *       convertible state, a legacy completion confirmation (D-22), or does not
+ *       share the others' functional location, nothing is written. This route is
+ *       additive; POST /{id}/convert-to-wo is untouched and remains the UI's
+ *       single-notification path. Validated by the zod schema
  *       `convertNotificationsSchema`. Requires the Maintenance Planner role.
  *     tags: [Notifications]
  *     security:
@@ -685,7 +687,7 @@ router.delete('/:id', authorizeMinRole('Maintenance Supervisor'), async (req: Re
  *           application/json:
  *             schema: { type: object, additionalProperties: true }
  *       '400':
- *         description: zod validation failed, no work center is available, a notification is not convertible, or the set spans more than one functional location
+ *         description: zod validation failed, no work center is available, a notification is not convertible, a legacy completion confirmation (D-22), or the set spans more than one functional location
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
@@ -712,6 +714,25 @@ router.post('/convert-to-wo', authorizeMinRole('Maintenance Planner'), validate(
     // Converted with no work order that names them, which is worse than refusing
     // the whole request and letting the caller fix the set.
     for (const notification of notifications) {
+      // D-22. A legacy completion confirmation is Open and would pass every
+      // check below, so it is refused first. Refusing the set whole is the same
+      // all-or-nothing rule as the rest of this loop: the audit row names the
+      // first offending notification, and nothing is converted.
+      if (isCompletionConfirmation(notification.type)) {
+        await logAuditFieldChange({
+          table: 'Notification',
+          recordId: notification.notificationId,
+          action: 'Blocked',
+          field: 'type',
+          oldValue: notification.type,
+          newValue: null,
+          userId: req.user!.userId,
+          ipAddress: req.ip,
+        });
+        return res.status(400).json({
+          error: `Notification ${notification.notificationNumber} is a completion confirmation and cannot be converted to a work order`,
+        });
+      }
       if (notification.status === 'Converted') {
         return res.status(400).json({ error: `Notification ${notification.notificationNumber} already converted` });
       }
@@ -821,7 +842,9 @@ router.post('/convert-to-wo', authorizeMinRole('Maintenance Planner'), validate(
  *       priority and breakdown flag, links the notification to the new work order and
  *       sets the notification status to Converted. Only a notification the lifecycle map
  *       permits converting (Open or In Process) is accepted; a Completed notification
- *       is rejected with 400. workCenterId defaults to the first
+ *       is rejected with 400, as is a legacy M3 completion confirmation (D-22), which
+ *       has no link back to the work order it describes and would restart the
+ *       completion-conversion loop. workCenterId defaults to the first
  *       available work center; supervisorUserId defaults to the reporting user, then the
  *       authenticated user. Validated by the zod schema `convertNotificationSchema`
  *       (see utils/validation.ts). Requires the Maintenance Planner role.
@@ -855,7 +878,7 @@ router.post('/convert-to-wo', authorizeMinRole('Maintenance Planner'), validate(
  *                 message: { type: string }
  *                 workOrder: { type: object, additionalProperties: true }
  *       '400':
- *         description: zod validation failed, no work center is available, or the notification's current status does not permit conversion
+ *         description: zod validation failed, no work center is available, the notification's current status does not permit conversion, or it is a legacy completion confirmation (D-22)
  *       '401':
  *         description: Missing or invalid bearer token
  *       '403':
@@ -875,6 +898,22 @@ router.post('/:id/convert-to-wo', authorizeMinRole('Maintenance Planner'), valid
     });
     if (!notification) {
       return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    if (isCompletionConfirmation(notification.type)) {
+      await logAuditFieldChange({
+        table: 'Notification',
+        recordId: notification.notificationId,
+        action: 'Blocked',
+        field: 'type',
+        oldValue: notification.type,
+        newValue: null,
+        userId: req.user!.userId,
+        ipAddress: req.ip,
+      });
+      return res.status(400).json({
+        error: `Notification ${notification.notificationNumber} is a completion confirmation and cannot be converted to a work order`,
+      });
     }
 
     if (notification.status === 'Converted') {

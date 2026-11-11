@@ -376,6 +376,61 @@ describe('completion creates no notification (D-22; matrix row :104 withdrawn)',
   });
 });
 
+describe('an M3 completion confirmation cannot be converted (D-22)', () => {
+  let m3Id = '';
+
+  it('refuses the single convert route, leaving the row and the work-order count untouched', async () => {
+    const m3 = await createNotifDirect({ type: 'M3', status: 'Open', description: 'legacy completion confirmation' });
+    m3Id = m3.notificationId;
+
+    const before = await prisma.workOrder.count({ where: { isDeleted: false } });
+    const res = await api()
+      .post(`/api/notifications/${m3Id}/convert-to-wo`)
+      .set(authHeaders(ctx.adminToken));
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/completion confirmation/i);
+
+    const row = await prisma.notification.findUniqueOrThrow({ where: { notificationId: m3Id } });
+    expect(row.status).toBe('Open');
+    expect(await prisma.workOrder.count({ where: { isDeleted: false } })).toBe(before);
+
+    const blocked = await prisma.auditLogEntry.findFirst({
+      where: { recordId: m3Id, action: 'Blocked', fieldName: 'type' },
+    });
+    expect(blocked).toBeTruthy();
+    expect(blocked?.oldValue).toBe('M3');
+  });
+
+  it('refuses a bulk set containing an M3 without converting the rest of it', async () => {
+    const m1 = await api()
+      .post('/api/notifications')
+      .set(authHeaders(ctx.operatorToken))
+      .send({
+        type: 'M1',
+        priority: 'Medium',
+        description: 'bulk M3 guard fixture',
+        equipmentId: equipId,
+        reportedByUserId: techId,
+      });
+    expect(m1.status).toBe(201);
+    notifIds.push(m1.body.notificationId);
+
+    const res = await api()
+      .post('/api/notifications/convert-to-wo')
+      .set(authHeaders(ctx.adminToken))
+      .send({ notificationIds: [m1.body.notificationId, m3Id] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/completion confirmation/i);
+
+    const stillOpen = await prisma.notification.findUniqueOrThrow({
+      where: { notificationId: m1.body.notificationId },
+    });
+    expect(stillOpen.status).toBe('Open');
+  });
+});
+
 describe('linked notifications auto-close on completion (SOW 3.2.3, :116)', () => {
   it('drives a Converted notification to Completed when its work order completes', async () => {
     const created = await api()

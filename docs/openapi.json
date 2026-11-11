@@ -5772,7 +5772,7 @@
     "/api/notifications/convert-to-wo": {
       "post": {
         "summary": "Convert several notifications into one corrective work order",
-        "description": "SOW 3.2.2 (row 20). Creates a single work order from a set of notifications and links every one of them to it through WorkOrderNotifLink, which already carries a composite (workOrderId, notificationId) key and therefore expresses N notifications to one work order without a schema change. The work order takes the highest priority of the set; if any notification is a breakdown the work order is an EM and therefore High (SOW 3.3.1). The batch is all-or-nothing: if any notification is missing, already converted, not in a convertible state, or does not share the others' functional location, nothing is written. This route is additive; POST /{id}/convert-to-wo is untouched and remains the UI's single-notification path. Validated by the zod schema `convertNotificationsSchema`. Requires the Maintenance Planner role.\n",
+        "description": "SOW 3.2.2 (row 20). Creates a single work order from a set of notifications and links every one of them to it through WorkOrderNotifLink, which already carries a composite (workOrderId, notificationId) key and therefore expresses N notifications to one work order without a schema change. The work order takes the highest priority of the set; if any notification is a breakdown the work order is an EM and therefore High (SOW 3.3.1). The batch is all-or-nothing: if any notification is missing, already converted, not in a convertible state, a legacy completion confirmation (D-22), or does not share the others' functional location, nothing is written. This route is additive; POST /{id}/convert-to-wo is untouched and remains the UI's single-notification path. Validated by the zod schema `convertNotificationsSchema`. Requires the Maintenance Planner role.\n",
         "tags": [
           "Notifications"
         ],
@@ -5825,7 +5825,7 @@
             }
           },
           "400": {
-            "description": "zod validation failed, no work center is available, a notification is not convertible, or the set spans more than one functional location"
+            "description": "zod validation failed, no work center is available, a notification is not convertible, a legacy completion confirmation (D-22), or the set spans more than one functional location"
           },
           "401": {
             "description": "Missing or invalid bearer token"
@@ -5845,7 +5845,7 @@
     "/api/notifications/{id}/convert-to-wo": {
       "post": {
         "summary": "Convert a notification into a corrective work order",
-        "description": "Creates a CM work order from the notification, copies the location, equipment, priority and breakdown flag, links the notification to the new work order and sets the notification status to Converted. Only a notification the lifecycle map permits converting (Open or In Process) is accepted; a Completed notification is rejected with 400. workCenterId defaults to the first available work center; supervisorUserId defaults to the reporting user, then the authenticated user. Validated by the zod schema `convertNotificationSchema` (see utils/validation.ts). Requires the Maintenance Planner role.\n",
+        "description": "Creates a CM work order from the notification, copies the location, equipment, priority and breakdown flag, links the notification to the new work order and sets the notification status to Converted. Only a notification the lifecycle map permits converting (Open or In Process) is accepted; a Completed notification is rejected with 400, as is a legacy M3 completion confirmation (D-22), which has no link back to the work order it describes and would restart the completion-conversion loop. workCenterId defaults to the first available work center; supervisorUserId defaults to the reporting user, then the authenticated user. Validated by the zod schema `convertNotificationSchema` (see utils/validation.ts). Requires the Maintenance Planner role.\n",
         "tags": [
           "Notifications"
         ],
@@ -5907,7 +5907,7 @@
             }
           },
           "400": {
-            "description": "zod validation failed, no work center is available, or the notification's current status does not permit conversion"
+            "description": "zod validation failed, no work center is available, the notification's current status does not permit conversion, or it is a legacy completion confirmation (D-22)"
           },
           "401": {
             "description": "Missing or invalid bearer token"

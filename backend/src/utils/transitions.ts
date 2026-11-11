@@ -37,3 +37,17 @@ export function transitionTargets(from: string): readonly string[] {
 export function invalidTransitionMessage(from: string, to: string): string {
   return `Invalid transition from '${from}' to '${to}'`;
 }
+
+/**
+ * A completion confirmation is the M3 notification an earlier release raised
+ * automatically when a work order was completed. D-22 (owner, 2026-11-11)
+ * stopped the generation, but the rows it already wrote are ordinary Open
+ * notifications whose only trace of their origin is their type: they carry no
+ * WorkOrderNotifLink back to the order they describe. Converting one starts
+ * the loop again, because completing the resulting work order used to raise
+ * another. The convert routes refuse them; the type itself stays accepted so
+ * the importer and those legacy rows keep working.
+ */
+export function isCompletionConfirmation(type: string | null | undefined): boolean {
+  return type === 'M3';
+}
