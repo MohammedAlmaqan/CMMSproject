@@ -167,6 +167,15 @@ correct in the result; the rules below still decide whether a change is right.
   loopback bind (`BIND_HOST`) remains the primary protection. The leftover IIS application
   pool `cmms-v167-test` was deleted the same day, leaving the four stale `CMCS-*` pools,
   the two scheduled tasks and every site untouched.
+- **Live application posture (2026-11-11):** IIS now starts with the host. During the
+  2026-11-11 frontend deploy, `W3SVC` and `WAS` were found `Stopped` / `StartType Manual`,
+  so `https://cmms.local` would have stayed dark after any reboot; both are now
+  `Running` / `Automatic`, and `https://cmms.local/api/health` returns 200. The site
+  inventory holds exactly two entries — `cmms.local` (`state:Started`,
+  `https://*:443:cmms.local`) and `Default Web Site` (`state:Unknown`, no bindings) — so
+  the stale `CMCS-*` objects named in the 2026-11-10 entry are application pools, not
+  sites, and no site needed stopping. The served bundle is `assets/index-D77h04iM.js`,
+  built and mirrored on 2026-11-11 with `web.config` preserved.
 
 ## Documentation accuracy
 
