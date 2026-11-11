@@ -18,6 +18,7 @@ import {
   UserPlus,
   Pencil,
   KeyRound,
+  Trash2,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
@@ -63,6 +64,13 @@ export default function AdministrationPage() {
   const [auditTotal, setAuditTotal] = useState(0);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState('');
+  // v1.1-23 residual: POST /audit-log/purge already existed (Administrator-only,
+  // retention window read from SystemConfig) but nothing in the app could call
+  // it, so the log only ever grew. The control is gated on the route's role.
+  const [purging, setPurging] = useState(false);
+  const [purgeMessage, setPurgeMessage] = useState('');
+  const [purgeError, setPurgeError] = useState('');
+  const [auditRefresh, setAuditRefresh] = useState(0);
 
   // Row 60: an Administrator can onboard a user and deactivate one from the UI.
   // G3 closes the edit half: fullName, email, role, work centre and active flag
@@ -169,7 +177,35 @@ export default function AdministrationPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, auditFilter, auditPage]);
+  }, [activeTab, auditFilter, auditPage, auditRefresh]);
+
+  // Irreversible, so it asks first, like the deactivate path above. The server
+  // owns the retention window; the message reports what it actually deleted.
+  const purgeAuditLog = async () => {
+    if (
+      !window.confirm(
+        'Delete audit entries older than the configured retention window? This cannot be undone.'
+      )
+    )
+      return;
+    setPurging(true);
+    setPurgeMessage('');
+    setPurgeError('');
+    try {
+      const result = await auditLogService.purge();
+      setPurgeMessage(
+        `Purged ${result.deleted} ${result.deleted === 1 ? 'entry' : 'entries'} older than ${
+          result.retentionYears
+        } ${result.retentionYears === 1 ? 'year' : 'years'}.`
+      );
+      setAuditPage(0);
+      setAuditRefresh((n) => n + 1);
+    } catch (err) {
+      setPurgeError((err as Error).message);
+    } finally {
+      setPurging(false);
+    }
+  };
 
   const filteredUsers = users.filter((u) => {
     if (!userSearch) return true;
@@ -400,7 +436,24 @@ export default function AdministrationPage() {
                   />
                 </div>
                 <span className="text-tertiary text-xs ml-auto">{auditLoading ? 'Loading…' : `${auditTotal} entries`}</span>
+                {user?.role === 'Administrator' && (
+                  <button
+                    onClick={purgeAuditLog}
+                    disabled={purging}
+                    aria-label="Purge expired audit entries"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs border border-subtle text-secondary hover:text-primary disabled:text-tertiary"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {purging ? 'Purging…' : 'Purge expired'}
+                  </button>
+                )}
               </div>
+              {purgeMessage && (
+                <p className="mb-4 text-xs text-green-400" role="status">{purgeMessage}</p>
+              )}
+              {purgeError && (
+                <p className="mb-4 text-xs text-red-400" role="alert">{purgeError}</p>
+              )}
               {auditError && (
                 <p className="mb-4 text-xs text-red-400" role="alert">{auditError}</p>
               )}

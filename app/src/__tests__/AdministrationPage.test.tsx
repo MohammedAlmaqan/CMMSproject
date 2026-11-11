@@ -2,7 +2,7 @@
 // user but never edit one, even though PUT /users/:id (userUpdateSchema) and
 // userService.update both existed. Deactivate stays a separate action (soft
 // delete); G11 deferred undelete is out of scope.
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -32,7 +32,7 @@ vi.mock('@/services/systemConfigService', () => ({
 }));
 
 vi.mock('@/services/auditLogService', () => ({
-  auditLogService: { getAll: vi.fn() },
+  auditLogService: { getAll: vi.fn(), purge: vi.fn() },
 }));
 
 const adminUser: User = {
@@ -195,5 +195,88 @@ describe('AdministrationPage password reset (F3)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Password does not meet policy');
     expect(screen.getByRole('dialog', { name: 'Reset password' })).toBeInTheDocument();
+  });
+});
+
+// v1.1-23: POST /audit-log/purge was Administrator-only and already read the
+// retention window from SystemConfig, but the UI never exposed it, so the log
+// only grew. The control is shown to Administrators only and asks before it
+// deletes anything, because the action is irreversible.
+describe('AdministrationPage audit log purge (v1.1-23)', () => {
+  const openAuditTab = async (user: ReturnType<typeof userEvent.setup>) => {
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Audit Log' }));
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
+    useAppStore.setState({ users: [adminUser, targetUser], workCenters: [], loading: false, error: null });
+    vi.mocked(systemConfigService.getAll).mockResolvedValue([]);
+    vi.mocked(auditLogService.getAll).mockResolvedValue({ data: [], total: 0, skip: 0, take: 100 });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('purges after confirmation, reports the count and reloads the table', async () => {
+    const confirm = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('confirm', confirm);
+    vi.mocked(auditLogService.purge).mockResolvedValue({
+      ranAt: '2026-11-11T09:00:00.000Z',
+      retentionYears: 7,
+      cutoff: '2019-11-11T09:00:00.000Z',
+      deleted: 12,
+    });
+    const user = userEvent.setup();
+    await openAuditTab(user);
+
+    const purgeButton = await screen.findByRole('button', { name: 'Purge expired audit entries' });
+    await waitFor(() => expect(vi.mocked(auditLogService.getAll)).toHaveBeenCalledTimes(1));
+    await user.click(purgeButton);
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Delete audit entries older than the configured retention window? This cannot be undone.'
+    );
+    await waitFor(() => expect(vi.mocked(auditLogService.purge)).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('status')).toHaveTextContent('Purged 12 entries older than 7 years.');
+    // The purge rewrote the log, so the current page is re-fetched.
+    await waitFor(() => expect(vi.mocked(auditLogService.getAll)).toHaveBeenCalledTimes(2));
+  });
+
+  it('does nothing when the confirmation is dismissed', async () => {
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+    const user = userEvent.setup();
+    await openAuditTab(user);
+
+    await user.click(await screen.findByRole('button', { name: 'Purge expired audit entries' }));
+
+    expect(vi.mocked(auditLogService.purge)).not.toHaveBeenCalled();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('is not offered to a non-Administrator', async () => {
+    useAuthStore.setState({ user: targetUser, isAuthenticated: true, loading: false, error: null });
+    const user = userEvent.setup();
+    await openAuditTab(user);
+
+    expect(await screen.findByText('0 entries')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Purge expired audit entries' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the server message and keeps the button when the API rejects', async () => {
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+    vi.mocked(auditLogService.purge).mockRejectedValue(new ApiError(403, 'Forbidden'));
+    const user = userEvent.setup();
+    await openAuditTab(user);
+
+    await user.click(await screen.findByRole('button', { name: 'Purge expired audit entries' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+    expect(screen.getByRole('button', { name: 'Purge expired audit entries' })).toBeEnabled();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
