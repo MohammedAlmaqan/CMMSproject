@@ -94,16 +94,19 @@ def main():
           re.search(r"action:\s*'Blocked'", notif) is not None)
     check("row 16  convert path also validates the lifecycle",
           "canTransition(notification.status, 'Converted')" in notif)
-    # row 15
-    check("row 15  work order completion autogenerates an M3 notification",
-          re.search(r"type:\s*'M3'", wos) is not None)
-    check("row 15  M3 is created inside the status-change transaction",
-          "prisma.$transaction(async (tx)" in wos and "tx.notification.create" in wos)
+    # row 15 - withdrawn 2026-11-11 under owner decision D-22. The checks are
+    # inverted on purpose: the defect was that this row existed at all, so the
+    # gate now fails if completion ever creates a notification again.
+    check("row 15  work order completion creates no notification",
+          "tx.notification.create" not in wos)
+    check("row 15  completion is recorded as the immutable snapshot, in the same transaction",
+          "tx.workOrderSnapshot.create" in wos
+          and wos.index("prisma.$transaction") < wos.index("tx.workOrderSnapshot.create"))
     # row 22
     check("row 22  linked notifications move to Completed on completion",
           re.search(r"canTransition\(notif\.status, 'Completed'\)", wos) is not None)
     check("row 22  completion side effects are atomic with the status change",
-          wos.index("prisma.$transaction") < wos.index("tx.notification.create"))
+          wos.index("prisma.$transaction") < wos.index("canTransition(notif.status, 'Completed')"))
     # row 33
     check("row 33  labour POST uses the shared attribution policy",
           "resolveAttributedUser" in labor_post)

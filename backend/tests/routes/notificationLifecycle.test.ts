@@ -2,13 +2,12 @@
 import { api, authHeaders, ctx, purgeNotifications, purgeWorkOrders, statusBody } from '../helpers.js';
 import { prisma } from '../../src/utils/prisma.js';
 
-// SOW 3.2.x (matrix :104, :106, :108, :115, :116): M3 completion confirmation,
-// the notification transition validity map driven through the live routes,
-// the mandatory location/equipment pair, the two-way work-order navigation
-// link, and the auto-close of linked notifications on completion. The pure
-// map (notificationLifecycle.test.ts) and the zod contract
-// (notificationLocationSelection.test.ts) were already covered; none of these
-// behaviours had been observed against live rows through the routes.
+// SOW 3.2.x (matrix :106, :108, :115, :116): the notification transition validity
+// map driven through the live routes, the mandatory location/equipment pair, the
+// two-way work-order navigation link, and the auto-close of linked notifications
+// on completion. Matrix row :104 (M3 on completion) was withdrawn on 2026-11-11
+// under owner decision D-22; this file now asserts the inverse - completion
+// creates no notification - and that an M3 cannot be converted.
 
 type Notification = {
   notificationId: string;
@@ -347,54 +346,43 @@ describe('notification transition validity driven both ways (SOW 3.2.3, :116)', 
   });
 });
 
-describe('M3 completion confirmation (SOW 3.2.4, :104)', () => {
+describe('completion creates no notification (D-22; matrix row :104 withdrawn)', () => {
   let woId = '';
-  let woNumber = '';
-  let m3: Notification | null = null;
 
-  it('auto-creates an M3 notification when the work order is completed', async () => {
-    woId = await createWoDirect({ status: 'In Progress', priority: 'High', woNumber: `WO-NAV-${stamp}-${nextSeq()}` });
-    const wo = await prisma.workOrder.findUniqueOrThrow({ where: { workOrderId: woId } });
-    woNumber = wo.woNumber;
+  it('does not create an M3, or any other notification, when a work order completes', async () => {
+    const woNumber = `WO-NAV-${stamp}-${nextSeq()}`;
+    woId = await createWoDirect({ status: 'In Progress', priority: 'High', woNumber });
 
+    const before = await prisma.notification.count({ where: { isDeleted: false } });
     await walkStatus(ctx.technicianToken, woId, ['Completed']);
+    const after = await prisma.notification.count({ where: { isDeleted: false } });
 
-    m3 = await prisma.notification.findFirst({
-      where: { description: `Completion confirmation for work order ${woNumber}`, isDeleted: false },
-    });
-    expect(m3).toBeTruthy();
-    expect(m3?.type).toBe('M3');
-    expect(m3?.status).toBe('Open');
-    expect(m3?.reportedByUserId).toBe(techId);
-    expect(m3?.createdBy).toBe(techId);
-    expect(m3?.modifiedBy).toBe(techId);
-    expect(m3?.priority).toBe('High');
-    expect(m3?.breakdownFlag).toBe(false);
-    expect(m3?.functionalLocationId).toBe(flatId);
-    expect(m3?.notificationNumber).toMatch(/^N-\d{6}$/);
-    if (m3) notifIds.push(m3.notificationId);
+    expect(after).toBe(before);
+    // Scoped to this order's number, so a legacy M3 left in the database by an
+    // earlier release cannot make the assertion lie in either direction.
+    expect(
+      await prisma.notification.count({
+        where: { description: `Completion confirmation for work order ${woNumber}` },
+      })
+    ).toBe(0);
   });
 
-  it('serves the M3 back through the public notification list', async () => {
-    const res = await api()
-      .get('/api/notifications')
-      .set(authHeaders(ctx.viewOnlyToken))
-      .query({ search: woNumber });
-    expect(res.status).toBe(200);
-    const found = (res.body.data ?? res.body ?? []).some(
-      (n: Notification) => n.notificationId === m3?.notificationId,
-    );
-    expect(found).toBe(true);
+  it('records completion as the immutable work-order snapshot instead', async () => {
+    const snapshot = await prisma.workOrderSnapshot.findFirst({
+      where: { workOrderId: woId, status: 'Completed' },
+    });
+    expect(snapshot).toBeTruthy();
+    expect(snapshot?.snapshot).toBeTruthy();
   });
 });
 
-describe('linked notifications auto-close on completion (SOW 3.2.5, :104)', () => {
+describe('linked notifications auto-close on completion (SOW 3.2.3, :116)', () => {
   it('drives a Converted notification to Completed when its work order completes', async () => {
     const created = await api()
       .post('/api/notifications')
       .set(authHeaders(ctx.operatorToken))
       .send({
-        type: 'M3',
+        type: 'M1',
         priority: 'Medium',
         description: 'auto-close fixture via convert',
         equipmentId: equipId,

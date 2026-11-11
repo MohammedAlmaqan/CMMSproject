@@ -138,11 +138,11 @@ describe('functional location tree counts (SOW 3.1.1)', () => {
   });
 
   it('drops the work order count for the node and every ancestor once the work closes', async () => {
-    // The route's own completion transaction would raise an M3 at this same
-    // node, which is a separate clause (F0k) and would move the notification
-    // count underneath this assertion. Posting the status change directly keeps
-    // the counts deterministic: the clause under test is the tree's definition
-    // of "open", and Completed is not open.
+    // D-22 (2026-11-11) removed the M3 completion confirmation this route used
+    // to raise, so completion no longer moves the notification count either. The
+    // status is still written directly: the clause under test is the tree's
+    // definition of "open", and Completed is not open, so the fixture stays on
+    // the single count it was written to observe.
     await prisma.workOrder.update({ where: { workOrderId: woId }, data: { status: 'Completed' } });
 
     const child = findNode(await tree(), childId);
