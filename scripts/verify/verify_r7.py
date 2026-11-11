@@ -17,8 +17,16 @@
 # PostgreSQL generate_series, because a pack that imported cyclesInWindow would
 # agree with a wrong denominator by construction.
 #
-# It runs a deterministic fixture (insert -> reconcile -> remove) because the
-# live seed is thin (no plans, no breakdown work orders, no material lines), and
+# It writes its own reference rows — three work centres, three equipment and
+# three materials, every id and code r7fix-prefixed — instead of reading the
+# demo seed.  The Client's operational dataset has no MECH/ELEC work centre and
+# no M-1002 equipment, so a pack that required those rows aborted before its
+# first assertion.  A user row is the one thing it cannot create (WorkOrder
+# supervisor/reporter and LaborEntry need a real account), so it reuses the
+# deployment's own administrator, falling back to any active user.
+#
+# It also runs a deterministic fixture (insert -> reconcile -> remove) because
+# the live data is thin on plans, breakdown work orders and material lines, and
 # a pack that reconciles empty sets proves nothing.  Every fixture row is
 # prefixed r7fix- so cleanup is exact.
 #
@@ -57,6 +65,15 @@ LAB_EM = "r7fix-lab-em"
 MAT_EM1, MAT_EM2, MAT_CM1 = "r7fix-mat-em1", "r7fix-mat-em2", "r7fix-mat-cm1"
 SVC_EM1, SVC_EM2 = "r7fix-svc-em1", "r7fix-svc-em2"
 N1, N2, N3, N4 = "r7fix-notif-1", "r7fix-notif-2", "r7fix-notif-3", "r7fix-notif-4"
+
+# Reference rows the pack owns.  These used to be read from the demo seed
+# (MECH/ELEC, M-1002/P-1001/C-1004, BEARING-6205/...), which the Client's
+# operational dataset does not contain, so the pack could not start against it.
+# The fixture now writes and removes them itself.  R7FIX-NONE carries no work
+# order on purpose: the hand case has to cover a zero-backlog work centre too.
+WC_MECH, WC_ELEC, WC_NONE = "r7fix-wc-mech", "r7fix-wc-elec", "r7fix-wc-none"
+EQ_M, EQ_P, EQ_C = "r7fix-eq-m", "r7fix-eq-p", "r7fix-eq-c"
+MAT_BEARING, MAT_GASKET, MAT_LUBE = "r7fix-mat-bearing", "r7fix-mat-gasket", "r7fix-mat-lube"
 
 RATE = 20.00  # fixture craft hourly rate — round number, hand-checkable
 RESULTS = []
@@ -127,6 +144,11 @@ def scalar(sql):
 def fixture_sql(ids):
     return f"""
 BEGIN;
+INSERT INTO "WorkCenter" ("workCenterId", code, name, "dailyCapacityHours", "costRatePerHour", "modifiedDate")
+VALUES ('{WC_MECH}', 'R7FIX-MECH', 'R7 fixture mechanical', 8, 0, now()),
+       ('{WC_ELEC}', 'R7FIX-ELEC', 'R7 fixture electrical', 8, 0, now()),
+       ('{WC_NONE}', 'R7FIX-NONE', 'R7 fixture idle',       8, 0, now());
+
 INSERT INTO "Craft" ("craftId", "workCenterId", "craftCode", description, "hourlyRate", "modifiedDate")
 VALUES ('{CRAFT}', '{ids['mech']}', 'R7CRAFT', 'R7 fixture craft', {RATE}, now());
 
@@ -136,6 +158,17 @@ VALUES ('{TL}', 'R7-TL', 'R7 fixture task list', '{ids['mech']}', now());
 INSERT INTO "FunctionalLocation" ("functionalLocationId", "locationCode", description, "parentLocationId", "locationType", "modifiedDate")
 VALUES ('{LOC}', 'R7-LOC', 'R7 fixture root', NULL, 'Area', now()),
        ('{LOC_CHILD}', 'R7-LOC-CH', 'R7 fixture child', '{LOC}', 'Area', now());
+
+INSERT INTO "Equipment" ("equipmentId", "equipmentCode", name, description, "functionalLocationId",
+  manufacturer, model, "serialNumber", "assetTag", "equipmentClass", criticality, "modifiedDate")
+VALUES ('{EQ_M}', 'R7FIX-M-1002', 'R7 fixture machine',      'r7 fixture equipment', '{LOC}', 'R7FIX', 'FIX', 'R7FIX-M', 'R7FIX-M', 'R7', 'A', now()),
+       ('{EQ_P}', 'R7FIX-P-1001', 'R7 fixture pump',         'r7 fixture equipment', '{LOC}', 'R7FIX', 'FIX', 'R7FIX-P', 'R7FIX-P', 'R7', 'A', now()),
+       ('{EQ_C}', 'R7FIX-C-1004', 'R7 fixture compressor',   'r7 fixture equipment', '{LOC}', 'R7FIX', 'FIX', 'R7FIX-C', 'R7FIX-C', 'R7', 'B', now());
+
+INSERT INTO "Material" ("materialId", "materialCode", description, "unitOfMeasure", "standardCost", "modifiedDate")
+VALUES ('{MAT_BEARING}', 'R7FIX-BEARING-6205',  'R7 fixture bearing', 'EA', 10.00, now()),
+       ('{MAT_GASKET}',  'R7FIX-GASKET-150',    'R7 fixture gasket',  'EA',  5.50, now()),
+       ('{MAT_LUBE}',    'R7FIX-LUBE-OIL-ISO68', 'R7 fixture lube',   'L',   8.00, now());
 
 INSERT INTO "MaintenancePlan" ("planId", "planCode", description, "functionalLocationId", "workCenterId", "taskListId",
   "strategyType", "intervalValue", "intervalUnit", "startDate", "endDate", priority, "modifiedDate")
@@ -202,27 +235,41 @@ DELETE FROM "MaintenancePlan"     WHERE "planId" = '{PLAN}';
 DELETE FROM "Notification"        WHERE "notificationId" IN ('{N1}','{N2}','{N3}','{N4}');
 DELETE FROM "TaskList"            WHERE "taskListId" = '{TL}';
 DELETE FROM "Craft"               WHERE "craftId" = '{CRAFT}';
+-- Reference rows the pack created, removed after everything that references
+-- them: Equipment before FunctionalLocation (FK), Material after
+-- WorkOrderMaterial, WorkCenter after Craft/TaskList/WorkOrder/Plan.
+DELETE FROM "Equipment"           WHERE "equipmentId" IN ('{EQ_M}','{EQ_P}','{EQ_C}');
+DELETE FROM "Material"            WHERE "materialId" IN ('{MAT_BEARING}','{MAT_GASKET}','{MAT_LUBE}');
+DELETE FROM "WorkCenter"          WHERE "workCenterId" IN ('{WC_MECH}','{WC_ELEC}','{WC_NONE}');
 DELETE FROM "FunctionalLocation"  WHERE "functionalLocationId" IN ('{LOC_CHILD}','{LOC}');
 """
 
 
-def resolve_seed_ids():
-    def one(sql):
-        v = scalar(sql)
-        if v is None:
-            raise SystemExit("seed reference not found: " + sql)
-        return v
+def fixture_ids():
+    """Ids the fixture writes, plus one pre-existing user to attribute rows to.
+
+    The pack used to look up MECH/ELEC/M-1002/BEARING-6205 and abort when they
+    were absent.  The Client dataset has none of them, so the only thing read
+    from the database now is a user: WorkOrder.supervisorUserId,
+    WorkOrder.reportedByUserId and LaborEntry.userId are real foreign keys, and
+    creating a user would mean inventing a password hash.
+    """
+    admin = scalar("SELECT \"userId\" FROM \"User\" WHERE username='admin'")
+    if admin is None:
+        admin = scalar("SELECT \"userId\" FROM \"User\" WHERE \"isActive\"=true ORDER BY \"userId\" LIMIT 1")
+    if admin is None:
+        raise SystemExit("no user row to attribute the fixture to")
 
     return {
-        "mech": one("SELECT \"workCenterId\" FROM \"WorkCenter\" WHERE code='MECH' AND \"isDeleted\"=false"),
-        "elec": one("SELECT \"workCenterId\" FROM \"WorkCenter\" WHERE code='ELEC' AND \"isDeleted\"=false"),
-        "admin": one("SELECT \"userId\" FROM \"User\" WHERE username='admin'"),
-        "eq_m": one("SELECT \"equipmentId\" FROM \"Equipment\" WHERE \"equipmentCode\"='M-1002' AND \"isDeleted\"=false"),
-        "eq_p": one("SELECT \"equipmentId\" FROM \"Equipment\" WHERE \"equipmentCode\"='P-1001' AND \"isDeleted\"=false"),
-        "eq_c": one("SELECT \"equipmentId\" FROM \"Equipment\" WHERE \"equipmentCode\"='C-1004' AND \"isDeleted\"=false"),
-        "mat_bearing": one("SELECT \"materialId\" FROM \"Material\" WHERE \"materialCode\"='BEARING-6205' AND \"isDeleted\"=false"),
-        "mat_gasket": one("SELECT \"materialId\" FROM \"Material\" WHERE \"materialCode\"='GASKET-150' AND \"isDeleted\"=false"),
-        "mat_lube": one("SELECT \"materialId\" FROM \"Material\" WHERE \"materialCode\"='LUBE-OIL-ISO68' AND \"isDeleted\"=false"),
+        "admin": admin,
+        "mech": WC_MECH,
+        "elec": WC_ELEC,
+        "eq_m": EQ_M,
+        "eq_p": EQ_P,
+        "eq_c": EQ_C,
+        "mat_bearing": MAT_BEARING,
+        "mat_gasket": MAT_GASKET,
+        "mat_lube": MAT_LUBE,
     }
 
 
@@ -522,8 +569,8 @@ def main():
     args = ap.parse_args()
 
     # Self-assertion: this pack must never touch a report_* view.
-    ids = resolve_seed_ids()
-    # Build all SQL now (resolve_seed_ids issues a few), then assert on the whole set.
+    ids = fixture_ids()
+    # Build all SQL now (fixture_ids issues one lookup), then assert on the whole set.
     # The important guard runs after all queries in `finally` too; here it is early:
     def assert_no_views():
         blob = "\n".join(ALL_SQL)
@@ -573,8 +620,13 @@ def main():
         api_bhwc = sorted([(r["workCenterCode"], r["openWorkOrderCount"], round(r["backlogHours"], 4)) for r in bhwc])
         record("backlog-hours-by-work-center (API = base-table SQL)", api_bhwc == sorted(oracle),
                f"api={api_bhwc} oracle={oracle}")
-        record("backlog-hours hand-computed (MECH 2/5.75, ELEC 1/10, INST 0/0)",
-               api_bhwc == sorted([("ELEC", 1, 10.0), ("INST", 0, 0.0), ("MECH", 2, 5.75)]))
+        # Filtered to the work centres this pack created: the endpoint returns
+        # every active work centre (the Client dataset has ten of its own), so a
+        # whole-endpoint equality would re-introduce a dependency on the seed.
+        fixture_wc = sorted([r for r in api_bhwc if r[0].startswith("R7FIX-")])
+        record("backlog-hours hand-computed (R7FIX-MECH 2/5.75, R7FIX-ELEC 1/10, R7FIX-NONE 0/0)",
+               fixture_wc == sorted([("R7FIX-ELEC", 1, 10.0), ("R7FIX-MECH", 2, 5.75), ("R7FIX-NONE", 0, 0.0)]),
+               f"fixture={fixture_wc}")
 
         # ---------- 3. pm-compliance (the hand case + cyclesInWindow-free denominator) ----------
         _, pm = api.get("/api/reports/pm-compliance", {**exact_q, "year": 2026, "month": 8})
@@ -595,7 +647,7 @@ def main():
         _, mtbf = api.get("/api/reports/mtbf", exact_q)
         oracle = sql_mtbf(EXACT)
         api_mtbf = sorted([(r["equipmentId"], round(r["mtbfHours"], 4), r["breakdownCount"]) for r in mtbf])
-        print("  HAND mtbf: M-1002 EM 2026-08-01..08-10 (9d=216h) minus 2h+1h downtime / (2-1) = 213.0h")
+        print("  HAND mtbf: R7FIX-M-1002 EM 2026-08-01..08-10 (9d=216h) minus 2h+1h downtime / (2-1) = 213.0h")
         record("mtbf (API = base-table SQL = hand 213.0 / n=2)", api_mtbf == sorted(oracle) and api_mtbf == [(ids['eq_m'], 213.0, 2)],
                f"api={api_mtbf} oracle={oracle}")
 
@@ -614,7 +666,7 @@ def main():
         _, dt = api.get("/api/reports/downtime", exact_q)
         oracle = sql_downtime(EXACT)
         api_dt = sorted([(r["equipmentId"], round(r["totalDowntimeHours"], 4), r["workOrderCount"]) for r in dt])
-        record("downtime (API = base-table SQL = hand M-1002 3.0h / n=2)",
+        record("downtime (API = base-table SQL = hand R7FIX-M-1002 3.0h / n=2)",
                api_dt == sorted(oracle) and api_dt == [(ids['eq_m'], 3.0, 2)], f"api={api_dt} oracle={oracle}")
 
         # ---------- 7. cost-summary ----------
@@ -646,18 +698,18 @@ def main():
         api_w = sorted([(r["woNumber"], round(r["totalQuantityUsed"], 4), round(r["totalCost"], 4), r["lineCount"]) for r in mc["byWorkOrder"]])
         api_e = sorted([(r["equipmentId"], round(r["totalQuantityUsed"], 4), round(r["totalCost"], 4), r["lineCount"]) for r in mc["byEquipment"]])
         record("material-consumption byMaterial (API = base-table SQL = hand)",
-               api_m == sorted(om) and api_m == [("BEARING-6205", 2.0, 20.0, 1), ("GASKET-150", 3.0, 16.5, 1)],
+               api_m == sorted(om) and api_m == [("R7FIX-BEARING-6205", 2.0, 20.0, 1), ("R7FIX-GASKET-150", 3.0, 16.5, 1)],
                f"api={api_m} oracle={om}")
         record("material-consumption byWorkOrder (API = SQL = hand R7-EM-001 5 / 36.50 / 2)",
                api_w == sorted(ow) and api_w == [("R7-EM-001", 5.0, 36.5, 2)], f"api={api_w} oracle={ow}")
-        record("material-consumption byEquipment (API = SQL = hand M-1002 5 / 36.50 / 2)",
+        record("material-consumption byEquipment (API = SQL = hand R7FIX-M-1002 5 / 36.50 / 2)",
                api_e == sorted(oe) and api_e == [(ids['eq_m'], 5.0, 36.5, 2)], f"api={api_e} oracle={oe}")
 
         # ---------- 9. top-cost-equipment ----------
         _, tc_rep = api.get("/api/reports/top-cost-equipment", exact_q)
         oracle = sql_top_cost(EXACT)
         api_tc = [(r["equipmentId"], r["workOrderCount"], round(r["plannedCost"], 4), round(r["actualCost"], 4), round(r["totalCost"], 4)) for r in tc_rep]
-        print("  HAND top-cost (stored): M-1002 em120+em2(20 from planned)+pm70+o1 50 = 260 (n4); P-1001 20; C-1004 10")
+        print("  HAND top-cost (stored): R7FIX-M-1002 em120+em2(20 from planned)+pm70+o1 50 = 260 (n4); R7FIX-P-1001 20; R7FIX-C-1004 10")
         record("top-cost-equipment (API = base-table SQL = hand ordering 260/20/10)",
                api_tc == sorted(oracle, key=lambda x: (-x[4], x[0])) and api_tc == [(ids['eq_m'], 4, 240.0, 120.0, 260.0),
                                                                                     (ids['eq_p'], 1, 20.0, 0.0, 20.0),
