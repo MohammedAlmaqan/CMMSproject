@@ -291,19 +291,19 @@ def main():
          f"{'OK' if total == 126 else 'MISMATCH'}")
     emit(f"  build set             : {build}   expected 0   "
          f"{'OK' if build == 0 else 'MISMATCH'}")
-    emit(f"  waived                : {cnt['Waived']}   expected 11   "
-         f"{'OK' if cnt['Waived'] == 11 else 'MISMATCH'}")
+    emit(f"  waived                : {cnt['Waived']}   expected 12   "
+         f"{'OK' if cnt['Waived'] == 12 else 'MISMATCH'}")
     check("section 3 still totals 126", total == 126)
     # Phase A froze the section 3 build set at 67. Layers A-C, R.2 and the later
     # C-H promotions have since moved every row they owned, and 65d296d promoted
     # the last one (§3.5.2 cost-split editor, owner decision 5). The live build
-    # set is therefore empty and Waived is 11; the expectation is corrected here
-    # rather than left at 1, which this gate had been failing on since 65d296d.
+    # set is therefore empty and Waived is 12: 11 rows were waived before D-22
+    # withdrew M3 generation on 2026-11-12 and moved §3.2.1 row 104 to Waived.
     # The matrix is the authority and verify_a1.py re-derives the same figures
     # from it, so this is an expectation update against the current matrix, not
     # a behaviour change.
     check("build set is empty", build == 0)
-    check("waived still 11", cnt["Waived"] == 11)
+    check("waived still 12", cnt["Waived"] == 12)
     recon = cnt["Met"] + build + cnt["Waived"] + cnt["Deferred"] + cnt["Excluded"]
     emit(f"  reconciliation        : {cnt['Met']} Met + {build} build + "
          f"{cnt['Waived']} waived + {cnt['Deferred']} Def + {cnt['Excluded']} Exc"
