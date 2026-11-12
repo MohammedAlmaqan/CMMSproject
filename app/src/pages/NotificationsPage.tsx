@@ -319,7 +319,6 @@ export default function NotificationsPage() {
                 <select id="ntf-type" value={formType} onChange={(e) => setFormType(e.target.value as NotificationType)} className={inputCls}>
                   <option value="M1">M1 — Malfunction</option>
                   <option value="M2">M2 — Request</option>
-                  <option value="M3">M3 — Completion</option>
                 </select>
               </div>
               <div>

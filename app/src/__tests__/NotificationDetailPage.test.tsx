@@ -103,6 +103,25 @@ describe('NotificationDetailPage conversion gating (SOW 3.2 / N12)', () => {
   });
 });
 
+describe('NotificationDetailPage legacy M3 (D-22)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ user: adminUser, isAuthenticated: true, loading: false, error: null });
+    vi.mocked(notificationService.getById).mockResolvedValue({ ...notification, type: 'M3' });
+  });
+
+  it('presents a completion confirmation read-only, with no edit, delete or convert control', async () => {
+    renderDetail();
+
+    await screen.findByText('NTF-0001');
+    expect(screen.getByText(/legacy M3 completion confirmation/i)).toBeInTheDocument();
+    expect(screen.getByText('Legacy record')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /convert to wo/i })).not.toBeInTheDocument();
+  });
+});
+
 describe('NotificationDetailPage edit (G9)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

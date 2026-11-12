@@ -187,6 +187,10 @@ export default function NotificationDetailPage() {
 
   const typeCfg = typeConfig[notif.type];
   const TypeIcon = typeCfg.icon;
+  // D-22. M3 completion confirmations are no longer generated. The rows that
+  // already exist describe finished work and carry no link back to their work
+  // order, so they are shown read-only: no edit, no delete, no conversion.
+  const isCompletion = notif.type === 'M3';
   const location = notif.functionalLocation;
   const equip = notif.equipment;
   const reporter = notif.reportedBy;
@@ -218,11 +222,16 @@ export default function NotificationDetailPage() {
                 }`}>
                   {notif.status}
                 </span>
+                {isCompletion && (
+                  <span className="text-xs px-2 py-0.5 rounded border border-subtle text-tertiary">
+                    Legacy record
+                  </span>
+                )}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {notif.status !== 'Converted' && canEdit && !editOpen && (
+            {notif.status !== 'Converted' && canEdit && !editOpen && !isCompletion && (
               <button
                 onClick={openEdit}
                 className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold border border-subtle text-secondary hover:text-primary hover:border-highlight transition-all"
@@ -231,7 +240,7 @@ export default function NotificationDetailPage() {
                 Edit
               </button>
             )}
-            {notif.status !== 'Converted' && canConvert && (
+            {notif.status !== 'Converted' && canConvert && !isCompletion && (
               <button
                 onClick={handleConvertToWO}
                 disabled={converting}
@@ -242,7 +251,7 @@ export default function NotificationDetailPage() {
                 Convert to WO
               </button>
             )}
-            {canDelete && (
+            {canDelete && !isCompletion && (
               <button
                 onClick={handleDelete}
                 disabled={deleting}
@@ -258,6 +267,15 @@ export default function NotificationDetailPage() {
           <div className="mt-2 text-red-status text-xs">{actionError}</div>
         )}
       </div>
+
+      {/* Legacy completion confirmation note (D-22) */}
+      {isCompletion && (
+        <div className="px-6 py-3 border-b border-subtle text-xs text-tertiary leading-relaxed">
+          This is a legacy M3 completion confirmation. It was raised automatically when a work order was
+          completed and is kept read-only for the record: it cannot be edited, deleted, or converted
+          into a work order.
+        </div>
+      )}
 
       {/* Breakdown Banner */}
       {notif.breakdownFlag && (
@@ -297,7 +315,6 @@ export default function NotificationDetailPage() {
                   >
                     <option value="M1">M1 — Malfunction</option>
                     <option value="M2">M2 — Request</option>
-                    <option value="M3">M3 — Completion</option>
                   </select>
                 </label>
                 <label className="text-xs text-secondary">
@@ -426,7 +443,7 @@ export default function NotificationDetailPage() {
               <div className="text-center py-8">
                 <ClipboardList className="w-8 h-8 text-tertiary mx-auto mb-2" />
                 <p className="text-tertiary text-xs">No work orders linked yet</p>
-                {notif.status !== 'Converted' && canConvert && (
+                {notif.status !== 'Converted' && canConvert && !isCompletion && (
                   <button
                     onClick={handleConvertToWO}
                     disabled={converting}

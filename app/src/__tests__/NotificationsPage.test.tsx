@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import NotificationsPage from '@/pages/NotificationsPage';
@@ -143,6 +143,24 @@ describe('NotificationsPage intake (SOW 3.2.2)', () => {
 
     expect(await screen.findByText(/at least 3 characters/i)).toBeInTheDocument();
     expect(notificationService.create).not.toHaveBeenCalled();
+  }, 20000);
+
+  it('no longer offers M3 as an intake type but still filters by it (D-22)', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    // The filter keeps M3 on purpose: the legacy rows are still reachable, they
+    // are just not offered as something new to raise.
+    expect(screen.getByLabelText('Filter by type')).toHaveTextContent('M3 - Completion');
+
+    await user.click(await screen.findByRole('button', { name: /new notification/i }));
+    const type = screen.getByLabelText('Type');
+    expect(within(type).queryByRole('option', { name: /M3/i })).not.toBeInTheDocument();
+    expect(
+      within(type)
+        .getAllByRole('option')
+        .map((o) => (o as HTMLOptionElement).value)
+    ).toEqual(['M1', 'M2']);
   }, 20000);
 
   it('hides the intake control from a View-Only user', async () => {
