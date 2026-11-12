@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
+import { NOT_A_COMPLETION_CONFIRMATION } from '../utils/transitions.js';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.use(authenticate);
  *                 overdueWorkOrders: { type: integer }
  *                 scheduledToday: { type: integer }
  *                 completionRate: { type: number, description: "Percent, 2dp" }
- *                 openNotifications: { type: integer }
+ *                 openNotifications: { type: integer, description: "Open or In Process; legacy M3 completion confirmations are excluded (D-22)" }
  *                 pmCompliance: { type: number, description: "Percent of current-month PM work orders Completed or Closed, 2dp" }
  *       '401':
  *         description: Missing or invalid bearer token
@@ -139,7 +140,7 @@ router.get('/kpis', async (_req: Request, res: Response) => {
         where: { isDeleted: false, status: { in: ['Completed', 'Closed'] } },
       }),
       prisma.notification.count({
-        where: { isDeleted: false, status: { in: ['Open', 'In Process'] } },
+        where: { isDeleted: false, status: { in: ['Open', 'In Process'] }, ...NOT_A_COMPLETION_CONFIRMATION },
       }),
     ]);
 

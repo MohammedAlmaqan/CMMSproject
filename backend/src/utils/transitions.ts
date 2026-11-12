@@ -51,3 +51,13 @@ export function invalidTransitionMessage(from: string, to: string): string {
 export function isCompletionConfirmation(type: string | null | undefined): boolean {
   return type === 'M3';
 }
+
+/**
+ * Prisma filter fragment for the intake and reporting surfaces. A legacy M3 is
+ * kept in the database - it is a historical record and three of them are linked
+ * to real work orders - but it is not work anyone has to pick up, so it is not
+ * counted as an open notification. D-22 (owner, 2026-11-11). The notification
+ * list still shows these rows under the M3 filter on purpose; only the counts
+ * that drive queues and reports exclude them.
+ */
+export const NOT_A_COMPLETION_CONFIRMATION = { type: { not: 'M3' } } as const;

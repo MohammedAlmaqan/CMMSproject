@@ -462,6 +462,36 @@ describe('report rows 65-67', () => {
       expect(res.body.byPriority).toEqual([]);
       expect(res.body.oldestAgeDays).toBeNull();
     });
+
+    it('does not count a legacy M3 completion confirmation (D-22)', async () => {
+      const report = () =>
+        api()
+          .get('/api/reports/notifications-awaiting-conversion')
+          .query({ equipmentId: hoursEquipmentId })
+          .set(authHeaders(ctx.adminToken));
+
+      const before = await report();
+      expect(before.status).toBe(200);
+
+      // M3 is still accepted on create - the importer and the historical rows
+      // depend on it - so the exclusion has to be in the report's filter.
+      const m3 = await api()
+        .post('/api/notifications')
+        .set(authHeaders(ctx.operatorToken))
+        .send({
+          type: 'M3',
+          priority: 'High',
+          description: 'r3 legacy completion confirmation',
+          equipmentId: hoursEquipmentId,
+          reportedByUserId: ctx.operatorId,
+        });
+      expect(m3.status).toBe(201);
+      notificationIds.push(m3.body.notificationId);
+
+      const after = await report();
+      expect(after.body.total).toBe(before.body.total);
+      expect(after.body.byPriority).toEqual(before.body.byPriority);
+    });
   });
 });
 

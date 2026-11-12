@@ -507,18 +507,20 @@ GROUP BY 1 ORDER BY 5 DESC, 1 ASC LIMIT 10;
 
 
 def sql_notifications(scope):
+    # D-22: legacy M3 completion confirmations are not intake work, and the API
+    # excludes them from this report, so the reconciliation counts them out too.
     rows = psql(f"""
 SELECT w."priority", count(*) FROM "Notification" w
-WHERE w."isDeleted"=false AND w."status" IN ('Open','In Process') AND {scope}
+WHERE w."isDeleted"=false AND w."status" IN ('Open','In Process') AND w."type" <> 'M3' AND {scope}
 GROUP BY 1;
 """)
     total = int(scalar(f"""
 SELECT count(*) FROM "Notification" w
-WHERE w."isDeleted"=false AND w."status" IN ('Open','In Process') AND {scope};
+WHERE w."isDeleted"=false AND w."status" IN ('Open','In Process') AND w."type" <> 'M3' AND {scope};
 """))
     oldest = scalar(f"""
 SELECT min(w."createdDate") FROM "Notification" w
-WHERE w."isDeleted"=false AND w."status" IN ('Open','In Process') AND {scope};
+WHERE w."isDeleted"=false AND w."status" IN ('Open','In Process') AND w."type" <> 'M3' AND {scope};
 """)
     return {r[0]: int(r[1]) for r in rows}, total, oldest
 

@@ -5036,7 +5036,7 @@
     "/api/reports/notifications-awaiting-conversion": {
       "get": {
         "summary": "Notifications raised but not yet turned into work",
-        "description": "SOW 3.7.2 row 67. \"Awaiting conversion\" is narrower than \"open\": it means the notification has not yet become a work order, so Converted is excluded even though a converted notification's issue stays open until the work order it became is completed. The two questions are answered by two different reports on purpose - this one counts work not yet raised.\nThis report rejects `workCenterId` with a 400 rather than ignoring it. A notification names a location and, when there is one, an asset; it does not name a work centre, because work centres are assigned per work order rather than per asset. Accepting the filter and quietly returning the unfiltered answer would hand the caller a number they believe they narrowed, which is the same class of wrong as an empty report.\n",
+        "description": "SOW 3.7.2 row 67. \"Awaiting conversion\" is narrower than \"open\": it means the notification has not yet become a work order, so Converted is excluded even though a converted notification's issue stays open until the work order it became is completed. The two questions are answered by two different reports on purpose - this one counts work not yet raised.\nLegacy M3 completion confirmations are excluded (D-22): the release that raised them wrote one per completed work order, unlinked to that order, so counting them would present already-completed work as work nobody has turned into a job.\nThis report rejects `workCenterId` with a 400 rather than ignoring it. A notification names a location and, when there is one, an asset; it does not name a work centre, because work centres are assigned per work order rather than per asset. Accepting the filter and quietly returning the unfiltered answer would hand the caller a number they believe they narrowed, which is the same class of wrong as an empty report.\n",
         "tags": [
           "Reports"
         ],
@@ -10437,7 +10437,8 @@
                       "description": "Percent, 2dp"
                     },
                     "openNotifications": {
-                      "type": "integer"
+                      "type": "integer",
+                      "description": "Open or In Process; legacy M3 completion confirmations are excluded (D-22)"
                     },
                     "pmCompliance": {
                       "type": "number",

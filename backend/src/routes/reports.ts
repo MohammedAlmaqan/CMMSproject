@@ -2,6 +2,7 @@
 import { prisma } from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
+import { NOT_A_COMPLETION_CONFIRMATION } from '../utils/transitions.js';
 import {
   buildDateWhere,
   buildScopeWhere,
@@ -1436,6 +1437,11 @@ register('top-cost-equipment', async (req: Request, res: Response) => {
  *       the work order it became is completed. The two questions are answered by
  *       two different reports on purpose - this one counts work not yet raised.
  *
+ *       Legacy M3 completion confirmations are excluded (D-22): the release that
+ *       raised them wrote one per completed work order, unlinked to that order, so
+ *       counting them would present already-completed work as work nobody has
+ *       turned into a job.
+ *
  *       This report rejects `workCenterId` with a 400 rather than ignoring it. A
  *       notification names a location and, when there is one, an asset; it does
  *       not name a work centre, because work centres are assigned per work order
@@ -1511,6 +1517,7 @@ register('notifications-awaiting-conversion', async (req: Request, res: Response
       where: {
         isDeleted: false,
         status: { in: ['Open', 'In Process'] },
+        ...NOT_A_COMPLETION_CONFIRMATION,
         ...scope,
         ...(buildDateWhere(filter, 'createdDate') ?? {}),
       },

@@ -18,6 +18,7 @@ import {
 import { logger } from '../utils/logger.js';
 import { parseCollectionQuery, mergeWhere, selectRows, QUERY_FIELDS } from '../utils/queryGrammar.js';
 import { csvDate, csvExportRoute, csvImportRoute } from '../utils/csvRoutes.js';
+import { NOT_A_COMPLETION_CONFIRMATION } from '../utils/transitions.js';
 
 const router = Router();
 
@@ -409,6 +410,7 @@ router.get('/tree', async (_req: Request, res: Response) => {
         where: {
           isDeleted: false,
           status: { in: [...OPEN_NOTIFICATION_STATUSES] },
+          ...NOT_A_COMPLETION_CONFIRMATION,
         },
         _count: { _all: true },
       }),
