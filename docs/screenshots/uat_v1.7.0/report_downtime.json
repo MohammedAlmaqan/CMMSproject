@@ -1,0 +1,22 @@
+[
+ {
+  "equipmentId": "b29fa96f-bcf0-462a-bf83-4cd2a6d3951d",
+  "totalDowntimeHours": 0,
+  "workOrderCount": 1
+ },
+ {
+  "equipmentId": "d48b115a-290c-4f8a-9bc7-f16aa1c02b05",
+  "totalDowntimeHours": 0.03,
+  "workOrderCount": 1
+ },
+ {
+  "equipmentId": "7b0922ba-f05e-43e3-a4b9-1e361ee1a04e",
+  "totalDowntimeHours": 0.09,
+  "workOrderCount": 7
+ },
+ {
+  "equipmentId": "8409f3c5-0cb5-4f7d-aeef-07bed50d78dd",
+  "totalDowntimeHours": 0,
+  "workOrderCount": 1
+ }
+]

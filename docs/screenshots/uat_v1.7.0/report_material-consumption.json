@@ -1,0 +1,32 @@
+{
+ "byMaterial": [
+  {
+   "materialId": "b71596f3-839a-402b-bfa6-32fc53f5c9d7",
+   "materialCode": "100920",
+   "description": "FILTER FUEL PN 10000-71712",
+   "unitOfMeasure": "PCS",
+   "totalQuantityUsed": 2,
+   "totalCost": 38.96,
+   "usageCount": 1
+  }
+ ],
+ "byWorkOrder": [
+  {
+   "workOrderId": "1159fcbf-d5d4-4ed7-ae71-edd39185d982",
+   "woNumber": "WO-001668",
+   "totalQuantityUsed": 2,
+   "totalCost": 38.96,
+   "lineCount": 1
+  }
+ ],
+ "byEquipment": [
+  {
+   "equipmentId": "e9d32d30-1484-4061-8260-7b2393679a82",
+   "equipmentCode": "GG803A",
+   "equipmentName": "GG803A GENERATOR GAS JENBACHER",
+   "totalQuantityUsed": 2,
+   "totalCost": 38.96,
+   "lineCount": 1
+  }
+ ]
+}

@@ -1,0 +1,4182 @@
+{
+ "period": "2026-11",
+ "budgetNote": "Budget comparison is waived (D-13): v1.0.0 has no budget column, so no budget figure is reported.",
+ "byCostCenter": [
+  {
+   "costCenterCode": "",
+   "plannedCost": 1829.96,
+   "actualCost": 118.96,
+   "variance": -1711,
+   "workOrderCount": 23
+  }
+ ],
+ "byLocation": [
+  {
+   "functionalLocationId": "bd1cb581-8a11-46df-a633-519351360c43",
+   "locationCode": "YE002",
+   "description": "BLOCK S2 - ALUQLAH FIELD",
+   "plannedCost": 1829.96,
+   "actualCost": 118.96,
+   "variance": -1711,
+   "workOrderCount": 23
+  },
+  {
+   "functionalLocationId": "ab2a85fe-0639-439b-b965-27de935e5663",
+   "locationCode": "YE002-CA01",
+   "description": "KHARWAH",
+   "plannedCost": 118.96,
+   "actualCost": 118.96,
+   "variance": 0,
+   "workOrderCount": 1
+  },
+  {
+   "functionalLocationId": "a079fd93-fdbd-4d4c-acca-b8de5e59464b",
+   "locationCode": "YE002-CA01-480",
+   "description": "KHARWAH CAMP UTILITIES",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "727a109b-ac63-40db-8ac7-73ff7d6819aa",
+   "locationCode": "YE002-CA01-480-ITCOMM",
+   "description": "KHARWAH IT COMMS SERVERS ROOMS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "51112b23-fa64-4037-bc77-34c5219c9369",
+   "locationCode": "YE002-CA01-480-MEDCAL",
+   "description": "KHARWAH CAMP MEDICAL UNIT",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "32e1b90b-101d-4a8e-b5ee-95b5af61e600",
+   "locationCode": "YE002-CA01-480-ROUNIT",
+   "description": "KHARWAH CAMP RO UNIT",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "313f8c81-6790-4935-92eb-75a371e73f0f",
+   "locationCode": "YE002-CA01-480-WMF",
+   "description": "KHARWAH WASTE MANAGEMENT FACILITY",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ab05fe57-5879-4d3a-a078-df7d3fe6fce5",
+   "locationCode": "YE002-CA01-480-WWT",
+   "description": "KHARWAH WASTE WATER TREATMENT UNIT",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6117c205-8b7e-4a5d-a91b-58107c7b0891",
+   "locationCode": "YE002-CA01-720",
+   "description": "KHARWAH FIRE FIGHTING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3622fb99-f9a3-4941-867d-0117f713c348",
+   "locationCode": "YE002-CA01-800",
+   "description": "KHARWAH CAMP POWER GENERATION",
+   "plannedCost": 118.96,
+   "actualCost": 118.96,
+   "variance": 0,
+   "workOrderCount": 1
+  },
+  {
+   "functionalLocationId": "d947219c-15b3-4aae-a1f2-2cadd84768ad",
+   "locationCode": "YE002-CA01-820",
+   "description": "KHARWAH",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "bb0e365c-7a89-4883-b995-25ce4c6b88ca",
+   "locationCode": "YE002-CA01-820-DS",
+   "description": "KHARWAH - DISTRIBUTION BOARDS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "68f8cb34-6c4b-4647-a3c3-532555192b38",
+   "locationCode": "YE002-CA02",
+   "description": "W/H",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "cd40315c-79d6-400c-af07-1ccb79cec5ab",
+   "locationCode": "YE002-CA02-950",
+   "description": "OLF SAFER CAMP CIVIL AND STRUCTURE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "330b1dc8-3810-40d9-925e-961ab57d0bb2",
+   "locationCode": "YE002-CA03",
+   "description": "MILITARY",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "82d67d37-b141-46a0-bba6-5f52f884c086",
+   "locationCode": "YE002-CA03-800",
+   "description": "MILITARY",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6d479ba1-68fd-47b5-9d9d-fbb635ab5dda",
+   "locationCode": "YE002-CA03-800-GX001",
+   "description": "MILITARY CAMP MAIN POWER GEN PACKAGE #1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2a7df3f2-02bd-41e8-b4bc-85f341578bdf",
+   "locationCode": "YE002-CA03-800-GX004",
+   "description": "MILITARY CHECK POINTS POWER GEN PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "122e46fd-e200-451c-9d07-c78c78356ea6",
+   "locationCode": "YE002-CA03-820",
+   "description": "MILITARY",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ae6f4f10-c969-49fe-844e-64264d748419",
+   "locationCode": "YE002-CA03-820-DS",
+   "description": "MILITARY CAMP -DISTRIBUTION BOARDS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e449201c-258d-4a41-8920-30baa4a9642f",
+   "locationCode": "YE002-DS01",
+   "description": "DSF",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7ee44485-66bb-40e6-8c34-9e8f53bbbe7b",
+   "locationCode": "YE002-DS01-480",
+   "description": "DSF",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "70a2847c-053d-4af6-9480-f75f82bb1b3b",
+   "locationCode": "YE002-DS01-480-ITCOMM",
+   "description": "DSF IT COMMUNICATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1cb312d1-a145-44de-b628-09567e2438b4",
+   "locationCode": "YE002-DS01-620",
+   "description": "DIESEL STORE AREA",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f607266a-4f8d-4ca7-8c1e-13a4f09e1140",
+   "locationCode": "YE002-DS01-620-DSLPUMP",
+   "description": "DSF DIESEL TRANSFER PUMPS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ef776beb-e591-427d-82df-28d7b2d65e93",
+   "locationCode": "YE002-DS01-620-DSLTNK",
+   "description": "DSF DIESEL STORAGE TANKS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a214a3ad-1abd-4677-97eb-f35d1e4da8a5",
+   "locationCode": "YE002-DS01-620-LOADARM",
+   "description": "DSF LOADING / UNLOADING ARM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "66905420-e244-4406-b96b-8e072ac87042",
+   "locationCode": "YE002-DS01-800",
+   "description": "DSF MAIN POWER GENERATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6ae476a5-78c0-4962-bfc6-2101ec6e68b3",
+   "locationCode": "YE002-DS01-820",
+   "description": "MAIN LOW VOLTAGE POWER DISTRIBUTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7bd35a90-606d-4691-9615-0641a37a7953",
+   "locationCode": "YE002-DS01-820-DS",
+   "description": "DSF DISTRIBUTION BOARDS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5e50c349-5f4f-4b9a-8c80-6375ccc74ee4",
+   "locationCode": "YE002-DS01-880",
+   "description": "DSF",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8bcdb918-748b-4bd1-b7e8-070e906e333a",
+   "locationCode": "YE002-DS01-880-PKEARTH1",
+   "description": "DSF EARTH PITS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9dbf4a1d-f9fa-49e9-a50d-817b62808010",
+   "locationCode": "YE002-OF01",
+   "description": "HABBAN FIELD",
+   "plannedCost": 80,
+   "actualCost": 0,
+   "variance": -80,
+   "workOrderCount": 1
+  },
+  {
+   "functionalLocationId": "6b8781dd-a7cf-490f-9f6a-36b67ef3d4a2",
+   "locationCode": "YE002-OF01-100",
+   "description": "HABBAN OIL WELLS",
+   "plannedCost": 80,
+   "actualCost": 0,
+   "variance": -80,
+   "workOrderCount": 1
+  },
+  {
+   "functionalLocationId": "145d8f58-115e-4c98-a392-c511839b4849",
+   "locationCode": "YE002-OF01-100-WELHAB",
+   "description": "SATTELITE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5466f85a-60dd-4632-9180-def3aa7a7d22",
+   "locationCode": "YE002-OF01-100-WELHAB-SAT01",
+   "description": "SAT01 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "037493ab-bb51-4701-a802-f21be12c3236",
+   "locationCode": "YE002-OF01-100-WELHAB01",
+   "description": "HABBAN-01 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c789ffad-cec0-43f8-b71e-43caf5b570fc",
+   "locationCode": "YE002-OF01-100-WELHAB02",
+   "description": "HABBAN-02 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "bfec813f-1421-40e0-a4d8-0daa436fa8fa",
+   "locationCode": "YE002-OF01-100-WELHAB04",
+   "description": "HABBAN-04 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "85965ed5-915d-4c2a-ba8e-d8b0b07b2fb9",
+   "locationCode": "YE002-OF01-100-WELHAB05",
+   "description": "HABBAN-05 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "03a6cc1f-fe9c-4212-86fb-5e7832fa89f8",
+   "locationCode": "YE002-OF01-100-WELHAB06",
+   "description": "HABBAN-06 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "316f6a6e-eb99-4fdb-a95a-9151af29ddad",
+   "locationCode": "YE002-OF01-100-WELHAB07",
+   "description": "HABBAN-07 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "689d89c7-fcc2-4363-8e69-e905ce4a0134",
+   "locationCode": "YE002-OF01-100-WELHAB08",
+   "description": "HABBAN-08 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9f568029-6ced-4788-a865-44c9991f14b4",
+   "locationCode": "YE002-OF01-100-WELHAB09",
+   "description": "HABBAN-09 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7a008e29-613a-41f0-8048-5ad6fd8675d0",
+   "locationCode": "YE002-OF01-100-WELHAB10",
+   "description": "HABBAN-10 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "dec16bb5-fe03-4e28-ac00-e908657ff008",
+   "locationCode": "YE002-OF01-100-WELHAB11",
+   "description": "HABBAN-11 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1de35704-0f20-4127-9f20-bec82bbf506c",
+   "locationCode": "YE002-OF01-100-WELHAB12",
+   "description": "HABBAN-12 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c692998c-155e-4a84-bb7f-3e72abd5af65",
+   "locationCode": "YE002-OF01-100-WELHAB13",
+   "description": "HABBAN-13 OIL WELL",
+   "plannedCost": 80,
+   "actualCost": 0,
+   "variance": -80,
+   "workOrderCount": 1
+  },
+  {
+   "functionalLocationId": "afcd10c2-faec-459f-8316-b4073aab6e86",
+   "locationCode": "YE002-OF01-100-WELHAB14",
+   "description": "HABBAN-14 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "077ed4f7-2330-4d4d-bd71-06f7b46bfb59",
+   "locationCode": "YE002-OF01-100-WELHAB15",
+   "description": "HABBAN-15 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c82e9af1-4078-4c7d-ba5f-597d5220c751",
+   "locationCode": "YE002-OF01-100-WELHAB16",
+   "description": "HABBAN-16 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e7797caa-0dba-48ef-9e03-97b906870164",
+   "locationCode": "YE002-OF01-100-WELHAB17",
+   "description": "HABBAN-17 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6aa1a7d0-b262-4366-b016-5df811646d7c",
+   "locationCode": "YE002-OF01-100-WELHAB18",
+   "description": "HABBAN-18 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6998b580-47e9-4274-9494-c751823267a1",
+   "locationCode": "YE002-OF01-100-WELHAB19",
+   "description": "HABBAN-19 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f28dfd38-dc49-418f-9d5c-4ca1da0333a4",
+   "locationCode": "YE002-OF01-100-WELHAB20",
+   "description": "HABBAN-20 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "399c6178-fd41-411c-a2c1-158ac5ca8933",
+   "locationCode": "YE002-OF01-100-WELHAB21",
+   "description": "HABBAN-21 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1f60f220-f569-4b96-aa05-96f918e0a4e0",
+   "locationCode": "YE002-OF01-100-WELHAB22",
+   "description": "HABBAN-22 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1a1c05d1-d3ff-4ac8-8f3d-dbe9fb687598",
+   "locationCode": "YE002-OF01-100-WELHAB23",
+   "description": "HABBAN-23 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c7f60765-37d1-40e8-85a9-50e75a005d99",
+   "locationCode": "YE002-OF01-100-WELHAB24",
+   "description": "HABBAN-24 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e719cb0b-656f-4080-989c-9498d70d154b",
+   "locationCode": "YE002-OF01-100-WELHAB25",
+   "description": "HABBAN-25 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "235e5b08-3e01-4666-a734-809461aebf93",
+   "locationCode": "YE002-OF01-100-WELHAB26",
+   "description": "HABBAN-26 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3c211e5b-8ecc-48aa-ad9c-a0fe357ef95d",
+   "locationCode": "YE002-OF01-100-WELHAB27",
+   "description": "HABBAN-27 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "759fef44-78cb-4423-8908-25fbd03ad1b8",
+   "locationCode": "YE002-OF01-100-WELHAB28",
+   "description": "HABBAN-28 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "54719a8f-23c5-48d1-b138-c1c4a60cfe22",
+   "locationCode": "YE002-OF01-100-WELHAB29",
+   "description": "HABBAN-29 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e1e63b39-e8f1-43d6-bdb0-a28ca8230624",
+   "locationCode": "YE002-OF01-100-WELHAB30",
+   "description": "HABBAN-30 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5f7a2480-9c7e-4749-b312-c2eb1be322e5",
+   "locationCode": "YE002-OF01-100-WELHAB31",
+   "description": "HABBAN-31 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4022c713-7c22-460e-809c-6de279e4d7ad",
+   "locationCode": "YE002-OF01-100-WELHAB32",
+   "description": "HABBAN-32 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b48a8c2f-3266-43ed-b483-555c07c7d9e4",
+   "locationCode": "YE002-OF01-100-WELHAB33",
+   "description": "HABBAN-33 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "49ec6dd3-8f62-4ad5-9479-0646e54b2958",
+   "locationCode": "YE002-OF01-100-WELHAB34",
+   "description": "HABBAN-34 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7e1c7087-7ccb-4655-b98f-62533b3dbae5",
+   "locationCode": "YE002-OF01-100-WELHAB35",
+   "description": "HABBAN-35 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "fe241877-3089-480f-b386-d662cbd66c83",
+   "locationCode": "YE002-OF01-100-WELHAB36",
+   "description": "HABBAN-36 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "247666e2-c7a6-4745-b78c-5a781f1af3d6",
+   "locationCode": "YE002-OF01-100-WELHAB37",
+   "description": "HABBAN-37 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8bfdf8f1-9f2e-4a5f-9a41-601abc7a6ce1",
+   "locationCode": "YE002-OF01-100-WELHAB38",
+   "description": "HABBAN-38 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2abc1f19-0a5f-4198-98ee-f561fbaa6b1b",
+   "locationCode": "YE002-OF01-100-WELHAB39",
+   "description": "HABBAN-39 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c9e864a4-d56b-466b-987f-51f4c5b7a0f1",
+   "locationCode": "YE002-OF01-100-WELHAB40",
+   "description": "HABBAN-40 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c1fd208b-1eed-4846-a6f5-b3a04619ce16",
+   "locationCode": "YE002-OF01-100-WELHAB41",
+   "description": "HABBAN-41 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "466b88ee-30a5-4034-a336-3860a0618a9d",
+   "locationCode": "YE002-OF01-100-WELHAB42",
+   "description": "HABBAN-42 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3281f21b-34a3-44fd-af43-c63a282a823e",
+   "locationCode": "YE002-OF01-100-WELHAB43",
+   "description": "HABBAN-43 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "715cb204-0bce-4416-a575-006821fd9746",
+   "locationCode": "YE002-OF01-100-WELHAB44",
+   "description": "HABBAN-44 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c151a604-526c-42bd-924c-a14cad017843",
+   "locationCode": "YE002-OF01-100-WELKHAR1",
+   "description": "KHARWAH-01 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "07edd49e-4223-4f28-abef-785f959d4bc0",
+   "locationCode": "YE002-OF01-100-WELNIL1",
+   "description": "ALNAILAM-01 OIL WELL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b9946584-b089-4562-9888-aaf1c3ff57cb",
+   "locationCode": "YE002-OF01-291",
+   "description": "WD-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "70d0c9f5-f0cf-42e2-97c7-ca4b8170d51a",
+   "locationCode": "YE002-OF01-291-WELDISP1",
+   "description": "WATER DISPOSAL WELL-01",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "abd6ae45-89a7-4379-9d88-7ae076dcb9f8",
+   "locationCode": "YE002-OF01-360",
+   "description": "HB-13",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c637a820-1016-4062-a034-075248fe2ab5",
+   "locationCode": "YE002-OF01-360-PIPHAB01",
+   "description": "HABBAN-01 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "93e97fcc-f4eb-4ac6-a558-e568c8160894",
+   "locationCode": "YE002-OF01-360-PIPHAB02",
+   "description": "HABBAN-02 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a487d5cb-ef4e-4b17-980d-4f003b310f00",
+   "locationCode": "YE002-OF01-360-PIPHAB04",
+   "description": "HABBAN-04 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "89b31774-13a3-44ac-8c76-b6c726e78b22",
+   "locationCode": "YE002-OF01-360-PIPHAB05",
+   "description": "HABBAN-05 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4ee40be1-1794-48e3-9487-1f553041001c",
+   "locationCode": "YE002-OF01-360-PIPHAB07",
+   "description": "HABBAN-07 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9ed2cb6c-06c1-432f-9da9-1ff47cdd9a7c",
+   "locationCode": "YE002-OF01-360-PIPHAB08",
+   "description": "HABBAN-08 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5b31bc0f-dde0-4f4d-a0de-72322c14788f",
+   "locationCode": "YE002-OF01-360-PIPHAB09",
+   "description": "HABBAN-09 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "50a71b93-b118-4145-a72e-dd26e7fbdf6c",
+   "locationCode": "YE002-OF01-360-PIPHAB10",
+   "description": "HABBAN-10 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d64d7682-958e-45e9-b5b7-206cf38a0057",
+   "locationCode": "YE002-OF01-360-PIPHAB11",
+   "description": "HABBAN-11 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "267a5892-0200-4db1-831b-5984f8c11094",
+   "locationCode": "YE002-OF01-360-PIPHAB13",
+   "description": "HABBAN-13 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "39fee5b1-3eef-4d6d-b3cd-7e536c5358b9",
+   "locationCode": "YE002-OF01-360-PIPHAB14",
+   "description": "HABBAN-14 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c39ecba7-7574-4ecd-8540-cd75c71b5e41",
+   "locationCode": "YE002-OF01-360-PIPHAB15",
+   "description": "HABBAN-15 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b7a90e55-a2b7-44d4-9e52-71cea6128557",
+   "locationCode": "YE002-OF01-360-PIPHAB16",
+   "description": "HABBAN-16 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ae611283-c44f-42c9-bd64-c03824a12dc4",
+   "locationCode": "YE002-OF01-360-PIPHAB17",
+   "description": "HABBAN-17 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ae9d472d-07b3-4537-998e-7d3457be54a1",
+   "locationCode": "YE002-OF01-360-PIPHAB18",
+   "description": "HABBAN-18 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ec2368e5-2ff3-4a5e-ad70-4f4a6cd623d2",
+   "locationCode": "YE002-OF01-360-PIPHAB19",
+   "description": "HABBAN-19 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "23b98cac-c153-4df2-9e74-049823503a89",
+   "locationCode": "YE002-OF01-360-PIPHAB20",
+   "description": "HABBAN-20 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7feaa663-028b-45a7-a7cc-2e4fded50c45",
+   "locationCode": "YE002-OF01-360-PIPHAB21",
+   "description": "HABBAN-21 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2bdf4428-4f9c-488b-a8c6-1398b0097813",
+   "locationCode": "YE002-OF01-360-PIPHAB22",
+   "description": "HABBAN-22 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "32431db7-b7d9-450b-ad73-071d6b557ed9",
+   "locationCode": "YE002-OF01-360-PIPHAB23",
+   "description": "HABBAN-23 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "fe672ea8-32c2-426f-8636-995e0f6e6035",
+   "locationCode": "YE002-OF01-360-PIPHAB24",
+   "description": "HABBAN-24 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d2c3af90-f4cc-4f8a-b5d7-cacf9a7341b0",
+   "locationCode": "YE002-OF01-360-PIPHAB25",
+   "description": "HABBAN-25 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1142e4ec-73f6-4ea9-a9b1-45cc51c60b6c",
+   "locationCode": "YE002-OF01-360-PIPHAB26",
+   "description": "HABBAN-26 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "0cf02ed6-95a2-41f6-9583-e37447c11b69",
+   "locationCode": "YE002-OF01-360-PIPHAB27",
+   "description": "HABBAN-27 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1e1a7d6b-4fbe-403d-9de9-85ef67dc3940",
+   "locationCode": "YE002-OF01-360-PIPHAB28",
+   "description": "HABBAN-28 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d8a5506d-a689-4f63-b04a-efcfd6dd7736",
+   "locationCode": "YE002-OF01-360-PIPHAB29",
+   "description": "HABBAN-29 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "be0d71fd-8d65-43af-b2bc-a0a03d091583",
+   "locationCode": "YE002-OF01-360-PIPHAB30",
+   "description": "HABBAN-30 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "983a1e34-d1f9-416f-9794-0704ef16c35a",
+   "locationCode": "YE002-OF01-360-PIPHAB31",
+   "description": "HABBAN-31 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d4836a1f-d769-42d5-8d95-45076b6b1cb3",
+   "locationCode": "YE002-OF01-360-PIPHAB32",
+   "description": "HABBAN-32 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "09d0d024-b834-4f65-8112-524fff024eec",
+   "locationCode": "YE002-OF01-360-PIPHAB33",
+   "description": "HABBAN-33 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "50c4f796-0ab4-411e-b4ec-b97dbe121dd3",
+   "locationCode": "YE002-OF01-360-PIPHAB34",
+   "description": "HABBAN-34 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "998b4b3a-34b0-4e58-8240-9f1c70c3f690",
+   "locationCode": "YE002-OF01-360-PIPHAB35",
+   "description": "HABBAN-35 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3208f9d5-5ce6-448e-8c53-c237a20f87be",
+   "locationCode": "YE002-OF01-360-PIPHAB36",
+   "description": "HABBAN-36 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5db963ae-ccf9-4b86-b05d-8822033761aa",
+   "locationCode": "YE002-OF01-360-PIPHAB37",
+   "description": "HABBAN-37 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5aafe678-aa1d-465f-ac50-343e9c6f5347",
+   "locationCode": "YE002-OF01-360-PIPHAB38",
+   "description": "HABBAN-38 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8a1fdbe4-fb3c-4f95-bba9-784a3b8a46bf",
+   "locationCode": "YE002-OF01-360-PIPHAB39",
+   "description": "HABBAN-39 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "897c38f0-d537-4382-b0b0-bdeb1238b081",
+   "locationCode": "YE002-OF01-360-PIPHAB40",
+   "description": "HABBAN-40 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ab894ba2-69ae-44e4-9485-ef11d9f7c23b",
+   "locationCode": "YE002-OF01-360-PIPHAB41",
+   "description": "HABBAN-41 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "248165a5-4426-438b-b373-0c0bea1637d2",
+   "locationCode": "YE002-OF01-360-PIPHAB42",
+   "description": "HABBAN-42 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f2ac0303-0707-4f3a-b961-fd3e4c9c362d",
+   "locationCode": "YE002-OF01-360-PIPHAB43",
+   "description": "HABBAN-43 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "370cc834-70c1-42c8-a4ea-1f463bdc3168",
+   "locationCode": "YE002-OF01-360-PIPHAB44",
+   "description": "HABBAN-44 FLOWLINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "97fda7ad-a5fe-4b63-8fdb-349a5628085d",
+   "locationCode": "YE002-PF01",
+   "description": "EPF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "04a72869-f711-4a80-8e32-59f684aece31",
+   "locationCode": "YE002-PF01-200",
+   "description": "EPF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8aed28ab-e4a4-4cdf-abb7-1ddfd803330f",
+   "locationCode": "YE002-PF01-200-HF201",
+   "description": "H-201 INTERSTAGE HEATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7e29b23b-2125-4854-b121-d73e47e905fb",
+   "locationCode": "YE002-PF01-200-PIP",
+   "description": "A-001 INLET MANIFOLD",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6a0d06da-7e0e-4803-81d6-ac8cb7c8c872",
+   "locationCode": "YE002-PF01-200-V102A",
+   "description": "V-102A 1ST STAGE PRODUCTION SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "79be2854-c02c-46ab-8760-dd2765060f3f",
+   "locationCode": "YE002-PF01-200-V102B",
+   "description": "V-102B 1ST STAGE PRODUCTION SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5e7f67cf-4ee4-4235-9094-c40eadaf27a9",
+   "locationCode": "YE002-PF01-200-V301",
+   "description": "V-301 2ND STAGE SEPARATOR (SURGE TANK)",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f20c1068-36b5-4202-ad7d-0cf6856d7c0b",
+   "locationCode": "YE002-PF01-210",
+   "description": "EPF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5cd97743-f362-4b2b-9219-9c0ad8db9bba",
+   "locationCode": "YE002-PF01-210-V101",
+   "description": "V-101 TEST SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2d46ad19-5a6d-4b5c-87e5-e281efc6ea27",
+   "locationCode": "YE002-PF01-330",
+   "description": "EPF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "56b7f53a-b295-4fc6-b0d6-062d2a97f6e7",
+   "locationCode": "YE002-PF01-330-P106",
+   "description": "P-106 A/B/C PUMP PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "973be351-6a07-4482-bda9-d79840bbde15",
+   "locationCode": "YE002-PF01-330-PKTL",
+   "description": "EPF1 TRUCK LOADING AND METERING UNIT",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "cb1d1f7b-e2e5-485f-b002-2d0da84835d4",
+   "locationCode": "YE002-PF01-330-PKVENT",
+   "description": "EPF1 COLD VENT PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c48b9a9f-3580-40cd-bc90-72e8d6eecce8",
+   "locationCode": "YE002-PF01-330-TK104A",
+   "description": "T-104A OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4993e2bc-5ee9-45bf-8bc7-f4f72ca905a4",
+   "locationCode": "YE002-PF01-330-TK104B",
+   "description": "T-104B OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7f0faaef-d84c-40c1-acd1-a57631d70a8d",
+   "locationCode": "YE002-PF01-330-TK104C",
+   "description": "T-104C OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "142b1b27-de34-4143-9a05-676ee0bdb3bb",
+   "locationCode": "YE002-PF01-330-TK104D",
+   "description": "T-104D OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e1cf742c-0f6e-4d80-a884-b21a33b7415a",
+   "locationCode": "YE002-PF01-330-TK104E",
+   "description": "T-104E OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6a466a26-b0ab-40b6-824b-a81e96916ceb",
+   "locationCode": "YE002-PF01-330-TK104F",
+   "description": "T-104F OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "bb1f1f3d-7488-4222-8d6e-c7117b9b3324",
+   "locationCode": "YE002-PF01-420",
+   "description": "EPF1 CHEMICAL INJECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "bd831e6c-4ef1-437a-a884-1a2d3e4d3f46",
+   "locationCode": "YE002-PF01-420-PKANTI",
+   "description": "ANTI-FOAM PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d228b316-bf9f-414c-84cb-4ba809f4a1c4",
+   "locationCode": "YE002-PF01-420-PKCOR",
+   "description": "CORROSION INHIBITOR PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "511a2796-f17a-45f2-8846-3827a8e01632",
+   "locationCode": "YE002-PF01-420-PKDMUL",
+   "description": "DEMULSIFIER PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d3aaa5d4-caed-4b20-96e7-22ed3e9f79b2",
+   "locationCode": "YE002-PF01-420-PKMETHA",
+   "description": "METHANOL PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3da2c1e6-0aa6-4b32-8a1c-48199f2901ec",
+   "locationCode": "YE002-PF01-430",
+   "description": "EPF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "05801b2e-28ad-4068-ad4d-dbf293ffaba7",
+   "locationCode": "YE002-PF01-430-FL101",
+   "description": "F-101 FLARE STACK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a8d42c16-d8f7-4bde-b010-afe8b3c8d78f",
+   "locationCode": "YE002-PF01-430-V501",
+   "description": "V-501 HP FLARE GAS K.O. VESSEL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8dee2e55-dec3-4a95-8393-d964e1bc200a",
+   "locationCode": "YE002-PF01-440",
+   "description": "EPF1 PRODUCED WATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ad73afe5-ae6b-4479-9a6c-c974c1d308a1",
+   "locationCode": "YE002-PF01-440-P103",
+   "description": "P-103 A/B RECYCLE OIL SKIM PUMP SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "eb454500-13e7-424e-906e-e108b39c8d93",
+   "locationCode": "YE002-PF01-440-P104",
+   "description": "P-104 A/B OIL SKIM PUMP SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "595887bb-06e9-4060-b2f5-b08d6b2b114b",
+   "locationCode": "YE002-PF01-440-P105",
+   "description": "P-105 A/B PRODUCED WATER PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ee522f9e-3ba7-45cb-a1e2-3ca511c9a921",
+   "locationCode": "YE002-PF01-440-TK103",
+   "description": "T-103 PRODUCED WATER DEGASSER TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "36fd9201-8c39-4898-b137-5459f601845f",
+   "locationCode": "YE002-PF01-450",
+   "description": "EPF1 FUEL GAS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "09339f67-66c4-40ca-93e9-f3e7aa6afe9e",
+   "locationCode": "YE002-PF01-480",
+   "description": "EPF1 UTILITY MISCELLANEOUS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a48276e8-9645-483e-8b3e-955e1bb47fe4",
+   "locationCode": "YE002-PF01-630",
+   "description": "EPF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "38d30329-f891-4537-bbeb-05fef0291456",
+   "locationCode": "YE002-PF01-630-PKINST",
+   "description": "EPF1 INSTRUMENT AIR PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "18dd6887-784a-45e8-a981-249657b75fb0",
+   "locationCode": "YE002-PF01-700",
+   "description": "EPF1 FIRE AND GAS DETECTION SYSTEM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "090b6a2d-6ac8-40c9-9f09-f861f2bfc83e",
+   "locationCode": "YE002-PF01-720",
+   "description": "EPF1 FIRE FIGHTING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "38b793a3-aafb-44ae-a61c-4cef09a26476",
+   "locationCode": "YE002-PF01-790",
+   "description": "EPF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d4c8557d-faff-4178-a226-01e0ecba8f65",
+   "locationCode": "YE002-PF01-790-ESD001",
+   "description": "ESDV001 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "47cbd360-62a9-4b33-b960-861527422ae2",
+   "locationCode": "YE002-PF01-790-ESD002",
+   "description": "ESDV002 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "adda1334-c365-483e-812c-5ad9b7b6d744",
+   "locationCode": "YE002-PF01-790-ESD003",
+   "description": "ESDV003 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "00348aaf-a02c-4f50-80b6-84b4f5b6728e",
+   "locationCode": "YE002-PF01-790-ESD004",
+   "description": "ESDV004 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ec66c2bc-779e-4646-a4eb-fbdc8b1c6c2d",
+   "locationCode": "YE002-PF01-790-ESD005",
+   "description": "ESDV005 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c899b6c5-a0d0-4c08-bdb0-0294bdb25c69",
+   "locationCode": "YE002-PF01-800",
+   "description": "EPF1 MAIN POWER GENERATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6cd193e0-f51f-4e3a-82a6-e451b3cac0f1",
+   "locationCode": "YE002-PF01-800-GX030",
+   "description": "EPF1 MAIN POWER GENERATION PACKAGE #1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "299ef60e-7b4e-4498-9d86-d0784afc2d18",
+   "locationCode": "YE002-PF01-800-GX031",
+   "description": "EPF1 MAIN POWER GENERATION PACKAGE #2",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6b85a507-0718-42da-92db-c2f20434e5c4",
+   "locationCode": "YE002-PF01-820",
+   "description": "EPF1 MAIN LOW VOLTAGE POWER DISTRIBUTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "182ffe0e-f63c-4bbf-a0bf-f5f41e2d4012",
+   "locationCode": "YE002-PF01-880",
+   "description": "EPF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "160ff95c-c218-419a-893a-ad13227834fd",
+   "locationCode": "YE002-PF01-880-PKEARTH1",
+   "description": "PLANT EARTHLING AND LIGHTNING PROTECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c1f21fe3-656d-457a-981a-19b547d09aa3",
+   "locationCode": "YE002-PF02",
+   "description": "EPF2 -EARLY PROD. FACILITY 2 (ALNAILAM)",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "0f99bc7d-b7d4-4d60-9c48-aca1be2ccd85",
+   "locationCode": "YE002-PF02-200",
+   "description": "EPF-2",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a4b87356-18c0-47ff-9f2f-c3dba15ed008",
+   "locationCode": "YE002-PF02-200-HF201",
+   "description": "H-201 INTERSTAGE HEATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "163a7bc8-4caf-4ad7-9a6a-4393f12a2e80",
+   "locationCode": "YE002-PF02-200-PIP",
+   "description": "A-001 INLET MANIFOLD",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d1a253c0-be5f-4c6d-aacb-f58bee544fd7",
+   "locationCode": "YE002-PF02-200-V102A",
+   "description": "V-102A 1ST STAGE PRODUCTION SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "314a52cb-91f8-486d-9e36-11aab026010b",
+   "locationCode": "YE002-PF02-200-V102B",
+   "description": "V-102B 1ST STAGE PRODUCTION SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "39091aa6-b55e-48bb-b52c-496def9c1168",
+   "locationCode": "YE002-PF02-200-V201",
+   "description": "V-201 2ND STAGE SEPARATOR (SURGE TANK)",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "59c3a6e1-dadf-40fe-aff9-eeb62047600a",
+   "locationCode": "YE002-PF02-210",
+   "description": "EPF-2",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "38174f2e-558f-41ca-a726-06cdc9a66647",
+   "locationCode": "YE002-PF02-210-V101",
+   "description": "V-101 TEST SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f3c03a22-3a66-420e-a3ee-fe296d16a474",
+   "locationCode": "YE002-PF02-330",
+   "description": "EPF2 OIL STORAGE AND METERING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b9ef39d4-13ff-4f4c-9881-6ad48641e7dc",
+   "locationCode": "YE002-PF02-330-P103",
+   "description": "P-103 A/B/C PUMP PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "54283eb7-a36c-4ef6-aa6a-f5e4f2a0e61a",
+   "locationCode": "YE002-PF02-330-PKTL",
+   "description": "EPF2 TRUCK LOADING AND METERING UNIT",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9a4511ad-72b8-4964-8a50-afdc50cbdfd0",
+   "locationCode": "YE002-PF02-330-PKVENT",
+   "description": "EPF2 COLD VENT PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "86804693-9c97-4903-b186-9236698b1f02",
+   "locationCode": "YE002-PF02-330-TK103A",
+   "description": "T-103A STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4b611ac5-789e-4c78-9d24-da8039026c12",
+   "locationCode": "YE002-PF02-330-TK103B",
+   "description": "T-103B STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a04a6924-d0ba-4bc9-8f1d-76d11aa351e1",
+   "locationCode": "YE002-PF02-330-TK103C",
+   "description": "T-103C STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f488f5b0-9cfa-4813-9dc0-664644408f3d",
+   "locationCode": "YE002-PF02-330-TK103D",
+   "description": "T-103D STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8387a687-a5c1-489f-a911-699661fd33c3",
+   "locationCode": "YE002-PF02-330-TK103E",
+   "description": "T-103E STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f196be77-6257-4ed2-bfbb-f483d7674a01",
+   "locationCode": "YE002-PF02-330-TK103F",
+   "description": "T-103F STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "52af31f5-2b71-45f4-8ba3-1dadb3f1e7d6",
+   "locationCode": "YE002-PF02-420",
+   "description": "EPF2 CHEMICAL INJECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "94a88706-d1d0-48e3-ac45-3beb9fb9c9ef",
+   "locationCode": "YE002-PF02-420-PKANTI",
+   "description": "ANTI-FOAM PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4ecb8c53-4f90-4856-9447-8946f04c7e85",
+   "locationCode": "YE002-PF02-420-PKCOR",
+   "description": "CORROSION INHIBITOR PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9dabf0e2-5147-4a7c-a73f-6a075a966d9c",
+   "locationCode": "YE002-PF02-420-PKDMUL",
+   "description": "DEMULSIFIER PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "267ae355-3d0d-4879-9aa4-6d42b5e7e9e3",
+   "locationCode": "YE002-PF02-430",
+   "description": "EPF-2",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7dc0a0ef-92a7-48d5-8867-f64c7ebcc0e5",
+   "locationCode": "YE002-PF02-430-FL101",
+   "description": "F-101 FLARE STACK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "651291e4-df82-4e3e-a74e-9d977beb8068",
+   "locationCode": "YE002-PF02-430-V501",
+   "description": "V-501 HP FLARE GAS K.O. VESSEL",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2fc2ac1f-77f6-4f86-9998-2d86e690e3e2",
+   "locationCode": "YE002-PF02-440",
+   "description": "EPF-2",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "06957cdb-479d-40a7-af82-bba793cbf4f4",
+   "locationCode": "YE002-PF02-440-P104",
+   "description": "P-104 A/B WATER TRANSFER PUMP SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "54a8a2b2-8a31-46f7-bd68-1cff66355f06",
+   "locationCode": "YE002-PF02-440-P105",
+   "description": "P-105 A/B RECYCLE OILY WATER PUMP SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6d128500-b8ab-44e3-a7e9-cf6c97ee8930",
+   "locationCode": "YE002-PF02-440-P106",
+   "description": "P-106 A/B OIL SKIM PUMP SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ce2a1d41-190b-407c-a80b-f9827de465e1",
+   "locationCode": "YE002-PF02-440-TK104",
+   "description": "T-104 PRODUCED WATER DEGASSER TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "43458d29-08d5-4545-b2f6-f9e491b90a03",
+   "locationCode": "YE002-PF02-480",
+   "description": "EPF2 UTILITY MISCELLANEOUS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "58e11356-5fa5-4373-b476-be5d54c20a52",
+   "locationCode": "YE002-PF02-630",
+   "description": "EPF-2",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "137685d5-60bc-4e20-8243-e85b7507617f",
+   "locationCode": "YE002-PF02-630-PKINST",
+   "description": "EPF2 INSTRUMENT AIR PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8107db7e-1143-4d5a-8861-e6a97e139b65",
+   "locationCode": "YE002-PF02-700",
+   "description": "EPF2 FIRE AND GAS DETECTION SYSTEM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "615673cd-7719-4247-9fcb-ce45873df9fe",
+   "locationCode": "YE002-PF02-790",
+   "description": "EPF-2",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8c2c98ad-04d6-4339-8603-e5adaa87f8a7",
+   "locationCode": "YE002-PF02-790-ESD001",
+   "description": "ESDV001 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "74c76310-65d4-4fc7-b554-983b3dc0dfe7",
+   "locationCode": "YE002-PF02-790-ESD002",
+   "description": "ESDV002 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "954e493b-aa70-4e8c-8a67-975dbebba6f4",
+   "locationCode": "YE002-PF02-800",
+   "description": "EPF2 MAIN POWER GENERATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "baab6b36-c7fc-42ed-a45e-fb2fde3a8e14",
+   "locationCode": "YE002-PF02-800-GX",
+   "description": "EPF2 EMERGENCY POWER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "50108648-bc8b-41cc-b7c7-aaaef1a1bbaf",
+   "locationCode": "YE002-PF02-820",
+   "description": "EPF2 MAIN LOW VOLTAGE POWER DISTRIBUTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "26883748-0d4a-4713-b4fa-d96f17d6f46c",
+   "locationCode": "YE002-PF02-830",
+   "description": "EPF-2",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9d52864c-84df-4051-aa8c-e9e9bff785b5",
+   "locationCode": "YE002-PF02-830-GX",
+   "description": "EPF2 EMERGENCY POWER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "491b3339-6490-4c80-9dd5-1d7a7de27e2d",
+   "locationCode": "YE002-PF02-830-GX032",
+   "description": "EPF2 EMERGENCY POWER GENERATION PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a77fec2b-5522-401a-a2c0-5a387325df19",
+   "locationCode": "YE002-PF02-880",
+   "description": "EPF2 EARTHLING AND LIGHTNING PROTECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8bdad143-5c2f-4ff1-9c5d-bdebaf6ff91c",
+   "locationCode": "YE002-PF03",
+   "description": "EPF-3",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5883c646-149b-45be-8580-3da8d443d416",
+   "locationCode": "YE002-PF03-200",
+   "description": "EPF3 OIL SEPARATION AND STABILIZATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "328cf220-e49b-4db6-b6e5-58cb444e7ab9",
+   "locationCode": "YE002-PF03-200-EH01",
+   "description": "HE-01 HEAT EXCHANGER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8cef5c96-e4f7-4731-9df7-ee7f9d3703e3",
+   "locationCode": "YE002-PF03-200-HF101",
+   "description": "H-101 INDIRECT HEATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5da41b86-ab84-4ae9-9298-d6d4242db2ab",
+   "locationCode": "YE002-PF03-200-P04A",
+   "description": "P-04A STABILIZED OIL PROCESS PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "0e241269-5996-4170-87ec-4e2719ab22ad",
+   "locationCode": "YE002-PF03-200-P04B",
+   "description": "P-04B STABILIZED OIL PROCESS PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "bf89d361-2cf3-41e5-b61f-e019e1d7cf43",
+   "locationCode": "YE002-PF03-200-P08A",
+   "description": "P-08A OIL PROCESS PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e70f4900-00b8-4ed2-9839-f25e28e8d62a",
+   "locationCode": "YE002-PF03-200-P08B",
+   "description": "P-08B OIL PROCESS PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a2e4858a-86f8-41cb-be4e-3c8cd3162aec",
+   "locationCode": "YE002-PF03-200-PIP",
+   "description": "IM-01 INLET MANIFOLD",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f770528b-6a4e-448a-9281-22b6a799995c",
+   "locationCode": "YE002-PF03-200-TK401",
+   "description": "T-401 OIL PROCESS TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5fc300b8-bbe5-49f1-a44d-699180e4fa11",
+   "locationCode": "YE002-PF03-200-TK402",
+   "description": "T-402 OIL PROCESS TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "bd9fb002-cc31-46c9-9dda-cd7ef167db5d",
+   "locationCode": "YE002-PF03-200-TK403",
+   "description": "T-403 OIL PROCESS TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4fe62331-8664-4283-8fbc-6ad62632ee66",
+   "locationCode": "YE002-PF03-200-TK404",
+   "description": "T-404 OIL PROCESS TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7b47e26d-009d-4d77-9a6f-03d684227070",
+   "locationCode": "YE002-PF03-200-TSC01",
+   "description": "C-01 STABILIZER / COLUMN SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "fe45cb08-6568-43cb-93bd-a5d6bd0203c9",
+   "locationCode": "YE002-PF03-200-V02",
+   "description": "V-02 PRODUCTION SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "075e1529-47f0-465a-a0c9-c425a9eeb724",
+   "locationCode": "YE002-PF03-210",
+   "description": "EPF-3",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "cf3f73ac-40ec-49f1-a2df-71706a937cec",
+   "locationCode": "YE002-PF03-210-V01",
+   "description": "V-01 TEST SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5b70fb19-5730-4663-af8f-ea2cde14c2ed",
+   "locationCode": "YE002-PF03-330",
+   "description": "EPF-3",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ade76325-fe39-4058-8578-6b1360a3729d",
+   "locationCode": "YE002-PF03-330-P14",
+   "description": "P-14 EXPORT OIL DRAINAGE PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1474b9af-8ac4-4377-86a0-0c5d8d17520b",
+   "locationCode": "YE002-PF03-330-PKTL01A",
+   "description": "TL-01 TRUCK LOADING AND METERING UNIT A",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "cd3e14ac-0fc5-4c26-877e-a0d36ff11e26",
+   "locationCode": "YE002-PF03-330-PKTL01B",
+   "description": "TL-01 TRUCK LOADING AND METERING UNIT B",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3aa23a69-13d1-4d06-baaa-d0b661135e6c",
+   "locationCode": "YE002-PF03-330-PKTL02A",
+   "description": "TL-02 TRUCK LOADING AND METERING UNIT A",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "eb95ad98-822d-4137-9986-e970413b423d",
+   "locationCode": "YE002-PF03-330-PKTL02B",
+   "description": "TL-02 TRUCK LOADING AND METERING UNIT B",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c96186b3-afbc-4181-a7b4-251cea602c93",
+   "locationCode": "YE002-PF03-330-TK501",
+   "description": "T-501 OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "83e6b8a1-416f-4f19-9d2c-cb6d6892efd9",
+   "locationCode": "YE002-PF03-330-TK502",
+   "description": "T-502 OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "fea5bd82-d4c8-4580-a779-0b3c5c0e40ee",
+   "locationCode": "YE002-PF03-330-TK503",
+   "description": "T-503 OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4dbd41a8-1076-4ede-b658-9d8838da498d",
+   "locationCode": "YE002-PF03-330-TK504",
+   "description": "T-504 OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "091334f8-7d5b-4fe7-b02d-e8b188617471",
+   "locationCode": "YE002-PF03-420",
+   "description": "EPF3 CHEMICAL INJECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5a1cd68b-58d2-4fad-b35b-6b80ce663b27",
+   "locationCode": "YE002-PF03-430",
+   "description": "EPF-3",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "88fbe716-51f1-48aa-910b-4b3c1d89aaca",
+   "locationCode": "YE002-PF03-430-FL01",
+   "description": "F-01 HP FLARE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4af6f76b-3ec7-4d1b-9a64-ab684549e51b",
+   "locationCode": "YE002-PF03-430-P13AB",
+   "description": "P-13A/B FLARE DRUM LIQUID PUMPS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a2e9cd1b-57c7-4f14-9dbb-6bfe22edc13e",
+   "locationCode": "YE002-PF03-430-VFS01",
+   "description": "FS-01 HP FLARE DRUM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "928a656f-12b4-406b-a422-8768d2c579f5",
+   "locationCode": "YE002-PF03-440",
+   "description": "EPF3 PRODUCED WATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "eba6ad04-57f5-472e-b074-72e6ee680725",
+   "locationCode": "YE002-PF03-440-P10",
+   "description": "P-10 WASTE WATER PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a82225e2-afc4-436d-a87d-474c79359aa3",
+   "locationCode": "YE002-PF03-440-P12",
+   "description": "P-12 SKIM OIL PUMP SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5d0a795c-b9a1-461f-8307-6b7f4af2db47",
+   "locationCode": "YE002-PF03-440-TK800",
+   "description": "T-800 SKIM OIL TANK SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "06b04013-1bbf-4a87-a08d-8c8362f8d38a",
+   "locationCode": "YE002-PF03-450",
+   "description": "EPF-3",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "03eb7f36-311f-406f-a8d5-8f211a03a1b9",
+   "locationCode": "YE002-PF03-450-PKFGS",
+   "description": "FGS FUEL GAS PACKAGE A",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "79fa1170-35b7-400c-b621-47cb6c8142f8",
+   "locationCode": "YE002-PF03-480",
+   "description": "EPF3 UTILITY MISCELLANEOUS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ee3fbfb3-75ac-4283-8b71-58bfdbe89673",
+   "locationCode": "YE002-PF03-630",
+   "description": "EPF-3",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "78e9a1d9-c5c3-43f2-b14b-04cb4dd09cb6",
+   "locationCode": "YE002-PF03-630-PKINST",
+   "description": "INSTRUMENT AIR PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "af0f95f4-0a32-4746-a50f-79be56f9fda5",
+   "locationCode": "YE002-PF03-700",
+   "description": "EPF3 FIRE AND GAS DETECTION SYSTEM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "90fe38d3-e2c2-44fa-916e-8e2aab4cf620",
+   "locationCode": "YE002-PF03-720",
+   "description": "EPF-3",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6c77411e-f099-4a8d-8eda-a7b1e65cb96e",
+   "locationCode": "YE002-PF03-720-SX1105",
+   "description": "FIREFIGHTING SYSTEM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b965847b-c308-4439-b33c-b81ff93e1784",
+   "locationCode": "YE002-PF03-720-SXIFEX",
+   "description": "FIREFIGHTING FOAM SYSTEM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3fab9f9f-f72e-4d51-bf64-35e16a184b08",
+   "locationCode": "YE002-PF03-790",
+   "description": "EPF3 EMERGENCY SHUTDOWN AND BLOWDOWN SYS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b8bb80dc-5e86-42c9-8d17-b14d09239076",
+   "locationCode": "YE002-PF03-790-ESD001",
+   "description": "ESDV001 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8e8c0b83-b96e-40d6-89c7-fa05a1085e88",
+   "locationCode": "YE002-PF03-790-ESD002",
+   "description": "ESDV002 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "324e84fc-bd92-46c2-887a-62025025c77c",
+   "locationCode": "YE002-PF03-800",
+   "description": "EPF3 MAIN POWER GENERATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "5a69d0bb-ab42-4e8c-b8f9-e0b1b0f9740f",
+   "locationCode": "YE002-PF03-800-GXEPF3B",
+   "description": "EPF3 MAIN POWER GEN DIESEL PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "cce4a071-c06a-4b58-93b2-2b2640771ad3",
+   "locationCode": "YE002-PF03-820",
+   "description": "EPF3 MAIN LOW VOLTAGE POWER DISTRIBUTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1ec0ccb1-3ec8-408e-85e3-162aa5863f17",
+   "locationCode": "YE002-PF03-820-MCCBLD1",
+   "description": "MOTOR CONTROL CENTER BUILDING 1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "fb93a38c-b78c-4109-999c-82387a7d912b",
+   "locationCode": "YE002-PF03-830",
+   "description": "YE002-PF03-830",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "dba5995d-bacc-46b0-ace8-88c3ebb09c6f",
+   "locationCode": "YE002-PF03-830-GX",
+   "description": "EMERGENCY POWER GENERATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9dcc3db6-0193-45bf-9f4b-2d7bfd3386ad",
+   "locationCode": "YE002-PF03-830-GXEPF3",
+   "description": "EMERGENCY POWER GENERATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "68e5a85b-32ca-4197-bbe4-8cf5f478b46e",
+   "locationCode": "YE002-PF03-870",
+   "description": "EPF3 CONTROL SYSTEM STATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e27529a4-6fe3-4f2e-bf28-c83167baa6f6",
+   "locationCode": "YE002-PF03-870-ZPCSBLD",
+   "description": "STATION PCS CONTROL BUILDING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "027f3b8c-2d7c-4ca8-965c-70bc6064e9bc",
+   "locationCode": "YE002-PF03-880",
+   "description": "EPF-3",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3878e773-e3a2-4174-a984-7c985d5c5ca1",
+   "locationCode": "YE002-PF03-880-PKEARTH",
+   "description": "PLANT EARTHLING AND LIGHTNING PROTECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2fc0265c-b5ee-418c-9d1c-f04ea21fe56b",
+   "locationCode": "YE002-PF04",
+   "description": "EPF-4",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b52b719a-2847-43f5-89fb-cb981b972464",
+   "locationCode": "YE002-PF04-200",
+   "description": "EPF4 OIL SEPARATION AND STABILIZATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e6116503-5111-4779-891b-f453f9cad9b3",
+   "locationCode": "YE002-PF04-200-EH01",
+   "description": "EH-01 HEAT EXCHANGER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2196b910-8011-4c98-80f6-badf5cda9707",
+   "locationCode": "YE002-PF04-200-HF101",
+   "description": "H-101 INDIRECT HEATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c0221dc8-46b3-4221-bc2d-bec1c1999b54",
+   "locationCode": "YE002-PF04-200-P04A",
+   "description": "P-04A STABILIZED OIL PROCESS PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d4f204c0-7bb8-4c2a-ae8b-e9c08e3620e2",
+   "locationCode": "YE002-PF04-200-P04B",
+   "description": "P-04B STABILIZED OIL PROCESS PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d30b64c4-3dfc-4c3c-8f21-dba07df4b7c4",
+   "locationCode": "YE002-PF04-200-P08A",
+   "description": "P-08A PROCESS OIL PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "28be6f26-e75c-4a61-8ac8-8f661f00731c",
+   "locationCode": "YE002-PF04-200-P08B",
+   "description": "P-08B PROCESS OIL PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "21e290aa-7b1d-4f53-b005-7995cade293a",
+   "locationCode": "YE002-PF04-200-PIP",
+   "description": "IM-01 INLET MANIFOLD",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c0f867df-6b75-49a8-80ce-63c48795503b",
+   "locationCode": "YE002-PF04-200-TK401",
+   "description": "T-401 OIL PROCESS TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e9d9bdb2-34fa-45c3-aadb-a15290eae56b",
+   "locationCode": "YE002-PF04-200-TK402",
+   "description": "T-402 OIL PROCESS TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3a53b4fc-a361-46e1-9d23-ae8598490469",
+   "locationCode": "YE002-PF04-200-TK403",
+   "description": "T-403 OIL PROCESS TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7169016a-d506-4524-85e0-839c7f6bf1c8",
+   "locationCode": "YE002-PF04-200-TK404",
+   "description": "T-404 OIL PROCESS TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "fa5de7c2-3c1e-46ef-9830-76b19f5feaf0",
+   "locationCode": "YE002-PF04-200-TSC01",
+   "description": "C-01 STABILIZER / COLUMN SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ec55b852-c8ba-4f5d-811e-edba7dffac7a",
+   "locationCode": "YE002-PF04-200-V02",
+   "description": "V-02 PRODUCTION SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e41eafe4-aa6c-484f-9cba-dbdd2058b027",
+   "locationCode": "YE002-PF04-210",
+   "description": "TEST SEPARATION AND METERING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "acb464a9-c2a2-4144-8274-c71634cf72b1",
+   "locationCode": "YE002-PF04-210-V01",
+   "description": "V-01 TEST SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "74363202-5667-4a59-880f-64c198ecafe2",
+   "locationCode": "YE002-PF04-300",
+   "description": "EPF4 OIL EXPORT LINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "30194ee5-5712-47cc-9f96-920464f8bcc9",
+   "locationCode": "YE002-PF04-330",
+   "description": "EPF-4",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "71ff8cab-1266-4034-ba70-189e7295573f",
+   "locationCode": "YE002-PF04-330-P14",
+   "description": "P-14 EXPORT OIL DRAINAGE PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "444a3e1c-0dcd-46ad-a6bb-562314581f26",
+   "locationCode": "YE002-PF04-330-PKTL01A",
+   "description": "TL-01 TRUCK LOADING AND METERING UNIT A",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a2a3559f-585f-4996-b790-45ead89285f8",
+   "locationCode": "YE002-PF04-330-PKTL01B",
+   "description": "TL-01 TRUCK LOADING AND METERING UNIT B",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "904b029e-7a1b-4c5e-8c7a-9e5e7186eafe",
+   "locationCode": "YE002-PF04-330-PKTL02A",
+   "description": "TL-02 TRUCK LOADING AND METERING UNIT A",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c4f6e3eb-38f0-497b-97ba-a51834a3e36f",
+   "locationCode": "YE002-PF04-330-PKTL02B",
+   "description": "TL-02 TRUCK LOADING AND METERING UNIT B",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4a86f386-1cbd-441d-843f-cfd1f24daa6e",
+   "locationCode": "YE002-PF04-330-TK501",
+   "description": "T-501 OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "436af16c-4f29-41e8-a57e-8463153adc69",
+   "locationCode": "YE002-PF04-330-TK502",
+   "description": "T-502 OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "59bf89d5-e219-455d-ab47-946405dc605e",
+   "locationCode": "YE002-PF04-330-TK503",
+   "description": "T-503 OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8c12cfa9-0dd1-4933-806b-256d9454bf01",
+   "locationCode": "YE002-PF04-330-TK504",
+   "description": "T-504 OIL STORAGE TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b1d23032-2f5a-41cc-9032-5540d9f38e0a",
+   "locationCode": "YE002-PF04-420",
+   "description": "EPF4 CHEMICAL INJECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "aa2466a1-2ea6-458f-a6d3-a5eea1fdd5db",
+   "locationCode": "YE002-PF04-430",
+   "description": "EPF4 FLARE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b9933f80-bf12-43bd-8f18-a3ea179bff55",
+   "locationCode": "YE002-PF04-430-FL01",
+   "description": "F-01 HP Flare",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "208a10b1-5bc0-4584-b877-71d7dc7f31d9",
+   "locationCode": "YE002-PF04-430-P13AB",
+   "description": "P-13A/B FLARE DRUM LIQUID PUMPS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c9f7721c-792b-4aeb-a4e0-ab3720f2f1ae",
+   "locationCode": "YE002-PF04-430-VFS01",
+   "description": "FS-01 HP FLARE DRUM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d1ef6e42-245f-4d2f-be33-f7249c26d11f",
+   "locationCode": "YE002-PF04-440",
+   "description": "EPF4 PRODUCED WATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "dba4395d-2da1-4e0c-b9ef-4861ae5d59bb",
+   "locationCode": "YE002-PF04-440-P10",
+   "description": "P-10 WASTE WATER PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "dcf42224-c025-403f-b506-304a5f80dff7",
+   "locationCode": "YE002-PF04-440-P12",
+   "description": "P-12 SKIM OIL PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "db391b45-2b53-4141-8b5d-76135178e13e",
+   "locationCode": "YE002-PF04-440-TK800",
+   "description": "T-800 SKIM OIL TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "fa92a1e1-f472-4822-ba27-6d2d975983de",
+   "locationCode": "YE002-PF04-450",
+   "description": "EPF-4",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9a6de2ad-9984-4840-a62f-01153143804e",
+   "locationCode": "YE002-PF04-450-PKFGS",
+   "description": "FGS FUEL GAS PACKAGE A",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4dac2b8a-22ca-4bc5-a603-7b838ebb7abb",
+   "locationCode": "YE002-PF04-480",
+   "description": "EPF4 UTILITY MISCELLANEOUS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9fde28a6-a41a-4031-97b2-0b9a184b790e",
+   "locationCode": "YE002-PF04-630",
+   "description": "EPF4 INSTRUMENT AIR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4e055aec-9c6f-46f6-88d5-4c2d24fccdeb",
+   "locationCode": "YE002-PF04-630-PKINST",
+   "description": "INSTRUMENT AIR PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1bfbb660-b89f-43c4-bf5e-01a984de4a28",
+   "locationCode": "YE002-PF04-700",
+   "description": "EPF4 FIRE AND GAS DETECTION SYSTEM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b3663446-3b81-4676-a5af-fad72c2b2fc8",
+   "locationCode": "YE002-PF04-720",
+   "description": "EPF-4",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "87dd4d46-e06e-4242-869a-fd420d84dccb",
+   "locationCode": "YE002-PF04-720-SX1105",
+   "description": "FIREFIGHTING SYSTEM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6c73435e-1487-47da-82d4-905a2f835d12",
+   "locationCode": "YE002-PF04-720-SXIFEX",
+   "description": "FIREFIGHTING FOAM SYSTEM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "cde9ae1c-6276-41be-9c01-31a384212b8e",
+   "locationCode": "YE002-PF04-790",
+   "description": "EPF-4",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "0d17100a-db6b-4bcd-838c-e06336e97632",
+   "locationCode": "YE002-PF04-790-ESD001",
+   "description": "ESDV001 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "74043199-e60d-4962-9919-8cc4e21d6962",
+   "locationCode": "YE002-PF04-790-ESD002",
+   "description": "ESDV002 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a63a3600-44d6-416b-994e-b1327c91f57f",
+   "locationCode": "YE002-PF04-800",
+   "description": "EPF4 MAIN POWER GENERATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "0342834e-8de1-4c26-aabd-e730afa78665",
+   "locationCode": "YE002-PF04-800-GXEPF4A",
+   "description": "EPF4 MAIN POWER GENERATION GAS PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "48bea429-4b8a-4dca-a45e-44fe41213497",
+   "locationCode": "YE002-PF04-820",
+   "description": "EPF4 MAIN LOW VOLTAGE POWER DISTRIBUTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "71d384c9-0264-44ce-a029-d0291200b02f",
+   "locationCode": "YE002-PF04-820-MCCBLD1",
+   "description": "MOTOR CONTROL CENTER BUILDING 1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "cb7cb6ac-b786-4eeb-945d-44cfc515ce8a",
+   "locationCode": "YE002-PF04-870",
+   "description": "EPF4 STATION CONTROL SYSTEM",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8fe203ab-0836-451b-b490-a4d9da691b82",
+   "locationCode": "YE002-PF04-870-ZPCSBLD",
+   "description": "STATION PCS CONTROL BUILDING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "fcfd8ab2-abcd-40bd-9066-cef8d8c6850c",
+   "locationCode": "YE002-PF04-880",
+   "description": "EPF-4",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b72de7ec-04c9-4925-bdce-04c9a46ecf43",
+   "locationCode": "YE002-PF04-880-PKEARTH",
+   "description": "PLANT EARTHLING AND LIGHTNING PROTECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "042685b4-7f45-433c-a01b-77fea905f874",
+   "locationCode": "YE002-PF05",
+   "description": "WTF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "53e9e9bc-f121-40de-a974-6bb05f502d66",
+   "locationCode": "YE002-PF05-200",
+   "description": "WTF1 OIL SEPARATION AND STABILIZATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "30b5502c-1693-46a1-a2e7-1390915f5b1e",
+   "locationCode": "YE002-PF05-200-PIP",
+   "description": "23-AX-01 INLET CHOKE MANIFOLD",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "59cfe584-c521-48b2-a66d-eca5fde874ba",
+   "locationCode": "YE002-PF05-200-V02",
+   "description": "V-02 2ND STAGE SEPARATOR (SURGE TANK)",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "fb945c5c-93bf-4a00-89a4-fa7ab0cc27ff",
+   "locationCode": "YE002-PF05-330",
+   "description": "WTF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "114d3799-72c6-46ca-83ee-358f62e8e00c",
+   "locationCode": "YE002-PF05-330-P01",
+   "description": "P-01 CRUDE OIL LOADING PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f3f7cc1e-e883-4569-b38b-61482dcc39ee",
+   "locationCode": "YE002-PF05-330-P02",
+   "description": "P-02 CRUDE OIL LOADING PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8ac78ff5-82c8-4f41-945e-f0dceb579a31",
+   "locationCode": "YE002-PF05-330-P03",
+   "description": "P-03 CRUDE OIL LOADING PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "a98e3d33-bb56-4408-a6ae-a51d14ec00a2",
+   "locationCode": "YE002-PF05-330-PKTL",
+   "description": "WTF1 TRUCK LOADING AND METERING UNIT",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "737f3fb9-712a-4332-a4cd-4875b4b3f3ef",
+   "locationCode": "YE002-PF05-330-PKVENT",
+   "description": "COLD VENT PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "0fe5d1bb-0fb0-4fff-8f41-01fa90fdd91d",
+   "locationCode": "YE002-PF05-330-TK01",
+   "description": "WTF-1 OIL STORAGE TANK 1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "81db114b-6450-442d-8415-647117959b66",
+   "locationCode": "YE002-PF05-330-TK02",
+   "description": "WTF-1 OIL STORAGE TANK 2",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9a5f03ce-42d0-4cb2-b857-5ee87a1b49c5",
+   "locationCode": "YE002-PF05-420",
+   "description": "WTF1 CHEMICAL INJECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "0478dd15-984c-48f5-acfe-4d7e79e7e2b2",
+   "locationCode": "YE002-PF05-430",
+   "description": "WTF1 FLARE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "48b886d2-577d-479c-b504-207ae41d5f23",
+   "locationCode": "YE002-PF05-440",
+   "description": "WTF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "66d03537-a4b8-4f90-ade9-cbb8c8e0473d",
+   "locationCode": "YE002-PF05-440-TK03",
+   "description": "WTF-1 PROCESS WATER TANK",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "bab71f02-56aa-4993-84ca-f655f2133fc2",
+   "locationCode": "YE002-PF05-450",
+   "description": "WTF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b7af7c64-2b24-4e73-8471-8250891daf2d",
+   "locationCode": "YE002-PF05-450-PKFGS",
+   "description": "FGS FUEL GAS PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3e5771a6-c51d-421c-9ab5-85aa722b2137",
+   "locationCode": "YE002-PF05-630",
+   "description": "WTF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "05de2d8d-e382-444b-a130-68f49763fbfa",
+   "locationCode": "YE002-PF05-630-PKINST",
+   "description": "INSTRUMENT AIR PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "fd84a0a8-0d0f-4042-aa39-2e97209f574a",
+   "locationCode": "YE002-PF05-720",
+   "description": "WTF1 FIRE FIGHTING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "132dd723-a717-4b51-8645-40b55afbfbce",
+   "locationCode": "YE002-PF05-790",
+   "description": "WTF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "84cd6583-86b7-440d-a8ac-f054542816b6",
+   "locationCode": "YE002-PF05-790-ESD001",
+   "description": "ESDV001 EMERGENCY SHUTDOWN VALVE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "6f2aacdb-cbcc-427f-9ad6-f32fd065317b",
+   "locationCode": "YE002-PF05-800",
+   "description": "WTF-1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "eea5a1f2-5280-4578-8556-a4ac95a7339b",
+   "locationCode": "YE002-PF05-800-GXDE01",
+   "description": "WTF1 MAIN POWER GENERATION PACKAGE #1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ea2ab918-ed2b-4480-86b9-f596f109f43c",
+   "locationCode": "YE002-PF05-820",
+   "description": "MAIN LOW VOLTAGE POWER DISTRIBUTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f5499395-10ff-4c29-b0dc-c577e5479995",
+   "locationCode": "YE002-PF05-880",
+   "description": "WTF1 EARTHLING AND LIGHTNING PROTECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "0defa810-6b69-449a-a1e3-5d528aa6d844",
+   "locationCode": "YE002-PF06",
+   "description": "WTF-2",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b2500a58-00d9-4bd3-aeba-474be9be3cb0",
+   "locationCode": "YE002-PF06-200",
+   "description": "WTF2 OIL SEPARATION AND STABILIZATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2a0b7f0a-bd99-4e2c-9772-6615d8f78a7e",
+   "locationCode": "YE002-PF06-330",
+   "description": "WTF2 OIL STORAGE AND METERING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "46b9e11b-4d5e-454b-a288-422afec17e4d",
+   "locationCode": "YE002-PF06-430",
+   "description": "WTF2 FLARE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1eb1fcd8-3b00-4d49-aedc-ae5954ed27e0",
+   "locationCode": "YE002-PF06-720",
+   "description": "WTF2 FIRE FIGHTING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ac2a8d12-91d1-473e-bd24-279fc73e6198",
+   "locationCode": "YE002-PF06-880",
+   "description": "WTF2 EARTHLING AND LIGHTNING PROTECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "104f1f9d-5232-4a27-b3c9-aeb5ea5adf05",
+   "locationCode": "YE002-PF07",
+   "description": "WTF-3",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4adca7a5-df52-4312-9d18-9b85f922671c",
+   "locationCode": "YE002-PF07-200",
+   "description": "WTF3 OIL SEPARATION AND STABILIZATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2ff012e7-f13f-4964-8d7c-1c34ad6cb288",
+   "locationCode": "YE002-PF07-330",
+   "description": "WTF3 OIL STORAGE AND METERING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e258d4e7-6c26-4b96-b295-d5dbe7d25641",
+   "locationCode": "YE002-PF07-880",
+   "description": "WTF3 EARTHLING AND LIGHTNING PROTECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "382532ea-fe84-46e9-9085-24eef74fb49c",
+   "locationCode": "YE002-PF08",
+   "description": "WTF-4",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "04f842cd-4ae3-4d9a-8364-e4bbfe9c35fe",
+   "locationCode": "YE002-PF08-200",
+   "description": "WTF4 OIL SEPARATION AND STABILIZATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "bb19f020-4768-48eb-a0a6-6314e98e7598",
+   "locationCode": "YE002-PF08-330",
+   "description": "WTF4 OIL STORAGE AND METERING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2ea4f8f2-8397-4f3d-b004-64322f4b143c",
+   "locationCode": "YE002-PF08-440",
+   "description": "WTF4 PRODUCED WATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "79e72f1e-1420-4885-a139-f6354af8383b",
+   "locationCode": "YE002-PF08-480",
+   "description": "WTF4 UTILITY MISCELLANEOUS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4fdaf84d-1c9d-4408-9acd-44b976423108",
+   "locationCode": "YE002-PF08-800",
+   "description": "MAINT. WORKSHOP YARD (GENEARTOR AREA)",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "df2d7a70-03d3-497a-b4f7-d8e9eb9c83dd",
+   "locationCode": "YE002-PF08-880",
+   "description": "WTF4 EARTHLING AND LIGHTNING PROTECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "228f4714-0483-4a37-b2d7-1e9162ac280e",
+   "locationCode": "YE002-PF09",
+   "description": "WTF-5",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e147cf49-02fd-4116-ace8-a4a0f7793beb",
+   "locationCode": "YE002-PF09-200",
+   "description": "WTF5 OIL SEPARATION AND STABILIZATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c8aeb4fc-6df9-44b5-a2ff-395fc6aa2112",
+   "locationCode": "YE002-PF09-330",
+   "description": "WTF5 OIL STORAGE AND METERING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2d157e73-4a18-4fab-825f-f8930136b01c",
+   "locationCode": "YE002-PF09-480",
+   "description": "WTF5 UTILITY MISCELLANEOUS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "941a19c3-e548-4e46-a102-ab4c7e95c96f",
+   "locationCode": "YE002-PF09-800",
+   "description": "WTF5 MAIN POWER GENERATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "b73ddd47-7e04-4d2a-bcce-9b62a534eae2",
+   "locationCode": "YE002-PF09-820",
+   "description": "WTF5 MAIN LOW VOLTAGE POWER DISTRIBUTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8c96fc4b-b768-4816-b256-5ffcef67ee58",
+   "locationCode": "YE002-PF09-880",
+   "description": "WTF5 EARTHLING AND LIGHTNING PROTECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4fcc33ee-9bb1-42cf-8a90-6c07e5b4aad6",
+   "locationCode": "YE002-PF10",
+   "description": "CPF UTILITY MISCELLANEOUS",
+   "plannedCost": 1150,
+   "actualCost": 0,
+   "variance": -1150,
+   "workOrderCount": 17
+  },
+  {
+   "functionalLocationId": "c0aee035-a23d-4dec-83bc-681900bfb41f",
+   "locationCode": "YE002-PF10-200",
+   "description": "CPF OIL SEPARATION AND STABILIZATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1ab1947d-cfbd-4a99-81c0-9aa61c6d937e",
+   "locationCode": "YE002-PF10-200-E3401B",
+   "description": "2-E-3401 EMULSION PREHEATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4868418e-0a52-4d6b-a115-44033cc81dec",
+   "locationCode": "YE002-PF10-200-E3401C",
+   "description": "3-E-3401 EMULSION PREHEATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "c71f6bbd-159c-4a5e-bb66-f054630f8f15",
+   "locationCode": "YE002-PF10-200-HF3401A",
+   "description": "1-E-3401 EMULSION HEATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "657984b5-c097-4488-8d86-19b778d20395",
+   "locationCode": "YE002-PF10-200-HF3401B",
+   "description": "2-E-3401 EMULSION HEATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "379a6dae-63bb-4d5f-a225-9f8eed56876e",
+   "locationCode": "YE002-PF10-200-HF3401C",
+   "description": "3-E-3401 EMULSION HEATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "45a30bf4-404f-4834-a542-3f620995b1db",
+   "locationCode": "YE002-PF10-200-P3401",
+   "description": "0-P-3401 A/B SLOP OIL PUMP SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "26927daf-1b7c-4333-8131-d1c78586a12c",
+   "locationCode": "YE002-PF10-200-P3402A",
+   "description": "1-P-3402 A/B DESALTER FEED PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "21cdca0c-9e95-4785-b098-20e63c5e0c86",
+   "locationCode": "YE002-PF10-200-P3402B",
+   "description": "2-P-3402 A/B DESALTER FEED PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "240bd5f3-3014-42bd-bc32-2fe5d6b97bcd",
+   "locationCode": "YE002-PF10-200-P3402C",
+   "description": "3-P-3402 A/B DESALTER FEED PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4fdce953-44b4-47f7-a829-4f6c30948ac0",
+   "locationCode": "YE002-PF10-200-V3402B",
+   "description": "2-V-3402 1ST STAGE DESALTER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "03417e38-396a-44ba-a3c6-c96090efa6e1",
+   "locationCode": "YE002-PF10-200-V3402C",
+   "description": "3-V-3402 1ST STAGE DESALTER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "daf707a6-02eb-4e63-8a95-607a936f8594",
+   "locationCode": "YE002-PF10-200-V3403A",
+   "description": "1-V-3403 2ND STAGE DESALTER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9e87034b-74bc-4fe0-9251-f5fc054fee01",
+   "locationCode": "YE002-PF10-200-V3403B",
+   "description": "2-V-3403 2ND STAGE DESALTER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d3483ee2-fe76-4421-929c-d3e8e33eaafd",
+   "locationCode": "YE002-PF10-200-V3403C",
+   "description": "3-V-3403 2ND STAGE DESALTER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3ff9ea90-40ce-4074-8094-d6d3d6bf79e6",
+   "locationCode": "YE002-PF10-210",
+   "description": "CPF TEST SEPARATION AND METERING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "dec7cb76-6647-4749-bb70-88e180e97658",
+   "locationCode": "YE002-PF10-210-PIP",
+   "description": "TEST MANIFOLD",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1b8124a1-66e3-4f28-a22f-c93c3ffc6859",
+   "locationCode": "YE002-PF10-230",
+   "description": "CPF",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "672ea9da-13f5-4534-b041-9c47ab21502a",
+   "locationCode": "YE002-PF10-230-PK3301",
+   "description": "0-A-3301 PROCESS VRU COMPRESSOR PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9c4455ea-4d09-4db8-b692-72002386d089",
+   "locationCode": "YE002-PF10-230-TK3701",
+   "description": "0-A-3701 TANK VRU COMPRESSOR PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e76aef31-37fa-4f29-b76b-773c4868dcfa",
+   "locationCode": "YE002-PF10-300",
+   "description": "CPF OIL EXPORT LINE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ca8ad439-6a69-4e05-b85f-1c6095fd1ff7",
+   "locationCode": "YE002-PF10-330",
+   "description": "CPF OIL STORAGE AND METERING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "44883b3c-d226-406d-83a2-7130e0f94e0e",
+   "locationCode": "YE002-PF10-330-P3601",
+   "description": "0-P-3601 A/B SALES OIL BOOSTER PUMPS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "64383e82-518f-4401-b463-b5de54c872f4",
+   "locationCode": "YE002-PF10-330-TK3602",
+   "description": "0-T-3602 OIL STORAGE TANK SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "40a59d88-5238-435d-b8f5-3b93b3c6ee7c",
+   "locationCode": "YE002-PF10-330-TK3603",
+   "description": "0-T-3603 OIL STORAGE TANK SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "67840821-e656-48e3-8e76-5a577a362d02",
+   "locationCode": "YE002-PF10-430",
+   "description": "CPF",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "404f2eb4-9194-44e6-a94e-df2c9011c49e",
+   "locationCode": "YE002-PF10-430-P4601",
+   "description": "0-P-4601 A/B FLARE K.O DRUM PUMPS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "d01e031e-bf44-4ab4-ba9e-bcb9cde91481",
+   "locationCode": "YE002-PF10-440",
+   "description": "CPF",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "92343aa2-b945-42f3-af56-ba39dc9cd732",
+   "locationCode": "YE002-PF10-440-P4901",
+   "description": "0-P-4901 A/B SKIM TANK WATER PUMP SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7ef7cb54-b8f6-4ed9-a2ee-04d78ee7dc92",
+   "locationCode": "YE002-PF10-440-P4902",
+   "description": "0-P-4902 A/B SKIM OIL PUMPS SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "15c1c1d0-cd26-4d13-a2fe-8df686abe286",
+   "locationCode": "YE002-PF10-440-P4904",
+   "description": "0-P-4904 A/B ISF PRODUCED WATER PUMP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "896d50db-0022-4482-abde-be86bf6f4b9b",
+   "locationCode": "YE002-PF10-440-P4905",
+   "description": "0-P-4905 A/B ISF SKIM OIL PUMPS SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "700dccf7-5e84-4163-aabd-f5d720363051",
+   "locationCode": "YE002-PF10-450",
+   "description": "CPF",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4b2c6f48-9a49-4e3f-9d10-46ebe174ea0d",
+   "locationCode": "YE002-PF10-450-V4301",
+   "description": "0-V-4301 FUEL GAS SEPARATOR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "dd343933-9fca-4e8f-a10a-35a6a38cb372",
+   "locationCode": "YE002-PF10-480",
+   "description": "CPF UTILITY MISCELLANEOUS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "64366be8-7576-40de-ae9a-3dca8ee362b4",
+   "locationCode": "YE002-PF10-630",
+   "description": "CPF INSTRUMENT AIR",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9127350b-077a-4967-b887-18e3cb2ba28b",
+   "locationCode": "YE002-PF10-710",
+   "description": "CPF FIRE WATER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "2c49fd05-a6bb-431d-90d4-c9277b7cb4e0",
+   "locationCode": "YE002-PF10-800",
+   "description": "CPF MAIN POWER GENERATION",
+   "plannedCost": 1150,
+   "actualCost": 0,
+   "variance": -1150,
+   "workOrderCount": 17
+  },
+  {
+   "functionalLocationId": "161b57bb-1645-4667-b4bd-8894ac114268",
+   "locationCode": "YE002-PF10-820",
+   "description": "CPF MAIN LOW VOLTAGE POWER DISTRIBUTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "706bc5aa-2629-48e9-92c3-1bf9d4913ba1",
+   "locationCode": "YE002-TF01",
+   "description": "SAFER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "f4a3b67a-b5fd-4106-8330-3f6510f18d9e",
+   "locationCode": "YE002-TF01-330",
+   "description": "SAFER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ac812162-4081-4e7b-9a30-ba38653849ef",
+   "locationCode": "YE002-TF01-330-PKFM",
+   "description": "OLF FISCAL SMITH METER PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "289780ca-c323-4d7e-8fb3-3b38dbd0f71c",
+   "locationCode": "YE002-TF01-330-PKTOM",
+   "description": "OLF TRUCK OFFLOADING AND METERING UNIT",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7f09701f-ff92-40ed-b2e2-ae8106e24100",
+   "locationCode": "YE002-TF01-330-PKVENT",
+   "description": "COLD VENT PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "75d98896-ce5a-48b6-ae89-715ed2cb454f",
+   "locationCode": "YE002-TF01-820",
+   "description": "SAFER",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "7c0db054-8638-46e6-ab17-bf4ad4092f2e",
+   "locationCode": "YE002-TF01-820-MCCBLD1",
+   "description": "MOTOR CONTROL CENTER BUILDING 1",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "da51c0ec-c828-47ea-af53-aa763b7bdd30",
+   "locationCode": "YE002-TF02",
+   "description": "PETROMASILA",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "9c7e7abb-ab50-4843-ab68-5faa7532a610",
+   "locationCode": "YE002-TF02-330",
+   "description": "OLF MASILA OIL STORAGE / METERING SKIDS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "43c5cced-b423-4f70-9b68-4a58885dfdef",
+   "locationCode": "YE002-TF02-390",
+   "description": "OLF PETROMASILA OFFLOADING STATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e50c5ef2-bf44-4446-ba83-934e5a0079ce",
+   "locationCode": "YE002-TF02-390-P31451A",
+   "description": "OLF PETROMASILA OFFLOADING PUMP A",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4eb2753c-a501-49e7-8d7f-0a3882b8482a",
+   "locationCode": "YE002-TF02-390-P31451B",
+   "description": "OLF PETROMASILA OFFLOADING PUMP B",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "72c2d135-8b89-4759-a309-045a62dca5ae",
+   "locationCode": "YE002-TF02-390-P31451C",
+   "description": "OLF PETROMASILA OFFLOADING PUMP C",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "1e213999-32a5-4d50-954f-ce0616df7496",
+   "locationCode": "YE002-TF02-390-P31451D",
+   "description": "OLF PETROMASILA OFFLOADING PUMP D",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "302dea75-57f7-4540-a796-05ff99045ce8",
+   "locationCode": "YE002-TF03",
+   "description": "BLK-4",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4a35770e-0123-4a04-b7cb-ed0b8b6e172e",
+   "locationCode": "YE002-TF03-330",
+   "description": "BLK-4",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "50d9e89a-47bf-46a7-bb3a-0fd86db34dab",
+   "locationCode": "YE002-TF03-330-PKFM",
+   "description": "OFFLOADING STATION METERING SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "dbb2f591-5ce5-4953-9ef9-af75564db579",
+   "locationCode": "YE002-TF03-390",
+   "description": "OLF BLK4 OFFLOADING STATION PUMPS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "e2e1e4d2-93ad-448c-a00a-c76057f460a6",
+   "locationCode": "YE002-TF03-390-P102",
+   "description": "OFFLOADING OIL PUMP 102 A/B SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "89ef534a-3d70-4f28-88f3-cbb27b770567",
+   "locationCode": "YE002-TF03-390-P103",
+   "description": "OFFLOADING OIL PUMP 103 A/B SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "ae6fbdc9-801c-49aa-8935-820a74caf516",
+   "locationCode": "YE002-TF03-390-P104",
+   "description": "OFFLOADING OIL PUMP 104 A/B SKID",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "bbdf3b2f-a7d6-4a21-9fc4-84dc3d2fb42d",
+   "locationCode": "YE002-TF03-480",
+   "description": "OLF BLK4 UTILITY MISCELLANEOUS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "28f725de-ecea-4e8a-a616-d160f1533f27",
+   "locationCode": "YE002-TF03-720",
+   "description": "OLF BLK4 FIRE FIGHTING",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "733af88a-cd21-4c6c-9004-4f32c66b0adf",
+   "locationCode": "YE002-TF03-800",
+   "description": "OLF BLK4 MAIN POWER GENERATION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "201b7c8b-86c4-4066-9102-34b8f39ead98",
+   "locationCode": "YE002-TF03-820",
+   "description": "OLF BLK4 MAIN LOW VOLTAGE POWER DISTRIB.",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "398bc6a1-d061-451a-be93-f3869daf6c46",
+   "locationCode": "YE002-TF03-880",
+   "description": "OLF BLK4 EARTHLING/LIGHTNING PROTECTION",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "484fc271-cc3d-49d5-8643-ccc3253fdbfd",
+   "locationCode": "YE002-WH01",
+   "description": "KHARWAH WAREHOUSE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "15f16bc0-a583-442f-a4bb-bf159fb4e6c5",
+   "locationCode": "YE002-WH01-480",
+   "description": "UTILITY MISCELLANEOUS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "92c56b6d-fbe8-4576-8060-eecfe0915358",
+   "locationCode": "YE002-WH02",
+   "description": "PIPELINE YARD WAREHOUSE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "69e2e579-64d3-47d3-bad0-85efa3755862",
+   "locationCode": "YE002-WS01",
+   "description": "MAINTENANCE WORKSHOP (EPF1 AREA)",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "45897386-46bd-4d9b-88d3-ef1eb2460a2f",
+   "locationCode": "YE002-WS01-480",
+   "description": "MAINT. WORKSHOP UTILITY MISCELLANEOUS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "cab3aa9e-fc14-4d60-af07-35b5578a5210",
+   "locationCode": "YE002-WS01-700",
+   "description": "MAINT WS",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "018131f8-3e1b-4aa1-b1c6-dfecfdabd3ec",
+   "locationCode": "YE002-WS01-700-PKGD",
+   "description": "PORTABLE GAS DETECTOR PACKAGE",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "3db6282f-225e-42ef-8ea0-e0c40fcac2b5",
+   "locationCode": "YE002-WS01-830",
+   "description": "MAINT. WORKSHOP EMERGENCY POWER GEN",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "4d248b6a-5a8b-40e8-85e7-ce533e7f110e",
+   "locationCode": "YE002-WS01-830-GX",
+   "description": "MAINT. WORKSHOP YARD (GENEARTOR AREA)",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  },
+  {
+   "functionalLocationId": "8bc0e4c0-2258-4f0e-b47a-69f651d9d998",
+   "locationCode": "YE002-WS02",
+   "description": "SILCKLINE WORKSHOP",
+   "plannedCost": 0,
+   "actualCost": 0,
+   "variance": 0,
+   "workOrderCount": 0
+  }
+ ]
+}

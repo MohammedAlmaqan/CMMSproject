@@ -1,0 +1,8 @@
+{
+ "period": "2026-11",
+ "scheduledPM": 4,
+ "completedPM": 0,
+ "complianceRate": 0,
+ "excludedMeterPlans": 0,
+ "exclusionNote": "Meter-driven plans are excluded from Scheduled PMs: a meter threshold has no calendar due date, so it cannot be placed in the period. They are counted by excludedMeterPlans instead."
+}

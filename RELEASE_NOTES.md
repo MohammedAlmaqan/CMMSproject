@@ -4,6 +4,103 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.7.0
+
+The M3 notification fix, plus a whole-application UAT of the tree that ships it.
+`v1.6.12` (2026-11-10) was a documentation checkpoint - the project state
+reconciliation and the host remediation record - and was never published as a
+bundle; this is the next published artifact and carries every application change
+since `v1.6.11`.
+
+### What a user will notice
+
+- **Completing a work order no longer raises an M3 completion confirmation.**
+  The work order already records its own completion, and the generated
+  notification carried no link back to the work order, so every completion left
+  an Open row in the intake list describing work already done - and converting
+  that row created another on completion. Completion now writes only the
+  immutable `WorkOrderSnapshot` and closes the linked notifications, in the same
+  transaction as the status change. Owner decision D-22, 2026-11-11.
+- **The M3 rows already in the database are read-only.** Their detail page
+  carries a `Legacy record` badge and a note, and hides Edit, Delete and both
+  Convert to WO controls, because the API now refuses the conversion. The intake
+  and edit forms no longer offer M3; the list filter keeps it, so the historical
+  rows remain findable.
+- **Those rows no longer inflate open-notification counts.** The dashboard KPI,
+  the functional-location tree roll-up and the notifications-awaiting-conversion
+  report all exclude a legacy completion confirmation. The notification list is
+  deliberately unchanged, so the record is still reachable under the M3 filter.
+- **Administrators can purge expired audit entries.** Administration > Audit Log
+  now offers "Purge expired", which asks for confirmation, reports the deleted
+  count and refetches the page. This closes the last residual of v1.1-23; the
+  `POST /audit-log/purge` route and its retention window already existed.
+
+### What this release does not change
+
+There is no schema change and no Prisma migration. M3 stays an accepted
+`NotificationType`, because the importer and the three historical Converted rows
+depend on it - only generation, conversion, counting and the UI actions change.
+The Converted -> Completed loop, the snapshot write, the audit entries and the
+`WorkOrderNotifLink` navigation are untouched.
+
+### Live cleanup of the legacy rows (2026-11-12)
+
+The code stops new rows; the ten already in the live `cmms` database needed a
+decision. Three are `Converted` and are the historical record of work orders that
+were completed from an M3; they stay exactly as they are. The other seven were
+`Open` with no work-order link, and one further row had already been soft-deleted,
+so the cleanup soft-deleted **8 Open rows** - `N-000478`, `N-000487`,
+`N-000488`, `N-000490`, `N-000493`, `N-000495`, `N-000497`, `N-000499` - rather
+than deleting them. Soft delete keeps every row recoverable and leaves the
+`Converted` set untouched.
+
+A fresh `scripts/backup.bat` snapshot was taken immediately before the update
+(`backups/cmms-2026-11-12-1747.sql`, 9,573,836 bytes, with its 245-file uploads
+snapshot), and a JSON pre-image of all eight rows plus an 8-statement rollback
+script were captured first. The update was attributed to the live `admin` user
+and stamped with `now()`. Afterwards the live database held M3 total 11, 3 live
+`Converted`, 0 `Open` and 8 soft-deleted `Open`; notifications totalled 2187, of
+which 2179 are live. The live API returns the three Converted rows for `?type=M3`
+and none for `?type=M3&status=Open`.
+
+### Verification
+
+**Whole-application UAT, 2026-11-13.** The UAT ran against a throwaway clone,
+`cmms_uat`, restored from a dump of the live database (39 tables, 41,905 rows,
+identical counts), with its own API on :4100 and Vite on :3000, so no workflow
+write could reach live `cmms`. Six UAT users covered all six roles.
+
+- `scripts/verify/verify_uat_v170.py`: **19/19 passed.** All ten report endpoints
+  returned 200. MTBF, Cost Summary and Material Consumption were re-derived with
+  direct SQL against the reporting views and matched the API exactly: MTBF 2
+  equipment / 0 mismatches; Cost Summary period 2026-11, planned 1829.96 and
+  actual 118.96 on both sides; Material Consumption quantity 2.0 and cost 38.96
+  on both sides; and the derived cost of `WO-001668` (labour + materials +
+  services) matched the view at 118.96 planned and actual.
+- `scripts/verify/verify_uat_v170_ui.py`: **62/62 passed, 0 console errors, 0
+  failed HTTP responses.** All 14 menu items rendered; all six role logins
+  succeeded with Administration visible only to the Administrator; a work
+  centre, material and equipment were created through the UI and confirmed by
+  API; materials CSV exported 5697 rows and imported a new row, and the
+  locations CSV exported and re-imported all 463 rows; a notification was
+  raised, converted, assigned, given an operation and driven
+  Plan/Schedule/Start/Complete/Close with each step reflected in the UI, and
+  completing it generated no M3; all seven report tabs rendered. The read-only
+  legacy check ran against the live site and confirmed exactly the three
+  Converted rows, none of the eight soft-deleted numbers, 0 Open, and the
+  `Legacy record` badge with Convert and Delete hidden.
+
+Evidence, including the screenshots and the two JSON result sets, is in
+`docs/screenshots/uat_v1.7.0/`.
+
+**Gates at the D-22 close.** `verify_a1.py` PASS (214 rows; 167 Met / 11 Partial
+/ 0 Not Met / 7 Deferred / 15 Excluded / 14 Waived, and 104/0/0/3/7/12 in
+section 3), `verify_a1_dispositions.py` PASSED (65 Build / 12 Waive, 21
+decisions), `verify_b1.py` PASS, `verify_openapi.py` PASS (166 operations / 111
+paths), backend 1256 tests, app 184 tests, `verify_r7.py` 27/27 against a
+throwaway clone. The R.7 pack now writes its own `R7FIX-*` reference rows instead
+of requiring the demo seed, so it runs against the Client dataset.
+
 ## v1.6.11
 
 The published form of the v1.6.10 traceability release. `v1.6.10` was tagged and

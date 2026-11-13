@@ -1,0 +1,92 @@
+[
+ {
+  "equipmentId": "7b0922ba-f05e-43e3-a4b9-1e361ee1a04e",
+  "equipmentCode": "0-A-2502",
+  "equipmentName": "0-A-2502-PACKAGE, GEN FUEL GAS TREATMENT",
+  "workOrderCount": 18,
+  "plannedCost": 1150,
+  "actualCost": 0,
+  "totalCost": 1150
+ },
+ {
+  "equipmentId": "d48b115a-290c-4f8a-9bc7-f16aa1c02b05",
+  "equipmentCode": "0-A-2502-M01C",
+  "equipmentName": "0-A-2502-M01C, MEMBRANE",
+  "workOrderCount": 2,
+  "plannedCost": 125,
+  "actualCost": 0,
+  "totalCost": 125
+ },
+ {
+  "equipmentId": "e9d32d30-1484-4061-8260-7b2393679a82",
+  "equipmentCode": "GG803A",
+  "equipmentName": "GG803A GENERATOR GAS JENBACHER",
+  "workOrderCount": 55,
+  "plannedCost": 118.96,
+  "actualCost": 118.96,
+  "totalCost": 118.96
+ },
+ {
+  "equipmentId": "8409f3c5-0cb5-4f7d-aeef-07bed50d78dd",
+  "equipmentCode": "0-FM102",
+  "equipmentName": "FM-102-METER. FLOW",
+  "workOrderCount": 1,
+  "plannedCost": 80,
+  "actualCost": 0,
+  "totalCost": 80
+ },
+ {
+  "equipmentId": "b29fa96f-bcf0-462a-bf83-4cd2a6d3951d",
+  "equipmentCode": "PLC01-EPF3",
+  "equipmentName": "PLC-01-CONTROLLER, LOGIC SYSTEM",
+  "workOrderCount": 7,
+  "plannedCost": 80,
+  "actualCost": 0,
+  "totalCost": 80
+ },
+ {
+  "equipmentId": "019e0876-1699-4ac3-8c59-cba8a2f6934c",
+  "equipmentCode": "0-A-3301-E01",
+  "equipmentName": "0-A-3301-E01-COOLER, GAS",
+  "workOrderCount": 1,
+  "plannedCost": 50,
+  "actualCost": 0,
+  "totalCost": 50
+ },
+ {
+  "equipmentId": "0000071c-736a-4b89-9eea-d554df90e3f0",
+  "equipmentCode": "P-001-EPF1",
+  "equipmentName": "P-001-EPF1 PANEL PNEUMATIC",
+  "workOrderCount": 4,
+  "plannedCost": 0,
+  "actualCost": 0,
+  "totalCost": 0
+ },
+ {
+  "equipmentId": "000e2593-0f3c-4d86-a961-0972f4f07d5f",
+  "equipmentCode": "P-04B-EPF3",
+  "equipmentName": "P-04B-PUMP, STABILIZED OIL PROCESS",
+  "workOrderCount": 3,
+  "plannedCost": 0,
+  "actualCost": 0,
+  "totalCost": 0
+ },
+ {
+  "equipmentId": "005d2758-3422-478c-9d7c-8578b658417f",
+  "equipmentCode": "K635A",
+  "equipmentName": "K635A-COMPRESSOR, MOBILE SULLIVAN",
+  "workOrderCount": 2,
+  "plannedCost": 0,
+  "actualCost": 0,
+  "totalCost": 0
+ },
+ {
+  "equipmentId": "009fc8b3-b7cc-4624-90a2-69d46a77b5e3",
+  "equipmentCode": "DB-01-EPF3",
+  "equipmentName": "DB-01-BOARD, POWER DISTRIBUTION",
+  "workOrderCount": 1,
+  "plannedCost": 0,
+  "actualCost": 0,
+  "totalCost": 0
+ }
+]

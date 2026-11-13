@@ -1,0 +1,31 @@
+{
+ "byEquipment": [
+  {
+   "equipmentId": "7b0922ba-f05e-43e3-a4b9-1e361ee1a04e",
+   "mttrHours": 0.08,
+   "breakdownCount": 1
+  },
+  {
+   "equipmentId": "d48b115a-290c-4f8a-9bc7-f16aa1c02b05",
+   "mttrHours": 0.03,
+   "breakdownCount": 1
+  }
+ ],
+ "byLocation": [
+  {
+   "functionalLocationId": "e41eafe4-aa6c-484f-9cba-dbdd2058b027",
+   "locationCode": "YE002-PF04-210",
+   "description": "TEST SEPARATION AND METERING",
+   "mttrHours": 0.03,
+   "breakdownCount": 1
+  },
+  {
+   "functionalLocationId": "2c49fd05-a6bb-431d-90d4-c9277b7cb4e0",
+   "locationCode": "YE002-PF10-800",
+   "description": "CPF MAIN POWER GENERATION",
+   "mttrHours": 0.08,
+   "breakdownCount": 1
+  }
+ ],
+ "excludedIncomplete": 2
+}

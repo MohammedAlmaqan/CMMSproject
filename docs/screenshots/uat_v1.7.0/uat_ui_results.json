@@ -1,0 +1,391 @@
+{
+ "generated": "2026-11-13T09:58:29.779202+00:00",
+ "base": "http://localhost:3000",
+ "sections": [
+  "nav",
+  "roles",
+  "masterdata",
+  "csv",
+  "lifecycle",
+  "reports",
+  "legacy"
+ ],
+ "checks": [
+  {
+   "section": "nav",
+   "name": "nav Dashboard: renders without error",
+   "ok": true,
+   "detail": "url=dashboard markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Work Orders: renders without error",
+   "ok": true,
+   "detail": "url=work-orders markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Preventive Maintenance: renders without error",
+   "ok": true,
+   "detail": "url=preventive-maintenance markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Notifications: renders without error",
+   "ok": true,
+   "detail": "url=notifications markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Locations: renders without error",
+   "ok": true,
+   "detail": "url=locations markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Equipment: renders without error",
+   "ok": true,
+   "detail": "url=equipment markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Work Centers: renders without error",
+   "ok": true,
+   "detail": "url=work-centers markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Crafts: renders without error",
+   "ok": true,
+   "detail": "url=crafts markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Task Lists: renders without error",
+   "ok": true,
+   "detail": "url=task-lists markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Materials: renders without error",
+   "ok": true,
+   "detail": "url=materials markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Code Lists: renders without error",
+   "ok": true,
+   "detail": "url=code-lists markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Safety Checklists: renders without error",
+   "ok": true,
+   "detail": "url=safety-checklists markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Reports: renders without error",
+   "ok": true,
+   "detail": "url=reports markers=[] console=[]"
+  },
+  {
+   "section": "nav",
+   "name": "nav Administration: renders without error",
+   "ok": true,
+   "detail": "url=administration markers=[] console=[]"
+  },
+  {
+   "section": "roles",
+   "name": "login Administrator",
+   "ok": true,
+   "detail": "user=uat170-admin navItems=14 adminVisible=True"
+  },
+  {
+   "section": "roles",
+   "name": "Administrator: Administration visibility matches policy",
+   "ok": true,
+   "detail": "adminVisible=True expected=True"
+  },
+  {
+   "section": "roles",
+   "name": "login Maintenance Planner",
+   "ok": true,
+   "detail": "user=uat170-planner navItems=13 adminVisible=False"
+  },
+  {
+   "section": "roles",
+   "name": "Maintenance Planner: Administration visibility matches policy",
+   "ok": true,
+   "detail": "adminVisible=False expected=False"
+  },
+  {
+   "section": "roles",
+   "name": "login Maintenance Supervisor",
+   "ok": true,
+   "detail": "user=uat170-supervisor navItems=13 adminVisible=False"
+  },
+  {
+   "section": "roles",
+   "name": "Maintenance Supervisor: Administration visibility matches policy",
+   "ok": true,
+   "detail": "adminVisible=False expected=False"
+  },
+  {
+   "section": "roles",
+   "name": "login Technician",
+   "ok": true,
+   "detail": "user=uat170-tech navItems=13 adminVisible=False"
+  },
+  {
+   "section": "roles",
+   "name": "Technician: Administration visibility matches policy",
+   "ok": true,
+   "detail": "adminVisible=False expected=False"
+  },
+  {
+   "section": "roles",
+   "name": "login Requester",
+   "ok": true,
+   "detail": "user=uat170-requester navItems=13 adminVisible=False"
+  },
+  {
+   "section": "roles",
+   "name": "Requester: Administration visibility matches policy",
+   "ok": true,
+   "detail": "adminVisible=False expected=False"
+  },
+  {
+   "section": "roles",
+   "name": "login View-Only",
+   "ok": true,
+   "detail": "user=uat170-viewonly navItems=13 adminVisible=False"
+  },
+  {
+   "section": "roles",
+   "name": "View-Only: Administration visibility matches policy",
+   "ok": true,
+   "detail": "adminVisible=False expected=False"
+  },
+  {
+   "section": "masterdata",
+   "name": "create work center: form accepted",
+   "ok": true,
+   "detail": "UAT170-WC-125619"
+  },
+  {
+   "section": "masterdata",
+   "name": "create material: form accepted",
+   "ok": true,
+   "detail": "UAT170-MAT-125619"
+  },
+  {
+   "section": "masterdata",
+   "name": "a lowest-level functional location exists",
+   "ok": true,
+   "detail": "status=200 locations=463 leaves=362"
+  },
+  {
+   "section": "masterdata",
+   "name": "create equipment: form accepted",
+   "ok": true,
+   "detail": "UAT170-EQ-125619"
+  },
+  {
+   "section": "masterdata",
+   "name": "master data persisted (API)",
+   "ok": true,
+   "detail": "wc=200 mat=200 eq=200"
+  },
+  {
+   "section": "csv",
+   "name": "materials CSV export",
+   "ok": true,
+   "detail": "rows=5697 header=materialCode,description,unitOfMeasure,standardCost,currentStock"
+  },
+  {
+   "section": "csv",
+   "name": "materials CSV import",
+   "ok": true,
+   "detail": "Imported 1 new, 0 updated"
+  },
+  {
+   "section": "csv",
+   "name": "locations CSV export",
+   "ok": true,
+   "detail": "rows=463"
+  },
+  {
+   "section": "csv",
+   "name": "locations CSV import",
+   "ok": true,
+   "detail": "Imported 0 new, 463 updated"
+  },
+  {
+   "section": "lifecycle",
+   "name": "notification raised via UI",
+   "ok": true,
+   "detail": "N-000505"
+  },
+  {
+   "section": "lifecycle",
+   "name": "notification detail shows M2",
+   "ok": true,
+   "detail": "N-000505"
+  },
+  {
+   "section": "lifecycle",
+   "name": "converted to work order",
+   "ok": true,
+   "detail": "http://localhost:3000/work-orders/7bdc6762-3b44-4876-ad6a-f2a24c949d82"
+  },
+  {
+   "section": "lifecycle",
+   "name": "work order assigned to supervisor",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "lifecycle",
+   "name": "operation added",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "lifecycle",
+   "name": "workflow Plan -> Planned",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "lifecycle",
+   "name": "workflow Schedule -> Scheduled",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "lifecycle",
+   "name": "workflow Start -> In Progress",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "lifecycle",
+   "name": "workflow Complete -> Completed",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "lifecycle",
+   "name": "workflow Close -> Closed",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "lifecycle",
+   "name": "D-22: completing the WO generated no M3",
+   "ok": true,
+   "detail": "m3 before=3 after=3"
+  },
+  {
+   "section": "lifecycle",
+   "name": "converted notification reached Completed",
+   "ok": true,
+   "detail": "status=Completed"
+  },
+  {
+   "section": "lifecycle",
+   "name": "closed WO carries actual timestamps",
+   "ok": true,
+   "detail": "actualStart=True actualFinish=True"
+  },
+  {
+   "section": "reports",
+   "name": "report tab WO Backlog renders",
+   "ok": true,
+   "detail": "markers=[] console=[]"
+  },
+  {
+   "section": "reports",
+   "name": "report tab PM Compliance renders",
+   "ok": true,
+   "detail": "markers=[] console=[]"
+  },
+  {
+   "section": "reports",
+   "name": "report tab MTBF renders",
+   "ok": true,
+   "detail": "markers=[] console=[]"
+  },
+  {
+   "section": "reports",
+   "name": "report tab MTTR renders",
+   "ok": true,
+   "detail": "markers=[] console=[]"
+  },
+  {
+   "section": "reports",
+   "name": "report tab Cost Summary renders",
+   "ok": true,
+   "detail": "markers=[] console=[]"
+  },
+  {
+   "section": "reports",
+   "name": "report tab Downtime renders",
+   "ok": true,
+   "detail": "markers=[] console=[]"
+  },
+  {
+   "section": "reports",
+   "name": "report tab Material Usage renders",
+   "ok": true,
+   "detail": "markers=[] console=[]"
+  },
+  {
+   "section": "legacy",
+   "name": "live M3 list holds only the three Converted rows",
+   "ok": true,
+   "detail": "rows=['N-000479', 'N-000481', 'N-000485']"
+  },
+  {
+   "section": "legacy",
+   "name": "live M3 list hides all eight soft-deleted Open rows",
+   "ok": true,
+   "detail": "visible=['N-000479', 'N-000481', 'N-000485']"
+  },
+  {
+   "section": "legacy",
+   "name": "live API returns zero Open M3",
+   "ok": true,
+   "detail": "open=0"
+  },
+  {
+   "section": "legacy",
+   "name": "legacy M3 shows the Legacy record badge",
+   "ok": true,
+   "detail": "N-000485"
+  },
+  {
+   "section": "legacy",
+   "name": "legacy M3 hides Convert to WO",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "legacy",
+   "name": "legacy M3 hides Delete",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "legacy",
+   "name": "legacy M3 shows the read-only note",
+   "ok": true,
+   "detail": ""
+  }
+ ],
+ "console_errors": [],
+ "failed_responses": [],
+ "passed": 62,
+ "failed": 0
+}

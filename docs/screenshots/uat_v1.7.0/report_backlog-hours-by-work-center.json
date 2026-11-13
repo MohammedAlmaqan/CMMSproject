@@ -1,0 +1,100 @@
+[
+ {
+  "workCenterId": "323cf64c-f79d-4355-875d-9c0c5044e649",
+  "workCenterCode": "I_CIVIL",
+  "workCenterName": "civil group",
+  "openWorkOrderCount": 20,
+  "backlogHours": 29
+ },
+ {
+  "workCenterId": "fba5a163-e537-4eb3-a525-493a1d84ea4e",
+  "workCenterCode": "I_ELEC",
+  "workCenterName": "electrical group",
+  "openWorkOrderCount": 7,
+  "backlogHours": 0
+ },
+ {
+  "workCenterId": "8e614985-77ad-4976-abbd-0f74aef5905c",
+  "workCenterCode": "I_INSP",
+  "workCenterName": "plant inspection group",
+  "openWorkOrderCount": 3,
+  "backlogHours": 0
+ },
+ {
+  "workCenterId": "ceba9fce-ae1c-4021-85e9-a4615d5c9882",
+  "workCenterCode": "I_INST",
+  "workCenterName": "instrumentaiton and controlsystem group",
+  "openWorkOrderCount": 8,
+  "backlogHours": 0
+ },
+ {
+  "workCenterId": "a836ce90-9f90-4f6e-b42b-41918a881321",
+  "workCenterCode": "I_MECH",
+  "workCenterName": "mechanical goup",
+  "openWorkOrderCount": 7,
+  "backlogHours": 2
+ },
+ {
+  "workCenterId": "8511d977-3dd7-48f4-b321-0f4e083678d1",
+  "workCenterCode": "UAT170-WC-124313",
+  "workCenterName": "UAT 1.7.0 Work Center 124313",
+  "openWorkOrderCount": 0,
+  "backlogHours": 0
+ },
+ {
+  "workCenterId": "45ed97b3-44e5-482b-849b-2343881f1883",
+  "workCenterCode": "UAT170-WC-124439",
+  "workCenterName": "UAT 1.7.0 Work Center 124439",
+  "openWorkOrderCount": 0,
+  "backlogHours": 0
+ },
+ {
+  "workCenterId": "a6b62f81-338f-4923-9827-e6e8560526ef",
+  "workCenterCode": "UAT170-WC-124848",
+  "workCenterName": "UAT 1.7.0 Work Center 124848",
+  "openWorkOrderCount": 0,
+  "backlogHours": 0
+ },
+ {
+  "workCenterId": "6fb555a6-63a0-4f16-a16c-79558bc25efa",
+  "workCenterCode": "UAT170-WC-125619",
+  "workCenterName": "UAT 1.7.0 Work Center 125619",
+  "openWorkOrderCount": 0,
+  "backlogHours": 0
+ },
+ {
+  "workCenterId": "9b23471e-f0ff-4cdd-82d0-f9acd4393d4d",
+  "workCenterCode": "UATWC183511",
+  "workCenterName": "UAT v1.6.9 work center 183511",
+  "openWorkOrderCount": 0,
+  "backlogHours": 0
+ },
+ {
+  "workCenterId": "3c705ecf-a7fe-4e32-9364-9c847fe631f1",
+  "workCenterCode": "UATWC267564",
+  "workCenterName": "UAT v1.6.9 work center 267564",
+  "openWorkOrderCount": 0,
+  "backlogHours": 0
+ },
+ {
+  "workCenterId": "2eb7faa0-cf47-4d9c-83a2-f47b67cece97",
+  "workCenterCode": "UATWC381055",
+  "workCenterName": "UAT v1.6.9 work center 381055",
+  "openWorkOrderCount": 1,
+  "backlogHours": 0
+ },
+ {
+  "workCenterId": "2e8e64a8-23db-4579-b165-c119f2f1c833",
+  "workCenterCode": "UATWC492707",
+  "workCenterName": "UAT v1.6.9 work center 492707",
+  "openWorkOrderCount": 2,
+  "backlogHours": 2
+ },
+ {
+  "workCenterId": "3c261b54-6f40-47df-9b45-728c49776943",
+  "workCenterCode": "UATWC577826",
+  "workCenterName": "UAT v1.6.9 work center 577826",
+  "openWorkOrderCount": 0,
+  "backlogHours": 0
+ }
+]

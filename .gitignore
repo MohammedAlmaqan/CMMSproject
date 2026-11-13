@@ -27,6 +27,10 @@ docs/screenshots/*
 !docs/screenshots/install_v1.6.10/**
 !docs/screenshots/install_v1.6.11/
 !docs/screenshots/install_v1.6.11/**
+# The v1.7.0 UAT evidence is tracked for the same reason: RELEASE_NOTES.md points
+# at it, and the report has to be reproducible from the shipped tree.
+!docs/screenshots/uat_v1.7.0/
+!docs/screenshots/uat_v1.7.0/**
 backend/uploads/
 backend/service/
 backups/

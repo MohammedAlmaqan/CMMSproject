@@ -1,0 +1,190 @@
+{
+ "generated": "2026-11-13T09:58:41.048069+00:00",
+ "api": "http://127.0.0.1:4100",
+ "database": "cmms_uat",
+ "reports": [
+  {
+   "report": "backlog",
+   "status": 200,
+   "size": 3
+  },
+  {
+   "report": "pm-compliance",
+   "status": 200,
+   "size": 6
+  },
+  {
+   "report": "mtbf",
+   "status": 200,
+   "size": 2
+  },
+  {
+   "report": "mttr",
+   "status": 200,
+   "size": 3
+  },
+  {
+   "report": "cost-summary",
+   "status": 200,
+   "size": 1
+  },
+  {
+   "report": "downtime",
+   "status": 200,
+   "size": 4
+  },
+  {
+   "report": "material-consumption",
+   "status": 200,
+   "size": 1
+  },
+  {
+   "report": "backlog-hours-by-work-center",
+   "status": 200,
+   "size": 14
+  },
+  {
+   "report": "top-cost-equipment",
+   "status": 200,
+   "size": 10
+  },
+  {
+   "report": "notifications-awaiting-conversion",
+   "status": 200,
+   "size": 3
+  }
+ ],
+ "checks": [
+  {
+   "name": "report backlog: HTTP 200",
+   "ok": true,
+   "detail": "status=200 size=3"
+  },
+  {
+   "name": "report pm-compliance: HTTP 200",
+   "ok": true,
+   "detail": "status=200 size=6"
+  },
+  {
+   "name": "report mtbf: HTTP 200",
+   "ok": true,
+   "detail": "status=200 size=2"
+  },
+  {
+   "name": "report mttr: HTTP 200",
+   "ok": true,
+   "detail": "status=200 size=3"
+  },
+  {
+   "name": "report cost-summary: HTTP 200",
+   "ok": true,
+   "detail": "status=200 size=1"
+  },
+  {
+   "name": "report downtime: HTTP 200",
+   "ok": true,
+   "detail": "status=200 size=4"
+  },
+  {
+   "name": "report material-consumption: HTTP 200",
+   "ok": true,
+   "detail": "status=200 size=1"
+  },
+  {
+   "name": "report backlog-hours-by-work-center: HTTP 200",
+   "ok": true,
+   "detail": "status=200 size=14"
+  },
+  {
+   "name": "report top-cost-equipment: HTTP 200",
+   "ok": true,
+   "detail": "status=200 size=10"
+  },
+  {
+   "name": "report notifications-awaiting-conversion: HTTP 200",
+   "ok": true,
+   "detail": "status=200 size=3"
+  },
+  {
+   "name": "mtbf: HTTP 200 and array",
+   "ok": true,
+   "detail": "status=200 rows=2"
+  },
+  {
+   "name": "mtbf: exact match against report_mtbf_by_equipment",
+   "ok": true,
+   "detail": "equipment=2 mismatches=0 extra=0"
+  },
+  {
+   "name": "cost-summary: HTTP 200 and expected keys",
+   "ok": true,
+   "detail": "status=200 period=2026-11"
+  },
+  {
+   "name": "cost-summary: exact match against direct cost SQL",
+   "ok": true,
+   "detail": "period=2026-11 costCentres=1 mismatches=0 extra=0"
+  },
+  {
+   "name": "cost-summary: total planned and actual agree",
+   "ok": true,
+   "detail": "planned api=1829.96 sql=1829.96; actual api=118.96 sql=118.96"
+  },
+  {
+   "name": "material-consumption: HTTP 200 and byMaterial",
+   "ok": true,
+   "detail": "status=200 materials=1"
+  },
+  {
+   "name": "material-consumption: exact match against direct SQL",
+   "ok": true,
+   "detail": "materials=1 mismatches=0 extra=0"
+  },
+  {
+   "name": "material-consumption: totals agree",
+   "ok": true,
+   "detail": "qty api=2.0 sql=2.0; cost api=38.96 sql=38.96"
+  },
+  {
+   "name": "cost spot-check: derived cost = labour + materials + services",
+   "ok": true,
+   "detail": "WO-001668 planned 118.96 vs 118.96; actual 118.96 vs 118.96"
+  }
+ ],
+ "sections": [
+  {
+   "title": "MTBF",
+   "lines": [
+    "API rows: 2; direct-SQL equipment: 2",
+    "Sample: d48b115a=0h/1bd, 7b0922ba=0h/1bd",
+    "Mismatches: 0"
+   ]
+  },
+  {
+   "title": "Cost Summary",
+   "lines": [
+    "Period: 2026-11",
+    "Cost centres: 1",
+    "Planned total: API 1829.96 / SQL 1829.96",
+    "Actual total:  API 118.96 / SQL 118.96"
+   ]
+  },
+  {
+   "title": "Material Consumption",
+   "lines": [
+    "Materials: 1",
+    "Quantity total: API 2.0 / SQL 2.0",
+    "Cost total:     API 38.96 / SQL 38.96"
+   ]
+  },
+  {
+   "title": "Cost spot-check",
+   "lines": [
+    "WO-001668: labour p/a 80.00/80.00, materials p/a 38.96/38.96, services 0",
+    "recomputed planned 118.96 vs view 118.96; actual 118.96 vs view 118.96"
+   ]
+  }
+ ],
+ "passed": 19,
+ "failed": 0
+}

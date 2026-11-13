@@ -1,0 +1,92 @@
+{
+ "byStatus": [
+  {
+   "status": "Draft",
+   "count": 10,
+   "totalPlannedHours": 9
+  },
+  {
+   "status": "In Progress",
+   "count": 2,
+   "totalPlannedHours": 4
+  },
+  {
+   "status": "Planned",
+   "count": 1,
+   "totalPlannedHours": 2
+  },
+  {
+   "status": "Scheduled",
+   "count": 31,
+   "totalPlannedHours": 18
+  },
+  {
+   "status": "Suspended",
+   "count": 4,
+   "totalPlannedHours": 0
+  }
+ ],
+ "byPriority": [
+  {
+   "priority": "High",
+   "count": 4,
+   "totalPlannedHours": 2
+  },
+  {
+   "priority": "Medium",
+   "count": 44,
+   "totalPlannedHours": 31
+  }
+ ],
+ "byWorkCenter": [
+  {
+   "workCenterId": "323cf64c-f79d-4355-875d-9c0c5044e649",
+   "workCenterCode": "I_CIVIL",
+   "workCenterName": "civil group",
+   "count": 20,
+   "totalPlannedHours": 29
+  },
+  {
+   "workCenterId": "fba5a163-e537-4eb3-a525-493a1d84ea4e",
+   "workCenterCode": "I_ELEC",
+   "workCenterName": "electrical group",
+   "count": 7,
+   "totalPlannedHours": 0
+  },
+  {
+   "workCenterId": "8e614985-77ad-4976-abbd-0f74aef5905c",
+   "workCenterCode": "I_INSP",
+   "workCenterName": "plant inspection group",
+   "count": 3,
+   "totalPlannedHours": 0
+  },
+  {
+   "workCenterId": "ceba9fce-ae1c-4021-85e9-a4615d5c9882",
+   "workCenterCode": "I_INST",
+   "workCenterName": "instrumentaiton and controlsystem group",
+   "count": 8,
+   "totalPlannedHours": 0
+  },
+  {
+   "workCenterId": "a836ce90-9f90-4f6e-b42b-41918a881321",
+   "workCenterCode": "I_MECH",
+   "workCenterName": "mechanical goup",
+   "count": 7,
+   "totalPlannedHours": 2
+  },
+  {
+   "workCenterId": "2eb7faa0-cf47-4d9c-83a2-f47b67cece97",
+   "workCenterCode": "UATWC381055",
+   "workCenterName": "UAT v1.6.9 work center 381055",
+   "count": 1,
+   "totalPlannedHours": 0
+  },
+  {
+   "workCenterId": "2e8e64a8-23db-4579-b165-c119f2f1c833",
+   "workCenterCode": "UATWC492707",
+   "workCenterName": "UAT v1.6.9 work center 492707",
+   "count": 2,
+   "totalPlannedHours": 2
+  }
+ ]
+}
