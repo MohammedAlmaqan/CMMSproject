@@ -101,6 +101,66 @@ paths), backend 1256 tests, app 184 tests, `verify_r7.py` 27/27 against a
 throwaway clone. The R.7 pack now writes its own `R7FIX-*` reference rows instead
 of requiring the demo seed, so it runs against the Client dataset.
 
+### Live installation of this build (2026-11-14)
+
+A fresh `scripts/backup.bat` snapshot was taken immediately before
+(`backups/cmms-2026-11-14-1351.sql`, 9,585,317 bytes, with its 247-file uploads
+snapshot), and the wizard was then driven through its own UI by
+`installer/tests/gui-e2e-v169.ps1`: Welcome to Finish without operator input,
+targeting the live `cmms` database, install root `C:\CMMS`, port 4000 and site
+`cmms.local`, and answering Yes to the existing-database prompt so the engine ran
+with `-AllowExistingDatabase`. Engine log
+`C:\ProgramData\CommandPulse\logs\install-20261114-140603.log`; screenshots in
+`docs/screenshots/install_v1.7.0/`.
+
+It exited 0. The engine verified all 226 bundle files, found 22 migrations and
+none pending, staged `npm ci` (364 packages) and `prisma generate` while the old
+application kept serving, and deployed the frontend to the folder IIS actually
+serves (`C:\inetpub\cmms-site`, 4 files copied and 4 verified). The Administrator
+step reported *an active Administrator already exists; nothing was written*, so
+no account was created or changed. Both services are `Running`, `Automatic`,
+`LocalSystem`, from `C:\CMMS\backend\service`, and the health watchdog is
+polling: `watchdog-state.json` recorded a success at 14:15:43 with 0 consecutive
+failures. `https://cmms.local/`, `/dashboard`, the served JS and CSS, and
+`/api/health` through IIS all returned 200.
+
+The Client data is intact. The database held 41,905 rows in 39 tables before the
+install and 41,907 after, and every table but one is unchanged: `WorkOrder` 2209,
+`Equipment` 6127, `Notification` 2187, `User` 6, `Material` 5691,
+`FunctionalLocation` 463, `AuditLogEntry` 20972, 22 applied migrations. The
+exception is `SchedulerRun` 52 -> 54, the worker's own run log after it restarted.
+The M3 set read back through the API is still the three `Converted` rows with none
+`Open`, so the cleanup of 2026-11-12 survived.
+
+**A defect this run found, and the fix it carries.** The first attempt (13:52)
+reported success - services running, health 200 - while both services still ran
+the *source tree's* wrapper: `sc config` updates start type, dependencies and
+account but never the binary path, so an install into a new folder rewrote that
+folder's XML and then kept executing the old wrapper, which reads the XML and
+`.env` beside itself. `9f68375` repoints an existing service at this install's
+wrapper while it is stopped, and reads the effective path back. The second run
+(14:06) logged both repoints, and `Win32_Service.PathName` now reads
+`C:\CMMS\backend\service\CommandPulseCMMSAPI.exe`. The artifact installed for this
+evidence is the rebuilt one described below.
+
+The install was run before the tag was cut, on purpose: the notes can then record
+what the published artifact actually did, and the tag documents a tested build
+rather than a build that was tested afterwards.
+
+### Release engineering
+
+`installer/build-wizard.ps1` at `9f68375` produced `Setup_CommandPulse.exe`,
+2,328,450 bytes, ProductVersion `1.7.0`, SHA-256
+`ED26951DE46DF22A02C8474C28D4DFF65ECD95BC6BAE4B81E5C5C4341C8B3D62`, from payload
+digest `cb8fd3b23bef1f2cb19a8505d1236bd3056b57b1e686756d94ea6fe269c7d488` (13
+entries, LF, timestamp-pinned) with Inno Setup 6.7.3. That is the file installed
+on 2026-11-14 and the file published at the root of the bundle.
+
+The tag rebuilds to the same bytes: two independent checkouts of `v1.7.0` - a
+fresh `git archive` extraction and a worktree - each built with
+`installer/build-wizard.ps1` produced that same SHA-256, so the setup program is a
+function of the commit rather than of this machine.
+
 ## v1.6.11
 
 The published form of the v1.6.10 traceability release. `v1.6.10` was tagged and
