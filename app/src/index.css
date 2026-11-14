@@ -2,48 +2,295 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════════
+   "Paper & Graphite" — industrial design tokens
+   ───────────────────────────────────────────────────────────────────────
+   Tier 1  primitives  raw colour ramps, never referenced by components
+   Tier 2  semantic    meaning (surface, text, status, chrome)
+   Tier 3  component   measurements (row height, radii, focus ring)
+
+   Components must use tier-2/3 tokens — never a hex literal. Charts read the
+   `--chart-*` tokens through `src/lib/chartTokens.ts` because SVG attributes
+   cannot resolve `var()` in every engine.
+   ═══════════════════════════════════════════════════════════════════════ */
+
 @layer base {
-  html {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    /* Paint native form controls (select dropdown list, pickers, scrollbars)
-       in the dark theme. Without this the browser paints the <select> option
-       list white while the option text inherits the app's light text colour,
-       making every option unreadable. */
+  :root {
+    /* ── Tier 1: primitives ─────────────────────────────────────────── */
+    --white: #ffffff;
+
+    --grey-25: #fafbfc;
+    --grey-50: #f4f5f7;
+    --grey-100: #edeff2;
+    --grey-150: #e7eaee;
+    --grey-200: #e2e5ea;
+    --grey-250: #e5e7eb;
+    --grey-300: #d5d9e0;
+    --grey-400: #b6bcc6;
+    --grey-500: #8a919b;
+    --grey-600: #646b75;
+    --grey-700: #4a5058;
+    --grey-750: #3a414a;
+    --grey-800: #2e333a;
+    --grey-850: #262b31;
+    --grey-875: #212529;
+    --grey-900: #1e242b;
+    --grey-925: #1a1d21;
+    --grey-950: #16181d;
+    --grey-975: #121418;
+
+    --amber-50: #fff8e6;
+    --amber-100: #fef3c7;
+    --amber-300: #fbbf24;
+    --amber-500: #d97706;
+    --amber-600: #b45309;
+    --amber-700: #8a4b08;
+    --amber-900: #3a2a0b;
+
+    --blue-50: #eff6ff;
+    --blue-100: #dbeafe;
+    --blue-200: #93c5fd;
+    --blue-300: #60a5fa;
+    --blue-700: #1d4ed8;
+    --blue-800: #1e40af;
+    --blue-900: #172a45;
+
+    --green-100: #d1fae5;
+    --green-300: #6ee7b7;
+    --green-700: #047857;
+    --green-900: #06302a;
+
+    --red-50: #fef2f2;
+    --red-100: #fee2e2;
+    --red-300: #fca5a5;
+    --red-600: #dc2626;
+    --red-700: #b91c1c;
+    --red-900: #3b1414;
+
+    --violet-700: #6d28d9;
+    --teal-700: #0f766e;
+    --slate-600: #475569;
+
+    /* ── Tier 2: semantic — light ("Paper") ─────────────────────────── */
+    --bg-app: var(--grey-50);
+    --surface-1: var(--white); /* cards, panels, popovers */
+    --surface-2: var(--grey-100); /* toolbars, table head, page header */
+    --surface-3: var(--grey-200); /* inputs, chips, wells */
+    --surface-hover: var(--grey-150);
+    --surface-selected: #e8edf5;
+
+    --border-subtle: var(--grey-300);
+    --border-strong: var(--grey-400);
+
+    --text-1: var(--grey-950); /* 16.3:1 on --bg-app */
+    --text-2: var(--grey-700); /*  7.5:1 on --bg-app */
+    --text-3: var(--grey-600); /*  4.9:1 on --bg-app */
+
+    --accent: var(--amber-600); /* text-safe accent, 4.6:1 on --bg-app */
+    --accent-fill: var(--amber-500); /* large fills and icons only */
+    --accent-weak: var(--amber-100);
+    --accent-ink: #1a1200; /* 5.8:1 on --accent-fill */
+
+    --focus: var(--blue-700);
+
+    /* Graphite navigation rail */
+    --nav-bg: var(--grey-900);
+    --nav-border: #2a313a;
+    --nav-text: #c7cdd5; /* 9.8:1 on --nav-bg */
+    --nav-text-active: var(--white);
+    --nav-active-bg: #2a313a;
+    --nav-accent: #f0a83c; /* 7.7:1 on --nav-bg */
+
+    /* Status tones — 8 states, text ≥ 4.5:1 on their own tint */
+    --status-open-fg: var(--amber-700);
+    --status-open-bg: var(--amber-100);
+    --status-open-border: var(--amber-600);
+
+    --status-scheduled-fg: var(--blue-800);
+    --status-scheduled-bg: #e0e7ff;
+    --status-scheduled-border: var(--blue-800);
+
+    --status-active-fg: var(--blue-700);
+    --status-active-bg: var(--blue-100);
+    --status-active-border: var(--blue-700);
+
+    --status-hold-fg: var(--grey-700);
+    --status-hold-bg: var(--grey-250);
+    --status-hold-border: var(--grey-600);
+
+    --status-done-fg: var(--green-700);
+    --status-done-bg: var(--green-100);
+    --status-done-border: var(--green-700);
+
+    --status-void-fg: var(--grey-700);
+    --status-void-bg: var(--grey-250);
+    --status-void-border: var(--grey-600);
+
+    --status-overdue-fg: var(--red-700);
+    --status-overdue-bg: var(--red-100);
+    --status-overdue-border: var(--red-700);
+
+    --status-breakdown-fg: var(--white);
+    --status-breakdown-bg: var(--red-700);
+    --status-breakdown-border: var(--red-700);
+
+    /* Chart tokens — read by src/lib/chartTokens.ts */
+    --chart-axis-tick: var(--grey-700);
+    --chart-axis-line: var(--grey-400);
+    --chart-grid: var(--grey-300);
+    --chart-tooltip-bg: var(--white);
+    --chart-tooltip-border: var(--grey-400);
+    --chart-tooltip-text: var(--grey-950);
+    --chart-series-1: var(--blue-700);
+    --chart-series-2: var(--amber-600);
+    --chart-series-3: var(--teal-700);
+    --chart-series-4: var(--red-700);
+    --chart-series-5: var(--violet-700);
+    --chart-series-6: var(--slate-600);
+
+    /* ── Tier 3: component ──────────────────────────────────────────── */
+    --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'Cascadia Mono', Consolas, 'Courier New', monospace;
+
+    --text-2xs: 11px;
+    --text-xs: 12px;
+    --text-sm: 13px;
+    --text-md: 14px;
+    --text-lg: 16px;
+    --text-xl: 20px;
+    --text-2xl: 24px;
+
+    --row-h: 32px;
+    --row-h-comfortable: 40px;
+    --control-h: 30px;
+    --radius-sm: 3px;
+    --radius-md: 4px;
+    --radius-lg: 6px;
+
+    --focus-width: 2px;
+    --focus-offset: 2px;
+
+    color-scheme: light;
+  }
+
+  /* ── Tier 2 override — graphite dark ──────────────────────────────── */
+  [data-theme='dark'] {
+    --bg-app: var(--grey-925);
+    --surface-1: var(--grey-875);
+    --surface-2: var(--grey-850);
+    --surface-3: #31373e;
+    --surface-hover: #2c3239;
+    --surface-selected: #26364d;
+
+    --border-subtle: var(--grey-750);
+    --border-strong: #4a525c;
+
+    --text-1: #f2f4f6;
+    --text-2: #b4bcc6;
+    --text-3: #a0a8b2;
+
+    --accent: #f0a83c;
+    --accent-fill: var(--amber-500);
+    --accent-weak: var(--amber-900);
+    --accent-ink: #1a1200;
+
+    --focus: var(--blue-300);
+
+    --nav-bg: #16191c;
+    --nav-border: #232a31;
+    --nav-text: #aeb6c0;
+    --nav-text-active: var(--white);
+    --nav-active-bg: #232a31;
+    --nav-accent: #f0a83c;
+
+    --status-open-fg: var(--amber-300);
+    --status-open-bg: var(--amber-900);
+    --status-open-border: #8a5a10;
+
+    --status-scheduled-fg: #a5b8ff;
+    --status-scheduled-bg: #1e2440;
+    --status-scheduled-border: #3b4a86;
+
+    --status-active-fg: var(--blue-200);
+    --status-active-bg: var(--blue-900);
+    --status-active-border: #2f5a8f;
+
+    --status-hold-fg: #c7cdd5;
+    --status-hold-bg: #2a2f36;
+    --status-hold-border: #4a525c;
+
+    --status-done-fg: var(--green-300);
+    --status-done-bg: var(--green-900);
+    --status-done-border: #1d6b52;
+
+    --status-void-fg: #c7cdd5;
+    --status-void-bg: #2a2f36;
+    --status-void-border: #4a525c;
+
+    --status-overdue-fg: var(--red-300);
+    --status-overdue-bg: var(--red-900);
+    --status-overdue-border: #8f2b2b;
+
+    --status-breakdown-fg: var(--white);
+    --status-breakdown-bg: var(--red-700);
+    --status-breakdown-border: var(--red-700);
+
+    --chart-axis-tick: #b4bcc6;
+    --chart-axis-line: #4a525c;
+    --chart-grid: var(--grey-750);
+    --chart-tooltip-bg: var(--grey-875);
+    --chart-tooltip-border: #4a525c;
+    --chart-tooltip-text: #f2f4f6;
+    --chart-series-1: var(--blue-300);
+    --chart-series-2: var(--amber-300);
+    --chart-series-3: #34d399;
+    --chart-series-4: #f87171;
+    --chart-series-5: #a78bfa;
+    --chart-series-6: #94a3b8;
+
     color-scheme: dark;
   }
 
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   /* Explicit fallback for engines/OSes that do not honour color-scheme for the
-     <select> option list: force readable option colours globally. */
+     <select> option list: force readable option colours from the tokens. */
   select option {
-    background-color: #18181B;
-    color: #FAFAFA;
+    background-color: var(--surface-1);
+    color: var(--text-1);
   }
 
   body {
-    background-color: #151517;
-    color: #FAFAFA;
+    background-color: var(--bg-app);
+    color: var(--text-1);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    /* A CMMS is read column-wise all day: aligned digits beat proportional ones. */
+    font-variant-numeric: tabular-nums;
     overflow: hidden;
   }
 
-  /* 3.5 WCAG: visible keyboard-only focus ring on every focused element */
+  /* WCAG 2.4.7: visible keyboard-only focus ring on every focused element */
   *:focus-visible {
-    outline: 2px solid #F59E0B;
-    outline-offset: 2px;
+    outline: var(--focus-width) solid var(--focus);
+    outline-offset: var(--focus-offset);
     border-radius: 2px;
   }
 
-  /* 3.5 WCAG: skip link hidden until focused */
+  /* WCAG 2.4.1: skip link hidden until focused */
   .skip-link {
     position: absolute;
     left: -9999px;
     top: 0;
     z-index: 100;
     padding: 8px 16px;
-    background-color: #27272A;
-    color: #FAFAFA;
-    font-size: 12px;
+    background-color: var(--nav-active-bg);
+    color: var(--nav-text-active);
+    font-size: var(--text-xs);
     text-decoration: none;
   }
 
@@ -52,180 +299,299 @@
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
   }
 
   ::-webkit-scrollbar-track {
-    background: #18181B;
+    background: var(--surface-2);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #3F3F46;
-    border-radius: 3px;
+    background: var(--border-strong);
+    border-radius: 5px;
+    border: 2px solid var(--surface-2);
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #52525B;
+    background: var(--grey-500);
   }
 
   ::selection {
-    background: rgba(217, 119, 6, 0.3);
-    color: #FAFAFA;
+    background: var(--accent-weak);
+    color: var(--text-1);
   }
 }
 
 @layer components {
-  .glass {
-    background: rgba(24, 24, 27, 0.6);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  .glass-strong {
-    background: rgba(24, 24, 27, 0.8);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
-
+  /* ── Surfaces ─────────────────────────────────────────────────────── */
   .industrial-card {
-    background-color: #1E1E22;
-    border: 1px solid #27272A;
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    background-color: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
   }
 
+  /* ── Navigation ───────────────────────────────────────────────────── */
   .nav-active {
-    background: rgba(217, 119, 6, 0.1);
-    color: #D97706;
-    border-right: 2px solid #D97706;
-    box-shadow: 0 0 0 1px #D97706, 0 0 15px rgba(217, 119, 6, 0.4);
+    background: var(--nav-active-bg);
+    color: var(--nav-text-active);
+    box-shadow: inset 3px 0 0 var(--nav-accent);
   }
 
-  .badge-in-progress {
-    background: rgba(37, 99, 235, 0.1);
-    color: #3B82F6;
-    border: 1px solid rgba(37, 99, 235, 0.3);
-  }
-
-  .badge-completed {
-    background: rgba(5, 150, 105, 0.1);
-    color: #059669;
-    border: 1px solid rgba(5, 150, 105, 0.3);
+  /* ── Status badges — colour is never the only signal ──────────────── */
+  .badge-open,
+  .badge-scheduled,
+  .badge-active,
+  .badge-hold,
+  .badge-done,
+  .badge-void,
+  .badge-overdue,
+  .badge-breakdown,
+  .badge-in-progress,
+  .badge-completed,
+  .badge-cancelled {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: var(--radius-sm);
+    border-style: solid;
+    border-width: 1px;
+    padding: 1px 6px;
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    line-height: 15px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
   }
 
   .badge-open {
-    background: rgba(217, 119, 6, 0.1);
-    color: #D97706;
-    border: 1px solid rgba(217, 119, 6, 0.3);
+    color: var(--status-open-fg);
+    background: var(--status-open-bg);
+    border-color: var(--status-open-border);
+  }
+
+  .badge-scheduled {
+    color: var(--status-scheduled-fg);
+    background: var(--status-scheduled-bg);
+    border-color: var(--status-scheduled-border);
+  }
+
+  .badge-active {
+    color: var(--status-active-fg);
+    background: var(--status-active-bg);
+    border-color: var(--status-active-border);
+  }
+
+  .badge-hold {
+    color: var(--status-hold-fg);
+    background: var(--status-hold-bg);
+    border-color: var(--status-hold-border);
+    border-style: dashed;
+  }
+
+  .badge-done {
+    color: var(--status-done-fg);
+    background: var(--status-done-bg);
+    border-color: var(--status-done-border);
+  }
+
+  .badge-void {
+    color: var(--status-void-fg);
+    background: var(--status-void-bg);
+    border-color: var(--status-void-border);
+  }
+
+  .badge-overdue {
+    color: var(--status-overdue-fg);
+    background: var(--status-overdue-bg);
+    border-color: var(--status-overdue-border);
+  }
+
+  .badge-breakdown {
+    color: var(--status-breakdown-fg);
+    background: var(--status-breakdown-bg);
+    border-color: var(--status-breakdown-border);
+    font-weight: 700;
+  }
+
+  /* Legacy aliases — removed once every page uses the tone classes above. */
+  .badge-in-progress {
+    color: var(--status-active-fg);
+    background: var(--status-active-bg);
+    border-color: var(--status-active-border);
+  }
+
+  .badge-completed {
+    color: var(--status-done-fg);
+    background: var(--status-done-bg);
+    border-color: var(--status-done-border);
   }
 
   .badge-cancelled {
-    background: rgba(82, 82, 91, 0.1);
-    color: #92929B;
-    border: 1px solid rgba(82, 82, 91, 0.3);
+    color: var(--status-void-fg);
+    background: var(--status-void-bg);
+    border-color: var(--status-void-border);
   }
 
+  /* ── Priority chips ───────────────────────────────────────────────── */
   .badge-high {
-    color: #F87171;
-    border: 1px solid rgba(220, 38, 38, 0.5);
+    color: var(--status-overdue-fg);
+    background: var(--status-overdue-bg);
+    border: 1px solid var(--status-overdue-border);
   }
 
   .badge-medium {
-    color: #D97706;
-    border: 1px solid rgba(217, 119, 6, 0.5);
+    color: var(--status-open-fg);
+    background: var(--status-open-bg);
+    border: 1px solid var(--status-open-border);
   }
 
   .badge-low {
-    color: #92929B;
-    border: 1px solid rgba(82, 82, 91, 0.5);
+    color: var(--status-void-fg);
+    background: var(--status-void-bg);
+    border: 1px solid var(--status-void-border);
   }
 
+  /* ── Criticality ──────────────────────────────────────────────────── */
   .criticality-s {
-    color: #E11D48;
-    border-color: #E11D48;
+    color: var(--red-700);
+    border-color: var(--red-700);
   }
 
   .criticality-a {
-    color: #F87171;
-    border-color: #F87171;
+    color: var(--red-600);
+    border-color: var(--red-600);
   }
 
   .criticality-b {
-    color: #D97706;
-    border-color: #D97706;
+    color: var(--amber-600);
+    border-color: var(--amber-600);
   }
 
   .criticality-c {
-    color: #059669;
-    border-color: #059669;
+    color: var(--green-700);
+    border-color: var(--green-700);
   }
 
-  .kpi-canvas-container {
-    position: relative;
+  /* ── Data tables ──────────────────────────────────────────────────── */
+  .data-table {
     width: 100%;
-    height: 120px;
-    overflow: hidden;
-    border-bottom: 1px solid #27272A;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-variant-numeric: tabular-nums;
   }
 
-  .kpi-canvas-layer {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-  }
-
-  .kpi-canvas-container canvas,
-  .kpi-canvas-layer canvas {
-    position: absolute;
+  .data-table thead th {
+    position: sticky;
     top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 0;
-    opacity: 0.4;
+    z-index: 1;
+    height: 28px;
+    padding: 0 10px;
+    background: var(--surface-2);
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border-subtle);
   }
 
-  .kpi-metrics-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 10;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    padding: 1rem;
-    align-items: center;
+  .data-table tbody td {
+    height: var(--row-h);
+    padding: 4px 10px;
+    font-size: var(--text-sm);
+    color: var(--text-1);
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+  }
+
+  .data-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .data-table tbody tr:hover {
+    background: var(--surface-hover);
+  }
+
+  .data-table-compact tbody td {
+    height: var(--row-h);
+  }
+
+  .data-table-comfortable tbody td {
+    height: var(--row-h-comfortable);
   }
 
   .table-row-hover:hover {
-    background-color: #27272A;
+    background-color: var(--surface-hover);
   }
 
+  /* ── Banners ──────────────────────────────────────────────────────── */
   .breakdown-banner {
-    background: linear-gradient(90deg, rgba(220, 38, 38, 0.2), rgba(220, 38, 38, 0.05));
-    border-left: 3px solid #F87171;
-    color: #FAFAFA;
+    background: var(--red-50);
+    border-left: 3px solid var(--status-breakdown-bg);
+    color: var(--text-1);
   }
 
   .priority-high-banner {
-    background: linear-gradient(90deg, rgba(217, 119, 6, 0.2), rgba(217, 119, 6, 0.05));
-    border-left: 3px solid #D97706;
+    background: var(--amber-50);
+    border-left: 3px solid var(--accent-fill);
+    color: var(--text-1);
   }
 }
 
 @layer utilities {
-  .text-primary { color: #FAFAFA; }
-  .text-secondary { color: #A1A1AA; }
-  .text-tertiary { color: #92929B; }
-  .bg-base { background-color: #151517; }
-  .bg-surface { background-color: #18181B; }
-  .bg-surface-secondary { background-color: #1E1E22; }
-  .bg-surface-tertiary { background-color: #27272A; }
-  .border-subtle { border-color: #27272A; }
-  .border-highlight { border-color: #3F3F46; }
-  .text-amber { color: #D97706; }
-  .bg-amber { background-color: #D97706; }
-  .text-green-status { color: #059669; }
-  .text-red-status { color: #F87171; }
-  .text-blue-status { color: #3B82F6; }
+  /* Legacy utility names retained so existing markup inherits the new theme. */
+  .text-primary {
+    color: var(--text-1);
+  }
+  .text-secondary {
+    color: var(--text-2);
+  }
+  .text-tertiary {
+    color: var(--text-3);
+  }
+  .bg-base {
+    background-color: var(--bg-app);
+  }
+  .bg-surface {
+    background-color: var(--surface-1);
+  }
+  .bg-surface-secondary {
+    background-color: var(--surface-2);
+  }
+  .bg-surface-tertiary {
+    background-color: var(--surface-3);
+  }
+  .border-subtle {
+    border-color: var(--border-subtle);
+  }
+  .border-highlight {
+    border-color: var(--border-strong);
+  }
+  .text-amber {
+    color: var(--accent);
+  }
+  .bg-amber {
+    background-color: var(--accent-fill);
+  }
+  .text-green-status {
+    color: var(--status-done-fg);
+  }
+  .text-red-status {
+    color: var(--status-overdue-fg);
+  }
+  .text-blue-status {
+    color: var(--status-active-fg);
+  }
+
+  /* Tabular figures for anything numeric: costs, hours, quantities, counts. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+  }
 }
