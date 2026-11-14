@@ -18,7 +18,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#151517' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-app)' }}>
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <Hexagon className="w-12 h-12 text-amber mb-3" strokeWidth={1.2} />
@@ -34,7 +34,7 @@ export default function LoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2 rounded text-primary text-sm outline-none border border-subtle focus:border-highlight transition-colors"
-              style={{ backgroundColor: '#27272A' }}
+              style={{ backgroundColor: 'var(--surface-1)' }}
               required
             />
           </div>
@@ -48,7 +48,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
                 className="w-full px-3 py-2 pr-10 rounded text-primary text-sm outline-none border border-subtle focus:border-highlight transition-colors"
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-1)' }}
                 required
               />
               <button
@@ -69,19 +69,15 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 rounded text-sm font-semibold transition-all hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2"
-            style={{
-              backgroundColor: '#D97706',
-              color: '#111113',
-              boxShadow: loading ? 'none' : '0 0 15px rgba(217, 119, 6, 0.3)',
-            }}
+            className="w-full h-control rounded bg-amber text-sm font-semibold transition-colors hover:bg-[var(--amber-600)] disabled:opacity-50 flex items-center justify-center gap-2"
+            style={{ color: 'var(--accent-ink)' }}
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <p className="text-center text-tertiary mt-4" style={{ fontSize: '11px' }}>
+        <p className="text-center text-tertiary text-2xs mt-4">
           Demo: use any username from seed data with password "password"
         </p>
       </div>

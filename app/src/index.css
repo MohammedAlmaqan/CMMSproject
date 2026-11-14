@@ -170,6 +170,8 @@
     --focus-width: 2px;
     --focus-offset: 2px;
 
+    --scrim: rgb(16 24 40 / 0.45);
+
     color-scheme: light;
   }
 
@@ -247,6 +249,8 @@
     --chart-series-4: #f87171;
     --chart-series-5: #a78bfa;
     --chart-series-6: #94a3b8;
+
+    --scrim: rgb(0 0 0 / 0.6);
 
     color-scheme: dark;
   }
@@ -570,6 +574,9 @@
   .border-highlight {
     border-color: var(--border-strong);
   }
+  .border-strong {
+    border-color: var(--border-strong);
+  }
   .text-amber {
     color: var(--accent);
   }
@@ -584,6 +591,26 @@
   }
   .text-blue-status {
     color: var(--status-active-fg);
+  }
+
+  /* Graphite rail utilities — the navigation chrome is dark in both themes. */
+  .bg-nav {
+    background-color: var(--nav-bg);
+  }
+  .text-nav {
+    color: var(--nav-text);
+  }
+  .text-nav-active {
+    color: var(--nav-text-active);
+  }
+  .border-nav {
+    border-color: var(--nav-border);
+  }
+  .hover\:bg-nav-active:hover {
+    background-color: var(--nav-active-bg);
+  }
+  .hover\:text-nav-active:hover {
+    color: var(--nav-text-active);
   }
 
   /* Tabular figures for anything numeric: costs, hours, quantities, counts. */

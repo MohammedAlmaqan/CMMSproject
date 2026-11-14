@@ -151,20 +151,14 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
     <div
       ref={dialogRef}
       className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
-      style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
+      style={{ backgroundColor: 'var(--scrim)' }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Command palette"
     >
       <div
-        className="w-full max-w-xl rounded-lg overflow-hidden"
-        style={{
-          background: 'rgba(24, 24, 27, 0.6)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          border: '1px solid #27272A',
-        }}
+        className="w-full max-w-xl rounded-lg overflow-hidden bg-surface border border-strong shadow-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Input */}
@@ -179,8 +173,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
             className="flex-1 bg-transparent text-primary text-sm outline-none placeholder:text-tertiary"
           />
           <kbd
-            className="px-1.5 py-0.5 rounded text-tertiary border border-subtle"
-            style={{ fontSize: '10px' }}
+            className="px-1.5 py-0.5 rounded text-2xs text-tertiary border border-subtle"
           >
             ESC
           </kbd>
@@ -191,8 +184,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
           {Object.entries(grouped).map(([category, items]) => (
             <div key={category}>
               <div
-                className="px-4 py-1.5 text-tertiary font-medium"
-                style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}
+                className="px-4 py-1.5 text-2xs text-tertiary font-medium uppercase tracking-[0.06em]"
               >
                 {category}
               </div>
@@ -205,10 +197,10 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     key={item.id}
                     onClick={item.action}
                     onMouseEnter={() => setSelectedIndex(idx)}
-                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-all ${
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
                       isSelected
                         ? 'bg-surface-tertiary text-primary'
-                        : 'text-secondary hover:text-primary hover:bg-surface-tertiary/50'
+                        : 'text-secondary hover:text-primary hover:bg-surface-hover'
                     }`}
                   >
                     <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />
@@ -230,12 +222,12 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
         <div className="flex items-center gap-4 px-4 py-2 border-t border-subtle">
           <div className="flex items-center gap-1">
             <ArrowRight className="w-3 h-3 text-tertiary" />
-            <span className="text-tertiary" style={{ fontSize: '10px' }}>
+            <span className="text-tertiary text-2xs">
               to select
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-tertiary" style={{ fontSize: '10px' }}>
+            <span className="text-tertiary text-2xs">
               ↑↓ to navigate
             </span>
           </div>

@@ -60,26 +60,22 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
 
   return (
     <div
-      className={`h-screen flex flex-col border-r border-subtle transition-all duration-200 relative ${
+      className={`h-screen flex flex-col border-r border-nav bg-nav transition-all duration-200 relative ${
         collapsed ? 'w-16' : 'w-60'
       }`}
-      style={{ backgroundColor: '#18181B' }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-16 border-b border-subtle">
+      <div className="flex items-center gap-3 px-4 h-14 border-b border-nav">
         <div className="flex items-center justify-center w-8 h-8 rounded">
           <Hexagon className="w-7 h-7 text-amber flex-shrink-0" strokeWidth={1.5} />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <div className="text-primary font-semibold text-sm tracking-tight whitespace-nowrap">
+            <div className="text-nav-active font-semibold text-sm tracking-tight whitespace-nowrap">
               CommandPulse
             </div>
-            <div
-              className="text-tertiary font-medium whitespace-nowrap"
-              style={{ fontSize: '9px', letterSpacing: '0.08em', textTransform: 'uppercase' }}
-            >
-              MAINTENANCE
+            <div className="text-nav text-2xs font-medium uppercase tracking-[0.08em] whitespace-nowrap">
+              Maintenance
             </div>
           </div>
         )}
@@ -99,7 +95,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
               className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-150 ${
                 isActive
                   ? 'nav-active'
-                  : 'text-secondary hover:text-primary hover:bg-surface-tertiary'
+                  : 'text-nav hover:text-nav-active hover:bg-nav-active'
               } ${collapsed ? 'justify-center' : ''}`}
               aria-label={item.name}
               title={collapsed ? item.name : undefined}
@@ -115,7 +111,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
       <div className="px-3 pb-2">
         <button
           onClick={onOpenCommandPalette}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded text-xs text-secondary border border-subtle hover:border-highlight hover:text-primary transition-all ${
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded text-xs text-nav border border-nav hover:border-highlight hover:text-nav-active transition-all ${
             collapsed ? 'justify-center' : ''
           }`}
         >
@@ -123,7 +119,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
           {!collapsed && (
             <>
               <span>Command</span>
-              <kbd className="ml-auto text-tertiary" style={{ fontSize: '10px' }}>
+              <kbd className="ml-auto text-nav text-2xs">
                 ⌘K
               </kbd>
             </>
@@ -132,7 +128,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
       </div>
 
       {/* User Profile */}
-      <div className="px-3 py-3 border-t border-subtle">
+      <div className="px-3 py-3 border-t border-nav">
         {/* Display only. This used to be a button that navigated to
             /administration for every role; the route floor is Administrator, so
             five of the six roles clicked their own name and were silently
@@ -144,17 +140,17 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
             collapsed ? 'justify-center' : ''
           }`}
         >
-          <div className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#D97706' }}>
-            <span className="text-xs font-semibold" style={{ color: '#111113' }}>
+          <div className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0 bg-amber">
+            <span className="text-xs font-semibold" style={{ color: 'var(--accent-ink)' }}>
               {user?.fullName?.charAt(0) || 'U'}
             </span>
           </div>
           {!collapsed && (
             <div className="overflow-hidden text-left">
-              <div className="text-primary text-xs font-medium truncate">
+              <div className="text-nav-active text-xs font-medium truncate">
                 {user?.fullName || 'User'}
               </div>
-              <div className="text-tertiary truncate" style={{ fontSize: '10px' }}>
+              <div className="text-nav text-2xs truncate">
                 {user?.role || 'Technician'}
               </div>
             </div>
@@ -165,7 +161,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
             the API accepts a self-change with currentPassword for any caller. */}
         <button
           onClick={() => setPasswordOpen(true)}
-          className={`w-full flex items-center gap-2 px-2 py-1.5 mt-1 rounded text-xs text-secondary hover:text-primary hover:bg-surface-tertiary transition-all ${
+          className={`w-full flex items-center gap-2 px-2 py-1.5 mt-1 rounded text-xs text-nav hover:text-nav-active hover:bg-nav-active transition-all ${
             collapsed ? 'justify-center' : ''
           }`}
           aria-label="Change password"
@@ -184,7 +180,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
             logout();
             navigate('/login');
           }}
-          className={`w-full flex items-center gap-2 px-2 py-1.5 mt-0.5 rounded text-xs text-secondary hover:text-primary hover:bg-surface-tertiary transition-all ${
+          className={`w-full flex items-center gap-2 px-2 py-1.5 mt-0.5 rounded text-xs text-nav hover:text-nav-active hover:bg-nav-active transition-all ${
             collapsed ? 'justify-center' : ''
           }`}
           aria-label="Sign out"
@@ -208,7 +204,7 @@ export default function Sidebar({ onOpenCommandPalette }: SidebarProps) {
         onClick={() => setCollapsed(!collapsed)}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         className="absolute -right-3 top-20 w-6 h-6 rounded-full flex items-center justify-center text-secondary hover:text-primary transition-all z-50"
-        style={{ backgroundColor: '#27272A', border: '1px solid #27272A' }}
+        style={{ backgroundColor: 'var(--nav-active-bg)', border: '1px solid var(--nav-border)' }}
       >
         {collapsed ? (
           <ChevronRight className="w-3 h-3" />

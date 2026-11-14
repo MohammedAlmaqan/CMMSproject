@@ -40,15 +40,11 @@ export default function Header({ title, onCreate, tabs, showActions = true }: He
 
   return (
     <div
-      className="flex items-center justify-between px-6 h-16 border-b border-subtle flex-shrink-0"
-      style={{ backgroundColor: '#18181B' }}
+      className="flex items-center justify-between px-5 h-14 border-b border-subtle flex-shrink-0 bg-surface"
     >
       {/* Left: Title & Breadcrumb */}
       <div className="flex flex-col justify-center">
-        <h1
-          className="text-primary font-bold tracking-tight"
-          style={{ fontSize: '20px', letterSpacing: '-0.01em' }}
-        >
+        <h1 className="text-primary text-xl font-semibold tracking-tight">
           {title}
         </h1>
         {getBreadcrumb() && (
@@ -58,24 +54,16 @@ export default function Header({ title, onCreate, tabs, showActions = true }: He
 
       {/* Center: Tabs */}
       {tabs && (
-        <div className="flex items-center rounded overflow-hidden" style={{ backgroundColor: '#151517' }}>
+        <div className="flex items-center rounded overflow-hidden bg-surface-secondary">
           {tabs.map((tab) => (
             <button
               key={tab.value}
               onClick={tab.onClick}
-              className={`px-4 py-1.5 text-xs font-medium transition-all ${
+              className={`px-4 py-1.5 text-xs font-medium transition-colors border-b-2 ${
                 tab.active
-                  ? 'text-primary shadow-sm'
-                  : 'text-tertiary hover:text-secondary'
+                  ? 'text-primary bg-surface border-[var(--accent)]'
+                  : 'text-tertiary border-transparent hover:text-secondary'
               }`}
-              style={
-                tab.active
-                  ? {
-                      backgroundColor: '#27272A',
-                      boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.05)',
-                    }
-                  : {}
-              }
             >
               {tab.label}
             </button>
@@ -97,7 +85,7 @@ export default function Header({ title, onCreate, tabs, showActions = true }: He
           >
             <Bell className="w-[18px] h-[18px]" strokeWidth={1.5} />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-amber text-xs font-medium flex items-center justify-center" style={{ color: '#111113', fontSize: '9px' }}>
+              <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-amber text-2xs font-semibold flex items-center justify-center" style={{ color: 'var(--accent-ink)' }}>
                 {unreadCount}
               </span>
             )}
@@ -106,12 +94,8 @@ export default function Header({ title, onCreate, tabs, showActions = true }: He
           {onCreate && (
             <button
               onClick={onCreate}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded transition-all hover:brightness-110"
-              style={{
-                backgroundColor: '#D97706',
-                color: '#111113',
-                boxShadow: '0 0 15px rgba(217, 119, 6, 0.3)',
-              }}
+              className="flex items-center gap-1.5 px-4 h-control text-xs font-semibold rounded bg-amber transition-colors hover:bg-[var(--amber-600)]"
+              style={{ color: 'var(--accent-ink)' }}
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Create</span>
