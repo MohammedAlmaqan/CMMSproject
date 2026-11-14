@@ -23,7 +23,7 @@ system; until then it describes the superseded dark palette.
       self-hosted via `@fontsource`, legacy utility class names
       (`.text-primary`, `.bg-surface`, `.border-subtle`, …) re-pointed at
       tokens so existing markup inherits the new palette.
-- [ ] **P2 — Status system.** `app/src/lib/status.ts` single source of truth
+- [x] **P2 — Status system.** `app/src/lib/status.ts` single source of truth
       for the 8 tones (open, scheduled, active, hold, done, void, overdue,
       breakdown) with derived Overdue/Breakdown, replacing 10 per-page maps.
 - [ ] **P3 — Chrome.** Sidebar, Header, AppLayout, LoginPage, CommandPalette:
@@ -48,3 +48,4 @@ system; until then it describes the superseded dark palette.
 | Date | Phase | Commit | Verified |
 |---|---|---|---|
 | 2026-11-14 | P1 | `this commit` | `tsc` clean · build 41.9 s (Plex woff2 bundled) · app 184/184 |
+| 2026-11-14 | P2 | `this commit` | status tests 15/15 · `tsc` clean |

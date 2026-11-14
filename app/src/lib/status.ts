@@ -32,6 +32,18 @@ export const STATUS_TONES: readonly StatusTone[] = [
   'breakdown',
 ] as const
 
+/** Lifecycle order, used by filters and the board view. */
+export const WORK_ORDER_STATUSES: readonly WorkOrderStatus[] = [
+  'Draft',
+  'Planned',
+  'Scheduled',
+  'In Progress',
+  'Suspended',
+  'Completed',
+  'Closed',
+  'Cancelled',
+] as const
+
 /** The stored lifecycle state → tone. Derived states are applied on top. */
 const TONE_BY_STATUS: Record<WorkOrderStatus, StatusTone> = {
   Draft: 'open',
@@ -73,6 +85,16 @@ export function labelForTone(tone: StatusTone): string {
 
 export function badgeClassFor(tone: StatusTone): string {
   return `badge-${tone}`
+}
+
+/** CSS colour for the status dot that precedes a badge. */
+export function statusDot(tone: StatusTone): string {
+  return `var(--status-${tone}-border)`
+}
+
+/** True when the tone is a derived state rather than the stored lifecycle. */
+export function isDerivedTone(tone: StatusTone): boolean {
+  return tone === 'overdue' || tone === 'breakdown'
 }
 
 /**

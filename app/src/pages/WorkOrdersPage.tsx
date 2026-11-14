@@ -20,8 +20,10 @@ import {
   XCircle,
   Lock,
   AlertTriangle,
+  Clock,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import StatusBadge from '@/components/StatusBadge';
 import ScheduleWorkOrderDialog from '@/components/ScheduleWorkOrderDialog';
 import CsvToolbar from '@/components/CsvToolbar';
 import type { ScheduleDates } from '@/components/ScheduleWorkOrderDialog';
@@ -29,41 +31,23 @@ import { useAuthStore } from '@/store/authStore';
 import { hasMinRole } from '@/lib/rbac';
 import { workOrderService } from '@/services/workOrderService';
 import { ApiError } from '@/lib/api';
-import type { WorkOrder, ViewMode, WorkOrderStatus, Priority } from '@/types';
+import {
+  badgeClassFor,
+  isDerivedTone,
+  labelForTone,
+  priorityBadgeClass,
+  statusDot,
+  toneForStatus,
+  toneForWorkOrder,
+  WORK_ORDER_STATUSES,
+} from '@/lib/status';
+import type { WorkOrder, ViewMode, WorkOrderStatus } from '@/types';
 
 interface WorkOrderRow extends WorkOrder {
   functionalLocation?: { functionalLocationId: string; locationCode: string; description?: string };
   equipment?: { equipmentId: string; equipmentCode: string; name?: string } | null;
   workCenter?: { workCenterId: string; code: string; name?: string };
 }
-
-const statusBadges: Record<WorkOrderStatus, string> = {
-  Draft: 'badge-open',
-  Planned: 'badge-open',
-  Scheduled: 'badge-in-progress',
-  'In Progress': 'badge-in-progress',
-  Suspended: 'badge-cancelled',
-  Completed: 'badge-completed',
-  Closed: 'badge-completed',
-  Cancelled: 'badge-cancelled',
-};
-
-const statusColors: Record<WorkOrderStatus, string> = {
-  Draft: '#D97706',
-  Planned: '#D97706',
-  Scheduled: '#2563EB',
-  'In Progress': '#2563EB',
-  Suspended: '#F87171',
-  Completed: '#059669',
-  Closed: '#059669',
-  Cancelled: '#92929B',
-};
-
-const priorityClasses: Record<Priority, string> = {
-  High: 'badge-high',
-  Medium: 'badge-medium',
-  Low: 'badge-low',
-};
 
 const PAGE_SIZE = 10;
 
@@ -276,7 +260,7 @@ export default function WorkOrdersPage() {
             style={{ backgroundColor: '#27272A' }}
           >
             <option value="All">All Statuses</option>
-            {Object.keys(statusBadges).map((s) => (
+            {WORK_ORDER_STATUSES.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
@@ -374,20 +358,10 @@ export default function WorkOrdersPage() {
                       role="link"
                     >
                       <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: statusColors[wo.status] }}
-                          />
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusBadges[wo.status]}`}
-                          >
-                            {wo.status}
-                          </span>
-                        </div>
+                        <StatusBadge wo={wo} />
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${priorityClasses[wo.priority]}`}>
+                        <span className={priorityBadgeClass(wo.priority)}>
                           {wo.priority}
                         </span>
                       </td>
@@ -545,7 +519,7 @@ export default function WorkOrdersPage() {
           </div>
         ) : (
           <div className="flex gap-4 overflow-x-auto pb-2">
-            {(['Draft', 'Planned', 'Scheduled', 'In Progress', 'Suspended', 'Completed', 'Closed', 'Cancelled'] as WorkOrderStatus[]).map(
+            {WORK_ORDER_STATUSES.map(
               (status) => {
                 const statusWos = boardRows.filter((w) => w.status === status);
                 return (
@@ -560,7 +534,7 @@ export default function WorkOrdersPage() {
                       <div className="flex items-center gap-2">
                         <div
                           className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: statusColors[status] }}
+                          style={{ backgroundColor: statusDot(toneForStatus(status)) }}
                         />
                         <span className="text-primary text-xs font-semibold">{status}</span>
                       </div>
@@ -583,7 +557,7 @@ export default function WorkOrdersPage() {
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-mono text-xs text-amber">{wo.woNumber}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${priorityClasses[wo.priority]}`}>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${priorityBadgeClass(wo.priority)}`}>
                               {wo.priority}
                             </span>
                           </div>
