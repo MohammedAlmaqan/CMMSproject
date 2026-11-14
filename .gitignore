@@ -31,6 +31,8 @@ docs/screenshots/*
 # at it, and the report has to be reproducible from the shipped tree.
 !docs/screenshots/uat_v1.7.0/
 !docs/screenshots/uat_v1.7.0/**
+!docs/screenshots/install_v1.7.0/
+!docs/screenshots/install_v1.7.0/**
 backend/uploads/
 backend/service/
 backups/
