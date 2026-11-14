@@ -303,6 +303,28 @@ function Install-CmmsSingleService {
     }
     # `sc config` updates start type, dependencies and account without deleting
     # the service, so an upgrade never has a window in which the service is absent.
+    # It does NOT change the binary path. A service registered by an earlier
+    # install in a different folder - a hand-run registration from a source tree,
+    # or an install that has since moved - would keep running that folder's
+    # wrapper, which reads the XML and .env beside itself, so the "upgrade" would
+    # report success and go on serving the old tree. Repoint it here, while it is
+    # stopped. The value written is the one `sc.exe config <id> binPath=` writes:
+    # ImagePath, quoted. It is written directly because sc.exe re-quotes its
+    # argument differently under Windows PowerShell and PowerShell 7, and it is
+    # read back so a wrong value fails the install instead of starting the wrong
+    # program.
+    $wrapper = '"{0}"' -f $ServiceExe
+    $serviceKey = "HKLM:\SYSTEM\CurrentControlSet\Services\$Id"
+    $currentPath = [string](Get-ItemProperty -LiteralPath $serviceKey -Name ImagePath -ErrorAction SilentlyContinue).ImagePath
+    if ($currentPath.Trim() -ne $wrapper) {
+      Write-ServiceLog "INFO" "Service '$Id' ran '$currentPath'; repointing it at '$ServiceExe'"
+      Set-ItemProperty -LiteralPath $serviceKey -Name ImagePath -Value $wrapper
+      $effective = [string](Get-CimInstance Win32_Service -Filter ("Name='{0}'" -f $Id) -ErrorAction SilentlyContinue).PathName
+      if ($effective.Trim() -ne $wrapper) {
+        throw "Service '$Id' still reports '$effective' after being pointed at '$ServiceExe'"
+      }
+      Write-ServiceLog "OK" "Service '$Id' now runs '$ServiceExe'"
+    }
     $null = & sc.exe config $Id start= auto 2>&1
     if ($LASTEXITCODE -ne 0) { throw "sc.exe config start=auto failed for '$Id' (exit $LASTEXITCODE)" }
     $null = & sc.exe description $Id $Description 2>&1
