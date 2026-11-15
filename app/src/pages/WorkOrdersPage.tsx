@@ -340,7 +340,7 @@ export default function WorkOrdersPage() {
                   {paged.map((wo) => (
                     <tr
                       key={wo.workOrderId}
-                      className="table-row-hover cursor-pointer transition-colors border-t border-subtle"
+                      className="table-row-hover cursor-pointer transition-colors"
                       onClick={() => navigate(`/work-orders/${wo.workOrderId}`)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {

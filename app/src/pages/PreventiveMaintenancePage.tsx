@@ -774,10 +774,7 @@ export default function PreventiveMaintenancePage() {
                 const wc = workCenters.find((w) => w.workCenterId === plan.workCenterId);
                 const tl = taskLists.find((t) => t.taskListId === plan.taskListId);
                 return (
-                  <tr
-                    key={plan.planId}
-                    className="border-t border-subtle"
-                  >
+                  <tr key={plan.planId}>
                     <td className="font-mono text-xs text-amber">{plan.planCode}</td>
                     <td className="text-xs text-primary">{plan.description}</td>
                     <td className="font-mono text-xs text-secondary">{targetLabel(plan, equipment, locations)}</td>

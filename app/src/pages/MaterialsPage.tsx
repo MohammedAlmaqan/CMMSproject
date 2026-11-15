@@ -316,10 +316,7 @@ export default function MaterialsPage() {
             </thead>
             <tbody>
               {paged.map((mat) => (
-                <tr
-                  key={mat.materialId}
-                  className="border-t border-subtle"
-                >
+                <tr key={mat.materialId}>
                   <td className="font-mono text-xs text-primary">{mat.materialCode}</td>
                   <td className="text-xs text-primary">{mat.description}</td>
                   <td className="text-xs text-secondary">{mat.unitOfMeasure}</td>

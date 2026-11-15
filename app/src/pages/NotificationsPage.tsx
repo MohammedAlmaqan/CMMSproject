@@ -438,7 +438,7 @@ export default function NotificationsPage() {
                     return (
                       <tr
                         key={notif.notificationId}
-                        className="border-t border-subtle cursor-pointer table-row-hover transition-colors"
+                        className="cursor-pointer table-row-hover transition-colors"
                         onClick={() => navigate(`/notifications/${notif.notificationId}`)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
