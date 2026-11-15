@@ -222,7 +222,7 @@ export default function SafetyChecklistsPage() {
               placeholder="Search templates..."
               aria-label="Search safety checklist templates"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-              style={{ backgroundColor: '#27272A' }}
+              style={{ backgroundColor: 'var(--surface-3)' }}
             />
           </div>
           <span className="text-tertiary text-xs ml-auto">
@@ -238,7 +238,7 @@ export default function SafetyChecklistsPage() {
           {loadError && (
             <button
               onClick={reload}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber/50 hover:bg-amber/10"
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber hover:bg-amber-weak"
             >
               <RefreshCw className="w-3 h-3" /> Retry
             </button>
@@ -247,7 +247,7 @@ export default function SafetyChecklistsPage() {
             <button
               onClick={openCreate}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110"
-              style={{ backgroundColor: '#D97706', color: '#111113' }}
+              style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
             >
               <Plus className="w-3.5 h-3.5" /> New Template
             </button>
@@ -358,7 +358,7 @@ export default function SafetyChecklistsPage() {
                 type="submit"
                 disabled={busy === 'save'}
                 className="px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                style={{ backgroundColor: '#D97706', color: '#111113' }}
+                style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
               >
                 {busy === 'save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : editingId ? 'Save Changes' : 'Create Template'}
               </button>
@@ -388,18 +388,18 @@ export default function SafetyChecklistsPage() {
           </div>
         ) : (
           <div className="industrial-card rounded overflow-hidden">
-            <div className="grid grid-cols-[1fr_2fr_90px_80px_auto] gap-4 px-3 py-2 border-b border-subtle" style={{ backgroundColor: '#27272A' }}>
-              <span className="text-tertiary font-medium" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Name</span>
-              <span className="text-tertiary font-medium" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Description</span>
-              <span className="text-tertiary font-medium" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Mandatory</span>
-              <span className="text-tertiary font-medium text-right" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Items</span>
+            <div className="grid grid-cols-[1fr_2fr_90px_80px_auto] gap-4 px-3 py-2 border-b border-subtle" style={{ backgroundColor: 'var(--surface-3)' }}>
+              <span className="text-tertiary font-medium" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Name</span>
+              <span className="text-tertiary font-medium" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Description</span>
+              <span className="text-tertiary font-medium" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Mandatory</span>
+              <span className="text-tertiary font-medium text-right" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Items</span>
               <span className="w-16" />
             </div>
             {filteredTemplates.map((template) => (
               <div
                 key={template.checklistTemplateId}
                 className="grid grid-cols-[1fr_2fr_90px_80px_auto] gap-4 px-3 py-2 text-xs border-b border-subtle hover:bg-surface-tertiary transition-colors"
-                style={{ backgroundColor: '#151517' }}
+                style={{ backgroundColor: 'var(--bg-app)' }}
               >
                 <span className="font-mono text-primary truncate">{template.name}</span>
                 <span className="text-secondary truncate">{template.description}</span>

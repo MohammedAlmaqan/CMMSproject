@@ -75,7 +75,7 @@ export default function ScheduleWorkOrderDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+      style={{ backgroundColor: 'var(--scrim)' }}
       role="dialog"
       aria-modal="true"
       aria-label={`Schedule ${woNumber}`}
@@ -83,7 +83,7 @@ export default function ScheduleWorkOrderDialog({
       <form
         onSubmit={submit}
         className="industrial-card rounded-lg p-5 w-full max-w-sm space-y-3"
-        style={{ backgroundColor: '#1E1E22' }}
+        style={{ backgroundColor: 'var(--surface-1)' }}
       >
         <div className="flex items-center justify-between">
           <h3 className="text-primary text-sm font-semibold flex items-center gap-2">
@@ -113,7 +113,7 @@ export default function ScheduleWorkOrderDialog({
             required
             aria-label="Planned start"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -125,7 +125,7 @@ export default function ScheduleWorkOrderDialog({
             required
             aria-label="Planned finish"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <div className="flex items-center gap-2 pt-1">
@@ -133,7 +133,7 @@ export default function ScheduleWorkOrderDialog({
             type="submit"
             disabled={busy}
             className="text-xs px-3 py-1.5 rounded bg-amber font-medium disabled:opacity-50"
-            style={{ color: '#111113' }}
+            style={{ color: 'var(--accent-ink)' }}
           >
             {busy ? (
               <span className="flex items-center gap-1">

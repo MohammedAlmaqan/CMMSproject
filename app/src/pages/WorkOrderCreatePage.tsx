@@ -149,8 +149,8 @@ export default function WorkOrderCreatePage() {
         </button>
 
         {loadError && (
-          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded text-xs text-red-status border border-red-status/30"
-            style={{ backgroundColor: 'rgba(220,38,38,0.08)' }}>
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded text-xs text-red-status border border-overdue"
+            style={{ backgroundColor: 'var(--status-overdue-bg)' }}>
             <AlertTriangle className="w-4 h-4" />
             {loadError}
           </div>
@@ -176,7 +176,7 @@ export default function WorkOrderCreatePage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Type</label>
-              <select value={type} onChange={(e) => setType(e.target.value as WorkOrderType)} className={inputClass} style={{ backgroundColor: '#27272A' }} required>
+              <select value={type} onChange={(e) => setType(e.target.value as WorkOrderType)} className={inputClass} style={{ backgroundColor: 'var(--surface-3)' }} required>
                 <option value="CM">Corrective Maintenance</option>
                 <option value="PM">Preventive Maintenance</option>
                 <option value="PdM">Predictive Maintenance</option>
@@ -187,7 +187,7 @@ export default function WorkOrderCreatePage() {
 
             <div>
               <label className={labelClass}>Priority</label>
-              <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} className={inputClass} style={{ backgroundColor: '#27272A' }} required>
+              <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} className={inputClass} style={{ backgroundColor: 'var(--surface-3)' }} required>
                 <option value="High">High</option>
                 <option value="Medium">Medium</option>
                 <option value="Low">Low</option>
@@ -200,7 +200,7 @@ export default function WorkOrderCreatePage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className={inputClass}
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
                 rows={3}
                 required
               />
@@ -212,7 +212,7 @@ export default function WorkOrderCreatePage() {
                 value={safetyNotes}
                 onChange={(e) => setSafetyNotes(e.target.value)}
                 className={inputClass}
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
                 rows={3}
                 placeholder="Hazards, isolations and precautions for this job"
                 aria-label="Safety notes"
@@ -225,7 +225,7 @@ export default function WorkOrderCreatePage() {
                 value={functionalLocationId}
                 onChange={(e) => { setFunctionalLocationId(e.target.value); setEquipmentId(''); }}
                 className={inputClass}
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
                 required
               >
                 <option value="">Select location</option>
@@ -243,7 +243,7 @@ export default function WorkOrderCreatePage() {
                 value={equipmentId}
                 onChange={(e) => handleEquipmentChange(e.target.value)}
                 className={inputClass}
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
                 disabled={!functionalLocationId}
               >
                 <option value="">None</option>
@@ -257,7 +257,7 @@ export default function WorkOrderCreatePage() {
 
             <div>
               <label className={labelClass}>Work Center</label>
-              <select value={workCenterId} onChange={(e) => setWorkCenterId(e.target.value)} className={inputClass} style={{ backgroundColor: '#27272A' }} required>
+              <select value={workCenterId} onChange={(e) => setWorkCenterId(e.target.value)} className={inputClass} style={{ backgroundColor: 'var(--surface-3)' }} required>
                 <option value="">Select work center</option>
                 {workCenters.map((wc) => (
                   <option key={wc.workCenterId} value={wc.workCenterId}>
@@ -274,7 +274,7 @@ export default function WorkOrderCreatePage() {
                 value={taskListId}
                 onChange={(e) => setTaskListId(e.target.value)}
                 className={inputClass}
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
               >
                 <option value="">No template (start empty)</option>
                 {taskLists.map((tl) => (
@@ -312,7 +312,7 @@ export default function WorkOrderCreatePage() {
 
             <div>
               <label className={labelClass}>Supervisor</label>
-              <select value={supervisorUserId} onChange={(e) => setSupervisorUserId(e.target.value)} className={inputClass} style={{ backgroundColor: '#27272A' }} required>
+              <select value={supervisorUserId} onChange={(e) => setSupervisorUserId(e.target.value)} className={inputClass} style={{ backgroundColor: 'var(--surface-3)' }} required>
                 <option value="">Select supervisor</option>
                 {users.map((u) => (
                     <option key={u.userId} value={u.userId}>
@@ -324,22 +324,22 @@ export default function WorkOrderCreatePage() {
 
             <div>
               <label className={labelClass}>Planned Start</label>
-              <input type="datetime-local" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} className={inputClass} style={{ backgroundColor: '#27272A' }} />
+              <input type="datetime-local" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} className={inputClass} style={{ backgroundColor: 'var(--surface-3)' }} />
             </div>
 
             <div>
               <label className={labelClass}>Planned Finish</label>
-              <input type="datetime-local" value={plannedFinish} onChange={(e) => setPlannedFinish(e.target.value)} className={inputClass} style={{ backgroundColor: '#27272A' }} />
+              <input type="datetime-local" value={plannedFinish} onChange={(e) => setPlannedFinish(e.target.value)} className={inputClass} style={{ backgroundColor: 'var(--surface-3)' }} />
             </div>
 
             <div>
               <label className={labelClass}>Cost Center Code</label>
-              <input type="text" value={costCenterCode} onChange={(e) => setCostCenterCode(e.target.value)} className={inputClass} style={{ backgroundColor: '#27272A' }} />
+              <input type="text" value={costCenterCode} onChange={(e) => setCostCenterCode(e.target.value)} className={inputClass} style={{ backgroundColor: 'var(--surface-3)' }} />
             </div>
 
             <div>
               <label className={labelClass}>Internal Order</label>
-              <input type="text" value={internalOrder} onChange={(e) => setInternalOrder(e.target.value)} className={inputClass} style={{ backgroundColor: '#27272A' }} />
+              <input type="text" value={internalOrder} onChange={(e) => setInternalOrder(e.target.value)} className={inputClass} style={{ backgroundColor: 'var(--surface-3)' }} />
             </div>
 
             <div>
@@ -348,7 +348,7 @@ export default function WorkOrderCreatePage() {
                 value={causeCodeId}
                 onChange={(e) => setCauseCodeId(e.target.value)}
                 className={inputClass}
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
               >
                 <option value="">None</option>
                 {causeCodes.map((c) => (
@@ -356,7 +356,7 @@ export default function WorkOrderCreatePage() {
                 ))}
               </select>
               {breakdownFlag && (
-                <p className="mt-1 text-[11px] text-tertiary">A cause code is required before this breakdown can be completed.</p>
+                <p className="mt-1 text-2xs text-tertiary">A cause code is required before this breakdown can be completed.</p>
               )}
             </div>
 
@@ -389,7 +389,7 @@ export default function WorkOrderCreatePage() {
               type="submit"
               disabled={submitting}
               className="flex items-center gap-2 px-5 py-2 rounded text-sm font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-              style={{ backgroundColor: '#D97706', color: '#111113' }}
+              style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {submitting ? 'Creating...' : 'Create Work Order'}

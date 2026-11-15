@@ -280,7 +280,7 @@ export default function LocationsPage() {
         <div key={node.functionalLocationId}>
           <div
             className="flex items-center gap-2 px-3 py-2 text-xs border-b border-subtle hover:bg-surface-tertiary transition-colors"
-            style={{ paddingLeft: `${12 + depth * 20}px`, backgroundColor: depth % 2 === 0 ? '#1E1E22' : '#151517' }}
+            style={{ paddingLeft: `${12 + depth * 20}px` }}
           >
             {children.length > 0 ? (
               <button onClick={() => toggleNode(node.functionalLocationId)} aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.locationCode}`} aria-expanded={isExpanded} className="flex-shrink-0">
@@ -296,17 +296,17 @@ export default function LocationsPage() {
               {node.operationalStatus}
             </span>
             {node.safetyCritical && (
-              <span className="text-xs px-1.5 py-0.5 rounded text-red-status border border-red-status/50 flex-shrink-0">
+              <span className="text-xs px-1.5 py-0.5 rounded text-red-status border border-overdue flex-shrink-0">
                 Safety Critical
               </span>
             )}
             <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-              <span className="text-tertiary" style={{ fontSize: '10px' }} title="Equipment">EQ: {stats.eqCount}</span>
+              <span className="text-tertiary" style={{ fontSize: '11px' }} title="Equipment">EQ: {stats.eqCount}</span>
               {stats.woCount > 0 && (
-                <span className="text-amber" style={{ fontSize: '10px' }} title="Open work orders, including child locations">Open WO: {stats.woCount}</span>
+                <span className="text-amber" style={{ fontSize: '11px' }} title="Open work orders, including child locations">Open WO: {stats.woCount}</span>
               )}
               {stats.notifCount > 0 && (
-                <span className="text-red-status flex items-center gap-0.5" style={{ fontSize: '10px' }} title="Open Notifications">
+                <span className="text-red-status flex items-center gap-0.5" style={{ fontSize: '11px' }} title="Open Notifications">
                   <AlertTriangle className="w-3 h-3" />{stats.notifCount}
                 </span>
               )}
@@ -372,7 +372,7 @@ export default function LocationsPage() {
               placeholder="Search locations..."
               aria-label="Search locations"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-              style={{ backgroundColor: '#27272A' }}
+              style={{ backgroundColor: 'var(--surface-3)' }}
             />
           </div>
           <span className="text-tertiary text-xs ml-auto">
@@ -381,7 +381,7 @@ export default function LocationsPage() {
           {loadError && (
             <button
               onClick={reload}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber/50 hover:bg-amber/10"
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber hover:bg-amber-weak"
             >
               <RefreshCw className="w-3 h-3" /> Retry
             </button>
@@ -397,7 +397,7 @@ export default function LocationsPage() {
             <button
               onClick={openCreate}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110"
-              style={{ backgroundColor: '#D97706', color: '#111113' }}
+              style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
             >
               <Plus className="w-3.5 h-3.5" /> New Location
             </button>
@@ -495,7 +495,7 @@ export default function LocationsPage() {
                 type="submit"
                 disabled={busy === 'save'}
                 className="px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                style={{ backgroundColor: '#D97706', color: '#111113' }}
+                style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
               >
                 {busy === 'save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : editingId ? 'Save Changes' : 'Create Location'}
               </button>
@@ -525,13 +525,13 @@ export default function LocationsPage() {
           </div>
         ) : (
           <div className="industrial-card rounded overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-3 py-2 border-b border-subtle" style={{ backgroundColor: '#27272A' }}>
-              <span className="text-tertiary font-medium" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Location</span>
-              <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Status</span>
-              <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Equipment</span>
-              <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Work Orders</span>
-              <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Open WOs</span>
-              <span className="text-tertiary font-medium text-center" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Alerts</span>
+            <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-3 py-2 border-b border-subtle" style={{ backgroundColor: 'var(--surface-3)' }}>
+              <span className="text-tertiary font-medium" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Location</span>
+              <span className="text-tertiary font-medium text-center" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Status</span>
+              <span className="text-tertiary font-medium text-center" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Equipment</span>
+              <span className="text-tertiary font-medium text-center" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Work Orders</span>
+              <span className="text-tertiary font-medium text-center" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Open WOs</span>
+              <span className="text-tertiary font-medium text-center" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Alerts</span>
             </div>
             {renderTree(rootLocations)}
           </div>

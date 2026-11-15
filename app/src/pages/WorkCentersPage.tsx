@@ -66,7 +66,7 @@ function WorkCenterForm({ initial, onCancel, onSaved }: WorkCenterFormProps) {
             required
             disabled={busy}
             className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="block text-xs text-secondary">
@@ -77,7 +77,7 @@ function WorkCenterForm({ initial, onCancel, onSaved }: WorkCenterFormProps) {
             required
             disabled={busy}
             className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="block text-xs text-secondary">
@@ -90,7 +90,7 @@ function WorkCenterForm({ initial, onCancel, onSaved }: WorkCenterFormProps) {
             onChange={(e) => setDailyCapacityHours(e.target.value)}
             disabled={busy}
             className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="block text-xs text-secondary">
@@ -103,7 +103,7 @@ function WorkCenterForm({ initial, onCancel, onSaved }: WorkCenterFormProps) {
             onChange={(e) => setCostRatePerHour(e.target.value)}
             disabled={busy}
             className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
       </div>
@@ -214,7 +214,7 @@ export default function WorkCentersPage() {
               <div key={wc.workCenterId} className="industrial-card rounded overflow-hidden">
                 <div
                   className="flex items-center justify-between px-4 py-3 border-b border-subtle"
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                 >
                   <button
                     onClick={() => toggleWC(wc.workCenterId)}
@@ -248,13 +248,13 @@ export default function WorkCentersPage() {
                 </div>
                 {isExpanded && (
                   <div>
-                    <div className="grid grid-cols-3 gap-2 px-4 py-2 border-b border-subtle" style={{ backgroundColor: '#1E1E22' }}>
-                      <span className="text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Craft Code</span>
-                      <span className="text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Description</span>
-                      <span className="text-tertiary text-right" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Hourly Rate</span>
+                    <div className="grid grid-cols-3 gap-2 px-4 py-2 border-b border-subtle" style={{ backgroundColor: 'var(--surface-1)' }}>
+                      <span className="text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Craft Code</span>
+                      <span className="text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Description</span>
+                      <span className="text-tertiary text-right" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Hourly Rate</span>
                     </div>
                     {wcCrafts.map((craft) => (
-                      <div key={craft.craftId} className="grid grid-cols-3 gap-2 px-4 py-2 border-b border-subtle" style={{ backgroundColor: '#151517' }}>
+                      <div key={craft.craftId} className="grid grid-cols-3 gap-2 px-4 py-2 border-b border-subtle" style={{ backgroundColor: 'var(--bg-app)' }}>
                         <span className="font-mono text-xs text-primary">{craft.craftCode}</span>
                         <span className="text-xs text-secondary">{craft.description}</span>
                         <span className="font-mono text-xs text-amber text-right">${craft.hourlyRate}/hr</span>

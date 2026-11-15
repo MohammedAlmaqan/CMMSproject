@@ -195,7 +195,7 @@ export default function CraftsPage() {
               placeholder="Search crafts..."
               aria-label="Search crafts"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-              style={{ backgroundColor: '#27272A' }}
+              style={{ backgroundColor: 'var(--surface-3)' }}
             />
           </div>
           <span className="text-tertiary text-xs ml-auto">
@@ -211,7 +211,7 @@ export default function CraftsPage() {
           {loadError && (
             <button
               onClick={reload}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber/50 hover:bg-amber/10"
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber hover:bg-amber-weak"
             >
               <RefreshCw className="w-3 h-3" /> Retry
             </button>
@@ -220,7 +220,7 @@ export default function CraftsPage() {
             <button
               onClick={openCreate}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110"
-              style={{ backgroundColor: '#D97706', color: '#111113' }}
+              style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
             >
               <Plus className="w-3.5 h-3.5" /> New Craft
             </button>
@@ -296,7 +296,7 @@ export default function CraftsPage() {
                 type="submit"
                 disabled={busy === 'save'}
                 className="px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                style={{ backgroundColor: '#D97706', color: '#111113' }}
+                style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
               >
                 {busy === 'save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : editingId ? 'Save Changes' : 'Create Craft'}
               </button>
@@ -326,18 +326,18 @@ export default function CraftsPage() {
           </div>
         ) : (
           <div className="industrial-card rounded overflow-hidden">
-            <div className="grid grid-cols-[120px_1fr_1fr_100px_auto] gap-4 px-3 py-2 border-b border-subtle" style={{ backgroundColor: '#27272A' }}>
-              <span className="text-tertiary font-medium" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Code</span>
-              <span className="text-tertiary font-medium" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Description</span>
-              <span className="text-tertiary font-medium" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Work Center</span>
-              <span className="text-tertiary font-medium text-right" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Hourly Rate</span>
+            <div className="grid grid-cols-[120px_1fr_1fr_100px_auto] gap-4 px-3 py-2 border-b border-subtle" style={{ backgroundColor: 'var(--surface-3)' }}>
+              <span className="text-tertiary font-medium" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Code</span>
+              <span className="text-tertiary font-medium" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Description</span>
+              <span className="text-tertiary font-medium" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Work Center</span>
+              <span className="text-tertiary font-medium text-right" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Hourly Rate</span>
               <span className="w-16" />
             </div>
             {filteredCrafts.map((craft) => (
               <div
                 key={craft.craftId}
                 className="grid grid-cols-[120px_1fr_1fr_100px_auto] gap-4 px-3 py-2 text-xs border-b border-subtle hover:bg-surface-tertiary transition-colors"
-                style={{ backgroundColor: '#151517' }}
+                style={{ backgroundColor: 'var(--bg-app)' }}
               >
                 <span className="font-mono text-primary">{craft.craftCode}</span>
                 <span className="text-secondary truncate">{craft.description}</span>

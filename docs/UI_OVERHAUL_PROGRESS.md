@@ -28,7 +28,7 @@ system; until then it describes the superseded dark palette.
       breakdown) with derived Overdue/Breakdown, replacing 10 per-page maps.
 - [x] **P3 — Chrome.** Sidebar, Header, AppLayout, LoginPage, CommandPalette:
       graphite rail, no glow, no 9px labels, flat surfaces.
-- [ ] **P4 — Data surfaces.** Dense tables (32px rows, 11px uppercase header,
+- [x] **P4 — Data surfaces.** Dense tables (32px rows, 11px uppercase header,
       tabular figures), cards, forms, banners. Sweep the 362 inline hex
       literals onto tokens.
 - [ ] **P5 — Charts.** `app/src/lib/chartTokens.ts`, axis/grid/series/tooltip
@@ -50,3 +50,4 @@ system; until then it describes the superseded dark palette.
 | 2026-11-14 | P1 | `this commit` | `tsc` clean · build 41.9 s (Plex woff2 bundled) · app 184/184 |
 | 2026-11-14 | P2 | `this commit` | status tests 15/15 · `tsc` clean |
 | 2026-11-14 | P3 | `this commit` | chrome tests 17/17 · `tsc` clean · 0 hex left in layout/ |
+| 2026-11-15 | P4 | `this commit` | `tsc` clean · eslint clean · app 193/193 · build 16.5 s · 25 files |

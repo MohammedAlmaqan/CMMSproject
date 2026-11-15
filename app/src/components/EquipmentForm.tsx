@@ -110,7 +110,7 @@ export default function EquipmentForm({
             required
             aria-label="Equipment code"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -121,7 +121,7 @@ export default function EquipmentForm({
             required
             aria-label="Equipment name"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -131,7 +131,7 @@ export default function EquipmentForm({
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             aria-label="Equipment description"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -142,7 +142,7 @@ export default function EquipmentForm({
             required
             aria-label="Equipment functional location"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             <option value="">Select...</option>
             {locations.map((loc) => (
@@ -159,7 +159,7 @@ export default function EquipmentForm({
             onChange={(e) => setForm({ ...form, equipmentClass: e.target.value })}
             aria-label="Equipment class"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -169,7 +169,7 @@ export default function EquipmentForm({
             onChange={(e) => setForm({ ...form, criticality: e.target.value as Equipment['criticality'] })}
             aria-label="Equipment criticality"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             {CRITICALITIES.map((c) => (
               <option key={c} value={c}>
@@ -185,7 +185,7 @@ export default function EquipmentForm({
             onChange={(e) => setForm({ ...form, manufacturer: e.target.value })}
             aria-label="Equipment manufacturer"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -195,7 +195,7 @@ export default function EquipmentForm({
             onChange={(e) => setForm({ ...form, model: e.target.value })}
             aria-label="Equipment model"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -205,7 +205,7 @@ export default function EquipmentForm({
             onChange={(e) => setForm({ ...form, serialNumber: e.target.value })}
             aria-label="Equipment serial number"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -215,7 +215,7 @@ export default function EquipmentForm({
             onChange={(e) => setForm({ ...form, assetTag: e.target.value })}
             aria-label="Equipment asset tag"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -226,7 +226,7 @@ export default function EquipmentForm({
             onChange={(e) => setForm({ ...form, installationDate: e.target.value })}
             aria-label="Equipment installation date"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -237,7 +237,7 @@ export default function EquipmentForm({
             onChange={(e) => setForm({ ...form, warrantyExpiryDate: e.target.value })}
             aria-label="Equipment warranty expiry"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className={labelCls}>
@@ -247,7 +247,7 @@ export default function EquipmentForm({
             onChange={(e) => setForm({ ...form, operationalStatus: e.target.value as Equipment['operationalStatus'] })}
             aria-label="Equipment operational status"
             className={inputCls}
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             {STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -262,7 +262,7 @@ export default function EquipmentForm({
           type="submit"
           disabled={submitting}
           className="text-xs px-3 py-1.5 rounded bg-amber font-medium disabled:opacity-50"
-          style={{ color: '#111113' }}
+          style={{ color: 'var(--accent-ink)' }}
         >
           {submitting ? (
             <span className="flex items-center gap-1">

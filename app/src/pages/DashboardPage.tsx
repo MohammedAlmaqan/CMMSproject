@@ -153,7 +153,7 @@ export default function DashboardPage() {
       <div className="flex-1 overflow-y-auto">
         {/* KPI Ribbon with 3D Grid */}
         <div className="kpi-canvas-container">
-          <Suspense fallback={<div style={{ backgroundColor: '#1E1E22' }} />}>
+          <Suspense fallback={<div style={{ backgroundColor: 'var(--surface-1)' }} />}>
             <TacticalDashboardGrid />
           </Suspense>
           <div className="kpi-metrics-overlay">
@@ -229,12 +229,12 @@ export default function DashboardPage() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#18181B',
-                      border: '1px solid #27272A',
+                      backgroundColor: 'var(--surface-1)',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: '4px',
                       fontSize: '12px',
                     }}
-                    itemStyle={{ color: '#FAFAFA' }}
+                    itemStyle={{ color: 'var(--text-1)' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -243,7 +243,7 @@ export default function DashboardPage() {
               {statusData.slice(0, 4).map((s) => (
                 <div key={s.name} className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-                  <span className="text-tertiary" style={{ fontSize: '10px' }}>{s.name}</span>
+                  <span className="text-tertiary" style={{ fontSize: '11px' }}>{s.name}</span>
                 </div>
               ))}
             </div>
@@ -270,12 +270,12 @@ export default function DashboardPage() {
                   <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#18181B',
-                      border: '1px solid #27272A',
+                      backgroundColor: 'var(--surface-1)',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: '4px',
                       fontSize: '12px',
                     }}
-                    itemStyle={{ color: '#FAFAFA' }}
+                    itemStyle={{ color: 'var(--text-1)' }}
                   />
                   <Area type="monotone" dataKey="planned" stroke="#D97706" fill="url(#plannedGrad)" strokeWidth={1.5} />
                   <Area type="monotone" dataKey="actual" stroke="#059669" fill="url(#actualGrad)" strokeWidth={1.5} />
@@ -295,12 +295,12 @@ export default function DashboardPage() {
                   <YAxis dataKey="name" type="category" stroke="#92929B" fontSize={11} tick={AXIS_TICK} width={30} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#18181B',
-                      border: '1px solid #27272A',
+                      backgroundColor: 'var(--surface-1)',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: '4px',
                       fontSize: '12px',
                     }}
-                    itemStyle={{ color: '#FAFAFA' }}
+                    itemStyle={{ color: 'var(--text-1)' }}
                   />
                   <Bar dataKey="value" radius={[0, 2, 2, 0]}>
                     {typeData.map((entry, index) => (
@@ -317,7 +317,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-primary text-sm font-semibold">Backlog Hours by Work Center</h3>
               {reportError === 'backlog hours by work center' && (
-                <span className="text-red-100" style={{ fontSize: '10px' }}>unavailable</span>
+                <span className="text-red-100" style={{ fontSize: '11px' }}>unavailable</span>
               )}
             </div>
             <div className="h-44">
@@ -328,12 +328,12 @@ export default function DashboardPage() {
                   <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#18181B',
-                      border: '1px solid #27272A',
+                      backgroundColor: 'var(--surface-1)',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: '4px',
                       fontSize: '12px',
                     }}
-                    itemStyle={{ color: '#FAFAFA' }}
+                    itemStyle={{ color: 'var(--text-1)' }}
                     formatter={(value: number, _name: string, item) => [
                       `${value.toFixed(1)} h across ${item?.payload?.openWorkOrderCount ?? 0} open WOs`,
                       'Backlog',
@@ -353,7 +353,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-primary text-sm font-semibold">Top 10 Highest-Cost Equipment</h3>
               {reportError === 'top cost equipment' && (
-                <span className="text-red-100" style={{ fontSize: '10px' }}>unavailable</span>
+                <span className="text-red-100" style={{ fontSize: '11px' }}>unavailable</span>
               )}
             </div>
             <div className="space-y-1.5 max-h-44 overflow-y-auto">
@@ -362,7 +362,7 @@ export default function DashboardPage() {
               ) : (
                 topCostEquipment.map((row, index) => (
                   <div key={row.equipmentId} className="flex items-baseline gap-2">
-                    <span className="text-tertiary" style={{ fontSize: '10px', width: '14px' }}>
+                    <span className="text-tertiary" style={{ fontSize: '11px', width: '14px' }}>
                       {index + 1}
                     </span>
                     <span className="text-primary text-xs truncate flex-1" title={row.equipmentName}>
@@ -386,12 +386,12 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-primary text-sm font-semibold">Awaiting Conversion</h3>
               {reportError === 'notifications awaiting conversion' && (
-                <span className="text-red-100" style={{ fontSize: '10px' }}>unavailable</span>
+                <span className="text-red-100" style={{ fontSize: '11px' }}>unavailable</span>
               )}
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-primary text-3xl font-bold">{awaitingConversion.total}</span>
-              <span className="text-tertiary" style={{ fontSize: '10px' }}>
+              <span className="text-tertiary" style={{ fontSize: '11px' }}>
                 NOTIFICATIONS NOT YET RAISED AS WORK
               </span>
             </div>
@@ -426,7 +426,7 @@ export default function DashboardPage() {
           <div className="col-span-4 industrial-card rounded p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-primary text-sm font-semibold">System Alerts</h3>
-              <span className="text-tertiary" style={{ fontSize: '10px' }}>
+              <span className="text-tertiary" style={{ fontSize: '11px' }}>
                 {unreadAlerts.length} unread
               </span>
             </div>
@@ -435,7 +435,7 @@ export default function DashboardPage() {
                 <div
                   key={alert.alertId}
                   className={`flex items-start gap-2 p-2 rounded ${
-                    !alert.isRead ? 'bg-surface-tertiary/30' : ''
+                    !alert.isRead ? 'bg-surface-hover' : ''
                   }`}
                 >
                   <Bell className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${
@@ -487,7 +487,7 @@ export default function DashboardPage() {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-primary text-2xl font-bold">{kpis.pmCompliance}%</span>
-                  <span className="text-tertiary" style={{ fontSize: '10px' }}>Compliance</span>
+                  <span className="text-tertiary" style={{ fontSize: '11px' }}>Compliance</span>
                 </div>
               </div>
             </div>
@@ -520,18 +520,14 @@ function KPICard({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 p-3 rounded transition-all hover:bg-surface-tertiary/30"
-      style={{
-        background: 'rgba(24, 24, 27, 0.4)',
-        backdropFilter: 'blur(10px)',
-      }}
+      className="flex items-center gap-3 p-3 rounded transition-colors industrial-card hover:bg-surface-hover"
     >
       <div className="text-tertiary">{icon}</div>
       <div className="text-left">
         <div className="font-bold" style={{ fontSize: '22px', letterSpacing: '-0.02em', color }}>
           {value}
         </div>
-        <div className="text-secondary" style={{ fontSize: '10px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        <div className="text-secondary" style={{ fontSize: '11px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
           {label}
         </div>
       </div>

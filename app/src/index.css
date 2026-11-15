@@ -583,6 +583,12 @@
   .bg-amber {
     background-color: var(--accent-fill);
   }
+  .bg-amber-weak {
+    background-color: var(--accent-weak);
+  }
+  .border-amber {
+    border-color: var(--accent-fill);
+  }
   .text-green-status {
     color: var(--status-done-fg);
   }
@@ -591,6 +597,24 @@
   }
   .text-blue-status {
     color: var(--status-active-fg);
+  }
+  .bg-overdue-weak {
+    background-color: var(--status-overdue-bg);
+  }
+  .border-overdue {
+    border-color: var(--status-overdue-border);
+  }
+  .bg-done-weak {
+    background-color: var(--status-done-bg);
+  }
+  .border-done {
+    border-color: var(--status-done-border);
+  }
+  .bg-active-weak {
+    background-color: var(--status-active-bg);
+  }
+  .border-active {
+    border-color: var(--status-active-border);
   }
 
   /* Graphite rail utilities — the navigation chrome is dark in both themes. */

@@ -202,7 +202,7 @@ export default function EquipmentPage() {
             }`}
             style={{
               paddingLeft: `${12 + depth * 16}px`,
-              backgroundColor: isSelected ? 'rgba(217, 119, 6, 0.1)' : 'transparent',
+              backgroundColor: isSelected ? 'var(--surface-selected)' : 'transparent',
             }}
           >
             {children.length > 0 ? (
@@ -229,14 +229,14 @@ export default function EquipmentPage() {
               className="flex items-center gap-2 flex-1 text-left min-w-0"
             >
               {children.length > 0 ? (
-                <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isSelected ? '#D97706' : '#A1A1AA' }} />
+                <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isSelected ? 'var(--accent)' : 'var(--text-2)' }} />
               ) : (
-                <Tag className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isSelected ? '#D97706' : '#92929B' }} />
+                <Tag className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isSelected ? 'var(--accent)' : 'var(--text-3)' }} />
               )}
               <span className="truncate font-mono">{node.locationCode}</span>
               <span className="text-tertiary truncate">- {node.description}</span>
               {equipCount > 0 && (
-                <span className="ml-auto text-tertiary flex-shrink-0" style={{ fontSize: '10px' }}>
+                <span className="ml-auto text-tertiary flex-shrink-0" style={{ fontSize: '11px' }}>
                   {equipCount}
                 </span>
               )}
@@ -256,7 +256,7 @@ export default function EquipmentPage() {
 
       <div className="flex-1 overflow-hidden flex">
         {/* Left: Location Tree */}
-        <div className="w-64 flex-shrink-0 border-r border-subtle overflow-y-auto" style={{ backgroundColor: '#18181B' }}>
+        <div className="w-64 flex-shrink-0 border-r border-subtle overflow-y-auto" style={{ backgroundColor: 'var(--surface-1)' }}>
           <div className="p-3 border-b border-subtle">
             <h3 className="text-primary text-xs font-semibold">Plant Hierarchy</h3>
           </div>
@@ -275,7 +275,7 @@ export default function EquipmentPage() {
                 placeholder="Search equipment..."
                 aria-label="Search equipment"
                 className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
               />
             </div>
             <select
@@ -283,7 +283,7 @@ export default function EquipmentPage() {
               onChange={(e) => { setClassFilter(e.target.value); setPage(0); }}
               aria-label="Filter by equipment class"
               className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
-              style={{ backgroundColor: '#27272A' }}
+              style={{ backgroundColor: 'var(--surface-3)' }}
             >
               <option value="All">All Classes</option>
               {equipmentClasses.map((c) => (
@@ -295,7 +295,7 @@ export default function EquipmentPage() {
               onChange={(e) => { setCriticalityFilter(e.target.value); setPage(0); }}
               aria-label="Filter by criticality"
               className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
-              style={{ backgroundColor: '#27272A' }}
+              style={{ backgroundColor: 'var(--surface-3)' }}
             >
               <option value="All">All Criticality</option>
               <option value="S">S - Safety Critical</option>
@@ -326,7 +326,7 @@ export default function EquipmentPage() {
             {loadError && (
               <button
                 onClick={() => { loadIndex(); fetchRows(); }}
-                className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber/50 hover:bg-amber/10"
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber hover:bg-amber-weak"
               >
                 <RefreshCw className="w-3 h-3" /> Retry
               </button>
@@ -371,23 +371,22 @@ export default function EquipmentPage() {
             <>
               {/* Grid */}
               <div className="industrial-card rounded overflow-hidden">
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Code', 'Name', 'Class', 'Criticality', 'Manufacturer', 'Location', 'Status', 'WO Count'].map((h) => (
-                        <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {paged.map((eq, idx) => {
+                    {paged.map((eq) => {
                       const loc = locations.find((l) => l.functionalLocationId === eq.functionalLocationId);
                       const woCount = woCounts[eq.equipmentId] || 0;
                       return (
                         <tr
                           key={eq.equipmentId}
                           className="border-t border-subtle cursor-pointer table-row-hover transition-colors"
-                          style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}
                           onClick={() => navigate(`/equipment/${eq.equipmentId}`)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -398,10 +397,10 @@ export default function EquipmentPage() {
                           tabIndex={0}
                           role="link"
                         >
-                          <td className="px-4 py-2.5 font-mono text-xs text-primary">{eq.equipmentCode}</td>
-                          <td className="px-4 py-2.5 text-xs text-primary">{eq.name}</td>
-                          <td className="px-4 py-2.5 text-xs text-secondary">{eq.equipmentClass}</td>
-                          <td className="px-4 py-2.5">
+                          <td className="font-mono text-xs text-primary">{eq.equipmentCode}</td>
+                          <td className="text-xs text-primary">{eq.name}</td>
+                          <td className="text-xs text-secondary">{eq.equipmentClass}</td>
+                          <td>
                             <span className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs font-semibold ${
                               eq.criticality === 'S' ? 'criticality-s' :
                               eq.criticality === 'A' ? 'criticality-a' :
@@ -410,9 +409,9 @@ export default function EquipmentPage() {
                               {eq.criticality}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-secondary">{eq.manufacturer}</td>
-                          <td className="px-4 py-2.5 font-mono text-xs text-secondary">{loc?.locationCode || '-'}</td>
-                          <td className="px-4 py-2.5">
+                          <td className="text-xs text-secondary">{eq.manufacturer}</td>
+                          <td className="font-mono text-xs text-secondary">{loc?.locationCode || '-'}</td>
+                          <td>
                             <span className={`text-xs px-1.5 py-0.5 rounded ${
                               eq.operationalStatus === 'Active' ? 'badge-completed' :
                               eq.operationalStatus === 'Inactive' ? 'badge-open' : 'badge-cancelled'
@@ -420,7 +419,7 @@ export default function EquipmentPage() {
                               {eq.operationalStatus}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td>
                             <span className="font-mono text-xs text-amber">{woCount}</span>
                           </td>
                         </tr>

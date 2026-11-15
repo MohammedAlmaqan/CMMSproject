@@ -106,7 +106,7 @@ export default function CapacityBoardPanel({ crafts }: Props) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-tertiary transition-colors"
-        style={{ backgroundColor: '#27272A' }}
+        style={{ backgroundColor: 'var(--surface-3)' }}
       >
         {open ? <ChevronDown className="w-4 h-4 text-tertiary" /> : <ChevronRight className="w-4 h-4 text-tertiary" />}
         <Gauge className="w-4 h-4 text-amber" />
@@ -124,7 +124,7 @@ export default function CapacityBoardPanel({ crafts }: Props) {
         <div className="p-4 space-y-3">
           <div className="flex flex-wrap items-end gap-3">
             <div>
-              <label htmlFor="cap-from" className="block text-tertiary mb-1" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>From</label>
+              <label htmlFor="cap-from" className="block text-tertiary mb-1" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>From</label>
               <input
                 id="cap-from"
                 type="date"
@@ -134,7 +134,7 @@ export default function CapacityBoardPanel({ crafts }: Props) {
               />
             </div>
             <div>
-              <label htmlFor="cap-to" className="block text-tertiary mb-1" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>To</label>
+              <label htmlFor="cap-to" className="block text-tertiary mb-1" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>To</label>
               <input
                 id="cap-to"
                 type="date"
@@ -174,7 +174,7 @@ export default function CapacityBoardPanel({ crafts }: Props) {
               </p>
 
               {undated > 0 && (
-                <div className="rounded-md border border-amber/40 bg-amber/5 px-3 py-2 text-xs text-amber flex items-start gap-2">
+                <div className="rounded-md border border-amber bg-amber-weak px-3 py-2 text-xs text-amber flex items-start gap-2">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span>
                     {undated} {undated === 1 ? 'centre has' : 'centres have'} committed hours with no
@@ -194,7 +194,7 @@ export default function CapacityBoardPanel({ crafts }: Props) {
                         onClick={() => toggle(entry.workCenterId)}
                         aria-expanded={isOpen}
                         className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-surface-tertiary transition-colors"
-                        style={{ backgroundColor: '#1E1E22' }}
+                        style={{ backgroundColor: 'var(--surface-1)' }}
                       >
                         {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-tertiary" /> : <ChevronRight className="w-3.5 h-3.5 text-tertiary" />}
                         <span className="font-mono text-xs text-primary font-semibold">{entry.workCenterCode}</span>
@@ -211,17 +211,17 @@ export default function CapacityBoardPanel({ crafts }: Props) {
 
                       {isOpen && (
                         <div className="overflow-x-auto">
-                          <table className="w-full">
+                          <table className="w-full data-table">
                             <thead>
-                              <tr style={{ backgroundColor: '#151517' }}>
-                                <th className="text-left px-3 py-2 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Day</th>
+                              <tr style={{ backgroundColor: 'var(--bg-app)' }}>
+                                <th className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Day</th>
                                 {entry.days.map((d) => {
                                   const { dow, dm } = fmtDay(d.date);
                                   return (
                                     <th
                                       key={d.date}
-                                      className="px-2 py-2 font-medium text-tertiary text-center whitespace-nowrap"
-                                      style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}
+                                      className="font-medium text-tertiary text-center whitespace-nowrap"
+                                      style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}
                                     >
                                       <span className="block">{dow}</span>
                                       <span className="block text-primary font-mono normal-case">{dm}</span>
@@ -231,8 +231,8 @@ export default function CapacityBoardPanel({ crafts }: Props) {
                               </tr>
                             </thead>
                             <tbody>
-                              <tr style={{ backgroundColor: '#1E1E22' }}>
-                                <td className="px-3 py-2 text-xs text-tertiary whitespace-nowrap">Planned h</td>
+                              <tr style={{ backgroundColor: 'var(--surface-1)' }}>
+                                <td className="text-xs text-tertiary whitespace-nowrap">Planned h</td>
                                 {entry.days.map((d) => (
                                   <td
                                     key={d.date}
@@ -244,8 +244,8 @@ export default function CapacityBoardPanel({ crafts }: Props) {
                                   </td>
                                 ))}
                               </tr>
-                              <tr style={{ backgroundColor: '#151517' }}>
-                                <td className="px-3 py-2 text-xs text-tertiary whitespace-nowrap">Utilisation</td>
+                              <tr style={{ backgroundColor: 'var(--bg-app)' }}>
+                                <td className="text-xs text-tertiary whitespace-nowrap">Utilisation</td>
                                 {entry.days.map((d) => (
                                   <td
                                     key={d.date}
@@ -266,7 +266,7 @@ export default function CapacityBoardPanel({ crafts }: Props) {
 
                           {entry.days.some((d) => d.crafts.length > 0) && (
                             <div className="px-3 py-2 border-t border-subtle">
-                              <div className="text-tertiary mb-1" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>By craft</div>
+                              <div className="text-tertiary mb-1" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>By craft</div>
                               <div className="flex flex-wrap gap-2">
                                 {entry.days
                                   .flatMap((d) => d.crafts.map((c) => ({ date: d.date, ...c })))

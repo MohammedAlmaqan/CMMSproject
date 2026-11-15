@@ -229,7 +229,7 @@ export default function AdministrationPage() {
       <Header title="ADMINISTRATION" showActions={false} />
       <div className="flex-1 overflow-hidden flex">
         {/* Tab selector sidebar */}
-        <div className="w-48 flex-shrink-0 border-r border-subtle" style={{ backgroundColor: '#18181B' }}>
+        <div className="w-48 flex-shrink-0 border-r border-subtle" style={{ backgroundColor: 'var(--surface-1)' }}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -250,11 +250,11 @@ export default function AdministrationPage() {
           <div className="border-t border-subtle mt-4 pt-4 px-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded bg-amber flex items-center justify-center">
-                <span className="text-xs font-semibold" style={{ color: '#111113' }}>{user?.fullName?.charAt(0) || 'U'}</span>
+                <span className="text-xs font-semibold" style={{ color: 'var(--accent-ink)' }}>{user?.fullName?.charAt(0) || 'U'}</span>
               </div>
               <div>
                 <div className="text-primary text-xs font-medium">{user?.fullName}</div>
-                <div className="text-tertiary" style={{ fontSize: '10px' }}>{user?.role}</div>
+                <div className="text-tertiary" style={{ fontSize: '11px' }}>{user?.role}</div>
               </div>
             </div>
             <button
@@ -291,7 +291,7 @@ export default function AdministrationPage() {
                     placeholder="Search users..."
                     aria-label="Search users"
                     className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   />
                 </div>
                 <button
@@ -339,27 +339,27 @@ export default function AdministrationPage() {
               )}
 
               <div className="industrial-card rounded overflow-hidden">
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Username', 'Full Name', 'Email', 'Role', 'Work Center', 'Status', 'Last Login', 'Actions'].map((h) => (
-                        <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {userPaged.map((u, idx) => {
+                    {userPaged.map((u) => {
                       const wc = workCenters.find((w) => w.workCenterId === u.workCenterId);
                       return (
-                        <tr key={u.userId} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
-                          <td className="px-4 py-2.5 font-mono text-xs text-primary">{u.username}</td>
-                          <td className="px-4 py-2.5 text-xs text-primary font-medium">{u.fullName}</td>
-                          <td className="px-4 py-2.5 text-xs text-secondary">{u.email}</td>
-                          <td className="px-4 py-2.5">
+                        <tr key={u.userId}>
+                          <td className="font-mono text-xs text-primary">{u.username}</td>
+                          <td className="text-xs text-primary font-medium">{u.fullName}</td>
+                          <td className="text-xs text-secondary">{u.email}</td>
+                          <td>
                             <span className="text-xs px-2 py-0.5 rounded badge-open">{u.role}</span>
                           </td>
-                          <td className="px-4 py-2.5 font-mono text-xs text-secondary">{wc?.code || '-'}</td>
-                          <td className="px-4 py-2.5">
+                          <td className="font-mono text-xs text-secondary">{wc?.code || '-'}</td>
+                          <td>
                             {u.isActive ? (
                               <span className="flex items-center gap-1 text-green-status text-xs">
                                 <CheckCircle className="w-3 h-3" /> Active
@@ -370,10 +370,10 @@ export default function AdministrationPage() {
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 font-mono text-xs text-secondary">
+                          <td className="font-mono text-xs text-secondary">
                             {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td>
                             <div className="flex items-center gap-1.5">
                               <button
                                 onClick={() => { setEditingUser(editingUser?.userId === u.userId ? null : u); setUserActionError(''); }}
@@ -432,7 +432,7 @@ export default function AdministrationPage() {
                     placeholder="Filter audit log..."
                     aria-label="Filter audit log"
                     className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   />
                 </div>
                 <span className="text-tertiary text-xs ml-auto">{auditLoading ? 'Loading…' : `${auditTotal} entries`}</span>
@@ -462,22 +462,22 @@ export default function AdministrationPage() {
               )}
 
               <div className="industrial-card rounded overflow-hidden">
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Timestamp', 'Table', 'Action', 'Record ID', 'Field', 'Old Value', 'New Value', 'User', 'IP'].map((h) => (
-                        <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {auditEntries.map((entry, idx) => {
+                    {auditEntries.map((entry) => {
                       const actor = users.find((u) => u.userId === entry.userId);
                       return (
-                        <tr key={entry.auditId} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
-                          <td className="px-4 py-2 font-mono text-xs text-secondary">{new Date(entry.timestamp).toLocaleString()}</td>
-                          <td className="px-4 py-2 font-mono text-xs text-primary">{entry.tableName}</td>
-                          <td className="px-4 py-2">
+                        <tr key={entry.auditId}>
+                          <td className="font-mono text-xs text-secondary">{new Date(entry.timestamp).toLocaleString()}</td>
+                          <td className="font-mono text-xs text-primary">{entry.tableName}</td>
+                          <td>
                             <span className={`text-xs px-1.5 py-0.5 rounded ${
                               entry.action === 'Create' ? 'badge-completed' :
                               entry.action === 'Update' ? 'badge-in-progress' : 'badge-cancelled'
@@ -485,12 +485,12 @@ export default function AdministrationPage() {
                               {entry.action}
                             </span>
                           </td>
-                          <td className="px-4 py-2 font-mono text-xs text-secondary">{entry.recordId}</td>
-                          <td className="px-4 py-2 font-mono text-xs text-tertiary">{entry.fieldName || '-'}</td>
-                          <td className="px-4 py-2 text-xs text-red-status">{entry.oldValue || '-'}</td>
-                          <td className="px-4 py-2 text-xs text-green-status">{entry.newValue || '-'}</td>
-                          <td className="px-4 py-2 text-xs text-primary">{actor?.fullName || entry.userId}</td>
-                          <td className="px-4 py-2 font-mono text-xs text-tertiary">{entry.ipAddress}</td>
+                          <td className="font-mono text-xs text-secondary">{entry.recordId}</td>
+                          <td className="font-mono text-xs text-tertiary">{entry.fieldName || '-'}</td>
+                          <td className="text-xs text-red-status">{entry.oldValue || '-'}</td>
+                          <td className="text-xs text-green-status">{entry.newValue || '-'}</td>
+                          <td className="text-xs text-primary">{actor?.fullName || entry.userId}</td>
+                          <td className="font-mono text-xs text-tertiary">{entry.ipAddress}</td>
                         </tr>
                       );
                     })}
@@ -534,7 +534,7 @@ export default function AdministrationPage() {
                   )}
 
                   <div className="pt-1">
-                    <div className="text-tertiary mb-1" style={{ fontSize: '10px' }}>
+                    <div className="text-tertiary mb-1" style={{ fontSize: '11px' }}>
                       Read-only (fixed configuration)
                     </div>
                     <SettingItem label="Session Timeout" value="30 minutes" description="Client-side inactivity timeout; the server session continues until the token expires" />
@@ -562,7 +562,7 @@ export default function AdministrationPage() {
                     <div key={r.role} className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
                       <div>
                         <div className="text-primary text-xs font-medium">{r.role}</div>
-                        <div className="text-tertiary" style={{ fontSize: '10px' }}>{r.desc}</div>
+                        <div className="text-tertiary" style={{ fontSize: '11px' }}>{r.desc}</div>
                       </div>
                       <Eye className="w-3.5 h-3.5 text-tertiary" />
                     </div>
@@ -582,7 +582,7 @@ function SettingItem({ label, value, description }: { label: string; value: stri
     <div className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
       <div>
         <div className="text-primary text-xs font-medium">{label}</div>
-        <div className="text-tertiary" style={{ fontSize: '10px' }}>{description}</div>
+        <div className="text-tertiary" style={{ fontSize: '11px' }}>{description}</div>
       </div>
       <span className="font-mono text-xs text-amber">{value}</span>
     </div>
@@ -625,17 +625,17 @@ function EditableSetting({
     <div className="flex items-center justify-between gap-4 py-2 border-b border-subtle last:border-0">
       <div>
         <div className="text-primary text-xs font-medium">{setting.label}</div>
-        <div className="text-tertiary" style={{ fontSize: '10px' }}>{setting.description}</div>
+        <div className="text-tertiary" style={{ fontSize: '11px' }}>{setting.description}</div>
         {canEdit && invalid && touched && (
-          <div className="text-red-400" style={{ fontSize: '10px' }}>
+          <div className="text-red-400" style={{ fontSize: '11px' }}>
             Use letters, digits, hyphen or underscore only
           </div>
         )}
         {saved && !dirty && (
-          <div className="text-green-500" style={{ fontSize: '10px' }}>Saved</div>
+          <div className="text-green-500" style={{ fontSize: '11px' }}>Saved</div>
         )}
         {setting.isDefault && (
-          <div className="text-tertiary" style={{ fontSize: '10px' }}>Using system default</div>
+          <div className="text-tertiary" style={{ fontSize: '11px' }}>Using system default</div>
         )}
       </div>
       <div className="flex items-center gap-2">
@@ -724,7 +724,7 @@ function UserForm({
             required
             aria-label="New user username"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-secondary">
@@ -735,7 +735,7 @@ function UserForm({
             required
             aria-label="New user full name"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-secondary">
@@ -747,7 +747,7 @@ function UserForm({
             required
             aria-label="New user email"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-secondary">
@@ -760,7 +760,7 @@ function UserForm({
             minLength={12}
             aria-label="New user password"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-secondary">
@@ -770,7 +770,7 @@ function UserForm({
             onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
             aria-label="New user role"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             {USER_ROLES.map((role) => (
               <option key={role} value={role}>{role}</option>
@@ -784,7 +784,7 @@ function UserForm({
             onChange={(e) => setForm({ ...form, workCenterId: e.target.value })}
             aria-label="New user work center"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             <option value="">Unassigned</option>
             {workCenters.map((wc) => (
@@ -798,7 +798,7 @@ function UserForm({
           type="submit"
           disabled={submitting}
           className="text-xs px-3 py-1.5 rounded bg-amber font-medium disabled:opacity-50"
-          style={{ color: '#111113' }}
+          style={{ color: 'var(--accent-ink)' }}
         >
           {submitting ? 'Creating...' : 'Create User'}
         </button>
@@ -874,7 +874,7 @@ function EditUserForm({
             required
             aria-label="Edit user full name"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-secondary">
@@ -886,7 +886,7 @@ function EditUserForm({
             required
             aria-label="Edit user email"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-secondary">
@@ -896,7 +896,7 @@ function EditUserForm({
             onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
             aria-label="Edit user role"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             {USER_ROLES.map((role) => (
               <option key={role} value={role}>{role}</option>
@@ -910,7 +910,7 @@ function EditUserForm({
             onChange={(e) => setForm({ ...form, workCenterId: e.target.value })}
             aria-label="Edit user work center"
             className="px-2 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             <option value="">Unassigned</option>
             {workCenters.map((wc) => (
@@ -934,7 +934,7 @@ function EditUserForm({
           type="submit"
           disabled={submitting}
           className="text-xs px-3 py-1.5 rounded bg-amber font-medium disabled:opacity-50"
-          style={{ color: '#111113' }}
+          style={{ color: 'var(--accent-ink)' }}
         >
           {submitting ? 'Saving...' : 'Save Changes'}
         </button>

@@ -27,9 +27,9 @@ import { hasMinRole } from '@/lib/rbac';
 import type { Notification, NotificationType, Priority } from '@/types';
 
 const typeConfig: Record<NotificationType, { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string; label: string }> = {
-  M1: { icon: AlertTriangle, color: '#F87171', label: 'Malfunction Report' },
-  M2: { icon: Wrench, color: '#2563EB', label: 'Maintenance Request' },
-  M3: { icon: Bell, color: '#059669', label: 'Completion Confirmation' },
+  M1: { icon: AlertTriangle, color: 'var(--status-overdue-fg)', label: 'Malfunction Report' },
+  M2: { icon: Wrench, color: 'var(--status-active-fg)', label: 'Maintenance Request' },
+  M3: { icon: Bell, color: 'var(--status-done-fg)', label: 'Completion Confirmation' },
 };
 
 export default function NotificationDetailPage() {
@@ -199,7 +199,7 @@ export default function NotificationDetailPage() {
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-subtle" style={{ backgroundColor: '#18181B' }}>
+      <div className="px-6 py-4 border-b border-subtle" style={{ backgroundColor: 'var(--surface-1)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button onClick={() => navigate('/notifications')} aria-label="Back to notifications" className="p-1.5 text-secondary hover:text-primary transition-colors">
@@ -245,7 +245,7 @@ export default function NotificationDetailPage() {
                 onClick={handleConvertToWO}
                 disabled={converting}
                 className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                style={{ backgroundColor: '#D97706', color: '#111113' }}
+                style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
               >
                 {converting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ClipboardList className="w-3.5 h-3.5" />}
                 Convert to WO
@@ -255,7 +255,7 @@ export default function NotificationDetailPage() {
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold border border-red-status/60 text-red-status hover:bg-red-status/10 transition-all disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold border border-overdue text-red-status hover:bg-overdue-weak transition-all disabled:opacity-50"
               >
                 {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                 Delete
@@ -311,7 +311,7 @@ export default function NotificationDetailPage() {
                     value={editType}
                     onChange={(e) => setEditType(e.target.value as NotificationType)}
                     className="mt-1 block w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   >
                     <option value="M1">M1 — Malfunction</option>
                     <option value="M2">M2 — Request</option>
@@ -324,7 +324,7 @@ export default function NotificationDetailPage() {
                     value={editPriority}
                     onChange={(e) => setEditPriority(e.target.value as Priority)}
                     className="mt-1 block w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   >
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
@@ -338,7 +338,7 @@ export default function NotificationDetailPage() {
                     value={editEquipmentId}
                     onChange={(e) => onEditEquipmentChange(e.target.value)}
                     className="mt-1 block w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   >
                     <option value="">No specific asset</option>
                     {equipmentList.map((eq) => (
@@ -354,7 +354,7 @@ export default function NotificationDetailPage() {
                     onChange={(e) => setEditLocationId(e.target.value)}
                     disabled={!!editEquipmentId}
                     className="mt-1 block w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   >
                     <option value="">Select…</option>
                     {locations.map((l) => (
@@ -370,7 +370,7 @@ export default function NotificationDetailPage() {
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   className="mt-1 block w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                 />
               </label>
               <label className="block text-xs text-secondary">
@@ -380,7 +380,7 @@ export default function NotificationDetailPage() {
                   value={editDamages}
                   onChange={(e) => setEditDamages(e.target.value)}
                   className="mt-1 block w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                 />
               </label>
               <label className="flex items-center gap-2 text-xs text-secondary">
@@ -408,7 +408,7 @@ export default function NotificationDetailPage() {
                   type="submit"
                   disabled={editBusy}
                   className="px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                  style={{ backgroundColor: '#D97706', color: '#111113' }}
+                  style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
                 >
                   {editBusy ? 'Saving…' : 'Save Changes'}
                 </button>
@@ -495,7 +495,7 @@ function DetailRow({ icon, label, value, highlight }: { icon: React.ReactNode; l
     <div className="flex items-start gap-3">
       <div className="text-tertiary mt-0.5">{icon}</div>
       <div>
-        <div className="text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</div>
+        <div className="text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</div>
         <div className={`text-sm ${highlight ? 'text-red-status font-semibold' : 'text-primary'}`}>{value}</div>
       </div>
     </div>

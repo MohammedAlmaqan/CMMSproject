@@ -400,25 +400,25 @@ export default function PreventiveMaintenancePage() {
             icon={<Clock className="w-5 h-5" />}
             label="Time-Based Plans"
             value={String(maintenancePlans.filter((p) => p.strategyType === 'Time').length)}
-            color="#D97706"
+            color="var(--accent)"
           />
           <SummaryCard
             icon={<Gauge className="w-5 h-5" />}
             label="Meter-Based Plans"
             value={String(maintenancePlans.filter((p) => p.strategyType === 'Meter').length)}
-            color="#2563EB"
+            color="var(--status-active-fg)"
           />
           <SummaryCard
             icon={<Zap className="w-5 h-5" />}
             label="Combined Plans"
             value={String(maintenancePlans.filter((p) => p.strategyType === 'Combined').length)}
-            color="#7C3AED"
+            color="var(--chart-series-5)"
           />
           <SummaryCard
             icon={<Settings className="w-5 h-5" />}
             label="Active Plans"
             value={String(maintenancePlans.filter((p) => p.activeFlag).length)}
-            color="#059669"
+            color="var(--status-done-fg)"
           />
         </div>
 
@@ -432,7 +432,7 @@ export default function PreventiveMaintenancePage() {
               placeholder="Search maintenance plans..."
               aria-label="Search maintenance plans"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-              style={{ backgroundColor: '#27272A' }}
+              style={{ backgroundColor: 'var(--surface-3)' }}
             />
           </div>
           <select
@@ -440,7 +440,7 @@ export default function PreventiveMaintenancePage() {
             onChange={(e) => { setStrategyFilter(e.target.value); setPage(0); }}
             aria-label="Filter by strategy"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             <option value="All">All Strategies</option>
             <option value="Time">Time-Based</option>
@@ -452,7 +452,7 @@ export default function PreventiveMaintenancePage() {
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
             aria-label="Filter by status"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             <option value="All">All Statuses</option>
             <option value="Active">Active</option>
@@ -480,7 +480,7 @@ export default function PreventiveMaintenancePage() {
             <button
               onClick={openCreate}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110"
-              style={{ backgroundColor: '#D97706', color: '#111113' }}
+              style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
             >
               <Plus className="w-3.5 h-3.5" /> New Plan
             </button>
@@ -725,7 +725,7 @@ export default function PreventiveMaintenancePage() {
                 type="submit"
                 disabled={busy === 'save'}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                style={{ backgroundColor: '#D97706', color: '#111113' }}
+                style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
               >
                 {busy === 'save' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {editingId ? 'Save changes' : 'Create plan'}
@@ -743,7 +743,7 @@ export default function PreventiveMaintenancePage() {
         ) : storeError && !errorDismissed ? (
           <div className="flex-1 flex items-center justify-center py-24">
             <div className="max-w-md w-full mx-4">
-              <div className="flex items-start justify-between gap-3 rounded border border-amber/50 bg-amber/5 px-4 py-3">
+              <div className="flex items-start justify-between gap-3 rounded border border-amber bg-amber-weak px-4 py-3">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber" />
                   <p className="text-secondary text-sm">{storeError}</p>
@@ -761,28 +761,27 @@ export default function PreventiveMaintenancePage() {
           </div>
         ) : (
         <div className="industrial-card rounded overflow-hidden">
-          <table className="w-full">
+          <table className="w-full data-table">
             <thead>
-              <tr style={{ backgroundColor: '#27272A' }}>
+              <tr>
                 {['Plan Code', 'Description', 'Target', 'Strategy', 'Interval', 'Call Horizon', 'Work Center', 'Task List', 'Status', 'Next Due', 'Generate', 'Actions'].map((h) => (
-                  <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                  <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {paged.map((plan, idx) => {
+              {paged.map((plan) => {
                 const wc = workCenters.find((w) => w.workCenterId === plan.workCenterId);
                 const tl = taskLists.find((t) => t.taskListId === plan.taskListId);
                 return (
                   <tr
                     key={plan.planId}
                     className="border-t border-subtle"
-                    style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}
                   >
-                    <td className="px-4 py-2.5 font-mono text-xs text-amber">{plan.planCode}</td>
-                    <td className="px-4 py-2.5 text-xs text-primary">{plan.description}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-secondary">{targetLabel(plan, equipment, locations)}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="font-mono text-xs text-amber">{plan.planCode}</td>
+                    <td className="text-xs text-primary">{plan.description}</td>
+                    <td className="font-mono text-xs text-secondary">{targetLabel(plan, equipment, locations)}</td>
+                    <td>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${
                         plan.strategyType === 'Time' ? 'badge-open' :
                         plan.strategyType === 'Meter' ? 'badge-in-progress' : 'badge-completed'
@@ -790,21 +789,21 @@ export default function PreventiveMaintenancePage() {
                         {plan.strategyType}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-secondary">
+                    <td className="text-xs text-secondary">
                       Every {plan.intervalValue} {plan.intervalUnit}
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-secondary">
+                    <td className="text-xs text-secondary">
                       {plan.callHorizonValue} {plan.callHorizonUnit}
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-secondary">{wc?.code || '-'}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-secondary">{tl?.code || '-'}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="font-mono text-xs text-secondary">{wc?.code || '-'}</td>
+                    <td className="font-mono text-xs text-secondary">{tl?.code || '-'}</td>
+                    <td>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${plan.activeFlag ? 'badge-completed' : 'badge-cancelled'}`}>
                         {plan.activeFlag ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-secondary">{dueLabel(plan)}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="text-xs text-secondary">{dueLabel(plan)}</td>
+                    <td>
                       {canGenerate && (
                         <button
                           onClick={() => handleGenerate(plan.planId)}
@@ -816,7 +815,7 @@ export default function PreventiveMaintenancePage() {
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td>
                       <div className="flex items-center gap-1">
                         {canWrite && (
                           <button
@@ -911,7 +910,7 @@ function SummaryCard({ icon, label, value, color }: { icon: React.ReactNode; lab
       <div style={{ color }}>{icon}</div>
       <div>
         <div className="text-lg font-bold" style={{ color }}>{value}</div>
-        <div className="text-tertiary" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+        <div className="text-tertiary" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
       </div>
     </div>
   );

@@ -21,7 +21,7 @@ export default function NotFoundPage() {
         <Link
           to="/dashboard"
           className="px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110"
-          style={{ backgroundColor: '#D97706', color: '#111113' }}
+          style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
         >
           Back to Dashboard
         </Link>

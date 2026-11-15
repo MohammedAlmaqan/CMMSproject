@@ -362,7 +362,7 @@ export default function TaskListsPage() {
             <button
               onClick={openCreate}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110"
-              style={{ backgroundColor: '#D97706', color: '#111113' }}
+              style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
             >
               <Plus className="w-3.5 h-3.5" /> New Task List
             </button>
@@ -475,7 +475,7 @@ export default function TaskListsPage() {
               </div>
 
               {ops.map((o, i) => (
-                <div key={i} className="rounded border border-subtle p-3 mb-2" style={{ backgroundColor: '#151517' }}>
+                <div key={i} className="rounded border border-subtle p-3 mb-2" style={{ backgroundColor: 'var(--bg-app)' }}>
                   <div className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-1">
                       <span className={labelCls}>#{o.sequenceNumber}</span>
@@ -545,13 +545,13 @@ export default function TaskListsPage() {
                   {/* SOW 3.1.4 required materials, per step. */}
                   <div className="mt-2 pl-6">
                     <div className="flex items-center justify-between">
-                      <span className="text-tertiary" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      <span className="text-tertiary" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         Required materials
                       </span>
                       <button
                         type="button"
                         onClick={() => addMaterial(i)}
-                        className="flex items-center gap-1 text-[10px] text-amber hover:underline"
+                        className="flex items-center gap-1 text-2xs text-amber hover:underline"
                       >
                         <Package className="w-3 h-3" /> Add material
                       </button>
@@ -623,7 +623,7 @@ export default function TaskListsPage() {
                 type="submit"
                 disabled={busy === 'save'}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                style={{ backgroundColor: '#D97706', color: '#111113' }}
+                style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
               >
                 {busy === 'save' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {editingId ? 'Save changes' : 'Create task list'}
@@ -659,15 +659,15 @@ export default function TaskListsPage() {
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
                         {tl.equipmentClass && (
-                          <span className="text-[10px] text-tertiary">Class: {tl.equipmentClass}</span>
+                          <span className="text-2xs text-tertiary">Class: {tl.equipmentClass}</span>
                         )}
                         {tl.equipmentId && (
-                          <span className="text-[10px] text-tertiary">
+                          <span className="text-2xs text-tertiary">
                             Asset: {equipment.find((e) => e.equipmentId === tl.equipmentId)?.equipmentCode ?? tl.equipmentId}
                           </span>
                         )}
                         {!tl.equipmentClass && !tl.equipmentId && (
-                          <span className="text-[10px] text-tertiary">Not tied to an asset or class</span>
+                          <span className="text-2xs text-tertiary">Not tied to an asset or class</span>
                         )}
                       </div>
                     </div>
@@ -728,17 +728,17 @@ export default function TaskListsPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs text-primary">{o.description}</span>
-                                <span className="text-[10px] px-1.5 py-0.5 rounded text-blue-status border border-blue-status/40 flex items-center gap-1">
+                                <span className="text-2xs px-1.5 py-0.5 rounded text-blue-status border border-active flex items-center gap-1">
                                   <Wrench className="w-2.5 h-2.5" />{craftName(o.craftId)}
                                 </span>
-                                <span className="text-[10px] text-tertiary">
+                                <span className="text-2xs text-tertiary">
                                   {o.plannedHours}h × {o.numberOfTechnicians} tech
                                 </span>
                               </div>
                               {(o.materials?.length ?? 0) > 0 && (
                                 <div className="mt-1.5 space-y-0.5">
                                   {o.materials!.map((m) => (
-                                    <div key={m.taskListMaterialId} className="flex items-center gap-2 text-[11px]">
+                                    <div key={m.taskListMaterialId} className="flex items-center gap-2 text-2xs">
                                       <Package className="w-2.5 h-2.5 text-tertiary flex-shrink-0" />
                                       <span className="text-secondary truncate">{materialLabel(m.materialId)}</span>
                                       <span className="font-mono text-amber flex-shrink-0">

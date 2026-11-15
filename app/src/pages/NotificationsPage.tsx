@@ -27,9 +27,9 @@ import { ApiError } from '@/lib/api';
 import type { Notification, NotificationInput, NotificationType, Priority } from '@/types';
 
 const typeConfig: Record<NotificationType, { icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string; label: string }> = {
-  M1: { icon: AlertTriangle, color: '#F87171', label: 'Malfunction' },
-  M2: { icon: Wrench, color: '#2563EB', label: 'Request' },
-  M3: { icon: Bell, color: '#059669', label: 'Completion' },
+  M1: { icon: AlertTriangle, color: 'var(--status-overdue-fg)', label: 'Malfunction' },
+  M2: { icon: Wrench, color: 'var(--status-active-fg)', label: 'Request' },
+  M3: { icon: Bell, color: 'var(--status-done-fg)', label: 'Completion' },
 };
 
 const priorityClasses: Record<Priority, string> = {
@@ -234,7 +234,7 @@ export default function NotificationsPage() {
               placeholder="Search notifications..."
               aria-label="Search notifications"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors"
-              style={{ backgroundColor: '#27272A' }}
+              style={{ backgroundColor: 'var(--surface-3)' }}
             />
           </div>
           <select
@@ -242,7 +242,7 @@ export default function NotificationsPage() {
             onChange={(e) => { setTypeFilter(e.target.value); setPage(0); }}
             aria-label="Filter by type"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             <option value="All">All Types</option>
             <option value="M1">M1 - Malfunction</option>
@@ -254,7 +254,7 @@ export default function NotificationsPage() {
             onChange={(e) => { setPriorityFilter(e.target.value); setPage(0); }}
             aria-label="Filter by priority"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             <option value="All">All Priorities</option>
             <option value="High">High</option>
@@ -266,7 +266,7 @@ export default function NotificationsPage() {
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
             aria-label="Filter by status"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             <option value="All">All Statuses</option>
             <option value="Open">Open</option>
@@ -283,7 +283,7 @@ export default function NotificationsPage() {
           {loadError && (
             <button
               onClick={reload}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber/50 hover:bg-amber/10"
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-amber border border-amber hover:bg-amber-weak"
             >
               <RefreshCw className="w-3 h-3" /> Retry
             </button>
@@ -292,7 +292,7 @@ export default function NotificationsPage() {
             <button
               onClick={openCreate}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110"
-              style={{ backgroundColor: '#D97706', color: '#111113' }}
+              style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
             >
               <Plus className="w-3.5 h-3.5" /> New Notification
             </button>
@@ -353,7 +353,7 @@ export default function NotificationsPage() {
                   ))}
                 </select>
                 {formEquipmentId && (
-                  <p className="text-tertiary mt-1" style={{ fontSize: '10px' }}>Derived from the selected equipment.</p>
+                  <p className="text-tertiary mt-1" style={{ fontSize: '11px' }}>Derived from the selected equipment.</p>
                 )}
               </div>
             </div>
@@ -389,7 +389,7 @@ export default function NotificationsPage() {
                 type="submit"
                 disabled={busy}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                style={{ backgroundColor: '#D97706', color: '#111113' }}
+                style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
               >
                 {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 Raise notification
@@ -422,24 +422,23 @@ export default function NotificationsPage() {
           <>
             {/* Notification List */}
             <div className="industrial-card rounded overflow-hidden">
-              <table className="w-full">
+              <table className="w-full data-table">
                 <thead>
-                  <tr style={{ backgroundColor: '#27272A' }}>
+                  <tr>
                     {['Type', 'Priority', 'Number', 'Description', 'Location', 'Equipment', 'Reported By', 'Date', 'Status'].map((h) => (
-                      <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                      <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                     ))}
-                    {canDelete && <th className="px-4 py-2.5" aria-label="Actions" />}
+                    {canDelete && <th aria-label="Actions" />}
                   </tr>
                 </thead>
                 <tbody>
-                  {paged.map((notif, idx) => {
+                  {paged.map((notif) => {
                     const typeCfg = typeConfig[notif.type];
                     const TypeIcon = typeCfg.icon;
                     return (
                       <tr
                         key={notif.notificationId}
                         className="border-t border-subtle cursor-pointer table-row-hover transition-colors"
-                        style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}
                         onClick={() => navigate(`/notifications/${notif.notificationId}`)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -450,28 +449,28 @@ export default function NotificationsPage() {
                         tabIndex={0}
                         role="link"
                       >
-                        <td className="px-4 py-2.5">
+                        <td>
                           <div className="flex items-center gap-2">
                             <TypeIcon className="w-4 h-4 flex-shrink-0" style={{ color: typeCfg.color }} />
                             <span className="text-xs text-primary">{typeCfg.label}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${priorityClasses[notif.priority]}`}>
                             {notif.priority}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-amber">{notif.notificationNumber}</td>
-                        <td className="px-4 py-2.5 text-xs text-primary max-w-[250px] truncate">{notif.description}</td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-secondary">
+                        <td className="font-mono text-xs text-amber">{notif.notificationNumber}</td>
+                        <td className="text-xs text-primary max-w-[250px] truncate">{notif.description}</td>
+                        <td className="font-mono text-xs text-secondary">
                           {notif.functionalLocation?.locationCode || notif.functionalLocationId}
                         </td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-secondary">
+                        <td className="font-mono text-xs text-secondary">
                           {notif.equipment?.equipmentCode || (notif.equipmentId ? notif.equipmentId : '-')}
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-secondary">{notif.reportedBy?.fullName || '-'}</td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-secondary">{new Date(notif.createdDate).toLocaleDateString()}</td>
-                        <td className="px-4 py-2.5">
+                        <td className="text-xs text-secondary">{notif.reportedBy?.fullName || '-'}</td>
+                        <td className="font-mono text-xs text-secondary">{new Date(notif.createdDate).toLocaleDateString()}</td>
+                        <td>
                           <span className={`text-xs px-1.5 py-0.5 rounded ${
                             notif.status === 'Converted' ? 'badge-completed' :
                             notif.status === 'In Process' ? 'badge-in-progress' :
@@ -481,7 +480,7 @@ export default function NotificationsPage() {
                           </span>
                         </td>
                         {canDelete && (
-                          <td className="px-4 py-2.5">
+                          <td>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleDelete(notif); }}
                               aria-label={`Delete ${notif.notificationNumber}`}

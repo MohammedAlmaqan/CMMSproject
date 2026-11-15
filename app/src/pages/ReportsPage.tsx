@@ -299,7 +299,7 @@ export default function ReportsPage() {
       <Header title="REPORTS & ANALYTICS" showActions={false} />
       <div className="flex-1 overflow-hidden flex">
         {/* Report Selector */}
-        <div className="w-52 flex-shrink-0 border-r border-subtle overflow-y-auto" style={{ backgroundColor: '#18181B' }}>
+        <div className="w-52 flex-shrink-0 border-r border-subtle overflow-y-auto" style={{ backgroundColor: 'var(--surface-1)' }}>
           {reportConfig.map((r) => {
             const Icon = r.icon;
             return (
@@ -332,7 +332,7 @@ export default function ReportsPage() {
                     value={filterFrom}
                     onChange={(e) => setFilterFrom(e.target.value)}
                     className="mt-1 block rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   />
                 </label>
                 <label className="text-xs text-secondary">
@@ -343,7 +343,7 @@ export default function ReportsPage() {
                     value={filterTo}
                     onChange={(e) => setFilterTo(e.target.value)}
                     className="mt-1 block rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   />
                 </label>
                 <label className="text-xs text-secondary">
@@ -353,7 +353,7 @@ export default function ReportsPage() {
                     value={filterLocation}
                     onChange={(e) => setFilterLocation(e.target.value)}
                     className="mt-1 block rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   >
                     <option value="">All locations</option>
                     {locations.map((l) => (
@@ -370,7 +370,7 @@ export default function ReportsPage() {
                     value={filterEquipment}
                     onChange={(e) => setFilterEquipment(e.target.value)}
                     className="mt-1 block rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   >
                     <option value="">All equipment</option>
                     {equipmentList.map((eq) => (
@@ -387,7 +387,7 @@ export default function ReportsPage() {
                     value={filterWorkCenter}
                     onChange={(e) => setFilterWorkCenter(e.target.value)}
                     className="mt-1 block rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   >
                     <option value="">All work centres</option>
                     {workCenters.map((wc) => (
@@ -431,7 +431,7 @@ export default function ReportsPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
                         <XAxis dataKey="status" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                         <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
                         <Bar dataKey="count" fill="#D97706" radius={[2, 2, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -445,7 +445,7 @@ export default function ReportsPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
                         <XAxis dataKey="priority" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                         <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
                         <Bar dataKey="count" fill="#2563EB" radius={[2, 2, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -459,7 +459,7 @@ export default function ReportsPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
                         <XAxis dataKey="status" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                         <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
                         <Bar dataKey="hours" fill="#059669" radius={[2, 2, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -469,20 +469,20 @@ export default function ReportsPage() {
               <div className="mt-4">
                 <h4 className="text-secondary text-xs font-medium mb-2">Backlog by Work Centre</h4>
                 <div className="industrial-card rounded overflow-hidden">
-                  <table className="w-full">
+                  <table className="w-full data-table">
                     <thead>
-                      <tr style={{ backgroundColor: '#27272A' }}>
+                      <tr>
                         {['Work Centre', 'Count', 'Planned Hours'].map((h) => (
-                          <th key={h} className="text-left px-4 py-2 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                          <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {backlogCentreData.map((c, idx) => (
-                        <tr key={c.centre} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
-                          <td className="px-4 py-2 font-mono text-xs text-primary">{c.centre}</td>
-                          <td className="px-4 py-2 font-mono text-xs text-secondary">{c.count}</td>
-                          <td className="px-4 py-2 font-mono text-xs text-secondary">{c.hours.toLocaleString()}</td>
+                      {backlogCentreData.map((c) => (
+                        <tr key={c.centre}>
+                          <td className="font-mono text-xs text-primary">{c.centre}</td>
+                          <td className="font-mono text-xs text-secondary">{c.count}</td>
+                          <td className="font-mono text-xs text-secondary">{c.hours.toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -499,16 +499,16 @@ export default function ReportsPage() {
               {isLoading ? <LoadingState /> : hasError ? <ErrorState message={reportError[activeReport]} /> : isEmpty ? <EmptyState /> : (
               <>
                 <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#151517' }}>
-                    <div className="text-tertiary" style={{ fontSize: '10px' }}>Period</div>
+                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: 'var(--bg-app)' }}>
+                    <div className="text-tertiary" style={{ fontSize: '11px' }}>Period</div>
                     <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.period}</div>
                   </div>
-                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#151517' }}>
-                    <div className="text-tertiary" style={{ fontSize: '10px' }}>PMs Scheduled</div>
+                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: 'var(--bg-app)' }}>
+                    <div className="text-tertiary" style={{ fontSize: '11px' }}>PMs Scheduled</div>
                     <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.scheduledPM ?? 0}</div>
                   </div>
-                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: '#151517' }}>
-                    <div className="text-tertiary" style={{ fontSize: '10px' }}>PMs Completed</div>
+                  <div className="p-4 rounded border border-subtle" style={{ backgroundColor: 'var(--bg-app)' }}>
+                    <div className="text-tertiary" style={{ fontSize: '11px' }}>PMs Completed</div>
                     <div className="text-primary text-lg font-semibold mt-1">{pmCompliance.completedPM ?? 0}</div>
                   </div>
                 </div>
@@ -535,7 +535,7 @@ export default function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
                     <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
                     <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                    <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
                     <Bar dataKey="mtbf" fill="#2563EB" radius={[2, 2, 0, 0]} name="MTBF (hrs)" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -557,7 +557,7 @@ export default function ReportsPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
                         <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
                         <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
                         <Bar dataKey="mttr" fill="#D97706" radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
                       </BarChart>
                     </ResponsiveContainer>
@@ -571,7 +571,7 @@ export default function ReportsPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
                         <XAxis dataKey="location" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
                         <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
                         <Bar dataKey="mttr" fill="#2563EB" radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
                       </BarChart>
                     </ResponsiveContainer>
@@ -601,28 +601,28 @@ export default function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
                     <XAxis dataKey="costCenter" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
                     <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                    <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
                     <Bar dataKey="planned" fill="#D97706" radius={[2, 2, 0, 0]} name="Planned" />
                     <Bar dataKey="actual" fill="#059669" radius={[2, 2, 0, 0]} name="Actual" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
               <div className="mt-4">
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Cost Center', 'Planned', 'Actual', 'Variance'].map((h) => (
-                        <th key={h} className="text-left px-4 py-2 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {costData.map((c, idx) => (
-                      <tr key={c.costCenter} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
-                        <td className="px-4 py-2 font-mono text-xs text-primary">{c.costCenter}</td>
-                        <td className="px-4 py-2 font-mono text-xs text-secondary">${c.planned.toLocaleString()}</td>
-                        <td className="px-4 py-2 font-mono text-xs text-secondary">${c.actual.toLocaleString()}</td>
-                        <td className={`px-4 py-2 font-mono text-xs ${c.variance > 0 ? 'text-red-status' : 'text-green-status'}`}>
+                    {costData.map((c) => (
+                      <tr key={c.costCenter}>
+                        <td className="font-mono text-xs text-primary">{c.costCenter}</td>
+                        <td className="font-mono text-xs text-secondary">${c.planned.toLocaleString()}</td>
+                        <td className="font-mono text-xs text-secondary">${c.actual.toLocaleString()}</td>
+                        <td className={`font-mono text-xs ${c.variance > 0 ? 'text-red-status' : 'text-green-status'}`}>
                           {c.variance > 0 ? '+' : ''}${c.variance.toLocaleString()}
                         </td>
                       </tr>
@@ -633,21 +633,21 @@ export default function ReportsPage() {
               <div className="mt-4">
                 <h4 className="text-secondary text-xs font-medium mb-2">Cost by Location</h4>
                 <div className="industrial-card rounded overflow-hidden">
-                  <table className="w-full">
+                  <table className="w-full data-table">
                     <thead>
-                      <tr style={{ backgroundColor: '#27272A' }}>
+                      <tr>
                         {['Location', 'Planned', 'Actual', 'Variance'].map((h) => (
-                          <th key={h} className="text-left px-4 py-2 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                          <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {costLocationData.map((c, idx) => (
-                        <tr key={c.location} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
-                          <td className="px-4 py-2 font-mono text-xs text-primary">{c.location}</td>
-                          <td className="px-4 py-2 font-mono text-xs text-secondary">${c.planned.toLocaleString()}</td>
-                          <td className="px-4 py-2 font-mono text-xs text-secondary">${c.actual.toLocaleString()}</td>
-                          <td className={`px-4 py-2 font-mono text-xs ${c.variance > 0 ? 'text-red-status' : 'text-green-status'}`}>
+                      {costLocationData.map((c) => (
+                        <tr key={c.location}>
+                          <td className="font-mono text-xs text-primary">{c.location}</td>
+                          <td className="font-mono text-xs text-secondary">${c.planned.toLocaleString()}</td>
+                          <td className="font-mono text-xs text-secondary">${c.actual.toLocaleString()}</td>
+                          <td className={`font-mono text-xs ${c.variance > 0 ? 'text-red-status' : 'text-green-status'}`}>
                             {c.variance > 0 ? '+' : ''}${c.variance.toLocaleString()}
                           </td>
                         </tr>
@@ -670,7 +670,7 @@ export default function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
                     <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
                     <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                    <Tooltip contentStyle={{ backgroundColor: '#18181B', border: '1px solid #27272A', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: '#FAFAFA' }} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
                     <Bar dataKey="hours" fill="#F87171" radius={[2, 2, 0, 0]} name="Downtime (hrs)" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -685,21 +685,21 @@ export default function ReportsPage() {
               <>
               <h4 className="text-secondary text-xs font-medium mb-2">By Material</h4>
               <div className="industrial-card rounded overflow-hidden">
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Material Code', 'Description', 'Total Qty', 'Total Cost'].map((h) => (
-                        <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {materialConsumption.map((m, idx) => (
-                      <tr key={m.code} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
-                        <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.code}</td>
-                        <td className="px-4 py-2.5 text-xs text-secondary">{m.description}</td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.totalQty}</td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-amber">${m.totalCost.toLocaleString()}</td>
+                    {materialConsumption.map((m) => (
+                      <tr key={m.code}>
+                        <td className="font-mono text-xs text-primary">{m.code}</td>
+                        <td className="text-xs text-secondary">{m.description}</td>
+                        <td className="font-mono text-xs text-primary">{m.totalQty}</td>
+                        <td className="font-mono text-xs text-amber">${m.totalCost.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -707,20 +707,20 @@ export default function ReportsPage() {
               </div>
               <h4 className="text-secondary text-xs font-medium mb-2 mt-4">By Work Order</h4>
               <div className="industrial-card rounded overflow-hidden">
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Work Order', 'Total Qty', 'Total Cost'].map((h) => (
-                        <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {materialByOrder.map((m, idx) => (
-                      <tr key={m.workOrder} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
-                        <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.workOrder}</td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.totalQty}</td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-amber">${m.totalCost.toLocaleString()}</td>
+                    {materialByOrder.map((m) => (
+                      <tr key={m.workOrder}>
+                        <td className="font-mono text-xs text-primary">{m.workOrder}</td>
+                        <td className="font-mono text-xs text-primary">{m.totalQty}</td>
+                        <td className="font-mono text-xs text-amber">${m.totalCost.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -728,20 +728,20 @@ export default function ReportsPage() {
               </div>
               <h4 className="text-secondary text-xs font-medium mb-2 mt-4">By Equipment</h4>
               <div className="industrial-card rounded overflow-hidden">
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Equipment', 'Total Qty', 'Total Cost'].map((h) => (
-                        <th key={h} className="text-left px-4 py-2.5 font-medium text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className="text-left font-medium text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {materialByEquipment.map((m, idx) => (
-                      <tr key={m.equipment} className="border-t border-subtle" style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}>
-                        <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.equipment}</td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-primary">{m.totalQty}</td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-amber">${m.totalCost.toLocaleString()}</td>
+                    {materialByEquipment.map((m) => (
+                      <tr key={m.equipment}>
+                        <td className="font-mono text-xs text-primary">{m.equipment}</td>
+                        <td className="font-mono text-xs text-primary">{m.totalQty}</td>
+                        <td className="font-mono text-xs text-amber">${m.totalCost.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>

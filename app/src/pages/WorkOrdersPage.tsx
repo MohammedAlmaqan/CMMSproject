@@ -20,7 +20,6 @@ import {
   XCircle,
   Lock,
   AlertTriangle,
-  Clock,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import StatusBadge from '@/components/StatusBadge';
@@ -32,13 +31,9 @@ import { hasMinRole } from '@/lib/rbac';
 import { workOrderService } from '@/services/workOrderService';
 import { ApiError } from '@/lib/api';
 import {
-  badgeClassFor,
-  isDerivedTone,
-  labelForTone,
   priorityBadgeClass,
   statusDot,
   toneForStatus,
-  toneForWorkOrder,
   WORK_ORDER_STATUSES,
 } from '@/lib/status';
 import type { WorkOrder, ViewMode, WorkOrderStatus } from '@/types';
@@ -214,8 +209,8 @@ export default function WorkOrdersPage() {
 
       <div className="flex-1 overflow-y-auto p-6">
         {actionError && (
-          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded text-xs text-red-status border border-red-status/30"
-            style={{ backgroundColor: 'rgba(220,38,38,0.08)' }}>
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded text-xs text-red-status border border-overdue"
+            style={{ backgroundColor: 'var(--status-overdue-bg)' }}>
             <AlertTriangle className="w-4 h-4" />
             {actionError}
           </div>
@@ -249,7 +244,7 @@ export default function WorkOrdersPage() {
               placeholder="Search work orders..."
               aria-label="Search work orders"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors"
-              style={{ backgroundColor: '#27272A' }}
+              style={{ backgroundColor: 'var(--surface-3)' }}
             />
           </div>
           <select
@@ -257,7 +252,7 @@ export default function WorkOrdersPage() {
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
             aria-label="Filter by status"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             <option value="All">All Statuses</option>
             {WORK_ORDER_STATUSES.map((s) => (
@@ -269,7 +264,7 @@ export default function WorkOrdersPage() {
             onChange={(e) => { setPriorityFilter(e.target.value); setPage(0); }}
             aria-label="Filter by priority"
             className="px-3 py-1.5 rounded text-xs text-primary outline-none border border-subtle"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           >
             <option value="All">All Priorities</option>
             <option value="High">High</option>
@@ -304,9 +299,9 @@ export default function WorkOrdersPage() {
         ) : viewMode === 'list' ? (
           <div className="industrial-card rounded overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full data-table">
                 <thead>
-                  <tr style={{ backgroundColor: '#27272A' }}>
+                  <tr>
                     {[
                       { key: 'status', label: 'Status' },
                       { key: 'priority', label: 'Priority' },
@@ -320,8 +315,8 @@ export default function WorkOrdersPage() {
                     ].map((col) => (
                       <th
                         key={col.key + col.label}
-                        className="text-left px-4 py-2.5 font-medium cursor-pointer select-none"
-                        style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92929B' }}
+                        className="font-medium cursor-pointer select-none"
+                        style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)' }}
                         onClick={() => col.key && handleSort(col.key)}
                         onKeyDown={(e) => {
                           if ((e.key === 'Enter' || e.key === ' ') && col.key) {
@@ -342,11 +337,10 @@ export default function WorkOrdersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paged.map((wo, idx) => (
+                  {paged.map((wo) => (
                     <tr
                       key={wo.workOrderId}
                       className="table-row-hover cursor-pointer transition-colors border-t border-subtle"
-                      style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}
                       onClick={() => navigate(`/work-orders/${wo.workOrderId}`)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -357,49 +351,49 @@ export default function WorkOrdersPage() {
                       tabIndex={0}
                       role="link"
                     >
-                      <td className="px-4 py-2.5">
+                      <td>
                         <StatusBadge wo={wo} />
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td>
                         <span className={priorityBadgeClass(wo.priority)}>
                           {wo.priority}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td>
                         <span className="font-mono text-xs text-primary">{wo.woNumber}</span>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td>
                         <span className="text-primary text-xs truncate max-w-[200px] block">
                           {wo.description}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td>
                         <span className="font-mono text-xs text-secondary">
                           {getEquipmentCode(wo)}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td>
                         <span
                           className="text-xs font-medium px-1.5 py-0.5 rounded"
                           style={{
-                            color: wo.type === 'EM' ? '#F87171' : wo.type === 'PM' ? '#2563EB' : '#A1A1AA',
-                            backgroundColor: wo.type === 'EM' ? 'rgba(220,38,38,0.1)' : wo.type === 'PM' ? 'rgba(37,99,235,0.1)' : 'rgba(82,82,91,0.1)',
+                            color: wo.type === 'EM' ? 'var(--status-overdue-fg)' : wo.type === 'PM' ? 'var(--status-active-fg)' : 'var(--text-2)',
+                            backgroundColor: wo.type === 'EM' ? 'var(--status-overdue-bg)' : wo.type === 'PM' ? 'var(--status-active-bg)' : 'var(--status-void-bg)',
                           }}
                         >
                           {wo.type}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td>
                         <span className="text-xs text-secondary font-mono">
                           {wo.plannedStart ? new Date(wo.plannedStart).toLocaleDateString() : '-'}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td>
                         <span className="text-xs text-secondary">
                           {getWorkCenterName(wo)} · {getLocationCode(wo)}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={(e) => { e.stopPropagation(); navigate(`/work-orders/${wo.workOrderId}`); }}
@@ -529,7 +523,7 @@ export default function WorkOrdersPage() {
                   >
                     <div
                       className="flex items-center justify-between px-3 py-2 rounded-t border-b border-subtle"
-                      style={{ backgroundColor: '#27272A' }}
+                      style={{ backgroundColor: 'var(--surface-3)' }}
                     >
                       <div className="flex items-center gap-2">
                         <div
@@ -562,7 +556,7 @@ export default function WorkOrdersPage() {
                             </span>
                           </div>
                           <p className="text-primary text-xs mb-2 line-clamp-2">{wo.description}</p>
-                          <div className="flex items-center justify-between text-tertiary" style={{ fontSize: '10px' }}>
+                          <div className="flex items-center justify-between text-tertiary" style={{ fontSize: '11px' }}>
                             <span>{getEquipmentCode(wo)}</span>
                             <span>{wo.type}</span>
                           </div>

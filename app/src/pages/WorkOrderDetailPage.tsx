@@ -55,6 +55,7 @@ import { craftService } from '@/services/craftService';
 import { materialService } from '@/services/materialService';
 import { ApiError } from '@/lib/api';
 import { hasMinRole } from '@/lib/rbac';
+import { badgeClassFor, toneForStatus } from '@/lib/status';
 import type {
   WorkOrder,
   WorkOrderStatus,
@@ -184,9 +185,8 @@ const inputCls =
   'px-2.5 py-1.5 rounded text-xs text-primary outline-none border border-subtle focus:border-highlight transition-colors w-full';
 const selectCls = inputCls;
 const thCls =
-  'text-left px-4 py-2.5 font-medium text-tertiary truncate';
-const tdCls = 'px-4 py-2.5';
-const rowBg = (idx: number) => (idx % 2 === 0 ? '#1E1E22' : '#151517');
+  'text-left font-medium text-tertiary truncate';
+const tdCls = '';
 
 interface OpFormState {
   description: string;
@@ -1089,12 +1089,7 @@ export default function WorkOrderDetailPage() {
     [wo]
   );
 
-  const statusColor = useMemo(() => {
-    if (!wo) return '#D97706';
-    return wo.status === 'In Progress' ? '#2563EB'
-      : wo.status === 'Completed' || wo.status === 'Closed' ? '#059669'
-      : wo.status === 'Suspended' || wo.status === 'Cancelled' ? '#F87171' : '#D97706';
-  }, [wo]);
+  const statusTone = wo ? toneForStatus(wo.status) : 'open';
 
   const costDraftTotal = useMemo(
     () => costDraft.reduce((sum, r) => sum + (Number(r.percentage) || 0), 0),
@@ -1149,15 +1144,15 @@ export default function WorkOrderDetailPage() {
   return (
     <div className="flex-1 overflow-y-auto">
       {actionError && (
-        <div className="flex items-center gap-2 mx-6 mt-4 px-3 py-2 rounded text-xs text-red-status border border-red-status/30"
-          style={{ backgroundColor: 'rgba(220,38,38,0.08)' }}>
+        <div className="flex items-center gap-2 mx-6 mt-4 px-3 py-2 rounded text-xs text-red-status border border-overdue"
+          style={{ backgroundColor: 'var(--status-overdue-bg)' }}>
           <AlertTriangle className="w-4 h-4" />
           {actionError}
         </div>
       )}
 
       {/* WO Header */}
-      <div className="px-6 py-4 border-b border-subtle" style={{ backgroundColor: '#18181B' }}>
+      <div className="px-6 py-4 border-b border-subtle" style={{ backgroundColor: 'var(--surface-1)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -1170,19 +1165,13 @@ export default function WorkOrderDetailPage() {
             <div>
               <div className="flex items-center gap-3">
                 <span className="font-mono text-lg font-bold text-primary">{wo.woNumber}</span>
-                <span
-                  className="px-2 py-0.5 rounded text-xs font-semibold"
-                  style={{
-                    color: statusColor,
-                    backgroundColor: `${statusColor}20`,
-                    border: `1px solid ${statusColor}50`,
-                  }}
-                >
+                <span className={`${badgeClassFor(statusTone)} text-xs`}>
                   {wo.status}
                 </span>
                 {wo.breakdownFlag && (
-                  <span className="px-2 py-0.5 rounded text-xs font-semibold text-red-status border border-red-status/50 bg-red-status/10">
-                    BREAKDOWN
+                  <span className="badge-breakdown">
+                    <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+                    Breakdown
                   </span>
                 )}
               </div>
@@ -1197,7 +1186,7 @@ export default function WorkOrderDetailPage() {
                 {canChangeStatus && canTransition('Planned') && (
                   <button
                     onClick={() => performTransition('Planned')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber hover:bg-amber-weak transition-all"
                   >
                     <CalendarClock className="w-3.5 h-3.5" /> Plan
                   </button>
@@ -1208,7 +1197,7 @@ export default function WorkOrderDetailPage() {
                       setScheduleError(null);
                       setScheduleOpen(true);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-blue-status border border-blue-status/50 hover:bg-blue-status/10 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-blue-status border border-active hover:bg-active-weak transition-all"
                   >
                     <CalendarCheck className="w-3.5 h-3.5" /> Schedule
                   </button>
@@ -1216,7 +1205,7 @@ export default function WorkOrderDetailPage() {
                 {canChangeStatus && canTransition('In Progress') && (
                   <button
                     onClick={() => performTransition('In Progress')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-green-status border border-green-status/50 hover:bg-green-status/10 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-green-status border border-done hover:bg-done-weak transition-all"
                   >
                     <Play className="w-3.5 h-3.5" /> Start
                   </button>
@@ -1224,7 +1213,7 @@ export default function WorkOrderDetailPage() {
                 {canChangeStatus && canTransition('Completed') && (
                   <button
                     onClick={() => performTransition('Completed')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-green-status border border-green-status/50 hover:bg-green-status/10 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-green-status border border-done hover:bg-done-weak transition-all"
                   >
                     <CheckCircle className="w-3.5 h-3.5" /> Complete
                   </button>
@@ -1240,7 +1229,7 @@ export default function WorkOrderDetailPage() {
                 {canChangeStatus && canTransition('Suspended') && (
                   <button
                     onClick={() => performTransition('Suspended')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber hover:bg-amber-weak transition-all"
                   >
                     <Pause className="w-3.5 h-3.5" /> Suspend
                   </button>
@@ -1248,7 +1237,7 @@ export default function WorkOrderDetailPage() {
                 {canChangeStatus && canTransition('Cancelled') && (
                   <button
                     onClick={() => performTransition('Cancelled')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-red-status border border-red-status/50 hover:bg-red-status/10 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-red-status border border-overdue hover:bg-overdue-weak transition-all"
                   >
                     <XCircle className="w-3.5 h-3.5" /> Cancel
                   </button>
@@ -1256,7 +1245,7 @@ export default function WorkOrderDetailPage() {
                 {hasPermission(['Maintenance Supervisor', 'Administrator']) && (
                   <button
                     onClick={handleDelete}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-red-status border border-red-status/50 hover:bg-red-status/10 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-red-status border border-overdue hover:bg-overdue-weak transition-all"
                   >
                     {busy === 'delete' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />} Delete
                   </button>
@@ -1270,7 +1259,7 @@ export default function WorkOrderDetailPage() {
       {/* WO Info Cards */}
       <div className="px-6 py-4 border-b border-subtle">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-tertiary" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          <span className="text-tertiary" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             Work order details
           </span>
           {canEditHeader && !headerEditing && (
@@ -1296,7 +1285,7 @@ export default function WorkOrderDetailPage() {
                   value={headerForm.supervisorUserId}
                   onChange={(e) => setHeaderForm({ ...headerForm, supervisorUserId: e.target.value })}
                   className={selectCls}
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                   aria-label="Supervisor"
                 >
                   <option value="">Select supervisor</option>
@@ -1317,7 +1306,7 @@ export default function WorkOrderDetailPage() {
                   value={headerForm.plannedStart}
                   onChange={(e) => setHeaderForm({ ...headerForm, plannedStart: e.target.value })}
                   className={inputCls}
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                   aria-label="Planned start"
                 />
               </div>
@@ -1328,7 +1317,7 @@ export default function WorkOrderDetailPage() {
                   value={headerForm.plannedFinish}
                   onChange={(e) => setHeaderForm({ ...headerForm, plannedFinish: e.target.value })}
                   className={inputCls}
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                   aria-label="Planned finish"
                 />
               </div>
@@ -1336,7 +1325,7 @@ export default function WorkOrderDetailPage() {
                 <button
                   type="submit"
                   disabled={busy === 'header:save'}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber hover:bg-amber-weak transition-all disabled:opacity-50"
                 >
                   {busy === 'header:save' ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1357,14 +1346,14 @@ export default function WorkOrderDetailPage() {
           </form>
         ) : (
           <div className="grid grid-cols-4 gap-4">
-            <InfoCard label="Type" value={wo.type} color={wo.type === 'EM' ? '#F87171' : wo.type === 'PM' ? '#2563EB' : '#A1A1AA'} />
-            <InfoCard label="Priority" value={wo.priority} color={wo.priority === 'High' ? '#F87171' : wo.priority === 'Medium' ? '#D97706' : '#92929B'} />
+            <InfoCard label="Type" value={wo.type} color={wo.type === 'EM' ? 'var(--status-overdue-fg)' : wo.type === 'PM' ? 'var(--status-active-fg)' : 'var(--text-2)'} />
+            <InfoCard label="Priority" value={wo.priority} color={wo.priority === 'High' ? 'var(--status-overdue-fg)' : wo.priority === 'Medium' ? 'var(--accent)' : 'var(--text-3)'} />
             <InfoCard label="Location" value={wo.functionalLocation?.locationCode || '-'} />
             <InfoCard label="Equipment" value={wo.equipment?.equipmentCode || '-'} />
             <InfoCard label="Work Center" value={wo.workCenter?.code || '-'} />
             <InfoCard label="Supervisor" value={wo.supervisor?.fullName || '-'} />
-            <InfoCard label="Planned Cost" value={`$${wo.plannedCost.toLocaleString()}`} color="#D97706" />
-            <InfoCard label="Actual Cost" value={`$${wo.actualCost.toLocaleString()}`} color={wo.actualCost > wo.plannedCost ? '#F87171' : '#059669'} />
+            <InfoCard label="Planned Cost" value={`$${wo.plannedCost.toLocaleString()}`} color="var(--accent)" />
+            <InfoCard label="Actual Cost" value={`$${wo.actualCost.toLocaleString()}`} color={wo.actualCost > wo.plannedCost ? 'var(--status-overdue-fg)' : 'var(--status-done-fg)'} />
             <InfoCard
               label="Planned Start"
               value={wo.plannedStart ? new Date(wo.plannedStart).toLocaleString() : '-'}
@@ -1414,7 +1403,7 @@ export default function WorkOrderDetailPage() {
               {canEdit && !opAdding && (
                 <button
                   onClick={startAddOperation}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber hover:bg-amber-weak transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add Operation
                 </button>
@@ -1455,7 +1444,7 @@ export default function WorkOrderDetailPage() {
                       type="submit"
                       disabled={!opForm.craftId || !opForm.description.trim() || busy === 'op:add'}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold w-full justify-center transition-all hover:brightness-110 disabled:opacity-50"
-                      style={{ backgroundColor: '#D97706', color: '#111113' }}
+                      style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
                     >
                       {busy === 'op:add' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Add
                     </button>
@@ -1467,17 +1456,17 @@ export default function WorkOrderDetailPage() {
               {(wo.operations?.length || 0) === 0 ? (
                 <EmptyState label="No operations" />
               ) : (
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Seq', 'Description', 'Craft', 'Planned Hrs', 'Techs', 'Actual Hrs', 'Status', ''].map((h) => (
-                        <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className={thCls} style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {wo.operations!.map((op, idx) => (
-                      <tr key={op.operationId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
+                    {wo.operations!.map((op) => (
+                      <tr key={op.operationId}>
                         {editingOpId === op.operationId ? (
                           <>
                             <td className={tdCls}>
@@ -1569,7 +1558,7 @@ export default function WorkOrderDetailPage() {
               {canEdit && !matAdding && (
                 <button
                   onClick={() => { setEditingMatId(null); setMatForm({ ...emptyMatForm, plannedQuantity: '1' }); setMatAdding(true); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber hover:bg-amber-weak transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add Material
                 </button>
@@ -1627,7 +1616,7 @@ export default function WorkOrderDetailPage() {
                       type="submit"
                       disabled={!matForm.materialId || busy === 'mat:add'}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold w-full justify-center transition-all hover:brightness-110 disabled:opacity-50"
-                      style={{ backgroundColor: '#D97706', color: '#111113' }}
+                      style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
                     >
                       {busy === 'mat:add' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Add
                     </button>
@@ -1639,17 +1628,17 @@ export default function WorkOrderDetailPage() {
               {(wo.woMaterials?.length || 0) === 0 ? (
                 <EmptyState label="No materials" />
               ) : (
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Material Code', 'Description', 'Issued To', 'Planned Qty', 'Actual Qty', 'Reserved', 'Unit Cost', 'Total', ''].map((h) => (
-                        <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className={thCls} style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {wo.woMaterials!.map((wm, idx) => (
-                      <tr key={wm.woMaterialId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
+                      <tr key={wm.woMaterialId}>
                         {editingMatId === wm.woMaterialId ? (
                           <>
                             <td className={`${tdCls} font-mono text-xs text-primary`}>{wm.material?.materialCode || '-'}</td>
@@ -1745,7 +1734,7 @@ export default function WorkOrderDetailPage() {
               {canEdit && !laborAdding && (
                 <button
                   onClick={() => { setEditingLaborId(null); setLaborForm({ ...emptyLaborForm, hoursWorked: '1', userId: currentUser?.userId ?? '' }); setLaborAdding(true); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber hover:bg-amber-weak transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" /> Log Labor
                 </button>
@@ -1791,7 +1780,7 @@ export default function WorkOrderDetailPage() {
                       type="submit"
                       disabled={!laborForm.operationId || !laborForm.userId || busy === 'labor:add'}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold w-full justify-center transition-all hover:brightness-110 disabled:opacity-50"
-                      style={{ backgroundColor: '#D97706', color: '#111113' }}
+                      style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
                     >
                       {busy === 'labor:add' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Log
                     </button>
@@ -1803,17 +1792,17 @@ export default function WorkOrderDetailPage() {
               {labor.length === 0 ? (
                 <EmptyState label="No labor entries" />
               ) : (
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Technician', 'Operation', 'Hours', 'Date/Time', 'Notes', ''].map((h) => (
-                        <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className={thCls} style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {labor.map((l, idx) => (
-                      <tr key={l.laborEntryId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
+                      <tr key={l.laborEntryId}>
                         {editingLaborId === l.laborEntryId ? (
                           <>
                             <td className={`${tdCls} text-xs text-primary`}>{l.user?.fullName || l.userId}</td>
@@ -1882,7 +1871,7 @@ export default function WorkOrderDetailPage() {
               {canEdit && !svcAdding && (
                 <button
                   onClick={() => { setEditingSvcId(null); setSvcForm(emptySvcForm); setSvcAdding(true); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber hover:bg-amber-weak transition-all"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add Service
                 </button>
@@ -1927,7 +1916,7 @@ export default function WorkOrderDetailPage() {
                       disabled={!svcForm.vendor.trim() || !svcForm.description.trim() || busy === 'svc:add'}
                       aria-label="Add service"
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold w-full justify-center transition-all hover:brightness-110 disabled:opacity-50"
-                      style={{ backgroundColor: '#D97706', color: '#111113' }}
+                      style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
                     >
                       {busy === 'svc:add' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                     </button>
@@ -1939,17 +1928,17 @@ export default function WorkOrderDetailPage() {
               {(wo.externalServices?.length || 0) === 0 ? (
                 <EmptyState label="No external services" />
               ) : (
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Vendor', 'Description', 'Category', 'Cost', 'Invoice Ref', ''].map((h) => (
-                        <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className={thCls} style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {wo.externalServices!.map((s, idx) => (
-                      <tr key={s.serviceCostId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
+                      <tr key={s.serviceCostId}>
                         {editingSvcId === s.serviceCostId ? (
                           <>
                             <td className={tdCls}>
@@ -2101,11 +2090,11 @@ export default function WorkOrderDetailPage() {
                     Total: {costDraftTotal}%
                   </span>
                 </div>
-                <p className="text-tertiary text-[11px]">
+                <p className="text-tertiary text-2xs">
                   Removing every row clears the allocation and returns the work order to its own cost centre.
                 </p>
                 {costError && (
-                  <div className="text-xs text-red-status border border-red-status/30 rounded px-2 py-1.5" style={{ backgroundColor: 'rgba(220,38,38,0.08)' }}>
+                  <div className="text-xs text-red-status border border-overdue rounded px-2 py-1.5" style={{ backgroundColor: 'var(--status-overdue-bg)' }}>
                     {costError}
                   </div>
                 )}
@@ -2117,7 +2106,7 @@ export default function WorkOrderDetailPage() {
                     type="submit"
                     disabled={busy === 'costs:save'}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                    style={{ backgroundColor: '#D97706', color: '#111113' }}
+                    style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
                   >
                     {busy === 'costs:save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                     {costDraft.length === 0 ? 'Clear allocation' : 'Save allocation'}
@@ -2133,14 +2122,14 @@ export default function WorkOrderDetailPage() {
                   <InfoCard
                     label="Allocation"
                     value={costs.splits.length === 0 ? 'Unallocated' : `${costs.totalPercentage}%`}
-                    color={costs.splits.length === 0 ? undefined : costs.isBalanced ? '#059669' : '#F87171'}
+                    color={costs.splits.length === 0 ? undefined : costs.isBalanced ? 'var(--status-done-fg)' : 'var(--status-overdue-fg)'}
                   />
                 </div>
                 <div className="flex justify-end">
                   {canReplaceAllocation && (
                     <button
                       onClick={openCostEditor}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber hover:bg-amber-weak transition-all"
                     >
                       <Plus className="w-3.5 h-3.5" /> Edit allocation
                     </button>
@@ -2150,17 +2139,17 @@ export default function WorkOrderDetailPage() {
                   {costs.splits.length === 0 ? (
                     <EmptyState label={`No cost split — charged wholly to ${costs.workOrderCostCenterCode || 'its own cost centre'}`} />
                   ) : (
-                    <table className="w-full">
+                    <table className="w-full data-table">
                       <thead>
-                        <tr style={{ backgroundColor: '#27272A' }}>
+                        <tr>
                           {['Cost Centre', 'Percentage', 'Allocated Actual Cost'].map((h) => (
-                            <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                            <th key={h} className={thCls} style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {costs.splits.map((s, idx) => (
-                          <tr key={s.splitId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
+                        {costs.splits.map((s) => (
+                          <tr key={s.splitId}>
                             <td className={`${tdCls} text-xs text-primary`}>{s.costCenterCode}</td>
                             <td className={`${tdCls} font-mono text-xs text-primary`}>{s.percentage}%</td>
                             <td className={`${tdCls} font-mono text-xs text-secondary`}>${formatMoney(s.allocatedActualCost)}</td>
@@ -2171,10 +2160,10 @@ export default function WorkOrderDetailPage() {
                   )}
                 </div>
                 {!canReplaceAllocation && (
-                  <p className="text-tertiary text-[11px]">Only Maintenance Planners can change the cost allocation.</p>
+                  <p className="text-tertiary text-2xs">Only Maintenance Planners can change the cost allocation.</p>
                 )}
                 {costSuccess && (
-                  <div className="text-xs text-green-status border border-green-status/30 rounded px-2 py-1.5" style={{ backgroundColor: 'rgba(5,150,105,0.08)' }}>
+                  <div className="text-xs text-green-status border border-done rounded px-2 py-1.5" style={{ backgroundColor: 'var(--status-done-bg)' }}>
                     {costSuccess}
                   </div>
                 )}
@@ -2200,7 +2189,7 @@ export default function WorkOrderDetailPage() {
                   type="submit"
                   disabled={!attachTemplateId || busy === 'cl:attach'}
                   className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50 whitespace-nowrap"
-                  style={{ backgroundColor: '#D97706', color: '#111113' }}
+                  style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
                 >
                   {busy === 'cl:attach' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                   Attach
@@ -2221,7 +2210,7 @@ export default function WorkOrderDetailPage() {
                         <Shield className="w-4 h-4 text-amber" />
                         <span className="text-primary text-sm font-medium">{template?.name}</span>
                         {template?.isMandatory && (
-                          <span className="text-red-status text-xs px-1.5 py-0.5 rounded border border-red-status/50">MANDATORY</span>
+                          <span className="text-red-status text-xs px-1.5 py-0.5 rounded border border-overdue">MANDATORY</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
@@ -2253,13 +2242,13 @@ export default function WorkOrderDetailPage() {
                                   type="button"
                                   onClick={() => handleRespondItem(ci, r)}
                                   disabled={busy === `cl:item:${ci.woChecklistItemId}`}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border transition-colors disabled:opacity-40 ${
+                                  className={`px-1.5 py-0.5 rounded text-2xs font-semibold border transition-colors disabled:opacity-40 ${
                                     ci.response === r
                                       ? r === 'Yes'
-                                        ? 'text-green-status border-green-status/60 bg-green-status/10'
+                                        ? 'text-green-status border-done bg-done-weak'
                                         : r === 'No'
-                                          ? 'text-red-status border-red-status/60 bg-red-status/10'
-                                          : 'text-amber border-amber/60 bg-amber/10'
+                                          ? 'text-red-status border-overdue bg-overdue-weak'
+                                          : 'text-amber border-amber bg-amber-weak'
                                       : 'text-tertiary border-subtle hover:text-primary hover:border-highlight'
                                   }`}
                                 >
@@ -2267,10 +2256,10 @@ export default function WorkOrderDetailPage() {
                                 </button>
                               ))
                             ) : (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                                ci.response === 'Yes' ? 'text-green-status bg-green-status/10'
-                                  : ci.response === 'No' ? 'text-red-status bg-red-status/10'
-                                  : 'text-amber bg-amber/10'
+                              <span className={`text-2xs px-1.5 py-0.5 rounded font-semibold ${
+                                ci.response === 'Yes' ? 'text-green-status bg-done-weak'
+                                  : ci.response === 'No' ? 'text-red-status bg-overdue-weak'
+                                  : 'text-amber bg-amber-weak'
                               }`}>
                                 {ci.response}
                               </span>
@@ -2292,7 +2281,7 @@ export default function WorkOrderDetailPage() {
                         <button
                           onClick={() => handleCompleteChecklist(cl)}
                           disabled={busy === `cl:complete:${cl.woChecklistId}`}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-green-status border border-green-status/50 hover:bg-green-status/10 transition-all disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-green-status border border-done hover:bg-done-weak transition-all disabled:opacity-50"
                         >
                           {busy === `cl:complete:${cl.woChecklistId}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                           Complete & Sign
@@ -2334,11 +2323,11 @@ export default function WorkOrderDetailPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs text-amber">{n.notificationNumber}</span>
                             <span
-                              className="text-[10px] px-1.5 py-0.5 rounded border"
+                              className="text-2xs px-1.5 py-0.5 rounded border"
                               style={{
-                                color: n.status === 'Completed' ? '#22C55E' : '#D97706',
-                                backgroundColor: `${n.status === 'Completed' ? '#22C55E' : '#D97706'}20`,
-                                border: `1px solid ${n.status === 'Completed' ? '#22C55E' : '#D97706'}50`,
+                                color: n.status === 'Completed' ? 'var(--status-done-fg)' : 'var(--status-open-fg)',
+                                backgroundColor: n.status === 'Completed' ? 'var(--status-done-bg)' : 'var(--status-open-bg)',
+                                border: n.status === 'Completed' ? '1px solid var(--status-done-border)' : '1px solid var(--status-open-border)',
                               }}
                             >
                               {n.status}
@@ -2346,7 +2335,7 @@ export default function WorkOrderDetailPage() {
                           </div>
                           <p className="text-xs text-primary mt-1 truncate">{n.description}</p>
                         </div>
-                        <span className="text-[10px] text-tertiary flex-shrink-0">Open</span>
+                        <span className="text-2xs text-tertiary flex-shrink-0">Open</span>
                       </div>
                     </button>
                   );
@@ -2366,13 +2355,13 @@ export default function WorkOrderDetailPage() {
                   placeholder="Add a comment..."
                   aria-label="Add a comment"
                   className="flex-1 px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors"
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                 />
                 <button
                   type="submit"
                   disabled={!newComment.trim() || busy === 'comment:add'}
                   className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                  style={{ backgroundColor: '#D97706', color: '#111113' }}
+                  style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
                 >
                   {busy === 'comment:add' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                   Post
@@ -2426,19 +2415,19 @@ export default function WorkOrderDetailPage() {
                 disabled={!canEdit}
                 aria-label="Failure code"
                 className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
               >
                 <option value="">None</option>
                 {failureCodes.map((c) => (
                   <option key={c.failureCodeId} value={c.failureCodeId}>{c.code} - {c.description}</option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-tertiary">
+              <p className="mt-1 text-2xs text-tertiary">
                 What was observed on this work order. Optional - unlike Root Cause, no SOW clause
                 requires a failure before completion.
               </p>
               {failureCodesFailed && (
-                <p className="mt-1 text-[11px] text-red-status">
+                <p className="mt-1 text-2xs text-red-status">
                   Failure codes could not be loaded, so this list is empty rather than complete.
                   Reload the page to try again.
                 </p>
@@ -2452,7 +2441,7 @@ export default function WorkOrderDetailPage() {
                 disabled={!canEdit}
                 aria-label="Root cause"
                 className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
               >
                 <option value="">None</option>
                 {causeCodes.map((c) => (
@@ -2460,7 +2449,7 @@ export default function WorkOrderDetailPage() {
                 ))}
               </select>
               {wo.breakdownFlag && !notesForm.causeCodeId && (
-                <p className="mt-1 text-[11px] text-amber">
+                <p className="mt-1 text-2xs text-amber">
                   This is a breakdown. A cause code is required before it can be completed.
                 </p>
               )}
@@ -2475,7 +2464,7 @@ export default function WorkOrderDetailPage() {
                 aria-label="Safety notes"
                 placeholder="Hazards, isolations and precautions for this job"
                 className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
               />
             </div>
             <div>
@@ -2488,7 +2477,7 @@ export default function WorkOrderDetailPage() {
                 aria-label="Completion remarks"
                 placeholder="What was done, what was found, and what was left outstanding"
                 className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                style={{ backgroundColor: '#27272A' }}
+                style={{ backgroundColor: 'var(--surface-3)' }}
               />
             </div>
             {canEdit && (
@@ -2497,7 +2486,7 @@ export default function WorkOrderDetailPage() {
                 onClick={handleSaveNotes}
                 disabled={busy === 'notes:save'}
                 className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                style={{ backgroundColor: '#D97706', color: '#111113' }}
+                style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
               >
                 {busy === 'notes:save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 Save Failure, Cause & Notes
@@ -2518,14 +2507,14 @@ export default function WorkOrderDetailPage() {
                   disabled={!canEdit}
                   aria-label="Calibration result"
                   className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                 >
                   <option value="">Not recorded</option>
                   <option value="Pass">Pass</option>
                   <option value="Fail">Fail</option>
                 </select>
                 {!calForm.calibrationResult && (
-                  <p className="mt-1 text-[11px] text-amber">
+                  <p className="mt-1 text-2xs text-amber">
                     A pass/fail result is required before this calibration can be completed.
                   </p>
                 )}
@@ -2539,7 +2528,7 @@ export default function WorkOrderDetailPage() {
                   disabled={!canEdit}
                   aria-label="Calibration due date"
                   className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                 />
               </div>
               <div>
@@ -2554,7 +2543,7 @@ export default function WorkOrderDetailPage() {
                     aria-label="Calibration interval value"
                     placeholder="e.g. 12"
                     className="w-1/2 px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   />
                   <select
                     value={calForm.calibrationIntervalUnit}
@@ -2562,7 +2551,7 @@ export default function WorkOrderDetailPage() {
                     disabled={!canEdit}
                     aria-label="Calibration interval unit"
                     className="w-1/2 px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                    style={{ backgroundColor: '#27272A' }}
+                    style={{ backgroundColor: 'var(--surface-3)' }}
                   >
                     <option value="">Unit</option>
                     <option value="Days">Days</option>
@@ -2581,7 +2570,7 @@ export default function WorkOrderDetailPage() {
                   aria-label="Calibration reference standard"
                   placeholder="Standard or instrument used as reference"
                   className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                 />
               </div>
               <div className="md:col-span-2">
@@ -2594,7 +2583,7 @@ export default function WorkOrderDetailPage() {
                   aria-label="Calibration as found"
                   placeholder="Readings and condition on arrival"
                   className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                 />
               </div>
               <div className="md:col-span-2">
@@ -2607,7 +2596,7 @@ export default function WorkOrderDetailPage() {
                   aria-label="Calibration as left"
                   placeholder="Readings and condition after adjustment"
                   className="w-full px-3 py-2 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight transition-colors disabled:opacity-60"
-                  style={{ backgroundColor: '#27272A' }}
+                  style={{ backgroundColor: 'var(--surface-3)' }}
                 />
               </div>
             </div>
@@ -2617,7 +2606,7 @@ export default function WorkOrderDetailPage() {
                 onClick={handleSaveCalibration}
                 disabled={busy === 'cal:save'}
                 className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-                style={{ backgroundColor: '#D97706', color: '#111113' }}
+                style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
               >
                 {busy === 'cal:save' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 Save Calibration
@@ -2639,7 +2628,7 @@ export default function WorkOrderDetailPage() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={attBusy === 'upload'}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber/50 hover:bg-amber/10 transition-all disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-amber border border-amber hover:bg-amber-weak transition-all disabled:opacity-50"
                 >
                   {attBusy === 'upload' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                   Upload
@@ -2648,15 +2637,15 @@ export default function WorkOrderDetailPage() {
               <span className="text-xs text-tertiary">PDF, images, text, Excel — up to 10 MB</span>
             </div>
             {attError && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded text-xs text-red-status border border-red-status/30"
-                style={{ backgroundColor: 'rgba(220,38,38,0.08)' }}>
+              <div className="flex items-center gap-2 px-3 py-2 rounded text-xs text-red-status border border-overdue"
+                style={{ backgroundColor: 'var(--status-overdue-bg)' }}>
                 <AlertTriangle className="w-4 h-4" />
                 {attError}
               </div>
             )}
             {attSuccess && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded text-xs text-green-status border border-green-status/30"
-                style={{ backgroundColor: 'rgba(5,150,105,0.08)' }}>
+              <div className="flex items-center gap-2 px-3 py-2 rounded text-xs text-green-status border border-done"
+                style={{ backgroundColor: 'var(--status-done-bg)' }}>
                 <CheckCircle className="w-4 h-4" />
                 {attSuccess}
               </div>
@@ -2665,11 +2654,11 @@ export default function WorkOrderDetailPage() {
               <EmptyState label="No attachments" />
             ) : (
               <div className="industrial-card rounded overflow-hidden">
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['File', 'Size', 'Uploaded By', 'Uploaded At', ''].map((h) => (
-                        <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className={thCls} style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -2677,7 +2666,7 @@ export default function WorkOrderDetailPage() {
                     {attachments.map((att, idx) => {
                       const uploader = users.find((u) => u.userId === att.uploadedByUserId);
                       return (
-                        <tr key={att.attachmentId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
+                        <tr key={att.attachmentId}>
                           <td className={`${tdCls} font-mono text-xs text-primary`}>{att.originalName}</td>
                           <td className={`${tdCls} text-xs text-secondary`}>{formatBytes(att.sizeBytes)}</td>
                           <td className={`${tdCls} text-xs text-primary`}>{uploader?.fullName || att.createdBy}</td>
@@ -2722,17 +2711,17 @@ export default function WorkOrderDetailPage() {
               <EmptyState label="No history entries" />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full data-table">
                   <thead>
-                    <tr style={{ backgroundColor: '#27272A' }}>
+                    <tr>
                       {['Status', 'Snapshot Date', 'Changed By', 'Planned Cost', 'Actual Cost'].map((h) => (
-                        <th key={h} className={thCls} style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
+                        <th key={h} className={thCls} style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {history.map((h, idx) => (
-                      <tr key={h.snapshotId} className="border-t border-subtle" style={{ backgroundColor: rowBg(idx) }}>
+                    {history.map((h) => (
+                      <tr key={h.snapshotId}>
                         <td className={tdCls}>
                           <span className="text-xs px-1.5 py-0.5 rounded badge-in-progress">{h.status}</span>
                         </td>
@@ -2769,11 +2758,11 @@ export default function WorkOrderDetailPage() {
 
 function InfoCard({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="p-3 rounded border border-subtle" style={{ backgroundColor: '#1E1E22' }}>
-      <div className="text-tertiary mb-1" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+    <div className="p-3 rounded border border-subtle" style={{ backgroundColor: 'var(--surface-1)' }}>
+      <div className="text-tertiary mb-1" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
         {label}
       </div>
-      <div className="text-sm font-medium truncate" style={{ color: color || '#FAFAFA' }}>
+      <div className="text-sm font-medium truncate" style={{ color: color || 'var(--text-1)' }}>
         {value}
       </div>
     </div>
@@ -2802,7 +2791,7 @@ function formatMoney(v: unknown): string {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-tertiary mb-1" style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+    <div className="text-tertiary mb-1" style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
       {children}
     </div>
   );

@@ -78,7 +78,7 @@ function MaterialForm({ initial, onCancel, onSaved }: MaterialFormProps) {
             required
             disabled={busy}
             className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="block text-xs text-secondary">
@@ -89,7 +89,7 @@ function MaterialForm({ initial, onCancel, onSaved }: MaterialFormProps) {
             required
             disabled={busy}
             className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="block text-xs text-secondary">
@@ -100,7 +100,7 @@ function MaterialForm({ initial, onCancel, onSaved }: MaterialFormProps) {
             required
             disabled={busy}
             className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="block text-xs text-secondary">
@@ -113,7 +113,7 @@ function MaterialForm({ initial, onCancel, onSaved }: MaterialFormProps) {
             onChange={(e) => setStandardCost(e.target.value)}
             disabled={busy}
             className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
         <label className="block text-xs text-secondary">
@@ -126,7 +126,7 @@ function MaterialForm({ initial, onCancel, onSaved }: MaterialFormProps) {
             onChange={(e) => setCurrentStock(e.target.value)}
             disabled={busy}
             className="mt-1 w-full rounded px-2 py-1.5 text-sm text-primary outline-none border border-subtle focus:border-highlight disabled:opacity-60"
-            style={{ backgroundColor: '#27272A' }}
+            style={{ backgroundColor: 'var(--surface-3)' }}
           />
         </label>
       </div>
@@ -236,7 +236,7 @@ export default function MaterialsPage() {
               placeholder="Search materials..."
               aria-label="Search materials"
               className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-primary outline-none border border-subtle focus:border-highlight"
-              style={{ backgroundColor: '#27272A' }}
+              style={{ backgroundColor: 'var(--surface-3)' }}
             />
           </div>
           <div className="flex items-center gap-2 ml-auto">
@@ -275,9 +275,9 @@ export default function MaterialsPage() {
         )}
 
         <div className="industrial-card rounded overflow-hidden">
-          <table className="w-full">
+          <table className="w-full data-table">
             <thead>
-              <tr style={{ backgroundColor: '#27272A' }}>
+              <tr>
                 {[
                   { key: 'materialCode', label: 'Material Code' },
                   { key: 'description', label: 'Description' },
@@ -289,8 +289,8 @@ export default function MaterialsPage() {
                 ].map((col) => (
                   <th
                     key={col.key}
-                    className="text-left px-4 py-2.5 font-medium text-tertiary select-none"
-                    style={{ fontSize: '10px', letterSpacing: '0.06em', textTransform: 'uppercase' }}
+                    className="font-medium text-tertiary select-none"
+                    style={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}
                     {...(col.key !== 'value' && col.key !== 'actions'
                       ? {
                           onClick: () => handleSort(col.key),
@@ -315,28 +315,27 @@ export default function MaterialsPage() {
               </tr>
             </thead>
             <tbody>
-              {paged.map((mat, idx) => (
+              {paged.map((mat) => (
                 <tr
                   key={mat.materialId}
                   className="border-t border-subtle"
-                  style={{ backgroundColor: idx % 2 === 0 ? '#1E1E22' : '#151517' }}
                 >
-                  <td className="px-4 py-2.5 font-mono text-xs text-primary">{mat.materialCode}</td>
-                  <td className="px-4 py-2.5 text-xs text-primary">{mat.description}</td>
-                  <td className="px-4 py-2.5 text-xs text-secondary">{mat.unitOfMeasure}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-secondary">${mat.standardCost.toLocaleString()}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="font-mono text-xs text-primary">{mat.materialCode}</td>
+                  <td className="text-xs text-primary">{mat.description}</td>
+                  <td className="text-xs text-secondary">{mat.unitOfMeasure}</td>
+                  <td className="font-mono text-xs text-secondary">${mat.standardCost.toLocaleString()}</td>
+                  <td>
                     <span className={`font-mono text-xs ${
                       mat.currentStock < 5 ? 'text-red-status' : mat.currentStock < 10 ? 'text-amber' : 'text-green-status'
                     }`}>
                       {mat.currentStock}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-primary">
+                  <td className="font-mono text-xs text-primary">
                     ${(mat.currentStock * mat.standardCost).toLocaleString()}
                   </td>
                   {canManage && (
-                    <td className="px-4 py-2.5">
+                    <td>
                       <button
                         onClick={() => { setShowCreateForm(false); setEditing(mat); }}
                         aria-label={`Edit material ${mat.materialCode}`}
