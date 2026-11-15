@@ -20,6 +20,7 @@ import { ApiError } from '@/lib/api';
 import { useAppStore } from '@/store/appStore';
 import { hasMinRole } from '@/lib/rbac';
 import { useAuthStore } from '@/store/authStore';
+import { chartTokens } from '@/lib/chartTokens';
 import type {
   BacklogReport,
   PMComplianceReport,
@@ -34,11 +35,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-// v1.1-13: tick text is the secondary token (#A1A1AA) so labels clear 4.5:1 on
-// every pane background; the axis stroke stays #92929B - axis lines are
-// decorative and outside the text-contrast rule.
-const AXIS_TICK = { fill: '#A1A1AA' };
-
 type ReportType =
   | 'backlog'
   | 'pm-compliance'
@@ -50,6 +46,9 @@ type ReportType =
 
 export default function ReportsPage() {
   const [activeReport, setActiveReport] = useState<ReportType>('backlog');
+  // SVG presentation attributes cannot resolve `var(--x)`, so chart colour is
+  // read from the computed `--chart-*` tokens once per mount.
+  const chart = useMemo(() => chartTokens(), []);
   interface ReportData {
     backlog: unknown;
     'pm-compliance': unknown;
@@ -428,11 +427,11 @@ export default function ReportsPage() {
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={backlogData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                        <XAxis dataKey="status" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
-                        <Bar dataKey="count" fill="#D97706" radius={[2, 2, 0, 0]} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                        <XAxis dataKey="status" stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                        <YAxis stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                        <Tooltip contentStyle={{ backgroundColor: chart.tooltipBg, border: `1px solid ${chart.tooltipBorder}`, borderRadius: '4px', fontSize: '12px', color: chart.tooltipText }} itemStyle={{ color: chart.tooltipText }} />
+                        <Bar dataKey="count" fill={chart.series[1]} radius={[2, 2, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -442,11 +441,11 @@ export default function ReportsPage() {
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={backlogPriorityData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                        <XAxis dataKey="priority" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
-                        <Bar dataKey="count" fill="#2563EB" radius={[2, 2, 0, 0]} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                        <XAxis dataKey="priority" stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                        <YAxis stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                        <Tooltip contentStyle={{ backgroundColor: chart.tooltipBg, border: `1px solid ${chart.tooltipBorder}`, borderRadius: '4px', fontSize: '12px', color: chart.tooltipText }} itemStyle={{ color: chart.tooltipText }} />
+                        <Bar dataKey="count" fill={chart.series[0]} radius={[2, 2, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -456,11 +455,11 @@ export default function ReportsPage() {
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={backlogData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                        <XAxis dataKey="status" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
-                        <Bar dataKey="hours" fill="#059669" radius={[2, 2, 0, 0]} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                        <XAxis dataKey="status" stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                        <YAxis stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                        <Tooltip contentStyle={{ backgroundColor: chart.tooltipBg, border: `1px solid ${chart.tooltipBorder}`, borderRadius: '4px', fontSize: '12px', color: chart.tooltipText }} itemStyle={{ color: chart.tooltipText }} />
+                        <Bar dataKey="hours" fill={chart.status.done} radius={[2, 2, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -532,11 +531,11 @@ export default function ReportsPage() {
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={mtbfData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                    <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
-                    <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
-                    <Bar dataKey="mtbf" fill="#2563EB" radius={[2, 2, 0, 0]} name="MTBF (hrs)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                    <XAxis dataKey="equipment" stroke={chart.axisLine} fontSize={10} angle={-30} textAnchor="end" height={60} tick={{ fill: chart.axisTick }} />
+                    <YAxis stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                    <Tooltip contentStyle={{ backgroundColor: chart.tooltipBg, border: `1px solid ${chart.tooltipBorder}`, borderRadius: '4px', fontSize: '12px', color: chart.tooltipText }} itemStyle={{ color: chart.tooltipText }} />
+                    <Bar dataKey="mtbf" fill={chart.series[0]} radius={[2, 2, 0, 0]} name="MTBF (hrs)" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -554,11 +553,11 @@ export default function ReportsPage() {
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={mttrData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                        <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
-                        <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
-                        <Bar dataKey="mttr" fill="#D97706" radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                        <XAxis dataKey="equipment" stroke={chart.axisLine} fontSize={10} angle={-30} textAnchor="end" height={60} tick={{ fill: chart.axisTick }} />
+                        <YAxis stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                        <Tooltip contentStyle={{ backgroundColor: chart.tooltipBg, border: `1px solid ${chart.tooltipBorder}`, borderRadius: '4px', fontSize: '12px', color: chart.tooltipText }} itemStyle={{ color: chart.tooltipText }} />
+                        <Bar dataKey="mttr" fill={chart.series[1]} radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -568,11 +567,11 @@ export default function ReportsPage() {
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={mttrLocationData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                        <XAxis dataKey="location" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
-                        <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                        <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
-                        <Bar dataKey="mttr" fill="#2563EB" radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                        <XAxis dataKey="location" stroke={chart.axisLine} fontSize={10} angle={-30} textAnchor="end" height={60} tick={{ fill: chart.axisTick }} />
+                        <YAxis stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                        <Tooltip contentStyle={{ backgroundColor: chart.tooltipBg, border: `1px solid ${chart.tooltipBorder}`, borderRadius: '4px', fontSize: '12px', color: chart.tooltipText }} itemStyle={{ color: chart.tooltipText }} />
+                        <Bar dataKey="mttr" fill={chart.series[0]} radius={[2, 2, 0, 0]} name="MTTR (hrs)" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -598,12 +597,12 @@ export default function ReportsPage() {
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={costData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                    <XAxis dataKey="costCenter" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                    <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
-                    <Bar dataKey="planned" fill="#D97706" radius={[2, 2, 0, 0]} name="Planned" />
-                    <Bar dataKey="actual" fill="#059669" radius={[2, 2, 0, 0]} name="Actual" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                    <XAxis dataKey="costCenter" stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                    <YAxis stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                    <Tooltip contentStyle={{ backgroundColor: chart.tooltipBg, border: `1px solid ${chart.tooltipBorder}`, borderRadius: '4px', fontSize: '12px', color: chart.tooltipText }} itemStyle={{ color: chart.tooltipText }} />
+                    <Bar dataKey="planned" fill={chart.series[1]} radius={[2, 2, 0, 0]} name="Planned" />
+                    <Bar dataKey="actual" fill={chart.status.done} radius={[2, 2, 0, 0]} name="Actual" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -667,11 +666,11 @@ export default function ReportsPage() {
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={downtimeData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                    <XAxis dataKey="equipment" stroke="#92929B" fontSize={10} angle={-30} textAnchor="end" height={60} tick={AXIS_TICK} />
-                    <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }} itemStyle={{ color: 'var(--text-1)' }} />
-                    <Bar dataKey="hours" fill="#F87171" radius={[2, 2, 0, 0]} name="Downtime (hrs)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                    <XAxis dataKey="equipment" stroke={chart.axisLine} fontSize={10} angle={-30} textAnchor="end" height={60} tick={{ fill: chart.axisTick }} />
+                    <YAxis stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                    <Tooltip contentStyle={{ backgroundColor: chart.tooltipBg, border: `1px solid ${chart.tooltipBorder}`, borderRadius: '4px', fontSize: '12px', color: chart.tooltipText }} itemStyle={{ color: chart.tooltipText }} />
+                    <Bar dataKey="hours" fill={chart.series[3]} radius={[2, 2, 0, 0]} name="Downtime (hrs)" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

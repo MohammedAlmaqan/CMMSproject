@@ -7,6 +7,7 @@ import { reportService } from '@/services/reportService';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
 import { ApiError } from '@/lib/api';
+import { chartTokenFallback } from '@/lib/chartTokens';
 import type { User } from '@/types';
 
 vi.mock('@/services/reportService', () => ({
@@ -50,7 +51,7 @@ describe('ReportsPage chart ticks (v1.1-13)', () => {
     });
   });
 
-  it('paints every backlog chart axis tick with the secondary text colour', async () => {
+  it('paints every backlog chart axis from the chart tokens', async () => {
     renderWithProviders(<ReportsPage />, { route: '/reports' });
 
     // Three backlog charts (by status, by priority, by work centre) at two
@@ -58,9 +59,10 @@ describe('ReportsPage chart ticks (v1.1-13)', () => {
     const axes = await screen.findAllByTestId('chart-axis');
     expect(axes.length).toBe(6);
     for (const axis of axes) {
-      expect(axis.dataset.tickFill).toBe('#A1A1AA');
-      // The axis line itself keeps the decorative stroke.
-      expect(axis.dataset.stroke).toBe('#92929B');
+      // Token identity, not a literal: jsdom has no stylesheet, so the
+      // fallback is the value the token resolves to in the light theme.
+      expect(axis.dataset.tickFill).toBe(chartTokenFallback.axisTick);
+      expect(axis.dataset.stroke).toBe(chartTokenFallback.axisLine);
     }
     expect(reportService.getBacklog).toHaveBeenCalledTimes(1);
   });

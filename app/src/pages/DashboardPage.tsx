@@ -19,44 +19,27 @@ import { dashboardService } from '@/services/dashboardService';
 import { reportService } from '@/services/reportService';
 import { workOrderService } from '@/services/workOrderService';
 import type { WorkOrder, SystemAlert } from '@/types';
+import { chartTokens } from '@/lib/chartTokens';
+import { toneForStatus } from '@/lib/status';
 import type { WorkOrderStatus, WorkOrderType } from '@/types';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, AreaChart, Area,
 } from 'recharts';
 
-// v1.1-13: tick text is the secondary token (#A1A1AA) so labels clear 4.5:1 on
-// every pane background; the axis stroke stays #92929B - axis lines are
-// decorative and outside the text-contrast rule.
-const AXIS_TICK = { fill: '#A1A1AA' };
-
 const TacticalDashboardGrid = lazy(
   () => import('@/components/dashboard/TacticalDashboardGrid')
 );
-
-const STATUS_COLORS: Record<WorkOrderStatus, string> = {
-  Draft: '#92929B',
-  Planned: '#D97706',
-  Scheduled: '#2563EB',
-  'In Progress': '#2563EB',
-  Suspended: '#F87171',
-  Completed: '#059669',
-  Closed: '#059669',
-  Cancelled: '#92929B',
-};
-
-const TYPE_COLORS: Record<WorkOrderType, string> = {
-  CM: '#D97706',
-  PM: '#2563EB',
-  PdM: '#7C3AED',
-  EM: '#F87171',
-  CAL: '#059669',
-};
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const kpis = useAppStore((s) => s.dashboardKPIs);
   const storeError = useAppStore((s) => s.error);
+  // Recharts writes fill/stroke as SVG attributes, where `var(--x)` is not
+  // reliably resolved, so the chart palette is read once from the computed
+  // `--chart-*` tokens. Nothing toggles `data-theme` at runtime, so the values
+  // cannot go stale behind this memo.
+  const chart = useMemo(() => chartTokens(), []);
   // The status/type pies and the "PMs completed" line count every work order,
   // so they are drawn from the whole estate (fanned out over the paginated list
   // endpoint, selecting only the two columns needed) rather than from the store,
@@ -125,12 +108,16 @@ export default function DashboardPage() {
     woMix.forEach((w) => {
       counts[w.status] = (counts[w.status] || 0) + 1;
     });
+    // Colour comes from the 8-tone status palette, so a slice matches the badge
+    // the same work order carries elsewhere. Two lifecycle states that share a
+    // tone (Draft and Planned are both "open") therefore share a fill; the
+    // legend still names each state, so the distinction is not colour-only.
     return Object.entries(counts).map(([name, value]) => ({
       name,
       value,
-      color: STATUS_COLORS[name as WorkOrderStatus] || '#92929B',
+      color: chart.status[toneForStatus(name as WorkOrderStatus)],
     }));
-  }, [woMix]);
+  }, [woMix, chart]);
 
   const typeData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -140,9 +127,9 @@ export default function DashboardPage() {
     return Object.entries(counts).map(([name, value]) => ({
       name,
       value,
-      color: TYPE_COLORS[name as WorkOrderType] || '#92929B',
+      color: chart.type[name as WorkOrderType] ?? chart.series[5],
     }));
-  }, [woMix]);
+  }, [woMix, chart]);
 
   const unreadAlerts = dashAlerts.filter((a) => !a.isRead);
 
@@ -161,28 +148,28 @@ export default function DashboardPage() {
               icon={<ClipboardList className="w-5 h-5" />}
               label="Active WOs"
               value={String(kpis.activeWorkOrders)}
-              color="#FAFAFA"
+              color="var(--text-1)"
               onClick={() => navigate('/work-orders')}
             />
             <KPICard
               icon={<AlertTriangle className="w-5 h-5" />}
               label="Overdue"
               value={String(kpis.overdueWorkOrders)}
-              color="#F87171"
+              color="var(--status-overdue-fg)"
               onClick={() => navigate('/work-orders')}
             />
             <KPICard
               icon={<Calendar className="w-5 h-5" />}
               label="Scheduled Today"
               value={String(kpis.scheduledToday)}
-              color="#2563EB"
+              color="var(--status-active-fg)"
               onClick={() => navigate('/work-orders')}
             />
             <KPICard
               icon={<TrendingUp className="w-5 h-5" />}
               label="Completion Rate"
               value={`${kpis.completionRate}%`}
-              color="#059669"
+              color="var(--status-done-fg)"
               onClick={() => navigate('/reports')}
             />
           </div>
@@ -229,12 +216,13 @@ export default function DashboardPage() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--surface-1)',
-                      border: '1px solid var(--border-subtle)',
+                      backgroundColor: chart.tooltipBg,
+                      border: `1px solid ${chart.tooltipBorder}`,
                       borderRadius: '4px',
                       fontSize: '12px',
+                      color: chart.tooltipText,
                     }}
-                    itemStyle={{ color: 'var(--text-1)' }}
+                    itemStyle={{ color: chart.tooltipText }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -257,28 +245,29 @@ export default function DashboardPage() {
                 <AreaChart data={trendData}>
                   <defs>
                     <linearGradient id="plannedGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#D97706" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#D97706" stopOpacity={0} />
+                      <stop offset="5%" stopColor={chart.status.open} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={chart.status.open} stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#059669" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#059669" stopOpacity={0} />
+                      <stop offset="5%" stopColor={chart.status.done} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={chart.status.done} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                  <XAxis dataKey="month" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                  <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                  <XAxis dataKey="month" stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                  <YAxis stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--surface-1)',
-                      border: '1px solid var(--border-subtle)',
+                      backgroundColor: chart.tooltipBg,
+                      border: `1px solid ${chart.tooltipBorder}`,
                       borderRadius: '4px',
                       fontSize: '12px',
+                      color: chart.tooltipText,
                     }}
-                    itemStyle={{ color: 'var(--text-1)' }}
+                    itemStyle={{ color: chart.tooltipText }}
                   />
-                  <Area type="monotone" dataKey="planned" stroke="#D97706" fill="url(#plannedGrad)" strokeWidth={1.5} />
-                  <Area type="monotone" dataKey="actual" stroke="#059669" fill="url(#actualGrad)" strokeWidth={1.5} />
+                  <Area type="monotone" dataKey="planned" stroke={chart.status.open} fill="url(#plannedGrad)" strokeWidth={1.5} />
+                  <Area type="monotone" dataKey="actual" stroke={chart.status.done} fill="url(#actualGrad)" strokeWidth={1.5} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -290,17 +279,18 @@ export default function DashboardPage() {
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={typeData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                  <XAxis type="number" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                  <YAxis dataKey="name" type="category" stroke="#92929B" fontSize={11} tick={AXIS_TICK} width={30} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                  <XAxis type="number" stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                  <YAxis dataKey="name" type="category" stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} width={30} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--surface-1)',
-                      border: '1px solid var(--border-subtle)',
+                      backgroundColor: chart.tooltipBg,
+                      border: `1px solid ${chart.tooltipBorder}`,
                       borderRadius: '4px',
                       fontSize: '12px',
+                      color: chart.tooltipText,
                     }}
-                    itemStyle={{ color: 'var(--text-1)' }}
+                    itemStyle={{ color: chart.tooltipText }}
                   />
                   <Bar dataKey="value" radius={[0, 2, 2, 0]}>
                     {typeData.map((entry, index) => (
@@ -323,17 +313,18 @@ export default function DashboardPage() {
             <div className="h-44">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={backlogByCenter}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272A" />
-                  <XAxis dataKey="name" stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
-                  <YAxis stroke="#92929B" fontSize={11} tick={AXIS_TICK} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+                  <XAxis dataKey="name" stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
+                  <YAxis stroke={chart.axisLine} fontSize={11} tick={{ fill: chart.axisTick }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--surface-1)',
-                      border: '1px solid var(--border-subtle)',
+                      backgroundColor: chart.tooltipBg,
+                      border: `1px solid ${chart.tooltipBorder}`,
                       borderRadius: '4px',
                       fontSize: '12px',
+                      color: chart.tooltipText,
                     }}
-                    itemStyle={{ color: 'var(--text-1)' }}
+                    itemStyle={{ color: chart.tooltipText }}
                     formatter={(value: number, _name: string, item) => [
                       `${value.toFixed(1)} h across ${item?.payload?.openWorkOrderCount ?? 0} open WOs`,
                       'Backlog',
@@ -342,7 +333,7 @@ export default function DashboardPage() {
                   {/* Hours, not work-order count. The bar length is planned
                       labour queued, which is what the row asks for and what a
                       capacity conversation actually needs. */}
-                  <Bar dataKey="backlogHours" fill="#D97706" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="backlogHours" fill={chart.series[1]} radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -471,7 +462,7 @@ export default function DashboardPage() {
                     cy="50"
                     r="42"
                     fill="none"
-                    stroke="#27272A"
+                    stroke={chart.grid}
                     strokeWidth="8"
                   />
                   <circle
@@ -479,7 +470,7 @@ export default function DashboardPage() {
                     cy="50"
                     r="42"
                     fill="none"
-                    stroke="#D97706"
+                    stroke={chart.status.done}
                     strokeWidth="8"
                     strokeDasharray={`${(kpis.pmCompliance / 100) * 264} 264`}
                     strokeLinecap="round"
