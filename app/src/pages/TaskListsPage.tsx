@@ -318,14 +318,14 @@ export default function TaskListsPage() {
         <div
           className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded border px-4 py-2 ${
             toast.error
-              ? 'border-red-500/50 bg-red-500/10'
-              : 'border-emerald-500/50 bg-emerald-500/10'
+              ? 'border-overdue bg-overdue-weak'
+              : 'border-done bg-done-weak'
           }`}
         >
           {toast.error ? (
-            <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+            <AlertTriangle className="w-3.5 h-3.5 text-red-status flex-shrink-0" />
           ) : (
-            <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+            <CheckCircle className="w-3.5 h-3.5 text-green-status flex-shrink-0" />
           )}
           <span className="text-xs text-primary">{toast.text}</span>
           <button
@@ -376,11 +376,11 @@ export default function TaskListsPage() {
           </div>
         )}
         {storeError && (
-          <div className="mb-4 flex items-center justify-between rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+          <div className="mb-4 flex items-center justify-between rounded-md border border-overdue bg-overdue-weak px-3 py-2 text-xs text-red-status">
             <span>{storeError}</span>
             <button
               onClick={() => useAppStore.getState().loadFromApi()}
-              className="ml-2 underline hover:text-red-100"
+              className="ml-2 underline hover:text-primary"
             >
               Retry
             </button>

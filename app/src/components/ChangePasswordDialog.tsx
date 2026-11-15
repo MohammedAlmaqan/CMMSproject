@@ -105,12 +105,12 @@ export default function ChangePasswordDialog({
           </button>
         </div>
         {error && (
-          <p className="text-xs text-red-400" role="alert">
+          <p className="text-xs text-red-status" role="alert">
             {error}
           </p>
         )}
         {success && (
-          <p className="text-xs text-green-500" role="status">
+          <p className="text-xs text-green-status" role="status">
             Password updated.
           </p>
         )}

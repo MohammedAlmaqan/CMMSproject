@@ -118,7 +118,7 @@ function WorkCenterForm({ initial, onCancel, onSaved }: WorkCenterFormProps) {
         Active
       </label>
       {error && (
-        <div role="alert" className="mt-3 rounded border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">{error}</div>
+        <div role="alert" className="mt-3 rounded border border-overdue bg-overdue-weak px-3 py-2 text-xs text-red-status">{error}</div>
       )}
       <div className="mt-3 flex items-center gap-2">
         <button type="submit" disabled={busy} className="px-3 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight disabled:opacity-50">
@@ -176,9 +176,9 @@ export default function WorkCentersPage() {
           </div>
         )}
         {storeError && (
-          <div className="mb-4 flex items-center justify-between rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+          <div className="mb-4 flex items-center justify-between rounded-md border border-overdue bg-overdue-weak px-3 py-2 text-xs text-red-status">
             <span>{storeError}</span>
-            <button onClick={() => useAppStore.getState().loadFromApi()} className="ml-2 underline hover:text-red-100">Retry</button>
+            <button onClick={() => useAppStore.getState().loadFromApi()} className="ml-2 underline hover:text-primary">Retry</button>
           </div>
         )}
         {!loading && !storeError && workCenters.length === 0 && (

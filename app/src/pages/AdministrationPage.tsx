@@ -275,9 +275,9 @@ export default function AdministrationPage() {
             </div>
           )}
           {storeError && (
-            <div className="mb-4 flex items-center justify-between rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+            <div className="mb-4 flex items-center justify-between rounded-md border border-overdue bg-overdue-weak px-3 py-2 text-xs text-red-status">
               <span>{storeError}</span>
-              <button onClick={() => useAppStore.getState().loadFromApi()} className="ml-2 underline hover:text-red-100">Retry</button>
+              <button onClick={() => useAppStore.getState().loadFromApi()} className="ml-2 underline hover:text-primary">Retry</button>
             </div>
           )}
           {activeTab === 'users' && (
@@ -306,7 +306,7 @@ export default function AdministrationPage() {
                 <span className="text-tertiary text-xs ml-auto">{filteredUsers.length} users</span>
               </div>
               {userActionError && (
-                <p className="mb-4 text-xs text-red-400" role="alert">{userActionError}</p>
+                <p className="mb-4 text-xs text-red-status" role="alert">{userActionError}</p>
               )}
               {showUserForm && (
                 <UserForm
@@ -449,13 +449,13 @@ export default function AdministrationPage() {
                 )}
               </div>
               {purgeMessage && (
-                <p className="mb-4 text-xs text-green-400" role="status">{purgeMessage}</p>
+                <p className="mb-4 text-xs text-green-status" role="status">{purgeMessage}</p>
               )}
               {purgeError && (
-                <p className="mb-4 text-xs text-red-400" role="alert">{purgeError}</p>
+                <p className="mb-4 text-xs text-red-status" role="alert">{purgeError}</p>
               )}
               {auditError && (
-                <p className="mb-4 text-xs text-red-400" role="alert">{auditError}</p>
+                <p className="mb-4 text-xs text-red-status" role="alert">{auditError}</p>
               )}
               {!auditLoading && !auditError && auditTotal === 0 && (
                 <div className="mb-4 rounded-md border border-subtle px-3 py-6 text-center text-tertiary text-xs">No audit log entries found.</div>
@@ -517,7 +517,7 @@ export default function AdministrationPage() {
                 </h3>
                 <div className="space-y-4">
                   {settingsError && (
-                    <p className="text-xs text-red-400" role="alert">{settingsError}</p>
+                    <p className="text-xs text-red-status" role="alert">{settingsError}</p>
                   )}
                   {settings.map((setting) => (
                     <EditableSetting
@@ -627,12 +627,12 @@ function EditableSetting({
         <div className="text-primary text-xs font-medium">{setting.label}</div>
         <div className="text-tertiary" style={{ fontSize: '11px' }}>{setting.description}</div>
         {canEdit && invalid && touched && (
-          <div className="text-red-400" style={{ fontSize: '11px' }}>
+          <div className="text-red-status" style={{ fontSize: '11px' }}>
             Use letters, digits, hyphen or underscore only
           </div>
         )}
         {saved && !dirty && (
-          <div className="text-green-500" style={{ fontSize: '11px' }}>Saved</div>
+          <div className="text-green-status" style={{ fontSize: '11px' }}>Saved</div>
         )}
         {setting.isDefault && (
           <div className="text-tertiary" style={{ fontSize: '11px' }}>Using system default</div>
@@ -714,7 +714,7 @@ function UserForm({
       <h3 className="text-primary text-sm font-semibold flex items-center gap-2">
         <UserPlus className="w-4 h-4 text-amber" /> New User
       </h3>
-      {error && <p className="text-xs text-red-400" role="alert">{error}</p>}
+      {error && <p className="text-xs text-red-status" role="alert">{error}</p>}
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-xs text-secondary">
           Username
@@ -864,7 +864,7 @@ function EditUserForm({
       <h3 className="text-primary text-sm font-semibold flex items-center gap-2">
         <Pencil className="w-4 h-4 text-amber" /> Edit User — {user.username}
       </h3>
-      {error && <p className="text-xs text-red-400" role="alert">{error}</p>}
+      {error && <p className="text-xs text-red-status" role="alert">{error}</p>}
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-xs text-secondary">
           Full Name

@@ -177,7 +177,7 @@ export default function DashboardPage() {
 
         {storeError && (
           <div className="px-6 pt-4">
-            <div className="flex items-center justify-between rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+            <div className="flex items-center justify-between rounded-md border border-overdue bg-overdue-weak px-3 py-2 text-xs text-red-status">
               <span>{storeError}</span>
               <button
                 onClick={() => {
@@ -185,7 +185,7 @@ export default function DashboardPage() {
                   useAppStore.getState().loadDashboardKPIs();
                   useAppStore.getState().loadAlerts();
                 }}
-                className="ml-2 underline hover:text-red-100"
+                className="ml-2 underline hover:text-primary"
               >
                 Retry
               </button>
@@ -307,7 +307,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-primary text-sm font-semibold">Backlog Hours by Work Center</h3>
               {reportError === 'backlog hours by work center' && (
-                <span className="text-red-100" style={{ fontSize: '11px' }}>unavailable</span>
+                <span className="text-red-status" style={{ fontSize: '11px' }}>unavailable</span>
               )}
             </div>
             <div className="h-44">
@@ -344,7 +344,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-primary text-sm font-semibold">Top 10 Highest-Cost Equipment</h3>
               {reportError === 'top cost equipment' && (
-                <span className="text-red-100" style={{ fontSize: '11px' }}>unavailable</span>
+                <span className="text-red-status" style={{ fontSize: '11px' }}>unavailable</span>
               )}
             </div>
             <div className="space-y-1.5 max-h-44 overflow-y-auto">
@@ -377,7 +377,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-primary text-sm font-semibold">Awaiting Conversion</h3>
               {reportError === 'notifications awaiting conversion' && (
-                <span className="text-red-100" style={{ fontSize: '11px' }}>unavailable</span>
+                <span className="text-red-status" style={{ fontSize: '11px' }}>unavailable</span>
               )}
             </div>
             <div className="flex items-baseline gap-2">

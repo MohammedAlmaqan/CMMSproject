@@ -100,7 +100,7 @@ export default function ScheduleWorkOrderDialog({
           </button>
         </div>
         {(error || serverError) && (
-          <p className="text-xs text-red-400" role="alert">
+          <p className="text-xs text-red-status" role="alert">
             {error || serverError}
           </p>
         )}

@@ -131,7 +131,7 @@ function MaterialForm({ initial, onCancel, onSaved }: MaterialFormProps) {
         </label>
       </div>
       {error && (
-        <div role="alert" className="mt-3 rounded border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">{error}</div>
+        <div role="alert" className="mt-3 rounded border border-overdue bg-overdue-weak px-3 py-2 text-xs text-red-status">{error}</div>
       )}
       <div className="mt-3 flex items-center gap-2">
         <button type="submit" disabled={busy} className="px-3 py-1.5 rounded text-xs text-primary border border-subtle hover:border-highlight disabled:opacity-50">
@@ -206,7 +206,7 @@ export default function MaterialsPage() {
     <>
       <Header title="MATERIALS" showActions={false} />
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded border px-4 py-2 ${toastError ? 'border-red-500/50 bg-red-500/10' : 'border-emerald-500/50 bg-emerald-500/10'}`}>
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded border px-4 py-2 ${toastError ? 'border-overdue bg-overdue-weak' : 'border-done bg-done-weak'}`}>
           <span className="text-xs text-primary">{toast}</span>
           <button onClick={() => setToast(null)} className="text-tertiary hover:text-primary" aria-label="Dismiss message"><X className="w-3.5 h-3.5" /></button>
         </div>
@@ -219,9 +219,9 @@ export default function MaterialsPage() {
           </div>
         )}
         {loadError && (
-          <div className="mb-4 flex items-center justify-between rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+          <div className="mb-4 flex items-center justify-between rounded-md border border-overdue bg-overdue-weak px-3 py-2 text-xs text-red-status">
             <span>{loadError}</span>
-            <button onClick={() => reload()} className="ml-2 underline hover:text-red-100">Retry</button>
+            <button onClick={() => reload()} className="ml-2 underline hover:text-primary">Retry</button>
           </div>
         )}
         {!loading && !loadError && materials.length === 0 && (

@@ -153,9 +153,9 @@ export default function CapacityBoardPanel({ crafts }: Props) {
           </div>
 
           {error && (
-            <div className="rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300 flex items-center justify-between">
+            <div className="rounded-md border border-overdue bg-overdue-weak px-3 py-2 text-xs text-red-status flex items-center justify-between">
               <span>{error}</span>
-              <button onClick={() => void load(range.from, range.to)} className="underline hover:text-red-100">Retry</button>
+              <button onClick={() => void load(range.from, range.to)} className="underline hover:text-primary">Retry</button>
             </div>
           )}
 

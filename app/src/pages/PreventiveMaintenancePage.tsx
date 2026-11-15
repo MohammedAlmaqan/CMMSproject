@@ -381,13 +381,13 @@ export default function PreventiveMaintenancePage() {
       {toast && (
         <div
           className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded border px-4 py-2 ${
-            toast.error ? 'border-red-500/50 bg-red-500/10' : 'border-emerald-500/50 bg-emerald-500/10'
+            toast.error ? 'border-overdue bg-overdue-weak' : 'border-done bg-done-weak'
           }`}
         >
           {toast.error ? (
-            <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+            <AlertTriangle className="w-3.5 h-3.5 text-red-status flex-shrink-0" />
           ) : (
-            <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+            <CheckCircle className="w-3.5 h-3.5 text-green-status flex-shrink-0" />
           )}
           <span className="text-xs text-primary">{toast.text}</span>
           <button onClick={() => setToast(null)} aria-label="Dismiss message" className="text-tertiary hover:text-primary"><X className="w-3.5 h-3.5" /></button>

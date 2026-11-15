@@ -1274,7 +1274,7 @@ export default function WorkOrderDetailPage() {
         {headerEditing ? (
           <form onSubmit={handleSaveHeader} className="space-y-3">
             {headerError && (
-              <p className="text-xs text-red-400" role="alert">
+              <p className="text-xs text-red-status" role="alert">
                 {headerError}
               </p>
             )}

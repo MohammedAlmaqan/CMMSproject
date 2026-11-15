@@ -97,7 +97,7 @@ export default function EquipmentForm({
         )}
       </h3>
       {error && (
-        <p className="text-xs text-red-400" role="alert">
+        <p className="text-xs text-red-status" role="alert">
           {error}
         </p>
       )}

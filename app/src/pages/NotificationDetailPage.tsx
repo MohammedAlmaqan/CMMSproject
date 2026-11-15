@@ -393,7 +393,7 @@ export default function NotificationDetailPage() {
                 Breakdown
               </label>
               {editError && (
-                <div role="alert" className="rounded border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">{editError}</div>
+                <div role="alert" className="rounded border border-overdue bg-overdue-weak px-3 py-2 text-xs text-red-status">{editError}</div>
               )}
               <div className="flex items-center justify-end gap-2">
                 <button

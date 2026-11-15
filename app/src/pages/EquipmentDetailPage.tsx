@@ -1,5 +1,5 @@
 // ============================================================
-// Equipment Detail Page — Live API
+// Equipment Detail Page ï¿½ Live API
 // ============================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -533,7 +533,7 @@ export default function EquipmentDetailPage() {
                     )}
                   </div>
                   {bomError && <p className="text-red-status text-xs mb-2">{bomError}</p>}
-                  {bomSuccess && <p className="text-emerald-400 text-xs mb-2">{bomSuccess}</p>}
+                  {bomSuccess && <p className="text-green-status text-xs mb-2">{bomSuccess}</p>}
 
                   {bomFormOpen && (
                     <form onSubmit={saveBom} className="mb-3 space-y-2 border border-subtle rounded p-2">
@@ -550,7 +550,7 @@ export default function EquipmentDetailPage() {
                             <option value="">Select...</option>
                             {materials.map((m) => (
                               <option key={m.materialId} value={m.materialId}>
-                                {m.materialCode} — {m.description}
+                                {m.materialCode} ï¿½ {m.description}
                               </option>
                             ))}
                           </select>
@@ -714,7 +714,7 @@ export default function EquipmentDetailPage() {
                 )}
               </div>
               {meterError && <p className="text-red-status text-xs mb-2">{meterError}</p>}
-              {meterSuccess && <p className="text-emerald-400 text-xs mb-2">{meterSuccess}</p>}
+              {meterSuccess && <p className="text-green-status text-xs mb-2">{meterSuccess}</p>}
 
               {meterFormOpen && (
                 <form onSubmit={saveMeter} className="industrial-card rounded p-4 space-y-3">
@@ -837,7 +837,7 @@ export default function EquipmentDetailPage() {
                               </div>
                             </div>
                             {readingError && (
-                              <div role="alert" className="rounded border border-red-900/50 bg-red-950/30 px-2 py-1 text-xs text-red-300">{readingError}</div>
+                              <div role="alert" className="rounded border border-overdue bg-overdue-weak px-2 py-1 text-xs text-red-status">{readingError}</div>
                             )}
                             <div className="flex items-center gap-2 justify-end">
                               <button
@@ -853,7 +853,7 @@ export default function EquipmentDetailPage() {
                                 className="px-2.5 py-1 rounded text-xs font-semibold transition-all hover:brightness-110 disabled:opacity-50"
                                 style={{ backgroundColor: 'var(--accent-fill)', color: 'var(--accent-ink)' }}
                               >
-                                {readingBusy ? 'Saving…' : 'Record reading'}
+                                {readingBusy ? 'Savingï¿½' : 'Record reading'}
                               </button>
                             </div>
                           </form>
@@ -927,7 +927,7 @@ export default function EquipmentDetailPage() {
                         <div className="min-w-0">
                           <p className="text-primary text-xs font-mono truncate">{att.originalName}</p>
                           <p className="text-tertiary text-xs mt-0.5">
-                            {formatBytes(att.sizeBytes)} · {att.createdBy} · {new Date(att.createdDate).toLocaleString()}
+                            {formatBytes(att.sizeBytes)} ï¿½ {att.createdBy} ï¿½ {new Date(att.createdDate).toLocaleString()}
                           </p>
                         </div>
                       </div>
