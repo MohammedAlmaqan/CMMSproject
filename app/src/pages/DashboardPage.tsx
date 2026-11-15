@@ -3,7 +3,7 @@
 // ============================================================
 
 import { useNavigate } from 'react-router-dom';
-import { lazy, Suspense, useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import {
   ClipboardList,
   AlertTriangle,
@@ -26,10 +26,6 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, AreaChart, Area,
 } from 'recharts';
-
-const TacticalDashboardGrid = lazy(
-  () => import('@/components/dashboard/TacticalDashboardGrid')
-);
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -138,41 +134,36 @@ export default function DashboardPage() {
       <Header title="DASHBOARD" showActions={false} />
 
       <div className="flex-1 overflow-y-auto">
-        {/* KPI Ribbon with 3D Grid */}
-        <div className="kpi-canvas-container">
-          <Suspense fallback={<div style={{ backgroundColor: 'var(--surface-1)' }} />}>
-            <TacticalDashboardGrid />
-          </Suspense>
-          <div className="kpi-metrics-overlay">
-            <KPICard
-              icon={<ClipboardList className="w-5 h-5" />}
-              label="Active WOs"
-              value={String(kpis.activeWorkOrders)}
-              color="var(--text-1)"
-              onClick={() => navigate('/work-orders')}
-            />
-            <KPICard
-              icon={<AlertTriangle className="w-5 h-5" />}
-              label="Overdue"
-              value={String(kpis.overdueWorkOrders)}
-              color="var(--status-overdue-fg)"
-              onClick={() => navigate('/work-orders')}
-            />
-            <KPICard
-              icon={<Calendar className="w-5 h-5" />}
-              label="Scheduled Today"
-              value={String(kpis.scheduledToday)}
-              color="var(--status-active-fg)"
-              onClick={() => navigate('/work-orders')}
-            />
-            <KPICard
-              icon={<TrendingUp className="w-5 h-5" />}
-              label="Completion Rate"
-              value={`${kpis.completionRate}%`}
-              color="var(--status-done-fg)"
-              onClick={() => navigate('/reports')}
-            />
-          </div>
+        {/* KPI ribbon */}
+        <div className="px-6 pt-6 grid grid-cols-4 gap-4">
+          <KPICard
+            icon={<ClipboardList className="w-5 h-5" />}
+            label="Active WOs"
+            value={String(kpis.activeWorkOrders)}
+            color="var(--text-1)"
+            onClick={() => navigate('/work-orders')}
+          />
+          <KPICard
+            icon={<AlertTriangle className="w-5 h-5" />}
+            label="Overdue"
+            value={String(kpis.overdueWorkOrders)}
+            color="var(--status-overdue-fg)"
+            onClick={() => navigate('/work-orders')}
+          />
+          <KPICard
+            icon={<Calendar className="w-5 h-5" />}
+            label="Scheduled Today"
+            value={String(kpis.scheduledToday)}
+            color="var(--status-active-fg)"
+            onClick={() => navigate('/work-orders')}
+          />
+          <KPICard
+            icon={<TrendingUp className="w-5 h-5" />}
+            label="Completion Rate"
+            value={`${kpis.completionRate}%`}
+            color="var(--status-done-fg)"
+            onClick={() => navigate('/reports')}
+          />
         </div>
 
         {storeError && (

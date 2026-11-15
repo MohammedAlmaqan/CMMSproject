@@ -33,7 +33,7 @@ system; until then it describes the superseded dark palette.
       literals onto tokens.
 - [x] **P5 — Charts.** `app/src/lib/chartTokens.ts`, axis/grid/series/tooltip
       from tokens; update the two chart tests to assert token identity.
-- [ ] **P6 — Cleanup.** Delete `TacticalDashboardGrid.tsx`, `three`,
+- [x] **P6 — Cleanup.** Delete `TacticalDashboardGrid.tsx`, `three`,
       `@react-three/*`, `@types/three`; delete `.glass*`, `.kpi-canvas*`,
       glow shadows, dead Tailwind HSL layer.
 - [ ] **P7 — Docs & verifiers.** Rewrite `docs/WCAG-AUDIT.md` as a contrast
@@ -52,3 +52,4 @@ system; until then it describes the superseded dark palette.
 | 2026-11-14 | P3 | `this commit` | chrome tests 17/17 · `tsc` clean · 0 hex left in layout/ |
 | 2026-11-15 | P4 | `this commit` | `tsc` clean · eslint clean · app 193/193 · build 16.5 s · 25 files |
 | 2026-11-15 | P5 | `this commit` | `tsc` clean · eslint clean · app 193/193 · build 18.9 s · 0 chart hex left |
+| 2026-11-15 | P6 | `this commit` | `tsc` clean · eslint clean · app 192/192 · build 14.3 s · 3D chunk gone |

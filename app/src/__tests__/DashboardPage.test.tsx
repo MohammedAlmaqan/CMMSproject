@@ -31,12 +31,6 @@ vi.mock('@/services/dashboardService', () => ({
   },
 }));
 
-// The 3D backdrop needs WebGL, which jsdom has none of, and it is lazy-loaded so
-// it would otherwise be pulled in as a side effect of rendering the page.
-vi.mock('@/components/dashboard/TacticalDashboardGrid', () => ({
-  default: () => <div data-testid="tactical-grid" />,
-}));
-
 /**
  * Recharts renders nothing measurable in jsdom -- a ResponsiveContainer has no
  * width, so its children never lay out. These stand-ins keep the props the page
