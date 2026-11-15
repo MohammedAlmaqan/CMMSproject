@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # ═══════════════════════════════════════════════════════════════════════
-# 3.5 E2E VERIFY — WCAG 2.1 AA light pass
-# Headless audit of all 14 protected routes: page load w/o errors, at
-# least one keyboard-focusable control per route, no interactive element
-# trapped with tabindex=-1, search/filter controls carry accessible
-# names, CommandPalette is a proper modal dialog, skip link + main
-# landmark present, global focus-visible ring + lightened tertiary text
-# compiled into the stylesheet, and a real keyboard-only Tab walk on
-# login, the WO list and the WO detail page.
+# 3.5 E2E VERIFY — WCAG 2.1 AA pass
+# Headless audit of the routes listed in `routes` below (11 static pages and
+# 3 detail pages): page load w/o errors, at least one keyboard-focusable
+# control per route, no interactive element trapped with tabindex=-1,
+# search/filter controls carry accessible names, CommandPalette is a proper
+# modal dialog, skip link + main landmark present, the global focus-visible
+# ring compiled into the stylesheet, and `.text-tertiary` clearing 4.5:1 on
+# `--bg-app` with both colours resolved from the live CSS variables, plus a
+# real keyboard-only Tab walk on login, the WO list and the WO detail page.
 # Usage: python scripts/verify/verify_g3_5.py
 # Exit:  0 PASS  1 FAIL
 # ═══════════════════════════════════════════════════════════════════════
@@ -25,6 +26,62 @@ SI = {}
 PAGE_ERRORS = []
 CONSOLE_ERRORS = []
 CONSOLE_WARNINGS = []
+
+# Global stylesheet probe, kept at module level so the same string can be
+# exercised outside a full audit run (it needs only a page with the built CSS
+# attached, no API and no database).
+#
+# Resolves `.text-tertiary` and `--bg-app` through the browser, so token chains
+# (`var(--text-3)` -> `var(--grey-650)` -> `#5f666f`) and keywords are handled,
+# then computes the WCAG 2.1 relative-luminance ratio. Nothing here compares
+# against a remembered rgb() literal.
+CSS_PROBE_JS = """() => {
+    const all = [...document.styleSheets].map(s => {
+        try { return [...s.cssRules].map(r => r.cssText).join('\\n'); }
+        catch (e) { return ''; }
+    }).join('\\n');
+    const probe = document.createElement('span');
+    probe.style.display = 'none';
+    document.body.appendChild(probe);
+    // Resolve any CSS colour (hex, rgb(), var()) through the browser so token
+    // chains and keywords are handled.
+    const rgbOf = (value) => {
+        probe.style.color = '';
+        probe.style.color = value;
+        return getComputedStyle(probe).color;
+    };
+    const tertiary = document.createElement('span');
+    tertiary.className = 'text-tertiary';
+    tertiary.style.display = 'none';
+    document.body.appendChild(tertiary);
+    const fg = getComputedStyle(tertiary).color;
+    tertiary.remove();
+    const bg = rgbOf(
+        getComputedStyle(document.documentElement).getPropertyValue('--bg-app').trim()
+    );
+    probe.remove();
+    const parse = (s) => {
+        const m = String(s).match(/rgba?\\(([^)]+)\\)/);
+        if (!m) return null;
+        return m[1].split(',').slice(0, 3).map(Number);
+    };
+    const lum = (rgb) => {
+        const f = (c) => {
+            c /= 255;
+            return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        };
+        return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
+    };
+    const f = parse(fg);
+    const b = parse(bg);
+    let ratio = 0;
+    if (f && b) {
+        const hi = Math.max(lum(f), lum(b));
+        const lo = Math.min(lum(f), lum(b));
+        ratio = (hi + 0.05) / (lo + 0.05);
+    }
+    return { hasFocusVisible: /focus-visible/.test(all), fg: fg, bg: bg, ratio: ratio };
+}"""
 
 
 def snap(page, label):
@@ -174,28 +231,18 @@ def main():
             SI["skip_link_present"] = SI["main_landmark_present"] = False
 
         # Global CSS smoke check (Vite dev injects CSS via JS <style>, so read
-        # the live CSSOM): focus-visible rule present + .text-tertiary lightened.
+        # the live CSSOM): focus-visible rule present + the tertiary text token
+        # clears 4.5:1 on the app surface. Contrast is computed from the live
+        # variables, never from a remembered rgb() literal.
         try:
-            css_state = page.evaluate(
-                """() => {
-                    const all = [...document.styleSheets].map(s => {
-                        try { return [...s.cssRules].map(r => r.cssText).join('\\n'); }
-                        catch (e) { return ''; }
-                    }).join('\\n');
-                    const probe = document.createElement('span');
-                    probe.className = 'text-tertiary';
-                    probe.style.display = 'none';
-                    document.body.appendChild(probe);
-                    const color = getComputedStyle(probe).color;
-                    probe.remove();
-                    return { hasFocusVisible: /focus-visible/.test(all), color: color };
-                }"""
-            )
+            css_state = page.evaluate(CSS_PROBE_JS)
             SI["css_focus_visible_rule"] = css_state.get("hasFocusVisible", False) is True
-            SI["css_tertiary_lightened"] = css_state.get("color") == "rgb(146, 146, 155)"
+            ratio = float(css_state.get("ratio") or 0)
+            SI["css_tertiary_contrast"] = ratio >= 4.5
+            print("CSS_TERTIARY_CONTRAST", css_state.get("fg"), "on", css_state.get("bg"), "=", round(ratio, 2))
         except Exception as e:
             print("CSS_ERR", e)
-            SI["css_focus_visible_rule"] = SI["css_tertiary_lightened"] = False
+            SI["css_focus_visible_rule"] = SI["css_tertiary_contrast"] = False
 
         # CommandPalette opens as a modal dialog
         try:
@@ -267,7 +314,7 @@ def main():
         ok = (
             all(SI.get(k) for k in (
                 "api_login_ok", "ui_login_ok", "skip_link_present", "main_landmark_present",
-                "css_focus_visible_rule", "css_tertiary_lightened",
+                "css_focus_visible_rule", "css_tertiary_contrast",
                 "command_palette_dialog", "command_palette_named", "command_palette_input_named",
                 "kw_login", "kw_work_orders",
             ))

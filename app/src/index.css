@@ -29,6 +29,7 @@
     --grey-400: #b6bcc6;
     --grey-500: #8a919b;
     --grey-600: #646b75;
+    --grey-650: #5f666f;
     --grey-700: #4a5058;
     --grey-750: #3a414a;
     --grey-800: #2e333a;
@@ -84,7 +85,7 @@
 
     --text-1: var(--grey-950); /* 16.3:1 on --bg-app */
     --text-2: var(--grey-700); /*  7.5:1 on --bg-app */
-    --text-3: var(--grey-600); /*  4.9:1 on --bg-app */
+    --text-3: var(--grey-650); /* 5.3:1 on --bg-app, 4.6:1 on --surface-3 */
 
     --accent: var(--amber-600); /* text-safe accent, 4.6:1 on --bg-app */
     --accent-fill: var(--amber-500); /* large fills and icons only */
