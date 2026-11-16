@@ -12,7 +12,7 @@ token system; its contrast matrices are derived from `app/src/index.css`, and th
 ## Definition of done per phase
 
 - `npx tsc --noEmit` clean in `app/`
-- `npm test` (app, 184 tests) green
+- `npm test` (app suite) green
 - `npm run build` green
 - no new hex literals introduced; inline styles reference `var(--token)`
 
