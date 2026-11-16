@@ -57,7 +57,7 @@ token system; its contrast matrices are derived from `app/src/index.css`, and th
 | 2026-11-15 | P5 | `01f1eaf` | `tsc` clean · eslint clean · app 193/193 · build 18.9 s · 0 chart hex left |
 | 2026-11-15 | P6 | `6cc6e32` | `tsc` clean · eslint clean · app 192/192 · build 14.3 s · 3D chunk gone |
 | 2026-11-15 | P7 | `982434e` | `tsc` clean · eslint clean · app 192/192 · build 14.3 s · CSS probe PASS (text-3 5.32:1, `#5f666f` on `#f4f5f7`) |
-| 2026-11-16 | P8 | `this commit` | a1 214/214 · dispositions 77 (65 build / 12 waive) · b1 PASS · openapi 166 ops / 111 paths · r7 27/27 on `cmms_r7_scratch` · backend 1256/1256 · app 192/192 · build 59.8 s |
+| 2026-11-16 | P8 | `193dbab` | a1 214/214 · dispositions 77 (65 build / 12 waive) · b1 PASS · openapi 166 ops / 111 paths · r7 27/27 on `cmms_r7_scratch` · backend 1256/1256 · app 192/192 · build 59.8 s |
 
 Two supporting commits sit between the phases and are not phases themselves:
 `db8ca07` repainted error/success feedback with the status tokens (between P5 and
