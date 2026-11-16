@@ -48,13 +48,18 @@ token system; its contrast matrices are derived from `app/src/index.css`, and th
 
 | Date | Phase | Commit | Verified |
 |---|---|---|---|
-| 2026-11-14 | P1 | `this commit` | `tsc` clean · build 41.9 s (Plex woff2 bundled) · app 184/184 |
-| 2026-11-14 | P2 | `this commit` | status tests 15/15 · `tsc` clean |
-| 2026-11-14 | P3 | `this commit` | chrome tests 17/17 · `tsc` clean · 0 hex left in layout/ |
-| 2026-11-15 | P4 | `this commit` | `tsc` clean · eslint clean · app 193/193 · build 16.5 s · 25 files |
-| 2026-11-15 | P5 | `this commit` | `tsc` clean · eslint clean · app 193/193 · build 18.9 s · 0 chart hex left |
-| 2026-11-15 | P6 | `this commit` | `tsc` clean · eslint clean · app 192/192 · build 14.3 s · 3D chunk gone |
-| 2026-11-15 | P7 | `this commit` | `tsc` clean · eslint clean · app 192/192 · build 14.3 s · CSS probe PASS (text-3 5.32:1, `#5f666f` on `#f4f5f7`) |
+| 2026-11-14 | P1 | `83cb2b0` | `tsc` clean · build 41.9 s (Plex woff2 bundled) · app 184/184 |
+| 2026-11-14 | P2 | `9613922` | status tests 15/15 · `tsc` clean |
+| 2026-11-14 | P3 | `78f59ad` | chrome tests 17/17 · `tsc` clean · 0 hex left in layout/ |
+| 2026-11-15 | P4 | `9b3269e` | `tsc` clean · eslint clean · app 193/193 · build 16.5 s · 25 files |
+| 2026-11-15 | P5 | `01f1eaf` | `tsc` clean · eslint clean · app 193/193 · build 18.9 s · 0 chart hex left |
+| 2026-11-15 | P6 | `6cc6e32` | `tsc` clean · eslint clean · app 192/192 · build 14.3 s · 3D chunk gone |
+| 2026-11-15 | P7 | `982434e` | `tsc` clean · eslint clean · app 192/192 · build 14.3 s · CSS probe PASS (text-3 5.32:1, `#5f666f` on `#f4f5f7`) |
+
+Two supporting commits sit between the phases and are not phases themselves:
+`db8ca07` repainted error/success feedback with the status tokens (between P5 and
+P6), and `d493b20` removed the duplicate row rule left on five data tables
+(after P6).
 
 ### P7 verification note
 
