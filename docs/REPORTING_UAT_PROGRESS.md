@@ -11,22 +11,22 @@ restore point.
 
 | # | Subject | State |
 |---|---|---|
-| 1 | `fix(reports): name equipment on the MTBF, MTTR and downtime rows` | pending |
+| 1 | `fix(reports): name equipment on the MTBF, MTTR and downtime rows` | done `9692dea` |
 | 2 | `fix(reports): clamp MTBF, report null intervals and count open breakdowns` | pending |
 | 3 | `test(uat): automate the zero-to-hero acceptance pass` | pending |
 
 ## Part 1 — reporting fixes
 
-- [ ] MTBF: join equipment, emit `equipmentCode` + `equipmentName`, fall back to the code for a soft-deleted asset
-- [ ] MTTR `byEquipment`: same join and labels
-- [ ] Downtime: same join and labels
+- [x] MTBF: join equipment, emit `equipmentCode` + `equipmentName`, fall back to the code for a soft-deleted asset
+- [x] MTTR `byEquipment`: same join and labels
+- [x] Downtime: same join and labels
 - [ ] MTBF: clamp at zero
 - [ ] MTBF: `mtbfHours` is `null` when there is no interval between failures
 - [ ] MTBF: `excludedIncomplete` counts breakdowns still open, and the UI says so
 - [ ] OpenAPI: correct `mtbfDays`/`failureCount`, `downtimeHours`, and the "reported and completed" wording
-- [ ] `reports.test.ts`: MTBF, downtime and label assertions (none existed)
-- [ ] `reportsViews.test.ts`: label agreement with the views
-- [ ] `ReportsPage.test.tsx`: axis carries the code, not the UUID
+- [x] `reports.test.ts`: MTBF, downtime and label assertions (none existed)
+- [x] `reportsViews.test.ts`: label agreement with the views
+- [x] `ReportsPage.test.tsx`: axis carries the code, not the UUID
 - [ ] backend typecheck + full backend suite green
 - [ ] app typecheck + full app suite green
 
