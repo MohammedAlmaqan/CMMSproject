@@ -191,23 +191,39 @@ describe('report views', () => {
     const [mttr, mtbf, viewMttr, viewMtbf] = await Promise.all([
       api().get('/api/reports/mttr').query({ equipmentId: eqEm }).set(authHeaders(ctx.adminToken)),
       api().get('/api/reports/mtbf').query({ equipmentId: eqEm }).set(authHeaders(ctx.adminToken)),
-      prisma.$queryRaw<Array<{ breakdown_count: number; mttr_hours: unknown }>>`
-        SELECT breakdown_count, mttr_hours FROM report_mttr_by_equipment WHERE equipment_id = ${eqEm}`,
-      prisma.$queryRaw<Array<{ breakdown_count: number; mtbf_hours: unknown }>>`
-        SELECT breakdown_count, mtbf_hours FROM report_mtbf_by_equipment WHERE equipment_id = ${eqEm}`,
+      prisma.$queryRaw<Array<{ equipment_code: string; breakdown_count: number; mttr_hours: unknown }>>`
+        SELECT equipment_code, breakdown_count, mttr_hours FROM report_mttr_by_equipment WHERE equipment_id = ${eqEm}`,
+      prisma.$queryRaw<Array<{ equipment_code: string; equipment_name: string; breakdown_count: number; mtbf_hours: unknown }>>`
+        SELECT equipment_code, equipment_name, breakdown_count, mtbf_hours FROM report_mtbf_by_equipment WHERE equipment_id = ${eqEm}`,
     ]);
     expect(mttr.status).toBe(200);
     expect(mtbf.status).toBe(200);
 
-    const apiMttr = (mttr.body.byEquipment as Array<{ equipmentId: string; mttrHours: number; breakdownCount: number }>)
-      .find((r) => r.equipmentId === eqEm);
+    const apiMttr = (mttr.body.byEquipment as Array<{
+      equipmentId: string;
+      equipmentCode: string;
+      equipmentName: string;
+      mttrHours: number;
+      breakdownCount: number;
+    }>).find((r) => r.equipmentId === eqEm);
     expect(apiMttr!.breakdownCount).toBe(1);
     expect(apiMttr!.mttrHours).toBeCloseTo(3, 2);
+    // The screen draws the axis from the code, so the API must resolve the same
+    // label the view layer resolves rather than leaking a UUID.
+    expect(apiMttr!.equipmentCode).toBe(viewMttr[0].equipment_code);
+    expect(apiMttr!.equipmentCode).not.toBe(apiMttr!.equipmentId);
     expect(Number(viewMttr[0].breakdown_count)).toBe(apiMttr!.breakdownCount);
     expect(Number(viewMttr[0].mttr_hours)).toBeCloseTo(apiMttr!.mttrHours, 2);
 
-    const apiMtbf = (mtbf.body as Array<{ equipmentId: string; mtbfHours: number; breakdownCount: number }>)
-      .find((r) => r.equipmentId === eqEm);
+    const apiMtbf = (mtbf.body as Array<{
+      equipmentId: string;
+      equipmentCode: string;
+      equipmentName: string;
+      mtbfHours: number;
+      breakdownCount: number;
+    }>).find((r) => r.equipmentId === eqEm);
+    expect(apiMtbf!.equipmentCode).toBe(viewMtbf[0].equipment_code);
+    expect(apiMtbf!.equipmentName).toBe(viewMtbf[0].equipment_name);
     expect(Number(viewMtbf[0].breakdown_count)).toBe(apiMtbf!.breakdownCount);
     expect(Number(viewMtbf[0].mtbf_hours)).toBeCloseTo(apiMtbf!.mtbfHours, 2);
   });
@@ -215,13 +231,20 @@ describe('report views', () => {
   it('agrees with /downtime for the fixture equipment', async () => {
     const [res, view] = await Promise.all([
       api().get('/api/reports/downtime').query({ equipmentId: eqEm }).set(authHeaders(ctx.adminToken)),
-      prisma.$queryRaw<Array<{ work_order_count: number; downtime_hours: unknown }>>`
-        SELECT work_order_count, downtime_hours FROM report_downtime_by_equipment WHERE equipment_id = ${eqEm}`,
+      prisma.$queryRaw<Array<{ equipment_code: string; equipment_name: string; work_order_count: number; downtime_hours: unknown }>>`
+        SELECT equipment_code, equipment_name, work_order_count, downtime_hours FROM report_downtime_by_equipment WHERE equipment_id = ${eqEm}`,
     ]);
     expect(res.status).toBe(200);
-    const apiRow = (res.body as Array<{ equipmentId: string; totalDowntimeHours: number; workOrderCount: number }>)
-      .find((r) => r.equipmentId === eqEm);
+    const apiRow = (res.body as Array<{
+      equipmentId: string;
+      equipmentCode: string;
+      equipmentName: string;
+      totalDowntimeHours: number;
+      workOrderCount: number;
+    }>).find((r) => r.equipmentId === eqEm);
     expect(apiRow!.workOrderCount).toBe(1);
+    expect(apiRow!.equipmentCode).toBe(view[0].equipment_code);
+    expect(apiRow!.equipmentName).toBe(view[0].equipment_name);
     expect(Number(view[0].work_order_count)).toBe(apiRow!.workOrderCount);
     expect(Number(view[0].downtime_hours)).toBeCloseTo(apiRow!.totalDowntimeHours, 2);
   });

@@ -777,7 +777,13 @@ describe('report rows 60-64', () => {
         .set(authHeaders(ctx.adminToken));
       expect(res.status).toBe(200);
       return res.body as {
-        byEquipment: Array<{ equipmentId: string; mttrHours: number; breakdownCount: number }>;
+        byEquipment: Array<{
+          equipmentId: string;
+          equipmentCode: string;
+          equipmentName: string;
+          mttrHours: number;
+          breakdownCount: number;
+        }>;
         byLocation: Array<{ functionalLocationId: string; locationCode: string; mttrHours: number; breakdownCount: number }>;
         excludedIncomplete: number;
       };
@@ -804,6 +810,35 @@ describe('report rows 60-64', () => {
     it('reports incomplete breakdowns as excluded rather than dropping them', async () => {
       const body = await mttr();
       expect(body.excludedIncomplete).toBe(1);
+    });
+
+    it('names the asset on the row instead of returning only its id', async () => {
+      const body = await mttr();
+      const row = body.byEquipment.find((r) => r.equipmentId === eqMttr);
+      expect(row!.equipmentCode).toBe(`R4MT${stamp}`);
+      expect(row!.equipmentName).toBe('R4 mttr probe');
+    });
+  });
+
+  describe('rows 61-62 - equipment labels', () => {
+    it('returns the code and name on every MTBF row', async () => {
+      const res = await api().get('/api/reports/mtbf').query({ equipmentId: eqMttr }).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      const row = (res.body as Array<{ equipmentId: string; equipmentCode: string; equipmentName: string }>)
+        .find((r) => r.equipmentId === eqMttr);
+      expect(row, 'the fixture asset appears in the MTBF rows').toBeDefined();
+      expect(row!.equipmentCode).toBe(`R4MT${stamp}`);
+      expect(row!.equipmentName).toBe('R4 mttr probe');
+    });
+
+    it('returns the code and name on every downtime row', async () => {
+      const res = await api().get('/api/reports/downtime').query({ equipmentId: eqMttr }).set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      const row = (res.body as Array<{ equipmentId: string; equipmentCode: string; equipmentName: string }>)
+        .find((r) => r.equipmentId === eqMttr);
+      expect(row, 'the fixture asset appears in the downtime rows').toBeDefined();
+      expect(row!.equipmentCode).toBe(`R4MT${stamp}`);
+      expect(row!.equipmentName).toBe('R4 mttr probe');
     });
   });
 

@@ -52,7 +52,13 @@ export interface PMComplianceReport {
 
 /** SOW 3.7.1 row 62. `excludedIncomplete` counts breakdowns with no duration. */
 export interface MTTRReport {
-  byEquipment: Array<{ equipmentId: string; mttrHours: number; breakdownCount: number }>;
+  byEquipment: Array<{
+    equipmentId: string;
+    equipmentCode: string;
+    equipmentName: string;
+    mttrHours: number;
+    breakdownCount: number;
+  }>;
   byLocation: Array<{
     functionalLocationId: string;
     locationCode: string;
@@ -115,12 +121,18 @@ export interface MaterialConsumptionReport {
 
 export interface MbtfReportRow {
   equipmentId: string;
+  equipmentCode: string;
+  equipmentName: string;
   mtbfHours: number;
+  breakdownCount: number;
 }
 
 export interface DowntimeReportRow {
   equipmentId: string;
+  equipmentCode: string;
+  equipmentName: string;
   totalDowntimeHours: number;
+  workOrderCount: number;
 }
 
 export const reportService = {

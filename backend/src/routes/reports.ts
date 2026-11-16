@@ -472,6 +472,7 @@ register('pm-compliance', async (req: Request, res: Response) => {
  *                 type: object
  *                 properties:
  *                   equipmentId: { type: string }
+ *                   equipmentCode: { type: string }
  *                   equipmentName: { type: string }
  *                   failureCount: { type: integer }
  *                   mtbfDays: { type: number, format: float }
@@ -515,10 +516,30 @@ register('mtbf', async (req: Request, res: Response) => {
       entry.totalRuntime += downtime;
     }
 
-    const result: Array<{ equipmentId: string; mtbfHours: number; breakdownCount: number }> = [];
+    // The label lookup deliberately does not filter isDeleted: this report is
+    // about history, so a row for an asset that has since been retired should
+    // still carry the code the plant knew it by rather than a bare id.
+    const equipment = await prisma.equipment.findMany({
+      where: { equipmentId: { in: [...equipmentMap.keys()] } },
+      select: { equipmentId: true, equipmentCode: true, name: true },
+    });
+    const detailById = new Map(equipment.map((e) => [e.equipmentId, e]));
+
+    const result: Array<{
+      equipmentId: string;
+      equipmentCode: string;
+      equipmentName: string;
+      mtbfHours: number;
+      breakdownCount: number;
+    }> = [];
     for (const [equipmentId, data] of equipmentMap) {
+      const detail = detailById.get(equipmentId);
+      const label = {
+        equipmentCode: detail?.equipmentCode ?? equipmentId,
+        equipmentName: detail?.name ?? equipmentId,
+      };
       if (data.dates.length < 2) {
-        result.push({ equipmentId, mtbfHours: 0, breakdownCount: data.dates.length });
+        result.push({ equipmentId, ...label, mtbfHours: 0, breakdownCount: data.dates.length });
         continue;
       }
 
@@ -531,10 +552,14 @@ register('mtbf', async (req: Request, res: Response) => {
 
       result.push({
         equipmentId,
+        ...label,
         mtbfHours: Math.round(mtbf * 100) / 100,
         breakdownCount: data.dates.length,
       });
     }
+    // Equipment code is the axis label, so ordering by it is what keeps the
+    // chart stable between calls when two assets tie on value.
+    result.sort((a, b) => a.equipmentCode.localeCompare(b.equipmentCode));
 
     res.json(result);
   } catch (error) {
@@ -595,6 +620,8 @@ register('mtbf', async (req: Request, res: Response) => {
  *                     type: object
  *                     properties:
  *                       equipmentId: { type: string }
+ *                       equipmentCode: { type: string }
+ *                       equipmentName: { type: string }
  *                       mttrHours: { type: number, format: float }
  *                       breakdownCount: { type: integer }
  *                 byLocation:
@@ -656,13 +683,25 @@ register('mttr', async (req: Request, res: Response) => {
       locationMap.set(bd.functionalLocationId, byLocationEntry);
     }
 
+    // Same history-not-current-state reasoning as /mtbf: no isDeleted filter.
+    const equipmentDetails = await prisma.equipment.findMany({
+      where: { equipmentId: { in: [...equipmentMap.keys()] } },
+      select: { equipmentId: true, equipmentCode: true, name: true },
+    });
+    const equipmentDetailMap = new Map(equipmentDetails.map((e) => [e.equipmentId, e]));
+
     const byEquipment = [...equipmentMap.entries()]
-      .map(([equipmentId, data]) => ({
-        equipmentId,
-        mttrHours: Math.round((data.totalDowntime / data.count / (1000 * 60 * 60)) * 100) / 100,
-        breakdownCount: data.count,
-      }))
-      .sort((a, b) => a.equipmentId.localeCompare(b.equipmentId));
+      .map(([equipmentId, data]) => {
+        const detail = equipmentDetailMap.get(equipmentId);
+        return {
+          equipmentId,
+          equipmentCode: detail?.equipmentCode ?? equipmentId,
+          equipmentName: detail?.name ?? equipmentId,
+          mttrHours: Math.round((data.totalDowntime / data.count / (1000 * 60 * 60)) * 100) / 100,
+          breakdownCount: data.count,
+        };
+      })
+      .sort((a, b) => a.equipmentCode.localeCompare(b.equipmentCode));
 
     const locationDetails = await prisma.functionalLocation.findMany({
       where: { functionalLocationId: { in: [...locationMap.keys()] } },
@@ -898,6 +937,7 @@ register('cost-summary', async (req: Request, res: Response) => {
  *                 type: object
  *                 properties:
  *                   equipmentId: { type: string }
+ *                   equipmentCode: { type: string }
  *                   equipmentName: { type: string }
  *                   downtimeHours: { type: number, format: float }
  *                   workOrderCount: { type: integer }
@@ -941,11 +981,25 @@ register('downtime', async (req: Request, res: Response) => {
       entry.count += 1;
     }
 
-    const result = Array.from(equipmentMap.entries()).map(([equipmentId, data]) => ({
-      equipmentId,
-      totalDowntimeHours: Math.round(data.totalDowntimeHours * 100) / 100,
-      workOrderCount: data.count,
-    }));
+    // Same history-not-current-state reasoning as /mtbf: no isDeleted filter.
+    const equipment = await prisma.equipment.findMany({
+      where: { equipmentId: { in: [...equipmentMap.keys()] } },
+      select: { equipmentId: true, equipmentCode: true, name: true },
+    });
+    const detailById = new Map(equipment.map((e) => [e.equipmentId, e]));
+
+    const result = Array.from(equipmentMap.entries())
+      .map(([equipmentId, data]) => {
+        const detail = detailById.get(equipmentId);
+        return {
+          equipmentId,
+          equipmentCode: detail?.equipmentCode ?? equipmentId,
+          equipmentName: detail?.name ?? equipmentId,
+          totalDowntimeHours: Math.round(data.totalDowntimeHours * 100) / 100,
+          workOrderCount: data.count,
+        };
+      })
+      .sort((a, b) => a.equipmentCode.localeCompare(b.equipmentCode));
 
     res.json(result);
   } catch (error) {

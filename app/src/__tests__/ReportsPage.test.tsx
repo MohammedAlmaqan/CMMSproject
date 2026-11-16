@@ -27,10 +27,12 @@ vi.mock('@/services/reportService', () => ({
 // tick text colour is the thing under test (v1.1-13).
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  BarChart: ({ children, data }: { children: React.ReactNode; data?: unknown[] }) => (
+    <div data-testid="chart" data-rows={JSON.stringify(data ?? [])}>{children}</div>
+  ),
   Bar: () => <div />,
-  XAxis: ({ stroke, tick }: { stroke?: string; tick?: { fill?: string } }) => (
-    <div data-testid="chart-axis" data-stroke={stroke} data-tick-fill={tick?.fill} />
+  XAxis: ({ stroke, tick, dataKey }: { stroke?: string; tick?: { fill?: string }; dataKey?: string }) => (
+    <div data-testid="chart-axis" data-stroke={stroke} data-tick-fill={tick?.fill} data-key={dataKey} />
   ),
   YAxis: ({ stroke, tick }: { stroke?: string; tick?: { fill?: string } }) => (
     <div data-testid="chart-axis" data-stroke={stroke} data-tick-fill={tick?.fill} />
@@ -145,4 +147,51 @@ describe('ReportsPage filters (G8)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('from must not be later than to');
   }, 20000);
+});
+
+/**
+ * The defect this guards against: the report handlers returned only the
+ * equipment's database id, and the page mapped it straight onto the axis, so
+ * the charts and the Excel export both showed UUIDs.
+ */
+describe('ReportsPage axis labels carry the equipment code', () => {
+  const uuid = '3f2a1c4e-9b8d-4f6a-8e21-5c7d0b9a1e33';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ user: requester, isAuthenticated: true, loading: false, error: null });
+    useAppStore.setState({ locations: [], equipment: [], workCenters: [] });
+    // The page opens on the backlog report; an empty one keeps the pane out of
+    // the way so the only chart rendered is the one under test.
+    vi.mocked(reportService.getBacklog).mockResolvedValue({ byStatus: [], byPriority: [], byWorkCenter: [] });
+  });
+
+  it('draws MTBF, MTTR and downtime from the code, never the id', async () => {
+    vi.mocked(reportService.getMTBF).mockResolvedValue([
+      { equipmentId: uuid, equipmentCode: 'P-101', equipmentName: 'Feed pump', mtbfHours: 18, breakdownCount: 2 },
+    ]);
+    vi.mocked(reportService.getMTTR).mockResolvedValue({
+      byEquipment: [
+        { equipmentId: uuid, equipmentCode: 'P-101', equipmentName: 'Feed pump', mttrHours: 3, breakdownCount: 2 },
+      ],
+      byLocation: [],
+      excludedIncomplete: 0,
+    });
+    vi.mocked(reportService.getDowntime).mockResolvedValue([
+      { equipmentId: uuid, equipmentCode: 'P-101', equipmentName: 'Feed pump', totalDowntimeHours: 6, workOrderCount: 2 },
+    ]);
+
+    const user = userEvent.setup();
+    renderWithProviders(<ReportsPage />, { route: '/reports' });
+
+    for (const report of ['MTBF', 'MTTR', 'Downtime']) {
+      await user.click(screen.getByRole('button', { name: report }));
+      // MTTR paints two charts (by equipment, by location); the equipment one
+      // is first and is the one that must carry the code.
+      const chart = (await screen.findAllByTestId('chart'))[0];
+      await waitFor(() => expect(chart.dataset.rows).toContain('P-101'));
+      expect(chart.dataset.rows, `${report} rows`).not.toContain(uuid);
+      expect(screen.getAllByTestId('chart-axis')[0].dataset.key).toBe('equipment');
+    }
+  }, 30000);
 });

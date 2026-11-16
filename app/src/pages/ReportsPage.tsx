@@ -157,11 +157,11 @@ export default function ReportsPage() {
   const pmCompliance = (reportData['pm-compliance'] ?? {}) as Partial<PMComplianceReport>;
   const pmComplianceSlice = reportData['pm-compliance'] as Partial<PMComplianceReport> | undefined;
 
-  // Report 3: MTBF
+  // Report 3: MTBF — the axis carries the asset's code, not its database id.
   const mtbfData = useMemo(() => {
     return Array.isArray(reportData.mtbf)
       ? (reportData.mtbf as MbtfReportRow[]).map((r) => ({
-          equipment: r.equipmentId,
+          equipment: r.equipmentCode || r.equipmentId,
           mtbf: r.mtbfHours,
         }))
       : [];
@@ -170,7 +170,11 @@ export default function ReportsPage() {
   // Report 4: MTTR (row 62) — per equipment and per location.
   const mttr = (reportData.mttr ?? {}) as Partial<MTTRReport>;
   const mttrData = useMemo(
-    () => (mttr.byEquipment ?? []).map((r) => ({ equipment: r.equipmentId, mttr: r.mttrHours })),
+    () =>
+      (mttr.byEquipment ?? []).map((r) => ({
+        equipment: r.equipmentCode || r.equipmentId,
+        mttr: r.mttrHours,
+      })),
     [mttr.byEquipment]
   );
   const mttrLocationData = useMemo(
@@ -205,7 +209,7 @@ export default function ReportsPage() {
   const downtimeData = useMemo(() => {
     return Array.isArray(reportData.downtime)
       ? (reportData.downtime as DowntimeReportRow[]).map((r) => ({
-          equipment: r.equipmentId,
+          equipment: r.equipmentCode || r.equipmentId,
           hours: r.totalDowntimeHours,
         }))
       : [];
