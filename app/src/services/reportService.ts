@@ -123,8 +123,15 @@ export interface MbtfReportRow {
   equipmentId: string;
   equipmentCode: string;
   equipmentName: string;
-  mtbfHours: number;
+  /** null when the asset has fewer than two failures, so there is no interval. */
+  mtbfHours: number | null;
   breakdownCount: number;
+}
+
+/** SOW 3.7.1 row 61. `excludedIncomplete` counts breakdowns still open. */
+export interface MTBFReport {
+  byEquipment: MbtfReportRow[];
+  excludedIncomplete: number;
 }
 
 export interface DowntimeReportRow {
@@ -142,8 +149,9 @@ export const reportService = {
   /** SOW 3.7.1 row 61: scheduled occurrences, not raised work orders. */
   getPMCompliance: (params?: Record<string, string>) =>
     api.get<PMComplianceReport>('/reports/pm-compliance', params),
+  /** SOW 3.7.1 row 61: per equipment, plus the breakdowns left out. */
   getMTBF: (params?: Record<string, string>) =>
-    api.get<MbtfReportRow[]>('/reports/mtbf', params),
+    api.get<MTBFReport>('/reports/mtbf', params),
   /** SOW 3.7.1 row 62: per equipment and per location. */
   getMTTR: (params?: Record<string, string>) =>
     api.get<MTTRReport>('/reports/mttr', params),

@@ -24,6 +24,7 @@ import { chartTokens } from '@/lib/chartTokens';
 import type {
   BacklogReport,
   PMComplianceReport,
+  MTBFReport,
   MTTRReport,
   CostSummaryReport,
   MaterialConsumptionReport,
@@ -158,14 +159,15 @@ export default function ReportsPage() {
   const pmComplianceSlice = reportData['pm-compliance'] as Partial<PMComplianceReport> | undefined;
 
   // Report 3: MTBF — the axis carries the asset's code, not its database id.
-  const mtbfData = useMemo(() => {
-    return Array.isArray(reportData.mtbf)
-      ? (reportData.mtbf as MbtfReportRow[]).map((r) => ({
-          equipment: r.equipmentCode || r.equipmentId,
-          mtbf: r.mtbfHours,
-        }))
-      : [];
-  }, [reportData]);
+  const mtbf = (reportData.mtbf ?? {}) as Partial<MTBFReport>;
+  const mtbfData = useMemo(
+    () =>
+      (mtbf.byEquipment ?? []).map((r: MbtfReportRow) => ({
+        equipment: r.equipmentCode || r.equipmentId,
+        mtbf: r.mtbfHours,
+      })),
+    [mtbf.byEquipment]
+  );
 
   // Report 4: MTTR (row 62) — per equipment and per location.
   const mttr = (reportData.mttr ?? {}) as Partial<MTTRReport>;
@@ -543,6 +545,13 @@ export default function ReportsPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              )}
+              {!isLoading && !hasError && (mtbf.excludedIncomplete ?? 0) > 0 && (
+                <p className="text-tertiary mt-4" style={{ fontSize: '11px' }}>
+                  {mtbf.excludedIncomplete} breakdown
+                  {(mtbf.excludedIncomplete ?? 0) === 1 ? '' : 's'} excluded: still open, with no
+                  completion time to measure.
+                </p>
               )}
             </ReportContainer>
           )}

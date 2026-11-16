@@ -167,9 +167,12 @@ describe('ReportsPage axis labels carry the equipment code', () => {
   });
 
   it('draws MTBF, MTTR and downtime from the code, never the id', async () => {
-    vi.mocked(reportService.getMTBF).mockResolvedValue([
-      { equipmentId: uuid, equipmentCode: 'P-101', equipmentName: 'Feed pump', mtbfHours: 18, breakdownCount: 2 },
-    ]);
+    vi.mocked(reportService.getMTBF).mockResolvedValue({
+      byEquipment: [
+        { equipmentId: uuid, equipmentCode: 'P-101', equipmentName: 'Feed pump', mtbfHours: 18, breakdownCount: 2 },
+      ],
+      excludedIncomplete: 0,
+    });
     vi.mocked(reportService.getMTTR).mockResolvedValue({
       byEquipment: [
         { equipmentId: uuid, equipmentCode: 'P-101', equipmentName: 'Feed pump', mttrHours: 3, breakdownCount: 2 },

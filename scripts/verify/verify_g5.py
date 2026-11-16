@@ -103,13 +103,13 @@ def main():
 
         # ---------- API: 7 report + 3 dashboard endpoints ----------
         # Shape per report: the rollup reports return an OBJECT keyed by grouping
-        # (byStatus/byEquipment/...), only mtbf and downtime return a bare list.
-        # Declaring the object reports as "list" made their shape assertion fail
-        # unconditionally, not merely on empty data.
+        # (byStatus/byEquipment/...), and mtbf now joins them, carrying its rows
+        # under byEquipment plus excludedIncomplete. Only downtime and the
+        # dashboard alerts/cost lists return a bare list.
         probes = [
             ("/api/reports/backlog", "dict", ("byStatus", "byPriority", "byWorkCenter")),
             ("/api/reports/pm-compliance", "dict", ("period", "complianceRate", "scheduledPM", "completedPM")),
-            ("/api/reports/mtbf", "list", None),
+            ("/api/reports/mtbf", "dict", ("byEquipment", "excludedIncomplete")),
             ("/api/reports/mttr", "dict", ("byEquipment", "byLocation", "excludedIncomplete")),
             ("/api/reports/cost-summary", "dict", ("period", "byCostCenter")),
             ("/api/reports/downtime", "list", None),

@@ -128,7 +128,8 @@ def verify_mtbf(ev, base, token, db, outdir):
     status, api = http_json(base, "/api/reports/mtbf", token)
     with io.open(os.path.join(outdir, "report_mtbf.json"), "w", encoding="utf-8") as f:
         json.dump(api, f, indent=1)
-    if not ev.check("mtbf: HTTP 200 and array", status == 200 and isinstance(api, list), f"status={status} rows={len(api) if isinstance(api, list) else 'n/a'}"):
+    rows_body = api.get("byEquipment") if isinstance(api, dict) else None
+    if not ev.check("mtbf: HTTP 200 and byEquipment array", status == 200 and isinstance(rows_body, list), f"status={status} rows={len(rows_body) if isinstance(rows_body, list) else 'n/a'}"):
         return
     rows = sql(
         db,
@@ -136,7 +137,14 @@ def verify_mtbf(ev, base, token, db, outdir):
         'order by equipment_id;',
     )
     direct = {r[0]: (int(r[1]), float(r[2])) for r in rows}
-    api_map = {r["equipmentId"]: (int(r["breakdownCount"]), float(r["mtbfHours"])) for r in api}
+    # A single failure has no interval to average: the API reports null where the
+    # view's CASE arm reports 0. Normalise to the view's number for the exact
+    # comparison, then assert null appears only where there is one failure.
+    api_map = {
+        r["equipmentId"]: (int(r["breakdownCount"]), 0.0 if r["mtbfHours"] is None else float(r["mtbfHours"]))
+        for r in rows_body
+    }
+    nulls = [r["equipmentId"] for r in rows_body if r["mtbfHours"] is None]
     mismatches = []
     for eq, (cnt, hours) in direct.items():
         if eq not in api_map:
@@ -144,18 +152,24 @@ def verify_mtbf(ev, base, token, db, outdir):
         elif api_map[eq][0] != cnt or not expect_close(api_map[eq][1], hours):
             mismatches.append(f"{eq}: api={api_map[eq]} sql={(cnt, hours)}")
     extra = sorted(set(api_map) - set(direct))
-    ok = not mismatches and not extra
+    bad_nulls = [e for e in nulls if api_map[e][0] >= 2]
+    ok = not mismatches and not extra and not bad_nulls
     ev.check(
         "mtbf: exact match against report_mtbf_by_equipment",
         ok,
         f"equipment={len(direct)} mismatches={len(mismatches)} extra={len(extra)}"
-        + ("" if ok else " :: " + "; ".join((mismatches + [f"extra {e}" for e in extra])[:4])),
+        + ("" if ok else " :: " + "; ".join((mismatches + [f"extra {e}" for e in extra] + [f"null with n>=2: {e}" for e in bad_nulls])[:4])),
+    )
+    ev.check(
+        "mtbf: excludedIncomplete is reported",
+        isinstance(api, dict) and isinstance(api.get("excludedIncomplete"), int),
+        f"excludedIncomplete={api.get('excludedIncomplete') if isinstance(api, dict) else 'n/a'}",
     )
     ev.section(
         "MTBF",
         [
-            f"API rows: {len(api)}; direct-SQL equipment: {len(direct)}",
-            "Sample: " + ", ".join(f"{r['equipmentId'][:8]}={r['mtbfHours']}h/{r['breakdownCount']}bd" for r in api[:3]),
+            f"API rows: {len(rows_body)}; direct-SQL equipment: {len(direct)}",
+            "Sample: " + ", ".join(f"{r['equipmentId'][:8]}={r['mtbfHours']}h/{r['breakdownCount']}bd" for r in rows_body[:3]),
             f"Mismatches: {len(mismatches)}",
         ],
     )

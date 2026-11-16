@@ -4119,7 +4119,7 @@
     "/api/reports/mtbf": {
       "get": {
         "summary": "Mean time between failures",
-        "description": "Computes mean time between failures from the completed breakdown work orders and their failure dates, reported per equipment. Read-only and available to any authenticated role.\n",
+        "description": "Computes mean time between failures per equipment from breakdown work orders (type EM) that have an actual start date. For each asset the uptime is the span from its first failure to its last, minus the repair time those failures consumed, divided by one fewer than the number of failures. A breakdown that has started but not finished carries no repair interval, so it is left out of the arithmetic and counted in excludedIncomplete rather than dropped silently. An asset with fewer than two failures has no interval to average, so its mtbfHours is null, not zero; a negative interval (overlapping repairs) is clamped to zero. Read-only and available to any authenticated role.\n",
         "tags": [
           "Reports"
         ],
@@ -4184,27 +4184,39 @@
         ],
         "responses": {
           "200": {
-            "description": "MTBF per equipment",
+            "description": "MTBF per equipment, plus the count of breakdowns left out",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "equipmentId": {
-                        "type": "string"
-                      },
-                      "equipmentName": {
-                        "type": "string"
-                      },
-                      "failureCount": {
-                        "type": "integer"
-                      },
-                      "mtbfDays": {
-                        "type": "number",
-                        "format": "float"
+                  "type": "object",
+                  "properties": {
+                    "byEquipment": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "equipmentId": {
+                            "type": "string"
+                          },
+                          "equipmentCode": {
+                            "type": "string"
+                          },
+                          "equipmentName": {
+                            "type": "string"
+                          },
+                          "mtbfHours": {
+                            "type": "number",
+                            "format": "float",
+                            "nullable": true
+                          },
+                          "breakdownCount": {
+                            "type": "integer"
+                          }
+                        }
                       }
+                    },
+                    "excludedIncomplete": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -4300,6 +4312,12 @@
                         "type": "object",
                         "properties": {
                           "equipmentId": {
+                            "type": "string"
+                          },
+                          "equipmentCode": {
+                            "type": "string"
+                          },
+                          "equipmentName": {
                             "type": "string"
                           },
                           "mttrHours": {
@@ -4531,8 +4549,8 @@
     },
     "/api/reports/downtime": {
       "get": {
-        "summary": "Equipment downtime for a month",
-        "description": "For the given calendar month, aggregates downtime hours per equipment from the interval between a work order being reported and completed. Defaults to the current month when year or month is omitted.\n",
+        "summary": "Equipment downtime for a date range",
+        "description": "Aggregates downtime hours per equipment from breakdown (EM) and corrective (CM) work orders over the given closed date range, measuring each repair from its actual start to its actual finish. A work order missing either timestamp cannot contribute an interval and is omitted. With no from/to the report covers all history rather than a single month. Read-only and available to any authenticated role.\n",
         "tags": [
           "Reports"
         ],
@@ -4608,10 +4626,13 @@
                       "equipmentId": {
                         "type": "string"
                       },
+                      "equipmentCode": {
+                        "type": "string"
+                      },
                       "equipmentName": {
                         "type": "string"
                       },
-                      "downtimeHours": {
+                      "totalDowntimeHours": {
                         "type": "number",
                         "format": "float"
                       },

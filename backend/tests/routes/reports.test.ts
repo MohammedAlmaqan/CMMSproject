@@ -820,23 +820,140 @@ describe('report rows 60-64', () => {
     });
   });
 
-  describe('rows 61-62 - equipment labels', () => {
-    it('returns the code and name on every MTBF row', async () => {
-      const res = await api().get('/api/reports/mtbf').query({ equipmentId: eqMttr }).set(authHeaders(ctx.adminToken));
+  describe('row 61 - MTBF', () => {
+    const mtbf = async () => {
+      const res = await api()
+        .get('/api/reports/mtbf')
+        .query({ equipmentId: eqMttr })
+        .set(authHeaders(ctx.adminToken));
       expect(res.status).toBe(200);
-      const row = (res.body as Array<{ equipmentId: string; equipmentCode: string; equipmentName: string }>)
-        .find((r) => r.equipmentId === eqMttr);
+      return res.body as {
+        byEquipment: Array<{
+          equipmentId: string;
+          equipmentCode: string;
+          equipmentName: string;
+          mtbfHours: number | null;
+          breakdownCount: number;
+        }>;
+        excludedIncomplete: number;
+      };
+    };
+
+    it('divides the uptime between the first and last failure by one fewer failure', async () => {
+      const body = await mtbf();
+      const row = body.byEquipment.find((r) => r.equipmentId === eqMttr);
       expect(row, 'the fixture asset appears in the MTBF rows').toBeDefined();
+      // The two failures are 24h apart; the repairs consumed 4h + 2h, leaving
+      // 18h of uptime across the single interval between them.
+      expect(row!.breakdownCount).toBe(2);
+      expect(row!.mtbfHours).toBeCloseTo(18, 5);
+    });
+
+    it('counts an open breakdown as excluded rather than folding it into the mean', async () => {
+      const body = await mtbf();
+      expect(body.excludedIncomplete).toBe(1);
+      // The open repair's start must not stretch the span: the answer stays 18h,
+      // not a figure computed from a third, unfinished failure.
+      const row = body.byEquipment.find((r) => r.equipmentId === eqMttr);
+      expect(row!.breakdownCount).toBe(2);
+      expect(row!.mtbfHours).toBeCloseTo(18, 5);
+    });
+
+    it('names the asset on the row instead of returning only its id', async () => {
+      const body = await mtbf();
+      const row = body.byEquipment.find((r) => r.equipmentId === eqMttr);
       expect(row!.equipmentCode).toBe(`R4MT${stamp}`);
       expect(row!.equipmentName).toBe('R4 mttr probe');
     });
+  });
 
-    it('returns the code and name on every downtime row', async () => {
-      const res = await api().get('/api/reports/downtime').query({ equipmentId: eqMttr }).set(authHeaders(ctx.adminToken));
+  describe('row 61 - MTBF edge cases', () => {
+    let eqSingle = '';
+    let eqOverlap = '';
+
+    beforeAll(async () => {
+      eqSingle = await createEquipment(`R4MS${stamp}`, 'R4 single failure probe');
+      eqOverlap = await createEquipment(`R4MO${stamp}`, 'R4 overlapping repair probe');
+
+      // One failure only: there is no interval between failures to average.
+      const single = await createWorkOrder(`r4 mtbf single probe ${stamp}`, eqSingle, 'EM');
+      await prisma.workOrder.update({
+        where: { workOrderId: single },
+        data: {
+          actualStart: new Date('2026-05-01T00:00:00.000Z'),
+          actualFinish: new Date('2026-05-01T02:00:00.000Z'),
+        },
+      });
+
+      // Two failures an hour apart, but each repair runs six hours, so the
+      // repairs consume more time than the span between the failures. The mean
+      // must clamp at zero rather than report a negative MTBF.
+      const overlapOne = await createWorkOrder(`r4 mtbf overlap one ${stamp}`, eqOverlap, 'EM');
+      const overlapTwo = await createWorkOrder(`r4 mtbf overlap two ${stamp}`, eqOverlap, 'EM');
+      await prisma.workOrder.update({
+        where: { workOrderId: overlapOne },
+        data: {
+          actualStart: new Date('2026-06-01T00:00:00.000Z'),
+          actualFinish: new Date('2026-06-01T06:00:00.000Z'),
+        },
+      });
+      await prisma.workOrder.update({
+        where: { workOrderId: overlapTwo },
+        data: {
+          actualStart: new Date('2026-06-01T01:00:00.000Z'),
+          actualFinish: new Date('2026-06-01T07:00:00.000Z'),
+        },
+      });
+    });
+
+    it('reports null, not zero, for an asset with a single failure', async () => {
+      const res = await api()
+        .get('/api/reports/mtbf')
+        .query({ equipmentId: eqSingle })
+        .set(authHeaders(ctx.adminToken));
       expect(res.status).toBe(200);
-      const row = (res.body as Array<{ equipmentId: string; equipmentCode: string; equipmentName: string }>)
-        .find((r) => r.equipmentId === eqMttr);
-      expect(row, 'the fixture asset appears in the downtime rows').toBeDefined();
+      const row = (res.body.byEquipment as Array<{
+        equipmentId: string;
+        mtbfHours: number | null;
+        breakdownCount: number;
+      }>).find((r) => r.equipmentId === eqSingle);
+      expect(row!.breakdownCount).toBe(1);
+      expect(row!.mtbfHours).toBeNull();
+    });
+
+    it('clamps an overlapping-repair interval at zero instead of going negative', async () => {
+      const res = await api()
+        .get('/api/reports/mtbf')
+        .query({ equipmentId: eqOverlap })
+        .set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      const row = (res.body.byEquipment as Array<{
+        equipmentId: string;
+        mtbfHours: number | null;
+        breakdownCount: number;
+      }>).find((r) => r.equipmentId === eqOverlap);
+      expect(row!.breakdownCount).toBe(2);
+      expect(row!.mtbfHours).toBe(0);
+    });
+  });
+
+  describe('row 62 - downtime by equipment', () => {
+    it('sums complete repair intervals and counts the work orders behind them', async () => {
+      const res = await api()
+        .get('/api/reports/downtime')
+        .query({ equipmentId: eqMttr })
+        .set(authHeaders(ctx.adminToken));
+      expect(res.status).toBe(200);
+      const row = (res.body as Array<{
+        equipmentId: string;
+        equipmentCode: string;
+        equipmentName: string;
+        totalDowntimeHours: number;
+        workOrderCount: number;
+      }>).find((r) => r.equipmentId === eqMttr);
+      // 4h + 2h across two complete breakdowns; the open one contributes nothing.
+      expect(row!.workOrderCount).toBe(2);
+      expect(row!.totalDowntimeHours).toBeCloseTo(6, 5);
       expect(row!.equipmentCode).toBe(`R4MT${stamp}`);
       expect(row!.equipmentName).toBe('R4 mttr probe');
     });

@@ -215,17 +215,25 @@ describe('report views', () => {
     expect(Number(viewMttr[0].breakdown_count)).toBe(apiMttr!.breakdownCount);
     expect(Number(viewMttr[0].mttr_hours)).toBeCloseTo(apiMttr!.mttrHours, 2);
 
-    const apiMtbf = (mtbf.body as Array<{
+    const apiMtbf = (mtbf.body.byEquipment as Array<{
       equipmentId: string;
       equipmentCode: string;
       equipmentName: string;
-      mtbfHours: number;
+      mtbfHours: number | null;
       breakdownCount: number;
     }>).find((r) => r.equipmentId === eqEm);
     expect(apiMtbf!.equipmentCode).toBe(viewMtbf[0].equipment_code);
     expect(apiMtbf!.equipmentName).toBe(viewMtbf[0].equipment_name);
     expect(Number(viewMtbf[0].breakdown_count)).toBe(apiMtbf!.breakdownCount);
-    expect(Number(viewMtbf[0].mtbf_hours)).toBeCloseTo(apiMtbf!.mtbfHours, 2);
+    // The one deliberate divergence: a single failure has no interval to
+    // average, so the API says null where the view's CASE arm says 0. Asserted
+    // here rather than glossed over, so the difference stays intentional.
+    if (apiMtbf!.breakdownCount < 2) {
+      expect(apiMtbf!.mtbfHours).toBeNull();
+      expect(Number(viewMtbf[0].mtbf_hours)).toBe(0);
+    } else {
+      expect(Number(viewMtbf[0].mtbf_hours)).toBeCloseTo(apiMtbf!.mtbfHours as number, 2);
+    }
   });
 
   it('agrees with /downtime for the fixture equipment', async () => {

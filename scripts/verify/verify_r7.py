@@ -648,7 +648,7 @@ def main():
         # ---------- 4. mtbf ----------
         _, mtbf = api.get("/api/reports/mtbf", exact_q)
         oracle = sql_mtbf(EXACT)
-        api_mtbf = sorted([(r["equipmentId"], round(r["mtbfHours"], 4), r["breakdownCount"]) for r in mtbf])
+        api_mtbf = sorted([(r["equipmentId"], round(r["mtbfHours"], 4), r["breakdownCount"]) for r in mtbf["byEquipment"]])
         print("  HAND mtbf: R7FIX-M-1002 EM 2026-08-01..08-10 (9d=216h) minus 2h+1h downtime / (2-1) = 213.0h")
         record("mtbf (API = base-table SQL = hand 213.0 / n=2)", api_mtbf == sorted(oracle) and api_mtbf == [(ids['eq_m'], 213.0, 2)],
                f"api={api_mtbf} oracle={oracle}")

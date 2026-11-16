@@ -432,9 +432,15 @@ register('pm-compliance', async (req: Request, res: Response) => {
  *   get:
  *     summary: Mean time between failures
  *     description: >
- *       Computes mean time between failures from the completed breakdown work orders and
- *       their failure dates, reported per equipment. Read-only and available to any
- *       authenticated role.
+ *       Computes mean time between failures per equipment from breakdown work orders
+ *       (type EM) that have an actual start date. For each asset the uptime is the span
+ *       from its first failure to its last, minus the repair time those failures consumed,
+ *       divided by one fewer than the number of failures. A breakdown that has started but
+ *       not finished carries no repair interval, so it is left out of the arithmetic and
+ *       counted in excludedIncomplete rather than dropped silently. An asset with fewer
+ *       than two failures has no interval to average, so its mtbfHours is null, not zero;
+ *       a negative interval (overlapping repairs) is clamped to zero. Read-only and
+ *       available to any authenticated role.
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
@@ -463,19 +469,23 @@ register('pm-compliance', async (req: Request, res: Response) => {
  *         schema: { type: string }
  *     responses:
  *       '200':
- *         description: MTBF per equipment
+ *         description: MTBF per equipment, plus the count of breakdowns left out
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   equipmentId: { type: string }
- *                   equipmentCode: { type: string }
- *                   equipmentName: { type: string }
- *                   failureCount: { type: integer }
- *                   mtbfDays: { type: number, format: float }
+ *               type: object
+ *               properties:
+ *                 byEquipment:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       equipmentId: { type: string }
+ *                       equipmentCode: { type: string }
+ *                       equipmentName: { type: string }
+ *                       mtbfHours: { type: number, format: float, nullable: true }
+ *                       breakdownCount: { type: integer }
+ *                 excludedIncomplete: { type: integer }
  *       '401':
  *         description: Missing or invalid bearer token
  *       '500':
@@ -491,7 +501,6 @@ register('mtbf', async (req: Request, res: Response) => {
         type: 'EM',
         equipmentId: { not: null },
         actualStart: { not: null },
-        actualFinish: { not: null },
         ...resolved.scope,
         ...(buildDateWhere(resolved.filter, 'actualStart') ?? {}),
       },
@@ -504,9 +513,17 @@ register('mtbf', async (req: Request, res: Response) => {
     });
 
     const equipmentMap = new Map<string, { dates: Date[]; totalRuntime: number }>();
+    // A breakdown that has started but not finished has no repair interval. It
+    // is left out of the arithmetic and counted here, because an MTBF that
+    // silently drops its open repairs reads better than the plant deserves.
+    let excludedIncomplete = 0;
 
     for (const bd of breakdowns) {
-      if (!bd.equipmentId || !bd.actualStart || !bd.actualFinish) continue;
+      if (!bd.equipmentId || !bd.actualStart) continue;
+      if (!bd.actualFinish) {
+        excludedIncomplete += 1;
+        continue;
+      }
       if (!equipmentMap.has(bd.equipmentId)) {
         equipmentMap.set(bd.equipmentId, { dates: [], totalRuntime: 0 });
       }
@@ -525,11 +542,11 @@ register('mtbf', async (req: Request, res: Response) => {
     });
     const detailById = new Map(equipment.map((e) => [e.equipmentId, e]));
 
-    const result: Array<{
+    const byEquipment: Array<{
       equipmentId: string;
       equipmentCode: string;
       equipmentName: string;
-      mtbfHours: number;
+      mtbfHours: number | null;
       breakdownCount: number;
     }> = [];
     for (const [equipmentId, data] of equipmentMap) {
@@ -539,7 +556,9 @@ register('mtbf', async (req: Request, res: Response) => {
         equipmentName: detail?.name ?? equipmentId,
       };
       if (data.dates.length < 2) {
-        result.push({ equipmentId, ...label, mtbfHours: 0, breakdownCount: data.dates.length });
+        // One failure (or none) gives no interval to average. Zero would claim
+        // the asset fails back-to-back; null says the interval is unknown.
+        byEquipment.push({ equipmentId, ...label, mtbfHours: null, breakdownCount: data.dates.length });
         continue;
       }
 
@@ -548,9 +567,11 @@ register('mtbf', async (req: Request, res: Response) => {
       const totalSpan = lastDate.getTime() - firstDate.getTime();
       const totalDowntime = data.totalRuntime;
       const uptime = totalSpan - totalDowntime;
-      const mtbf = data.dates.length > 1 ? uptime / (data.dates.length - 1) / (1000 * 60 * 60) : 0;
+      // Overlapping repairs can consume more time than the span between the
+      // first and last failure; clamp so MTBF never reports a negative.
+      const mtbf = Math.max(0, uptime / (data.dates.length - 1) / (1000 * 60 * 60));
 
-      result.push({
+      byEquipment.push({
         equipmentId,
         ...label,
         mtbfHours: Math.round(mtbf * 100) / 100,
@@ -559,9 +580,9 @@ register('mtbf', async (req: Request, res: Response) => {
     }
     // Equipment code is the axis label, so ordering by it is what keeps the
     // chart stable between calls when two assets tie on value.
-    result.sort((a, b) => a.equipmentCode.localeCompare(b.equipmentCode));
+    byEquipment.sort((a, b) => a.equipmentCode.localeCompare(b.equipmentCode));
 
-    res.json(result);
+    res.json({ byEquipment, excludedIncomplete });
   } catch (error) {
     logger.error({ err: error }, 'Error generating MTBF report');
     res.status(500).json({ error: 'Internal server error' });
@@ -895,11 +916,13 @@ register('cost-summary', async (req: Request, res: Response) => {
  * @openapi
  * /api/reports/downtime:
  *   get:
- *     summary: Equipment downtime for a month
+ *     summary: Equipment downtime for a date range
  *     description: >
- *       For the given calendar month, aggregates downtime hours per equipment from the
- *       interval between a work order being reported and completed. Defaults to the
- *       current month when year or month is omitted.
+ *       Aggregates downtime hours per equipment from breakdown (EM) and corrective (CM)
+ *       work orders over the given closed date range, measuring each repair from its actual
+ *       start to its actual finish. A work order missing either timestamp cannot contribute
+ *       an interval and is omitted. With no from/to the report covers all history rather
+ *       than a single month. Read-only and available to any authenticated role.
  *     tags: [Reports]
  *     security:
  *       - bearerAuth: []
@@ -939,7 +962,7 @@ register('cost-summary', async (req: Request, res: Response) => {
  *                   equipmentId: { type: string }
  *                   equipmentCode: { type: string }
  *                   equipmentName: { type: string }
- *                   downtimeHours: { type: number, format: float }
+ *                   totalDowntimeHours: { type: number, format: float }
  *                   workOrderCount: { type: integer }
  *       '401':
  *         description: Missing or invalid bearer token
