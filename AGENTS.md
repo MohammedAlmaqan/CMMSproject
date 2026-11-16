@@ -175,7 +175,26 @@ correct in the result; the rules below still decide whether a change is right.
   `https://*:443:cmms.local`) and `Default Web Site` (`state:Unknown`, no bindings) — so
   the stale `CMCS-*` objects named in the 2026-11-10 entry are application pools, not
   sites, and no site needed stopping. The served bundle is `assets/index-D77h04iM.js`,
-  built and mirrored on 2026-11-11 with `web.config` preserved.
+  built and mirrored on 2026-11-11 with `web.config` preserved. *Superseded
+  2026-11-16: the served bundle is now `assets/index-CFG72T-P.js` — see the
+  2026-11-16 entry below.*
+- **Live application posture (2026-11-16):** the Paper & Graphite UI overhaul
+  (`83cb2b0`…`34c39ec`, CI run 43840811967 green on Backend, Frontend and
+  Installer) was deployed to `C:\inetpub\cmms-site` on 2026-11-16. The mirror was
+  `robocopy app\dist … /MIR /XF web.config` run from an elevated process; robocopy
+  exited 3 (files copied, extras removed) and `web.config` was preserved. The site
+  now serves `assets/index-CFG72T-P.js` (1,112,734 B, SHA-256
+  `BCC91067F7AC181651A0705BAD6FD0E04978406AF07CC5C33913EB48B670B411`) and
+  `assets/index-BuhV54ul.css` (30,229 B, SHA-256
+  `53C838F13B363B0B15694D98638E651B520D1F1A65B0A3E61B18CB863DD4C6E7`), both
+  byte-identical to the repo build; the mirror also removed the stale
+  `index-w6bgJz-R.js`, `index-u9PKtRla.css` and `TacticalDashboardGrid-CGT8LaFA.js`
+  the site had been serving since 11-13. `https://cmms.local/`, both assets,
+  `/dashboard` and `/api/health` return 200, and a headless load of `/login`
+  resolved `--bg-app` `#f4f5f7` and `--text-3` `#5f666f`, loaded the self-hosted
+  Plex Sans faces from IIS, and reported no console or page errors. The full
+  `scripts/verify/verify_g3_5.py` audit passed 14/14 routes against a throwaway
+  `cmms_g35` clone with the API on 4100; live `cmms` was not written to.
 
 ## Documentation accuracy
 
