@@ -52,9 +52,9 @@ Scope, in four parts:
 
 | # | Item | Done | Evidence |
 |---|------|------|----------|
-| 4.1 | Live artifacts verified (asset hashes, health) | [ ] | |
-| 4.2 | `cmms` row counts unchanged against the baseline | [ ] | |
-| 4.3 | Services running, no crash loop | [ ] | |
+| 4.1 | Live artifacts verified (asset hashes, health) | [x] | served `index-Bq2YWIrw.js`; JS/CSS SHA-256 match repo **and** bundle; health 200 at 09:23:17Z; live `reports.js` carries the fixes |
+| 4.2 | `cmms` row counts unchanged against the baseline | [x] | WorkOrder 2210, Notification 2187, Equipment 6127, User 6, MaintenancePlan 4, AuditLogEntry 20999, RefreshToken 151, 22 migrations — read before and after |
+| 4.3 | Services running, no crash loop | [x] | both Running/Automatic; PIDs 3992 (API) and 8580 (Worker) unchanged from the 12:05 restart; no 7031/7032/7034 events in 25 min |
 
 ## Notes
 
