@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/MohammedAlmaqan/CMMSproject/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MohammedAlmaqan/CMMSproject/actions/workflows/ci.yml)
 
-A maintenance management system covering master data, notifications, work orders, preventive maintenance planning, and standard reports — built as a React SPA over an Express/Prisma API on PostgreSQL.
+A maintenance management system covering master data, notifications, work orders, preventive maintenance planning, and standard reports — built as a React SPA over an Express/Prisma API on PostgreSQL. The interface is the **Paper & Graphite** industrial design system: a light, paper-toned work surface under graphite chrome, IBM Plex typography, and one eight-tone status vocabulary shared by every screen.
 
 This README describes what the code in this repository actually does today. Known gaps are listed explicitly in [Not implemented](#not-implemented) and [Known issues](#known-issues) rather than being papered over.
 
@@ -61,7 +61,7 @@ overwritten.*
 
 ### Work management
 - Five work order types: `CM`, `PM`, `PdM`, `EM`, `CAL`.
-- Eight-status lifecycle: `Draft → Planned → Scheduled → In Progress → Suspended → Completed → Closed`, plus `Cancelled`, with guarded transitions.
+- Eight-status lifecycle: `Draft → Planned → Scheduled → In Progress → Suspended → Completed → Closed`, plus `Cancelled`, with guarded transitions. The eight tones that present these states — including derived overdue and breakdown — are described under [Interface](#interface).
 - Operations/tasks with craft assignment.
 - Work order material reservations and consumption.
 - Labour entries recorded against operations.
@@ -93,6 +93,33 @@ overwritten.*
 - Administration screens for users and audit log. The **Settings** tab edits runtime configuration through `GET`/`PUT /api/system-config`.
 - Rate limiting on the login route.
 - Structured JSON logging (pino) to `logs/api-out.log` / `logs/api-err.log` (API) and `logs/worker-out.log` / `logs/worker-err.log` (scheduler worker) when launched under PM2; the production runtime is the `CommandPulseCMMSAPI` / `CommandPulseCMMSWorker` Windows services, which capture the same JSON streams in `backend\logs` (see `docs/ADMIN_GUIDE.md` §2.2).
+
+## Interface
+
+The UI is built on the **Paper & Graphite** design system. The tokens are tiered
+CSS custom properties in `app/src/index.css` — primitives → semantic → component
+— and components reference the semantic layer rather than hex literals, so the
+light "Paper" surface and the graphite chrome stay consistent across 20 pages.
+Charts read the `--chart-*` tokens through `app/src/lib/chartTokens.ts`, because
+SVG attributes cannot resolve `var()` in every rendering engine.
+
+- **Typography is self-hosted.** IBM Plex Sans and IBM Plex Mono ship from the
+  application bundle (`@fontsource/ibm-plex-sans`, `@fontsource/ibm-plex-mono`,
+  emitted as `woff2`/`woff` under `assets/`), so the UI renders its intended
+  faces with no outbound font request and no third-party CDN dependency.
+- **Eight status tones, one source of truth.** `app/src/lib/status.ts` maps the
+  eight stored work-order states onto eight tones — `open`, `scheduled`,
+  `active`, `hold`, `done`, `void`, plus the derived `overdue` and
+  `breakdown` — and every tone carries a colour class, a label and a glyph, so
+  status is never conveyed by colour alone (WCAG 1.4.1). Overdue and breakdown
+  are derived from the planned finish and the breakdown flag, and are suppressed
+  once a work order is terminal. This replaced ten per-page badge maps that
+  collapsed eight states into four buckets, where Draft read the same as Planned
+  and Suspended the same as Cancelled, and neither overdue nor breakdown existed.
+- **No 3D canvas.** The animated React Three Fiber KPI grid was removed in the
+  Paper & Graphite overhaul; the dashboard is HTML/CSS with Recharts for its
+  charts, and `three`, `@react-three/*` and `@types/three` are no longer
+  dependencies or part of the bundle.
 
 ## Not implemented
 
@@ -231,9 +258,12 @@ All routes are under `/api`. Full request/response schemas are in Swagger at `/a
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 19, TypeScript 5.9, Vite 7, Tailwind CSS 3 |
+| UI system | "Paper & Graphite" — tiered CSS custom-property tokens (`app/src/index.css`) |
+| Fonts | IBM Plex Sans / IBM Plex Mono, self-hosted from the bundle via `@fontsource` |
+| Status vocabulary | Eight tones (`app/src/lib/status.ts`), each with a colour, a label and a glyph |
 | State | Zustand 5 |
-| Charts | Recharts 2 |
-| 3D | React Three Fiber 9 (animated dashboard KPI canvas) |
+| Charts | Recharts 2, coloured from `app/src/lib/chartTokens.ts` |
+| Icons and toasts | lucide-react, sonner |
 | Validation (UI) | Zod 4 |
 | Backend | Express, TypeScript, Prisma ORM |
 | Database | PostgreSQL 15+ |
@@ -291,7 +321,8 @@ npm run lint
 CMMSproject/
 ├── app/                        # React SPA
 │   └── src/
-│       ├── components/         # layout, dashboard (incl. the R3F canvas)
+│       ├── components/         # layout chrome, forms, status badge, shared widgets
+│       ├── lib/                # status tones, chart tokens, RBAC, datetime, API client
 │       ├── pages/              # 20 page components
 │       ├── services/           # 27 API service modules
 │       ├── store/              # Zustand
