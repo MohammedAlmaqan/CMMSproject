@@ -32,10 +32,18 @@ These counts are the actual current state, not aspirations:
 | Prisma migrations | 22 |
 | Backend API route files | 27 |
 | Backend route groups mounted | 27 |
-| Backend test files | 88 `.test.ts` run by vitest (39 unit + 49 routes), 1180 tests executed (`vitest list` prints 1176: it counts each `it.each` template once, and the runner expands the two 3-case `it.each` templates in `laborAttribution.test.ts` into six); 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 91 |
+| Backend test files | 89 `.test.ts` run by vitest (39 unit + 50 routes), 1263 tests executed; 3 non-test support files (`helpers.ts`, `load-env.ts`, `setup.ts`) bring the tracked total to 92 |
 | Frontend pages | 20 |
-| Frontend service modules | 27 |
-| Frontend test files | 28 (153 tests) |
+| Frontend service modules | 28 |
+| Frontend test files | 29 (193 tests) |
+
+*Re-derived 2026-11-17 for the v1.8.0 release, against `3a53e5e`. The file
+counts are taken from the tree (`app/src/pages`, `app/src/services`,
+`app/src/__tests__`, `backend/tests`) and the executed-test counts from CI run
+`44047428597`, which ran both suites on that SHA: backend 89 files / 1263 tests,
+frontend 29 files / 193 tests. The 2026-10-20 values that follow — backend 88
+files / 1180 tests, frontend service modules 27 and test files 28 / 153 tests —
+are kept in the dated paragraph below rather than overwritten.*
 
 *Re-derived 2026-10-20 against the repository at `e5de737`. This table moved
 from the 2026-10-16 re-derivation: frontend pages 17→20 (`EquipmentForm`-backed
@@ -326,10 +334,10 @@ CMMSproject/
 │       ├── components/         # layout chrome, forms, status badge, shared widgets
 │       ├── lib/                # status tones, chart tokens, RBAC, datetime, API client
 │       ├── pages/              # 20 page components
-│       ├── services/           # 27 API service modules
+│       ├── services/           # 28 API service modules
 │       ├── store/              # Zustand
 │       ├── types/              # TypeScript types
-│       └── __tests__/          # 28 test files
+│       └── __tests__/          # 29 test files
 ├── backend/                    # Express API
 │   ├── src/
 │   │   ├── routes/             # 27 route files
@@ -340,7 +348,7 @@ CMMSproject/
 │   │   ├── schema.prisma       # 38 models
 │   │   ├── migrations/         # 22 migrations
 │   │   └── seed.ts             # guarded demo seed
-│   └── tests/                  # 88 test files + 3 support = 91 tracked
+│   └── tests/                  # 89 test files + 3 support = 92 tracked
 ├── scripts/                    # Windows batch scripts, k6, verify scripts
 ├── installer/                  # standalone installer: engine, wizard, harness
 │   ├── install.ps1             # the engine (build, migrate, install, Windows services)
