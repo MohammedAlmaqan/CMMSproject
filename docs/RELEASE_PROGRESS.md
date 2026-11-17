@@ -17,12 +17,13 @@ Scope, in four parts:
 
 | # | Item | Done | Evidence |
 |---|------|------|----------|
-| 1.1 | Ledger opened before any change | [x] | this file |
-| 1.2 | Paper & Graphite UI described | [ ] | |
-| 1.3 | 3D grid / Three.js removal reflected | [ ] | |
-| 1.4 | Self-hosted IBM Plex fonts recorded | [ ] | |
-| 1.5 | 8-tone status system documented | [ ] | |
-| 1.6 | MTBF math fixes and the UAT recorded | [ ] | |
+| 1.1 | Ledger opened before any change | [x] | `f1e25e9` |
+| 1.2 | Paper & Graphite UI described | [x] | `53ab141` |
+| 1.3 | 3D grid / Three.js removal reflected | [x] | `53ab141` |
+| 1.4 | Self-hosted IBM Plex fonts recorded | [x] | `53ab141` |
+| 1.5 | 8-tone status system documented | [x] | `53ab141` |
+| 1.6 | MTBF math fixes and the UAT recorded | [x] | `9f7d8ec` |
+| 1.7 | Scale table re-derived against the current tree | [x] | `68be3bc` |
 
 ## Part 2 — Build and deploy
 
