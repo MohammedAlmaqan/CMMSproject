@@ -63,4 +63,5 @@ Result: **81 passed, 0 failed**, 0 console errors, 0 failed page responses
       recorded there as an open discrepancy, not attributed to this pass.
 - [x] `cmms_uat` dropped, ports 3000/4100 free
 - [x] UAT suite and evidence committed
-- [ ] pushed to `origin/main`, CI green
+- [x] pushed to `origin/main`, CI green — run 44046148582, Backend / Frontend /
+      Installer all success
