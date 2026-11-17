@@ -53,6 +53,15 @@ restore point.
 Result: **81 passed, 0 failed**, 0 console errors, 0 failed page responses
 (`docs/screenshots/uat_v1.7.1/UAT_S0_S6_REPORT.md`).
 
+The S4 clamp fixture overlaps by a fraction of a second (`spanHours=0.0001`,
+`repairHours=0.0003`), because both work-order transitions run inside one pass.
+That confirms the path end-to-end — the intermediate uptime really is negative —
+but at that magnitude rounding to two places would also print 0, so the fixture
+does not by itself distinguish the clamp from rounding. The magnitude proof is
+the backend unit test `reports.test.ts` "clamps an overlapping-repair interval at
+zero instead of going negative", which seeds two failures an hour apart with
+six-hour repairs each: unclamped that is -11 h, and the handler reports 0.
+
 ## Part 4 — close-out
 
 - [x] live `cmms` proven untouched (`admin.lastLogin`, `AuditLogEntry`,
