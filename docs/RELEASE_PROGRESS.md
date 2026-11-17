@@ -41,9 +41,9 @@ Scope, in four parts:
 
 | # | Item | Done | Evidence |
 |---|------|------|----------|
-| 3.1 | Version bump applied (`installer/wizard/CommandPulse.iss`) | [ ] | |
-| 3.2 | `RELEASE_NOTES.md` v1.8.0 entry | [ ] | |
-| 3.3 | Installer compiled, payload digest recorded | [ ] | |
+| 3.1 | Version bump applied (`installer/wizard/CommandPulse.iss`) | [x] | `20e250e` — `1.8.0` |
+| 3.2 | `RELEASE_NOTES.md` v1.8.0 entry | [x] | `ccb25de` |
+| 3.3 | Installer compiled, payload digest recorded | [x] | `Setup_CommandPulse.exe`, SHA-256 `92407FF5…DE0A4`; payload `cb8fd3b2…9c7d488`; archive rebuild identical |
 | 3.4 | `SHA256SUMS.txt` generated for the bundle | [ ] | |
 | 3.5 | Tag cut and pushed with the commits | [ ] | |
 | 3.6 | CI green at the tag | [ ] | |
