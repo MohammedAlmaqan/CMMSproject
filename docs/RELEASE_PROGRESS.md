@@ -45,8 +45,8 @@ Scope, in four parts:
 | 3.2 | `RELEASE_NOTES.md` v1.8.0 entry | [x] | `ccb25de` |
 | 3.3 | Installer compiled, payload digest recorded | [x] | `Setup_CommandPulse.exe`, SHA-256 `92407FF5…DE0A4`; payload `cb8fd3b2…9c7d488`; archive rebuild identical |
 | 3.4 | `SHA256SUMS.txt` generated for the bundle | [ ] | |
-| 3.5 | Tag cut and pushed with the commits | [ ] | |
-| 3.6 | CI green at the tag | [ ] | |
+| 3.5 | Tag cut and pushed with the commits | [x] | annotated `v1.8.0` → `096001e`; `origin/main` `3a53e5e..096001e`, tag `* [new tag] v1.8.0` |
+| 3.6 | CI green at the tag | [x] | run `44053890969` at `096001e`, all three jobs success |
 
 ## Part 4 — Live verification
 
