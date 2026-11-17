@@ -13,7 +13,7 @@ restore point.
 |---|---|---|
 | 1 | `fix(reports): name equipment on the MTBF, MTTR and downtime rows` | done `9692dea` |
 | 2 | `fix(reports): clamp MTBF, report null intervals and count open breakdowns` | done `1765c0a` |
-| 3 | `test(uat): automate the zero-to-hero acceptance pass` | pending |
+| 3 | `test(uat): automate the zero-to-hero acceptance pass` | done `43d328c` |
 
 ## Part 1 — reporting fixes
 
@@ -32,27 +32,35 @@ restore point.
 
 ## Part 2 — UAT environment
 
-- [ ] fresh `pg_dump` of `cmms` immediately before testing
-- [ ] restore into `cmms_uat`
-- [ ] row counts match `cmms` exactly (WorkOrder, Notification, Equipment, User, AuditLogEntry, RefreshToken)
-- [ ] API on 4100 against `cmms_uat`
-- [ ] built `app/dist` on 3000 proxying to 4100 (never the vite dev server: it proxies to live 4000)
+- [x] fresh `pg_dump` of `cmms` immediately before testing
+- [x] restore into `cmms_uat`
+- [x] row counts match `cmms` exactly (WorkOrder, Notification, Equipment, User, AuditLogEntry, RefreshToken)
+- [x] API on 4100 against `cmms_uat`
+- [x] built `app/dist` on 3000 proxying to 4100 (never the vite dev server: it proxies to live 4000)
 
 ## Part 3 — UAT execution
 
-- [ ] S0 preflight
-- [ ] S1 master data: location → equipment → work centre, linked
-- [ ] S2 lifecycle: M1 notification → WO → operation → scheduled → executed → closed
-- [ ] S3a WO without operations refused (409)
-- [ ] S3b scheduling without dates refused (400)
-- [ ] S3c M3 completion confirmation not convertible (400)
-- [ ] S4 reports: no UUID on any axis, math recomputed independently, Excel carries the code
-- [ ] S5 RBAC: lower role blocked from Administration and from `/api/users`, `/api/audit-log`
-- [ ] S6 evidence written, environment torn down
+- [x] S0 preflight
+- [x] S1 master data: location → equipment → work centre, linked
+- [x] S2 lifecycle: M1 notification → WO → operation → scheduled → executed → closed
+- [x] S3a WO without operations refused (409)
+- [x] S3b scheduling without dates refused (400)
+- [x] S3c M3 completion confirmation not convertible (400)
+- [x] S4 reports: no UUID on any axis, math recomputed independently, Excel carries the code
+- [x] S5 RBAC: lower role blocked from Administration and from `/api/users`, `/api/audit-log`
+- [x] S6 evidence written, environment torn down
+
+Result: **81 passed, 0 failed**, 0 console errors, 0 failed page responses
+(`docs/screenshots/uat_v1.7.1/UAT_S0_S6_REPORT.md`).
 
 ## Part 4 — close-out
 
-- [ ] live `cmms` proven untouched (`admin.lastLogin`, `AuditLogEntry`, `RefreshToken`)
-- [ ] `cmms_uat` dropped, ports 3000/4100 free
-- [ ] UAT suite and evidence committed
+- [x] live `cmms` proven untouched (`admin.lastLogin`, `AuditLogEntry`,
+      `RefreshToken`) — see `docs/screenshots/uat_v1.7.1/LIVE_SAFETY.md`.
+      Nothing in live carries a 2026-11-17 timestamp and live holds zero
+      `UAT171-*` fixtures. Live did move on 2026-11-16 13:18–13:48 UTC (+18
+      audit rows, +2 tokens, all updates/PM runs, no records created), which is
+      recorded there as an open discrepancy, not attributed to this pass.
+- [x] `cmms_uat` dropped, ports 3000/4100 free
+- [x] UAT suite and evidence committed
 - [ ] pushed to `origin/main`, CI green
