@@ -4,6 +4,111 @@ What changed in each release, most recent first. Every entry corresponds to
 commits on `main`; the CI run at the tagged SHA is the evidence that the tree
 was green when the tag was cut.
 
+## v1.8.0
+
+The interface overhaul and the reporting-arithmetic fixes, with a zero-to-hero
+acceptance pass over the tree that ships them. `v1.7.0` is the last published
+bundle; this tag carries every application change since it. A minor bump: the
+API contract and the schema are unchanged (22 migrations), but what a user sees
+and the figures they read from the reports change materially.
+
+### What a user will notice
+
+- **Paper & Graphite.** The interface is now a light, paper-toned work surface
+  under graphite chrome, built from a three-tier CSS custom-property token set
+  (primitives → semantic → component) in `app/src/index.css`. Dense tables,
+  forms, cards and charts all read those tokens; charts go through
+  `app/src/lib/chartTokens.ts` because SVG attributes cannot resolve `var()`
+  in every engine. IBM Plex Sans and IBM Plex Mono are self-hosted through
+  `@fontsource` and ship in the bundle as `woff2`/`woff`, so no font request
+  leaves the application. The UI overhaul is recorded phase by phase in
+  `docs/UI_OVERHAUL_PROGRESS.md`, and the contrast matrix in
+  `docs/WCAG-AUDIT.md` is derived from the shipped tokens.
+- **Eight status tones, one source of truth.** `app/src/lib/status.ts` replaces
+  ten per-page badge maps. The eight stored work-order states map to `open`,
+  `scheduled`, `active`, `hold`, `done` and `void`, with `overdue` and
+  `breakdown` derived from the planned finish and the breakdown flag and
+  suppressed for terminal work. Each tone carries a colour, a label and a
+  glyph, so status is never conveyed by colour alone (WCAG 1.4.1). Draft no
+  longer reads as Planned, Suspended no longer reads as Cancelled, and overdue
+  and breakdown are visible for the first time.
+- **The animated 3D KPI grid is gone.** `TacticalDashboardGrid.tsx`, `three`,
+  `@react-three/*` and `@types/three` were removed in P6 (`6cc6e32`); the
+  dashboard is HTML/CSS with Recharts for its charts. There is no WebGL chunk
+  in this build.
+- **MTBF answers the awkward cases honestly.** With fewer than two completed
+  breakdowns an asset has no interval to average, so `mtbfHours` is `null`
+  instead of `0` — zero would claim the asset fails back-to-back. Overlapping
+  repairs can consume more time than the span between first and last failure;
+  the figure is clamped at `0` rather than published as a negative interval. A
+  breakdown still open has no repair time to measure, so it is excluded from
+  the arithmetic and counted in the top-level `excludedIncomplete`, which the
+  screen states in words. Rows carry the plant's equipment code and name on
+  screen, in the chart axis and in the `.xlsx` export, not a UUID. The same
+  label and history corrections apply to MTTR and downtime.
+
+### Verification
+
+- **S0–S6 acceptance pass: 81 passed, 0 failed** (`docs/screenshots/uat_v1.7.1/UAT_S0_S6_REPORT.md`,
+  generated 2026-11-17). `scripts/verify/uat/run_uat.py` drove the built SPA and
+  the API through master data, notification → work-order conversion, the
+  full workflow and its guards, the D-22 no-M3-on-completion rule, the role
+  boundaries, and all ten reports with their `.xlsx` exports, against a
+  throwaway `cmms_uat` clone. MTBF, MTTR and downtime were checked against an
+  independently recomputed oracle, not against the handlers being tested: the
+  fixture's two repairs overlap, and the unclamped interval is negative, so a
+  reported `0` proves the clamp ran rather than agreeing by construction. The
+  single-failure `null` and the open-breakdown exclusion count were pinned the
+  same way. Zero console errors, zero failed HTTP responses.
+- **Live-safety proof.** `docs/screenshots/uat_v1.7.1/LIVE_SAFETY.md` records
+  that the suite targeted the throwaway clone on port 4100 and that the live
+  `cmms` database was not written to. The clone has since been dropped and the
+  ports released.
+- **Suite and gate evidence at `3a53e5e`:** backend 89 files / 1263 tests and
+  frontend 29 files / 193 tests (CI run `44047428597`, all three jobs green);
+  `verify_a1.py` (214 rows, total unchanged) and
+  `verify_a1_dispositions.py` (77 rows, 65 Build / 12 Waive) both pass.
+- **Hosted deploy, 2026-11-17.** Both packages rebuilt from source. The
+  frontend bundle `assets/index-Bq2YWIrw.js` (1,113,044 B, SHA-256
+  `A14D70144F3E94BE542A108B799AD10C4F8F37AA430AD620127DBF7BAE0CDFAC`) and
+  `assets/index-BuhV54ul.css` (30,229 B, SHA-256
+  `53C838F13B363B0B15694D98638E651B520D1F1A65B0A3E61B18CB863DD4C6E7`) were
+  mirrored to `C:\inetpub\cmms-site` with `/MIR /XF web.config`; both hashes
+  match the repository build byte for byte, the stale `index-CFG72T-P.js` was
+  removed, and `web.config` was preserved. The rebuilt backend `dist` was
+  copied into the live API root at `C:\CMMS\backend\dist`. Both
+  `CommandPulseCMMSAPI` and `CommandPulseCMMSWorker` were restarted and are
+  Running; `https://cmms.local/` serves the new asset and
+  `https://cmms.local/api/health` returns 200 (`{"status":"ok"}`). Because
+  this session's token is unprivileged, the mirror and the restarts ran as
+  SYSTEM through a flag-guarded one-shot hook on the existing
+  `CommandPulse CMMS Daily Backup` task; `scripts\backup.bat` was restored
+  byte for byte afterwards (SHA-256 `0C2F3FD1CB016182870BBF9DFA851C0813CF4D9C79E8D8740DEC7DD3407CCEE6`).
+- **Live data intact.** Before and after the deploy the same counts were read
+  from `cmms`: `WorkOrder` 2210, `Notification` 2187, `Equipment` 6127,
+  `MaintenancePlan` 4, `User` 6, `AuditLogEntry` 20999, `RefreshToken` 151,
+  22 applied migrations. No migration, seed, clear or write was run against
+  the live database in this pass; the final verification was of the deployed
+  artifacts rather than another installer run.
+
+### Release engineering
+
+- `installer/wizard/CommandPulse.iss` declares `1.8.0` at `20e250e`, so the
+  bundle name, the setup program and its Add/Remove Programs entry all agree.
+- `installer/build-wizard.ps1` at that commit produced
+  `Setup_CommandPulse.exe`, 2,328,446 B, ProductVersion `1.8.0`, SHA-256
+  `92407FF5BA41A88E9CB630FA0A9FA9D0DFFA2DB41E15FB1A1CF248283C8DE0A4`, from
+  payload digest `cb8fd3b23bef1f2cb19a8505d1236bd3056b57b1e686756d94ea6fe269c7d488`
+  (13 entries, LF, timestamp-pinned) with Inno Setup 6.7.3. The payload digest
+  is the same as `v1.7.0` because only the version define changed; the setup
+  program itself is different. A fresh `git archive` extraction of `20e250e`
+  compiled to the identical SHA-256, so the artifact is a function of the
+  commit and not of this working tree.
+- The `CommandPulse-CMMS-v1.8.0` bundle is assembled from the tag and its
+  `SHA256SUMS.txt` covers every file including the setup program. The CI run
+  at the tagged SHA is the evidence that the tree was green when the tag was
+  cut.
+
 ## v1.7.0
 
 The M3 notification fix, plus a whole-application UAT of the tree that ships it.
