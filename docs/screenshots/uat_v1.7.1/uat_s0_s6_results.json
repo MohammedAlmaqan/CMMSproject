@@ -1,0 +1,525 @@
+{
+ "generated": "2026-11-17T08:13:14.410075+00:00",
+ "base": "http://localhost:3000",
+ "api": "http://localhost:4100",
+ "sections": [
+  "s0",
+  "s1",
+  "s2",
+  "s3",
+  "s4",
+  "s5"
+ ],
+ "facts": {
+  "locationCode": "UAT171-LOC-111203",
+  "functionalLocationId": "6717ed1d-068e-4944-88fa-dfa530f7412d",
+  "equipmentCode": "UAT171-EQ-111203",
+  "equipmentName": "UAT 1.7.1 pump 111203",
+  "equipmentId": "db824c02-bf5b-4c6a-b983-48010b69a590",
+  "workCenterCode": "UAT171-WC-111203",
+  "workCenterId": "7418a2f7-9b11-445f-bc12-dfc7629f13ec",
+  "lifecycleWorkOrderId": "b3d5a278-6f0c-472a-9006-a03ef0334edd",
+  "lifecycleNotificationId": "e2e37664-5db0-4145-9ccf-bf1557a76dd3",
+  "lifecycleNotificationNumber": "N-000503",
+  "guardWorkOrderId": "6d0ddf63-dd62-4266-9aaa-b21b90d5e63a",
+  "m3NotificationId": "8f2af7c3-945d-477c-8a25-0729c901c8f9",
+  "breakdownWorkOrders": [
+   "cba85ceb-e0b9-4d0b-b14d-3ed9f7202285",
+   "1895ee34-b4d6-4e8f-8a92-afb274d885e3",
+   "eef5d0f6-a6f0-4a0f-a134-48b05a3c2725"
+  ],
+  "requesterUsername": "uat171-requester-111203"
+ },
+ "checks": [
+  {
+   "section": "s0",
+   "name": "S0 API health is 200 and ok",
+   "ok": true,
+   "detail": "status=200 body={'status': 'ok', 'timestamp': '2026-11-17T08:12:07.082Z'}"
+  },
+  {
+   "section": "s0",
+   "name": "S0 the API session is the Administrator",
+   "ok": true,
+   "detail": "status=200 user=admin role=Administrator"
+  },
+  {
+   "section": "s0",
+   "name": "S0 the app loads the dashboard",
+   "ok": true,
+   "detail": "title=CommandPulse CMMS"
+  },
+  {
+   "section": "s0",
+   "name": "S0 the dashboard renders without an error marker",
+   "ok": true,
+   "detail": "markers=[]"
+  },
+  {
+   "section": "s0",
+   "name": "S0 the served bundle is the build under test",
+   "ok": true,
+   "detail": "served=/assets/index-Bq2YWIrw.js expected=index-Bq2YWIrw.js"
+  },
+  {
+   "section": "s0",
+   "name": "S0 no console error on load",
+   "ok": true,
+   "detail": "console=[]"
+  },
+  {
+   "section": "s1",
+   "name": "S1 functional location created through the form",
+   "ok": true,
+   "detail": "UAT171-LOC-111203"
+  },
+  {
+   "section": "s1",
+   "name": "S1 the location persisted",
+   "ok": true,
+   "detail": "status=200 rows=1"
+  },
+  {
+   "section": "s1",
+   "name": "S1 equipment created through the form",
+   "ok": true,
+   "detail": "UAT171-EQ-111203"
+  },
+  {
+   "section": "s1",
+   "name": "S1 the equipment is linked to the new location",
+   "ok": true,
+   "detail": "equipmentLocation=6717ed1d-068e-4944-88fa-dfa530f7412d expected=6717ed1d-068e-4944-88fa-dfa530f7412d"
+  },
+  {
+   "section": "s1",
+   "name": "S1 the equipment sits on a lowest-level location",
+   "ok": true,
+   "detail": "locationsAtOrBelow=1"
+  },
+  {
+   "section": "s1",
+   "name": "S1 work centre created through the form",
+   "ok": true,
+   "detail": "UAT171-WC-111203"
+  },
+  {
+   "section": "s1",
+   "name": "S1 the work centre persisted",
+   "ok": true,
+   "detail": "status=200"
+  },
+  {
+   "section": "s2",
+   "name": "S2 M1 notification raised through the form",
+   "ok": true,
+   "detail": "N-000503"
+  },
+  {
+   "section": "s2",
+   "name": "S2 notification carries the M1 type and the new equipment",
+   "ok": true,
+   "detail": "type=M1 equipment=db824c02-bf5b-4c6a-b983-48010b69a590"
+  },
+  {
+   "section": "s2",
+   "name": "S2 notification converted to a work order",
+   "ok": true,
+   "detail": "http://localhost:3000/work-orders/b3d5a278-6f0c-472a-9006-a03ef0334edd"
+  },
+  {
+   "section": "s2",
+   "name": "S2 operation added to the work order",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s2",
+   "name": "S2 workflow Plan -> Planned",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s2",
+   "name": "S2 workflow Schedule -> Scheduled",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s2",
+   "name": "S2 workflow Start -> In Progress",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s2",
+   "name": "S2 workflow Complete -> Completed",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s2",
+   "name": "S2 workflow Close -> Closed",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s2",
+   "name": "S2 completing the work order generated no M3 (D-22)",
+   "ok": true,
+   "detail": "m3 before=4 after=4"
+  },
+  {
+   "section": "s2",
+   "name": "S2 the converted notification reached Completed",
+   "ok": true,
+   "detail": "status=Completed"
+  },
+  {
+   "section": "s2",
+   "name": "S2 the closed work order carries both actual timestamps",
+   "ok": true,
+   "detail": "actualStart=True actualFinish=True"
+  },
+  {
+   "section": "s3",
+   "name": "S3a a draft work order was created",
+   "ok": true,
+   "detail": "status=201"
+  },
+  {
+   "section": "s3",
+   "name": "S3a the UI refuses to plan a work order with no operations",
+   "ok": true,
+   "detail": "alert=0"
+  },
+  {
+   "section": "s3",
+   "name": "S3a the API refuses Draft -> Planned with 409",
+   "ok": true,
+   "detail": "status=409 body={'error': 'A work order must contain at least one operation before it can be planned'}"
+  },
+  {
+   "section": "s3",
+   "name": "S3b an operation was added to the guard work order",
+   "ok": true,
+   "detail": "status=201"
+  },
+  {
+   "section": "s3",
+   "name": "S3b the work order reaches Planned",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s3",
+   "name": "S3b the UI keeps the dialog open and does not schedule without dates",
+   "ok": true,
+   "detail": "dialogOpen=True status=Planned"
+  },
+  {
+   "section": "s3",
+   "name": "S3b the API refuses Scheduled without dates with 400",
+   "ok": true,
+   "detail": "status=400 body={'error': 'Scheduling a work order requires plannedStart and plannedFinish'}"
+  },
+  {
+   "section": "s3",
+   "name": "S3c an M3 completion confirmation was created",
+   "ok": true,
+   "detail": "status=201"
+  },
+  {
+   "section": "s3",
+   "name": "S3c the UI hides Convert to WO on a completion confirmation",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s3",
+   "name": "S3c the UI explains why the record is read-only",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s3",
+   "name": "S3c the API refuses to convert a completion confirmation with 400",
+   "ok": true,
+   "detail": "status=400 body={'error': 'Notification N-000504 is a completion confirmation and cannot be converted to a work order'}"
+  },
+  {
+   "section": "s4",
+   "name": "S4 breakdown A started",
+   "ok": true,
+   "detail": "id=cba85ceb-e0b9-4d0b-b14d-3ed9f7202285 state=In Progress "
+  },
+  {
+   "section": "s4",
+   "name": "S4 breakdown B started",
+   "ok": true,
+   "detail": "id=1895ee34-b4d6-4e8f-8a92-afb274d885e3 state=In Progress "
+  },
+  {
+   "section": "s4",
+   "name": "S4 breakdown B completed and closed",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s4",
+   "name": "S4 breakdown A completed and closed (overlapping B)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "section": "s4",
+   "name": "S4 breakdown C left open for the exclusion count",
+   "ok": true,
+   "detail": "id=eef5d0f6-a6f0-4a0f-a134-48b05a3c2725 "
+  },
+  {
+   "section": "s4",
+   "name": "S4 raw breakdown rows fetched",
+   "ok": true,
+   "detail": "status=200 rows=10"
+  },
+  {
+   "section": "s4",
+   "name": "S4 raw corrective rows fetched",
+   "ok": true,
+   "detail": "status=200 rows=223"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTBF returns an object with byEquipment",
+   "ok": true,
+   "detail": "status=200 keys=['byEquipment', 'excludedIncomplete']"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTBF labels the row with the equipment code and name",
+   "ok": true,
+   "detail": "code=UAT171-EQ-111203 name=UAT 1.7.1 pump 111203 expectedName=UAT 1.7.1 pump 111203"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTBF reports two failures for the new asset",
+   "ok": true,
+   "detail": "breakdownCount=2"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTBF clamps overlapping repairs at zero",
+   "ok": true,
+   "detail": "mtbfHours=0 recomputed={'mtbfHours': 0.0, 'breakdownCount': 2}"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTBF counts the open breakdown as excluded",
+   "ok": true,
+   "detail": "excludedIncomplete=1 recomputed=1"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the clamp was actually needed (unclamped uptime is negative)",
+   "ok": true,
+   "detail": "spanHours=0.0001 repairHours=0.0003 unclamped=-0.0001"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTBF reports a null interval for a single failure",
+   "ok": true,
+   "detail": "singleFailureRows=[('0-A-2502', None), ('0-A-2502-M01C', None)]"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTBF orders rows by equipment code",
+   "ok": true,
+   "detail": "rows=4"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTBF never uses a UUID as a label",
+   "ok": true,
+   "detail": "uuidLabels=[] rows=4"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTBF matches the independently recomputed arithmetic",
+   "ok": true,
+   "detail": "problems=[] excluded=2 recomputed=2"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTTR returns byEquipment and byLocation",
+   "ok": true,
+   "detail": "status=200 keys=['byEquipment', 'byLocation', 'excludedIncomplete']"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTTR by equipment matches the recomputed arithmetic",
+   "ok": true,
+   "detail": "problems=[] rows=4"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTTR by location matches the recomputed arithmetic",
+   "ok": true,
+   "detail": "problems=[] rows=4"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTTR counts the open breakdown as excluded",
+   "ok": true,
+   "detail": "excludedIncomplete=4 recomputed=4"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTTR reports a positive repair interval",
+   "ok": true,
+   "detail": "values=[0.08, 0.03, 0, 0]"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTTR never uses a UUID as a label",
+   "ok": true,
+   "detail": "uuidLabels=[]"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTTR by location carries a location code",
+   "ok": true,
+   "detail": "emptyLabels=[]"
+  },
+  {
+   "section": "s4",
+   "name": "S4 downtime returns a list of equipment rows",
+   "ok": true,
+   "detail": "status=200"
+  },
+  {
+   "section": "s4",
+   "name": "S4 downtime matches the recomputed arithmetic",
+   "ok": true,
+   "detail": "problems=[] rows=6"
+  },
+  {
+   "section": "s4",
+   "name": "S4 downtime never uses a UUID as a label",
+   "ok": true,
+   "detail": "uuidLabels=[] rows=6"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the MTBF axis carries the equipment code",
+   "ok": true,
+   "detail": "axis=['UAT171-EQ-111203', '0', '1', '2', '3', '4']"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the MTBF screen shows no UUID",
+   "ok": true,
+   "detail": "uuids=[]"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the MTBF screen states how many breakdowns were excluded",
+   "ok": true,
+   "detail": "snippet=['1 breakdown excluded: still open, with no completion time to measure.']"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the MTTR screen shows no UUID",
+   "ok": true,
+   "detail": "uuids=[]"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the Downtime screen shows no UUID",
+   "ok": true,
+   "detail": "uuids=[]"
+  },
+  {
+   "section": "s4",
+   "name": "S4 MTBF export returns an xlsx",
+   "ok": true,
+   "detail": "status=200 bytes=3555"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the MTBF workbook carries a Summary and a By Equipment sheet",
+   "ok": true,
+   "detail": "sheets=['Summary', 'By Equipment']"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the export carries equipmentCode and equipmentName columns",
+   "ok": true,
+   "detail": "header=['equipmentId', 'equipmentCode', 'equipmentName', 'mtbfHours', 'breakdownCount']"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the export's label cells are the plant's code, not a UUID",
+   "ok": true,
+   "detail": "codes=['UAT171-EQ-111203'] names=['UAT 1.7.1 pump 111203']"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the mttr export carries plant labels and no UUID label",
+   "ok": true,
+   "detail": "status=200 labelCells=16 uuidLabels=[]"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the downtime export carries plant labels and no UUID label",
+   "ok": true,
+   "detail": "status=200 labelCells=12 uuidLabels=[]"
+  },
+  {
+   "section": "s4",
+   "name": "S4 the Export button downloads a workbook",
+   "ok": true,
+   "detail": "file=export_mtbf_ui.xlsx bytes=3555"
+  },
+  {
+   "section": "s5",
+   "name": "S5 a Requester account was created",
+   "ok": true,
+   "detail": "status=201"
+  },
+  {
+   "section": "s5",
+   "name": "S5 the Requester signs in",
+   "ok": true,
+   "detail": "user=uat171-requester-111203"
+  },
+  {
+   "section": "s5",
+   "name": "S5 the Requester has no Administration navigation entry",
+   "ok": true,
+   "detail": "navItems=13"
+  },
+  {
+   "section": "s5",
+   "name": "S5 a direct visit to /administration lands on the dashboard",
+   "ok": true,
+   "detail": "url=http://localhost:3000/dashboard"
+  },
+  {
+   "section": "s5",
+   "name": "S5 the Requester is refused /api/users with 403",
+   "ok": true,
+   "detail": "status=403 body={'error': 'Forbidden'}"
+  },
+  {
+   "section": "s5",
+   "name": "S5 the Requester is refused /api/audit-log with 403",
+   "ok": true,
+   "detail": "status=403 body={'error': 'Insufficient permissions'}"
+  }
+ ],
+ "console_errors": [],
+ "failed_responses": [],
+ "passed": 81,
+ "failed": 0
+}
